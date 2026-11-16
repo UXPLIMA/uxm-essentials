@@ -19,8 +19,8 @@ import org.jspecify.annotations.Nullable;
 
 /**
  * Builds the staff-mode gadget items and reads the gadget tag back off them. One {@link NamespacedKey} is
- * created once in the constructor and reused on every build and every interact read, never on a hot path
- * (CLAUDE.md §NamespacedKey). The tag carries the stable {@link StaffGadget#tag()} value (not the operator's
+ * created once in the constructor and reused on every build and every interact read, so no hot path allocates
+ * one. The tag carries the stable {@link StaffGadget#tag()} value (not the operator's
  * re-skinnable display name), so the right-click listener resolves the gadget regardless of how the item is
  * styled in config.
  *

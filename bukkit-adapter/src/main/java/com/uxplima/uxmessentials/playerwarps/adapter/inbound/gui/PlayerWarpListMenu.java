@@ -50,7 +50,7 @@ import org.jspecify.annotations.NullMarked;
  * the {@code pwarp_icon} placeholder; the {@code pwarp_name} / {@code pwarp_owner} / {@code pwarp_world} /
  * {@code pwarp_x} / {@code pwarp_y} / {@code pwarp_z} / {@code pwarp_visibility} placeholders fill that warp's
  * name, owner, world, rounded coordinates, and visibility word into the catalog entry. A left click runs
- * {@code playerwarps:edit}, which opens the still-bespoke {@link PlayerWarpEditorView} for the clicked warp; the
+ * {@code playerwarps:edit}, which opens the bespoke {@link PlayerWarpEditorView} for the clicked warp; the
  * create button runs {@code playerwarps:create}, which prompts for a name and creates a private warp at the
  * operator's feet through the same {@link SetPlayerWarp} use case {@code /setpwarp} drives, so the list adds no
  * domain logic of its own.
@@ -67,7 +67,7 @@ public final class PlayerWarpListMenu {
     /** Disk-first then bundled, mirroring the GUI-layout loader, so an operator edit to the spec takes effect. */
     private static final String SPEC_RESOURCE = "modules/playerwarps/gui/playerwarp-list.conf";
 
-    /** The icon a warp with no configured (or an unparseable) material falls back to, matching the old list. */
+    /** The icon a warp with no configured (or an unparseable) material falls back to. */
     private static final Material FALLBACK_ICON = Material.ENDER_PEARL;
 
     private final Menus menus;
@@ -152,7 +152,7 @@ public final class PlayerWarpListMenu {
         return ownedOf(ctx).warp();
     }
 
-    /** The entry's icon: the warp's configured material, falling back to {@link #FALLBACK_ICON} as the old list did. */
+    /** The entry's icon: the warp's configured material, falling back to {@link #FALLBACK_ICON}. */
     private Material iconMaterial(PlayerWarp warp) {
         return warp.icon().map(IconSpec::value).map(this::matchOrFallback).orElse(FALLBACK_ICON);
     }

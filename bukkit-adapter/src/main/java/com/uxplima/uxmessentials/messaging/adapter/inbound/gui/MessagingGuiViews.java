@@ -92,7 +92,7 @@ public final class MessagingGuiViews {
 
         // The mailbox renders through the menu engine too: the list and per-mail detail geometry live in the
         // messaging-mailbox / messaging-mail-detail specs, its clear button routes through the same ClearMail use
-        // case, and opening the list marks the box read in the same off-thread hop the old view did.
+        // case, and opening the list marks the box read in the same off-thread hop, so the read never runs on a tick.
         MailboxMenu mailboxMenu = new MailboxMenu(menus, guiText, scheduler, mail, services.clearMail());
         mailboxMenu.register(menuBindings, dataFolder, log);
 

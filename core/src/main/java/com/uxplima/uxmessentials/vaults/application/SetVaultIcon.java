@@ -43,7 +43,7 @@ public final class SetVaultIcon {
             notifier.renameUnknown(owner, index);
             return Result.err(VaultError.VAULT_UNKNOWN);
         }
-        // There is no dedicated icon-cleared key in the catalog yet (D3); a clear persists silently and the GUI
+        // The catalog has no icon-cleared line: a clear persists silently and the GUI
         // simply falls back to the default icon. A set confirms with the material name.
         if (materialName != null) {
             notifier.iconSet(owner, index, materialName);

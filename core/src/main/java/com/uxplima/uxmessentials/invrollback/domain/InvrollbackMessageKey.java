@@ -8,15 +8,13 @@ import com.uxplima.uxmessentials.shared.domain.message.MessageKey;
  * compile-time handle, the catalog holds the text. There are no inline player-facing literals anywhere in the
  * context.
  *
- * <p>Phase 1's capture path is silent (a snapshot is taken in the background with no player-facing feedback) so
- * these are the seed for the Phase 2 {@code /invrestore} staff surface (the snapshot listing, the restore
- * confirmation, and the not-found refusals). Per the i18n contract the keys ship now even though the command that
- * resolves them lands later, so the catalog stays whole and the locale-parity guard sees the full {@code en} key
- * set.
+ * <p>The capture path is silent (a snapshot is taken in the background with no player-facing feedback), so these
+ * are the {@code /invrestore} staff surface's lines: the snapshot listing, the restore confirmation, and the
+ * not-found refusals.
  */
 public enum InvrollbackMessageKey implements MessageKey {
 
-    // Refusals shown to the staff member running the (Phase 2) /invrestore command.
+    // Refusals shown to the staff member running the /invrestore command.
     INVROLLBACK_NO_SNAPSHOTS("invrollback.no-snapshots"),
     INVROLLBACK_PLAYER_NOT_FOUND("invrollback.player-not-found"),
     INVROLLBACK_SNAPSHOT_NOT_FOUND("invrollback.snapshot-not-found"),

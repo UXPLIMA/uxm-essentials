@@ -30,10 +30,10 @@ import org.jspecify.annotations.Nullable;
 
 /**
  * {@code /villager}: the villagers context's root command. Its subcommands act on the villager the player is looking at
- * (or the nearest one within reach): {@code manager} opens the trade manager (Phase 2, gated on
- * {@code uxmessentials.villagers.manager}), {@code protect} toggles the villager's protection mark (Phase 3, gated on
- * {@code uxmessentials.villagers.protect}), and {@code follow} toggles whether the villager follows the player (Phase 4,
- * gated on {@code uxmessentials.villagers.follow}). Each subcommand is present only when its feature is wired, so the
+ * (or the nearest one within reach): {@code manager} opens the trade manager (gated on
+ * {@code uxmessentials.villagers.manager}), {@code protect} toggles the villager's protection mark (gated on
+ * {@code uxmessentials.villagers.protect}), and {@code follow} toggles whether the villager follows the player (gated
+ * on {@code uxmessentials.villagers.follow}). Each subcommand is present only when its feature is wired, so the
  * command carries exactly the verbs the operator enabled; a sender who is not a player, or who is not looking at a
  * villager, gets a feedback line instead. The target is resolved on the Brigadier (global) thread and the actual entity
  * work is hopped to the villager's region by the collaborator it is handed to.

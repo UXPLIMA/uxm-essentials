@@ -11,8 +11,8 @@ import org.jooq.DSLContext;
 import org.jspecify.annotations.NullMarked;
 
 /**
- * Stamps this backend's {@code network.server-id} onto the {@code player_warps} rows the T6 data migration and the
- * basic create path leave with a NULL {@code server_id}, so P7's cross-server teleport can route to a warp's home
+ * Stamps this backend's {@code network.server-id} onto the {@code player_warps} rows the legacy data migration and
+ * the basic create path leave with a NULL {@code server_id}, so the cross-server teleport can route to a warp's home
  * backend. V70 already added the nullable {@code server_id} column; this is a runtime routine, not a migration,
  * because SQL cannot know the runtime backend id or which worlds are loaded on this server.
  *
@@ -36,7 +36,7 @@ public final class PlayerWarpServerClaimer extends JooqRepository {
     /**
      * Claim over the shared {@link Persistence} handle, hiding the jOOQ {@code DSLContext} from the bukkit-adapter
      * caller (jOOQ is off the consumer's compile classpath) exactly as {@link PlayerWarpDataMigration#run} does. This
-     * is the entry point the player-warps wiring calls off the tick thread, chained after the T6 migration.
+     * is the entry point the player-warps wiring calls off the tick thread, chained after the legacy data migration.
      */
     public static int claim(Persistence persistence, String serverId, Collection<String> localWorldUids) {
         Objects.requireNonNull(persistence, "persistence");

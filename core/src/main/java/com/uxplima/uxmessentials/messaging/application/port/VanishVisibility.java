@@ -7,7 +7,7 @@ import com.uxplima.uxmessentials.shared.domain.PlayerRef;
  * vanish. A vanished player is hidden from {@code /msg} target resolution. A sender who cannot see them
  * resolves them as if they were offline. Staff holding the vanish-see node still see, and so can still message, a vanished target.
  *
- * <p>The coupling is soft: when the vanish module is disabled (or has not yet landed) the wiring binds
+ * <p>The coupling is soft: when the vanish module is disabled the wiring binds
  * {@link #ALWAYS_VISIBLE}, so messaging degrades to "no one is hidden" rather than failing, mirroring the
  * teleport context, whose {@code /tpa} is likewise vanish-aware through a check over the same authority that
  * degrades when vanish is off.

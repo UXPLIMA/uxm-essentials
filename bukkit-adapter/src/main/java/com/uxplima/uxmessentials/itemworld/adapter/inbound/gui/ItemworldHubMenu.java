@@ -118,7 +118,7 @@ public final class ItemworldHubMenu {
         }
     }
 
-    /** Set the world time on the global region, then reply, exactly as the old time button did. */
+    /** Set the world time on the global region, then reply. */
     private void setTime(MenuActionContext ctx, TimeSpec spec) {
         PlayerRef viewer = BukkitRefs.toRef(ctx.viewer());
         World world = ctx.player().getWorld();
@@ -132,7 +132,7 @@ public final class ItemworldHubMenu {
         });
     }
 
-    /** Apply the weather on the global region, then reply, exactly as the old weather button did. */
+    /** Apply the weather on the global region, then reply. */
     private void setWeather(MenuActionContext ctx, WeatherSpec spec) {
         PlayerRef viewer = BukkitRefs.toRef(ctx.viewer());
         World world = ctx.player().getWorld();

@@ -15,7 +15,7 @@ public enum SnapshotCause {
 
     /**
      * The player's current inventory was frozen as a safety copy immediately before it was overwritten by a
-     * restore, so an accidental restore can itself be undone. Reserved for the Phase 2 restore flow.
+     * restore, so an accidental restore can itself be undone.
      */
     RESTORE
 }

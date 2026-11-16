@@ -24,7 +24,7 @@ import com.uxplima.uxmessentials.warps.domain.WarpName;
  * {@link Optional} injected at wiring time: when it is absent, a warp's recorded cost is ignored and the
  * warp is usable for free; when it is present, the cost is charged through the narrow {@link WarpEconomy}
  * seam after the permission gates pass. The warps context therefore never hard-depends on the economy
- * context: economy landing in P3 only flips this {@code Optional} from empty to present.
+ * context: turning economy on or off only flips this {@code Optional} between present and empty.
  */
 public final class WarpAccess {
 

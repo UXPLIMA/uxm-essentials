@@ -43,8 +43,7 @@ import org.jspecify.annotations.NullMarked;
  * <p>The screen carries only the active currency as its {@link BulkSubject}, so each button's active-currency line
  * fills from the shared {@code eco_currency} placeholder without the renderer touching a port. The roster is
  * enumerated on the global region thread (the one thread {@code Server.getOnlinePlayers()} is safely readable on
- * Folia) when an op fires, snapshotted to {@link PlayerRef}s, and the bulk op runs off the tick thread, exactly as
- * the old view did. The menu holds no new domain logic. Every visible string resolves from the economy catalog.
+ * Folia) when an op fires, snapshotted to {@link PlayerRef}s, and the bulk op runs off the tick thread. The menu holds no new domain logic. Every visible string resolves from the economy catalog.
  *
  * <p>The shared {@code eco_currency} placeholder and the {@code economy:multi-currency} view condition are
  * registered by {@link EconomyTargetMenu} (both screens are wired against one {@code MenuBindings}), so this menu
@@ -118,7 +117,7 @@ public final class EconomyBulkMenu {
         menus.open(viewer, SPEC_ID, new BulkSubject(active));
     }
 
-    /** Capture an amount through the input seam, then credit every online wallet, exactly as before. */
+    /** Capture an amount through the input seam, then credit every online wallet. */
     private void promptGiveAll(MenuActionContext ctx) {
         Player viewer = ctx.player();
         PlayerRef viewerRef = BukkitRefs.toRef(ctx.viewer());
@@ -133,7 +132,7 @@ public final class EconomyBulkMenu {
     /**
      * Parse the typed amount, and on success snapshot the online roster on the global thread and credit it off the
      * tick thread, then re-open. A malformed amount sends the existing parse-error rejection and re-opens, no op
-     * runs. Package-private so the amount branch is unit-tested without driving a live anvil, mirroring the old view.
+     * runs. Package-private so the amount branch is unit-tested without driving a live anvil.
      */
     void applyGiveAll(Player viewer, PlayerRef viewerRef, Currency active, String raw) {
         Result<Money, AmountParseError> parsed = AmountParser.parse(raw, active);

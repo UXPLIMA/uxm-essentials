@@ -80,7 +80,7 @@ public class UxmEssentialsPlugin extends JavaPlugin {
 
         // The colours, before anything renders a line: the file the server shares with the other plugins it
         // runs of ours, then this plugin's own file over it. A server that wrote neither keeps the colours
-        // this plugin ships, which is what every server has seen until now.
+        // this plugin ships, so a fresh install needs no theme file.
         try {
             Theme theme = ThemeFile.theme(getDataFolder().toPath());
             StyleTags.use(theme);
@@ -163,10 +163,10 @@ public class UxmEssentialsPlugin extends JavaPlugin {
      * Serves our built-in {@code uxmEssentials:void|flat} generators to any world configured with
      * {@code generator: uxmEssentials:<id>}, including the default world.
      *
-     * <p>The default world is the case this hook exists for and the case that used to be impossible.
+     * <p>The default world is the case this hook exists for, and the hard one.
      * {@code CraftServer.getGenerator} refuses a generator whose plugin is not enabled yet, and the default
-     * world is created before a {@code POSTWORLD} plugin enables, so the hook was simply never called and the
-     * world generated as vanilla terrain with a SEVERE nobody could act on. The plugin therefore declares
+     * world is created before a {@code POSTWORLD} plugin enables, so for such a plugin the hook is never called and
+     * the world generates as vanilla terrain with a SEVERE nobody can act on. The plugin therefore declares
      * {@code load: STARTUP}; {@link com.uxplima.uxmessentials.bootstrap.di.WorldPhase} carries the cost of that.
      *
      * <p>A null return means vanilla generation, so the two ways of getting there are logged rather than left

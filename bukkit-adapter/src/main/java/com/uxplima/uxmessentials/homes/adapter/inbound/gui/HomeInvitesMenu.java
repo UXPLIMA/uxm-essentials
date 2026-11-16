@@ -44,7 +44,7 @@ import org.jspecify.annotations.Nullable;
  * <p>The home's invite set is a database read whose names resolve through the offline-capable kernel
  * {@link PlayerLookup}, so the {@code homes:invited-players} source runs off the viewer's region thread (the engine
  * does the hop) and touches no Bukkit API. When the home has no invites the source emits one placeholder entry so the
- * "no invited players" head shows in the first cell, exactly as the old view did. The {@code invited_player}
+ * "no invited players" head shows in the first cell. The {@code invited_player}
  * placeholder resolves each head's label and the revoke action routes through the same {@link UninviteFromHome} use
  * case {@code /uninvite} drives; the add button prompts for a name through the shared text-input seam, then invites
  * that player and reopens. The back button returns to the action menu through the shared {@link ActionMenuOpener}.
@@ -117,7 +117,7 @@ public final class HomeInvitesMenu {
     /**
      * The home's invited players, read off the region thread (it reads the database and resolves names through the
      * offline-capable lookup); touches no Bukkit API. Sorted by name so the order is stable. An empty set yields a
-     * single empty-marker entry so the "no invited players" head shows, exactly as the old view did.
+     * single empty-marker entry so the "no invited players" head shows.
      */
     private List<InvitedEntry> invited(MenuContext ctx) {
         Home home = ctx.subject(Home.class);
@@ -170,7 +170,7 @@ public final class HomeInvitesMenu {
         });
     }
 
-    /** Prompt for a name through the shared text-input seam, exactly as the old add button did. */
+    /** Prompt for a name through the shared text-input seam. */
     private void promptAdd(MenuActionContext ctx) {
         Player player = ctx.player();
         Home home = ctx.subject(Home.class);

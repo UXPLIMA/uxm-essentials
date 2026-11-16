@@ -39,7 +39,7 @@ import org.jspecify.annotations.NullMarked;
  * Registers the {@code /exchange} currency-swapper dashboard with the menu engine and opens it. A three-row panel for
  * one source/target currency pair: a source icon (slot 11), a target icon (slot 15), a convert button (slot 13) and a
  * close button. The source and target, and the viewer's balance in each, are read off the tick thread when the panel
- * opens and handed in as the {@link ExchangeSubject} the icons render from, exactly as the old view did; the
+ * opens and handed in as the {@link ExchangeSubject} the icons render from; the
  * exchange itself runs off-tick as the {@code /exchange} command does.
  *
  * <p>Clicking the source or target opens the shared paginated {@link CurrencyPickerMenu}; choosing a currency
@@ -47,7 +47,7 @@ import org.jspecify.annotations.NullMarked;
  * cycling with the same picker the eco-admin screens use. The convert button captures an amount through the shared
  * input seam, then runs {@link ExchangeService#exchange}. When no rate is configured between the two currencies the
  * convert button is replaced in place by a no-rate marker through a pair of mutually-exclusive view conditions. The
- * menu holds no new domain logic: it replays the old view's handlers through the engine. Every visible string
+ * menu holds no new domain logic: it runs the exchange use case through the engine. Every visible string
  * resolves from the economy catalog.
  */
 @NullMarked
@@ -133,7 +133,7 @@ public final class EconomyExchangeMenu {
 
     /**
      * Open the dashboard for {@code source}/{@code target}. The two balances are read off the tick thread, then the
-     * panel is opened through the engine, which renders it on the viewer's entity thread: the old view's threading.
+     * panel is opened through the engine, which renders it on the viewer's entity thread.
      */
     public void open(Player viewer, Currency source, Currency target) {
         Objects.requireNonNull(viewer, "viewer");
@@ -195,7 +195,7 @@ public final class EconomyExchangeMenu {
     /**
      * Parse the typed amount and, when valid, run the exchange off the tick thread, then re-open. A malformed amount
      * sends the existing rejection and re-opens, no exchange runs. Package-private so the amount branch is
-     * unit-tested without driving a live anvil, mirroring the old view.
+     * unit-tested without driving a live anvil.
      */
     void applyConvert(Player viewer, PlayerRef viewerRef, Currency source, Currency target, String raw) {
         BigDecimal amount;

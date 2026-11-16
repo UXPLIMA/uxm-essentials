@@ -47,9 +47,9 @@ import org.jspecify.annotations.NullMarked;
  * dialog before zeroing the balance.
  *
  * <p>The balances are read off the tick thread when the panel opens and handed in as the {@link TargetSubject} the
- * head and the buttons render from, exactly as the old view did; the op itself is dispatched off-tick as the
- * {@code /eco} command does. The menu holds no new domain logic. It replays the old view's handlers verbatim
- * through the engine. Every visible string resolves from the economy catalog.
+ * head and the buttons render from; the op itself is dispatched off-tick as the
+ * {@code /eco} command does. The menu holds no new domain logic: it runs the eco-admin use cases through the
+ * engine. Every visible string resolves from the economy catalog.
  */
 @NullMarked
 public final class EconomyTargetMenu {
@@ -166,7 +166,7 @@ public final class EconomyTargetMenu {
                 .collect(Collectors.joining("\n"));
     }
 
-    /** Capture an amount through the input seam, then dispatch {@code verb} for the active currency, exactly as before. */
+    /** Capture an amount through the input seam, then dispatch {@code verb} for the active currency. */
     private void prompt(MenuActionContext ctx, EcoAdminOps.Verb verb) {
         Player viewer = ctx.player();
         PlayerRef viewerRef = BukkitRefs.toRef(ctx.viewer());
@@ -181,7 +181,7 @@ public final class EconomyTargetMenu {
     /**
      * Parse the typed amount against the active currency and, when valid, dispatch the op off the tick thread, then
      * re-open the screen. A malformed amount sends the existing parse-error rejection and re-opens, no op runs.
-     * Package-private so the amount branch is unit-tested without driving a live anvil, mirroring the old view.
+     * Package-private so the amount branch is unit-tested without driving a live anvil.
      */
     void applyAmount(
             Player viewer, PlayerRef viewerRef, PlayerRef target, Currency active, EcoAdminOps.Verb verb, String raw) {
@@ -215,7 +215,7 @@ public final class EconomyTargetMenu {
                 () -> open(viewer, viewerRef, target, active));
     }
 
-    /** Open the read-only transaction-history list for this target, exactly as the old history button did. */
+    /** Open the read-only transaction-history list for this target. */
     private void openHistory(MenuActionContext ctx) {
         TargetSubject subject = ctx.subject(TargetSubject.class);
         PlayerRef target = subject.target();

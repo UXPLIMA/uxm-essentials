@@ -24,8 +24,8 @@ import org.jspecify.annotations.NullMarked;
  * the persistence layer), so the module declares no extra migration location of its own, the same arrangement
  * vaults/holograms use. The jOOQ {@code SnapshotRepository} and the death/logout capture listener are constructed
  * in the adapter wiring once the module has started; the lifecycle bookkeeping here keeps {@code stop()} honest.
- * The {@code /invrestore} GUI command is Bukkit-facing and lands with a later phase, so this phase publishes no
- * command.
+ * The {@code /invrestore} GUI command is Bukkit-facing and comes from the adapter wiring, so the module publishes no
+ * declarative command.
  */
 @NullMarked
 public final class InvrollbackModule implements FeatureModule {
@@ -46,8 +46,8 @@ public final class InvrollbackModule implements FeatureModule {
 
     @Override
     public List<ListenerFactory> listeners() {
-        // The death/logout capture listeners are Bukkit-facing and land with the inbound adapter wiring; a
-        // disabled or not-yet-adapted module registers none here.
+        // The death/logout capture listeners are Bukkit-facing and come from the inbound adapter wiring; a
+        // disabled module registers none here.
         return List.of();
     }
 

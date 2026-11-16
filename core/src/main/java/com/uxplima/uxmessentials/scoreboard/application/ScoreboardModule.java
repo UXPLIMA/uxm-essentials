@@ -17,7 +17,7 @@ import org.jspecify.annotations.NullMarked;
  * operator-authored MiniMessage content under {@code modules/scoreboard/config.conf} through the placeholder
  * pipeline. It owns the single {@code /scoreboard} (alias {@code /sb}) per-player visibility toggle and the
  * self-rescheduling render timer on the {@code Scheduler} port that re-renders every viewer each configured refresh
- * interval; the render/join/quit machinery is Bukkit-facing and lands with the adapter wiring. The tablist
+ * interval; the render/join/quit machinery is Bukkit-facing and comes from the adapter wiring. The tablist
  * header/footer is a separate {@code tablist} context.
  *
  * <p><b>Ships disabled by default.</b> The sidebar is a surface a dedicated scoreboard plugin also draws, and two
@@ -55,8 +55,8 @@ public final class ScoreboardModule implements FeatureModule {
 
     @Override
     public List<ListenerFactory> listeners() {
-        // The join/quit connection listener is Bukkit-facing and lands with the inbound adapter; a disabled or
-        // not-yet-adapted module registers none here.
+        // The join/quit connection listener is Bukkit-facing and comes from the inbound adapter; a disabled
+        // module registers none here.
         return List.of();
     }
 

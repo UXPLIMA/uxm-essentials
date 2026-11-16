@@ -45,7 +45,7 @@ public final class CrossServerTrade {
     /**
      * How long an {@code ABORT} is remembered for an escrow of this side still on its way to the table. Far longer
      * than an escrow write takes even on a stalled database; an escrow written later still is refunded on the
-     * owner's next join, as before.
+     * owner's next join.
      */
     static final Duration ABORT_MEMORY = Duration.ofMinutes(10);
 

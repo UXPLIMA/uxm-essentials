@@ -50,7 +50,7 @@ public enum RankRequirementType {
     /**
      * Parse a raw keyword into its type, tolerating surrounding spaces, case, and the {@code prev-rank} alias for
      * {@link #PREVIOUS_RANK}; empty when the keyword names no known requirement kind (so an operator's typo or a
-     * requirement kind a later phase adds is simply not enforced rather than failing the whole ladder).
+     * requirement kind this version does not know is simply not enforced rather than failing the whole ladder).
      */
     public static Optional<RankRequirementType> parse(String keyword) {
         Objects.requireNonNull(keyword, "keyword");

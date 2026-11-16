@@ -138,7 +138,7 @@ public record VillagersConfig(
     /**
      * The disable-trades feature under {@code disable-trades { … }}: with {@code enabled} on, every villager refuses to
      * open its trade GUI (a right-click on the villager is cancelled and the player is told). The listener also honours
-     * a per-villager PDC flag the Phase-2 trade manager sets, so an individual villager can be disabled even while the
+     * a per-villager PDC flag the trade manager sets, so an individual villager can be disabled even while the
      * global switch is off.
      *
      * @param enabled whether trading is disabled for every villager globally ({@code disable-trades.enabled}, default

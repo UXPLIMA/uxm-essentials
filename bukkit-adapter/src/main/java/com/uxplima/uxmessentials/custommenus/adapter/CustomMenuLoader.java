@@ -27,7 +27,7 @@ import org.spongepowered.configurate.hocon.HoconConfigurationLoader;
 
 /**
  * Reads the operator's {@code menus/*.conf} files into the running menu engine. Each top-level {@code .conf}
- * becomes a spec registered under its file name (sans extension): the file is parsed by the Phase-1
+ * becomes a spec registered under its file name (sans extension): the file is parsed by the
  * {@link MenuSpecLoader} and its refs validated against the registered {@link MenuBindings} before it reaches
  * {@link Menus}. A file that fails to parse, or that names an action/condition/placeholder no binding provides,
  * is skipped with a logged warning rather than aborting the whole load. One operator typo never hides every

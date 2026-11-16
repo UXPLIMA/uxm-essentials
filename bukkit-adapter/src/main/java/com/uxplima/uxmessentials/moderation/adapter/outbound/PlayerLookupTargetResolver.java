@@ -19,9 +19,9 @@ import org.jspecify.annotations.NullMarked;
  * owner of the name: on another backend a renamed or case-variant account may hold the name now, and resolving it
  * through the cache would sanction the wrong account.
  *
- * <p>Moderation used to resolve targets itself against {@code Server.getOfflinePlayer(String)}. That reads the
- * server's name cache only on an online-mode server, so on an offline-mode one a name typed in a different case
- * derived a uuid nobody owns and the sanction answered "unknown player" instead of landing.
+ * <p>Moderation does not resolve targets against {@code Server.getOfflinePlayer(String)}. That reads the server's
+ * name cache only on an online-mode server, so on an offline-mode one a name typed in a different case derives a
+ * uuid nobody owns and the sanction would answer "unknown player" instead of landing.
  */
 @NullMarked
 public final class PlayerLookupTargetResolver implements TargetResolver {

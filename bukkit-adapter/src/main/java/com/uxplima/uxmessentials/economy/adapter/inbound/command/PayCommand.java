@@ -27,7 +27,7 @@ import org.jspecify.annotations.NullMarked;
  * {@code min-pay}, the target's {@code /paytoggle}, the per-currency confirm-threshold) and the atomic move
  * are the {@link com.uxplima.uxmessentials.economy.application.Pay} use case's job; this handler resolves the
  * target name and the currency at the boundary, parses the amount to the currency's precision, and runs the
- * provider call off the tick thread so a foreign provider can never wedge the command (§4.3).
+ * provider call off the tick thread so a foreign provider can never wedge the command.
  *
  * <p>The currency is resolved before any provider call (an unknown id is an error listing the valid ids).
  * Above the currency's confirm-threshold the use case stages the pay for {@code /payconfirm}: no money moves,

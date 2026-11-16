@@ -14,8 +14,8 @@ import org.jspecify.annotations.NullMarked;
  * The mail-expiry sweep: a self-rescheduling async loop that deletes mail older than the configured
  * retention window so a mailbox cannot grow without bound.
  * It runs off the tick thread (the delete is a bounded {@code DELETE ... WHERE sent_at < ?} on the indexed
- * column) and observes the module's {@code running} flag so it stops cleanly on disable, the §6.10
- * self-rescheduling-loop pattern, matching the teleport context's request-expiry sweep.
+ * column) and observes the module's {@code running} flag so it stops cleanly on disable, the same
+ * self-rescheduling loop as the teleport context's request-expiry sweep.
  *
  * <p>A non-positive retention disables expiry: the sweep keeps running but deletes nothing, so an operator
  * who wants mail to live forever simply sets the window to zero. The first sweep is delayed by one interval

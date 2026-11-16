@@ -366,10 +366,9 @@ public final class AnnouncementEditorView {
     /**
      * Create the announcement {@code id} and land in its editor, or say why not.
      *
-     * <p>Package visible so the collision and the creation can be driven from a test without a prompt: both
-     * branches used to be silent, and an operator who reused an id watched the window blink and no
-     * announcement appear while {@code communication.announce.editor.create-exists} sat unsent in twelve
-     * catalogues.
+     * <p>Package visible so the collision and the creation can be driven from a test without a prompt: a silent
+     * branch leaves an operator who reused an id watching the window blink and no announcement appear, so both
+     * branches must say what happened.
      */
     void create(Player player, String id) {
         PlayerRef viewer = BukkitRefs.toRef(player);

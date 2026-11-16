@@ -62,7 +62,7 @@ import org.jspecify.annotations.NullMarked;
  *
  * <p>The editor mutates the grid's per-viewer working copy in place: each property reads the item fresh from the
  * session on every draw (so a change shows on re-render) and writes back through the session's field setters, never
- * the live menu. The live menu changes only when the operator saves on the grid or overview (the P0 validate → write →
+ * the live menu. The live menu changes only when the operator saves on the grid or overview (the validate → write →
  * hot-reload path). Back returns to the grid, which re-renders with the edit. There is no delete button, clearing a
  * cell is a grid gesture, not an item-editor field.
  */

@@ -296,8 +296,8 @@ public final class EcoCommand extends EconomyCommandSupport implements CommandRe
     }
 
     /**
-     * Whether the bulk verb has nobody to act on, telling {@code actor} so when that is the case. An empty
-     * server used to run the verb over an empty roster and report nothing at all.
+     * Whether the bulk verb has nobody to act on, telling {@code actor} so when that is the case, so an empty
+     * server never runs the verb over an empty roster and reports nothing at all.
      */
     private boolean noTargets(PlayerRef actor, List<PlayerRef> online) {
         if (!online.isEmpty()) {

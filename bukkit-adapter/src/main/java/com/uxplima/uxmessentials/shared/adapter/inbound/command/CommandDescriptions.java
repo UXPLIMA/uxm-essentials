@@ -12,8 +12,8 @@ import org.jspecify.annotations.NullMarked;
  * A command's description in the reader's language: the {@code describe.<command id>} line of their catalogue, or the
  * code's English where the catalogue has none.
  *
- * <p>Every description used to be the English a command class returns, so a Turkish player's /help and every usage
- * line were English. The code's English stays, because Paper registers it as the command's own description and a
+ * <p>The English a command class returns would leave a Turkish player's /help and every usage line in English.
+ * The code's English stays, because Paper registers it as the command's own description and a
  * command an operator adds has no catalogue line; the catalogue line is what a player reads.
  */
 @NullMarked

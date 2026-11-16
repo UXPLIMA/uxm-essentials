@@ -80,7 +80,7 @@ public final class HomeServerAdoption implements Runnable {
             cache.invalidateAll();
             bus.publish(HomeSync.everyOwnerChanged(server));
         } catch (RuntimeException unclaimed) {
-            // The homes keep reading as unknown and are used locally, as before; the next start tries again.
+            // The homes keep reading as unknown and are used locally; the next start tries again.
             kernel.log().error("event=home_server_claim_failed server=" + server, unclaimed);
         }
     }

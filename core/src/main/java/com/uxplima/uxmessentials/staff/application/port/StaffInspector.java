@@ -7,7 +7,7 @@ import com.uxplima.uxmessentials.shared.domain.PlayerRef;
  * the EXAMINE gadget. Staff mode does not own the inventory-view machinery; it orchestrates the existing
  * playerstate module's {@code OpenContainer#openInventory} through this port.
  *
- * <p>The coupling is soft: when the playerstate module is disabled (or has not yet landed) the wiring binds
+ * <p>The coupling is soft: when the playerstate module is disabled the wiring binds
  * {@link #NONE}, so the EXAMINE gadget degrades to a no-op (or to the info line the adapter still shows)
  * rather than failing: mirroring messaging's {@code MutePolicy.NEVER}.
  */

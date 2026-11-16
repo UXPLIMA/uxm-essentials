@@ -163,8 +163,7 @@ public final class WorldListMenu {
     }
 
     /**
-     * Right-click a world icon: teleport the viewer there, mirroring the old picker's {@code /worlds tp <self>}
-     * override. The staff override skips the access gate and entry fee (the editor is already permission-gated), and
+     * Right-click a world icon: teleport the viewer there, as {@code /worlds tp <self>} does. The staff override skips the access gate and entry fee (the editor is already permission-gated), and
      * the load-then-teleport runs on the global region thread because loading a world is legal under Folia only there.
      */
     private void teleport(MenuActionContext ctx) {
@@ -180,7 +179,7 @@ public final class WorldListMenu {
         });
     }
 
-    /** Left-click the create button: open the engine new-world configuration screen, exactly as the old button did. */
+    /** Left-click the create button: open the engine new-world configuration screen. */
     private void create(MenuActionContext ctx) {
         createMenu.open(ctx.player(), BukkitRefs.toRef(ctx.viewer()));
     }

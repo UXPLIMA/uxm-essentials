@@ -269,8 +269,8 @@ final class DefaultResources {
     }
 
     /**
-     * Bring every line the operator never touched to this version's wording. A corrected message used to reach new
-     * servers only, because the append below adds keys and never changes one.
+     * Bring every line the operator never touched to this version's wording. Without it a corrected message would
+     * reach new servers only, because the append below adds keys and never changes one.
      */
     private static void updateUntouchedLines(Path target, String resource, String bundled, String previous, Logger log)
             throws IOException {

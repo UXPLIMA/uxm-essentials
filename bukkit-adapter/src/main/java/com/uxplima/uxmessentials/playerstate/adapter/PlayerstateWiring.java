@@ -96,7 +96,7 @@ import org.jspecify.annotations.Nullable;
  * database and no {@code Plugin} handle: its only outbound adapters are the in-memory snapshot store, the
  * reconciler, the effects bridge, and the nearby scan, all of which sit on the kernel {@code Scheduler} port.
  *
- * <p>The {@code heal-remove-effects} toggle (§15.6) is read once from {@code playerstate.conf} here and fixed
+ * <p>The {@code heal-remove-effects} toggle is read once from {@code playerstate.conf} here and fixed
  * into the {@link Heal} use case; an operator changes it via a module reload, which re-wires the context.
  */
 @NullMarked

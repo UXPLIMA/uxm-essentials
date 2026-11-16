@@ -45,8 +45,7 @@ import org.jspecify.annotations.Nullable;
  * {@code vault-selector} spec and hands it to {@link Menus}.
  *
  * <p>The owned and locked indices collapse into one {@link VaultSlot} list template: an entry is owned when it
- * carries a {@link VaultSummary} and locked otherwise. The {@code vault:slots} source replicates the old view's
- * build logic. It lists the player's vaults, resolves the amount cap, and emits index {@code 1..cap}, including a
+ * carries a {@link VaultSummary} and locked otherwise. The {@code vault:slots} source lists the player's vaults, resolves the amount cap, and emits index {@code 1..cap}, including a
  * locked index only when {@code show-locked} is on. It reads the database, so the engine resolves it off the
  * viewer's region thread; it touches no Bukkit API. The {@code vault_icon}/{@code vault_name} placeholders read the
  * bound entry to render the right material and label, and {@code vault:open-slot} opens an owned vault through the

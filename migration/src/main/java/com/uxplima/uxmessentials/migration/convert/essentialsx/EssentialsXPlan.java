@@ -33,7 +33,7 @@ import org.jspecify.annotations.Nullable;
  * warp files, and the kits file. Into one {@link ImportRecord} stream, each evaluated on demand as the
  * importer's bounded executor drains it. A userdata or warp file that cannot be read, a warp with no world or a
  * world the server does not know, an unreadable {@code kits.yml}, and a single kit that cannot be imported are each
- * dropped from the stream with a warning that names them, so one bad entry never aborts the import (§4). A dropped
+ * dropped from the stream with a warning that names them, so one bad entry never aborts the import. A dropped
  * entry never reaches the writer, so it is not in the run's summary counts; the warning is the operator's record of
  * it. A home in a world the server does not know is left out of its player, who still imports.
  *
@@ -94,7 +94,7 @@ final class EssentialsXPlan implements ImportPlan {
 
     private Stream<ImportRecord> userRecords(EssXUserdata parsed) {
         // One userdata file yields the player record plus, when the player carries a mute or jail, a separate
-        // moderation record: both keyed by the same uuid so a re-run upserts each idempotently (§6).
+        // moderation record: both keyed by the same uuid so a re-run upserts each idempotently.
         ImportRecord user = new ImportRecord.UserRecord(userMapper.map(parsed, oneTimeKits()));
         PlayerRef owner = new PlayerRef(parsed.uuid(), parsed.name());
         return jailMuteMapper

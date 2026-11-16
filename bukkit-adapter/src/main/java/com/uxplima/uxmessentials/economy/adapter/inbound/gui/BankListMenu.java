@@ -38,13 +38,13 @@ import org.jspecify.annotations.NullMarked;
  * Registers the {@code /bank} list menu with the menu engine and opens it. A paginated grid of one chest per shared
  * bank the viewer belongs to, showing the bank's name, id, balance, creator and member count. A left click opens that
  * bank's engine {@link BankActionsMenu} hub through the {@link BankNavigation} supplier; the create button
- * opens the still-bespoke {@link CurrencyPickerMenu} after prompting for a name, exactly as the old view did.
+ * opens the {@link CurrencyPickerMenu} after prompting for a name.
  *
  * <p>The bank list is a repository read (no Bukkit call), but each bank is resolved by id, so {@link #open} runs the
  * read off the tick thread and hands the already-read banks in as the menu subject; the {@code economy:banks} list
  * source only reads that subject. The {@code bank_*} placeholders fill each chest from the bound bank, prefixed so
  * they never collide with the generic engine tokens or another menu's fields. Every label resolves from the economy
- * catalog, so no user-facing text lives here. The geometry mirrors the original list: a grid across the top five rows,
+ * catalog, so no user-facing text lives here. The geometry: a grid across the top five rows,
  * the nav arrows at the corners of the bottom row, and the create button in its centre.
  */
 @NullMarked
@@ -123,7 +123,7 @@ public final class BankListMenu {
         navigation.get().bankActionsView().open(ctx.player(), bank);
     }
 
-    /** Left-click the create button: prompt for a name, then open the bespoke currency picker, as the old button did. */
+    /** Left-click the create button: prompt for a name, then open the bespoke currency picker. */
     private void createBank(MenuActionContext ctx) {
         promptCreateName(ctx.player());
     }

@@ -6,8 +6,8 @@ import java.util.UUID;
 
 /**
  * A persistent, per-player key→value store backed by the plugin database. The menu engine's substrate for
- * arbitrary player-scoped data that must survive a restart or a world rollback (the Phase-2 data actions
- * {@code SET/ADD/SUB/MUL/DIV} write through it, the Phase-6 {@code %..._value_<key>%} placeholders read it).
+ * arbitrary player-scoped data that must survive a restart or a world rollback (the data actions
+ * {@code SET/ADD/SUB/MUL/DIV} write through it, the {@code %..._value_<key>%} placeholders read it).
  *
  * <p>Values are stored as plain strings; {@link #number} and {@link #apply} layer a parse-or-fallback numeric
  * view on top so a key can be treated as a counter without the caller hand-parsing. The store is deliberately

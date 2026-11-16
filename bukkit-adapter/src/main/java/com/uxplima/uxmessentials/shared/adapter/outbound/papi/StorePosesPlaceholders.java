@@ -41,7 +41,7 @@ public final class StorePosesPlaceholders implements PosesPlaceholders {
     @Override
     public boolean posing(PlayerRef who) {
         Objects.requireNonNull(who, "who");
-        // A free pose is anything but the two sits: the lie-down and spin verbs of Phase 3 (and crawl later).
+        // A free pose is anything but the two sits: the lie-down, spin and crawl verbs.
         return sessions.current(who)
                 .map(PoseSession::type)
                 .filter(type -> type != PoseType.SIT && type != PoseType.PLAYER_SIT)

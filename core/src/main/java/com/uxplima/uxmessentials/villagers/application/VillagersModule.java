@@ -11,10 +11,10 @@ import com.uxplima.uxmessentials.shared.application.port.ConfigStore;
 import org.jspecify.annotations.NullMarked;
 
 /**
- * The villagers bounded context as a first-class {@link FeatureModule}: villager trade management (Phase 1
+ * The villagers bounded context as a first-class {@link FeatureModule}: villager trade management (among others
  * infinite trading, a configurable restock timer, instant restock, and a global/per-villager trade toggle). The
  * behaviour is almost entirely Bukkit villager and merchant-recipe handling, so the trade and interact listeners
- * and the restock sweep land with the adapter wiring; this module stands up the identity, the enable gate, and the
+ * and the restock sweep come from the adapter wiring; this module stands up the identity, the enable gate, and the
  * lifecycle bookkeeping behind them.
  *
  * <p><b>Ships disabled by default.</b> Turning it on changes what a villager trades and how often it restocks,
@@ -25,7 +25,7 @@ import org.jspecify.annotations.NullMarked;
  * behaviour until an operator turns a feature on. It persists nothing, the per-villager last-restock stamp and the
  * disable flag are PDC state on the villager entity itself, so the module owns no Flyway location.
  *
- * <p>Phase 1 publishes no declarative command and registers no declarative listener: the listeners and the sweep are
+ * <p>The module publishes no declarative command and registers no declarative listener: the listeners and the sweep are
  * contributed through the adapter wiring, gated per sub-feature, and a disabled module wires zero of them (the
  * {@code FeatureModule} contract). The wiring drains the sweep and drops its state on {@link #stop()} so a disable or
  * reload strands no scheduled work.
@@ -50,7 +50,7 @@ public final class VillagersModule implements FeatureModule {
     @Override
     public List<ListenerFactory> listeners() {
         // The trade / interact listeners and the restock sweep are contributed through the adapter wiring, gated per
-        // sub-feature; a disabled or not-yet-adapted module registers none here.
+        // sub-feature; a disabled module registers none here.
         return List.of();
     }
 

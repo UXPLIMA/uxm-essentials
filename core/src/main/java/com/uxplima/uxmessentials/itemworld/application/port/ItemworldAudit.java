@@ -15,7 +15,7 @@ import com.uxplima.uxmessentials.shared.domain.PlayerRef;
  * verbs. The cosmetic and workstation verbs are not audited. The event names mirror the {@code itemworld_*}
  * rows in the audit catalogue one-for-one.
  *
- * <p>The implementation lands with the bukkit-adapter (mirroring {@code LoggingModerationAudit}); the use
+ * <p>The implementation lives in the bukkit-adapter (mirroring {@code LoggingModerationAudit}); the use
  * cases depend only on this contract. Each abusable-verb audit line is additionally gated by a per-action
  * {@code audit} toggle in {@code itemworld.conf}, so an operator can quiet a high-volume verb while keeping
  * the channel for the rest.

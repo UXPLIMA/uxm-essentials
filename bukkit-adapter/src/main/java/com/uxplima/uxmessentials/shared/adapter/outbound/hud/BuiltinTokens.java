@@ -19,9 +19,9 @@ import org.jspecify.annotations.NullMarked;
  * so a {@code {token}} and a {@code %papi%} placeholder never collide: this pass only ever rewrites the curly-brace
  * tokens it knows, leaving every {@code %…%} (and unknown {@code {…}}) untouched for PlaceholderAPI or MiniMessage.
  *
- * <p>This is the same convenience syntax the tablist name-format already used for {@code {player}}; that ad-hoc
- * substitution now routes through here so every rendered HUD source. Scoreboard title and lines, tablist header,
- * footer, and name-format, resolves the same token set consistently.
+ * <p>This is the same convenience syntax the tablist name-format uses for {@code {player}}, routed through here so
+ * every rendered HUD source (scoreboard title and lines, tablist header, footer, and name-format) resolves the same
+ * token set.
  *
  * <p>Alongside the per-viewer tokens it also resolves a handful of server-wide metric tokens, {@code {tps}},
  * {@code {tps_colored}}, {@code {uptime}}, {@code {ram_used}}, {@code {ram_max}}, which ignore the viewer. These

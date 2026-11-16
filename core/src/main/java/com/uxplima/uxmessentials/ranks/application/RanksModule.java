@@ -13,10 +13,9 @@ import org.jspecify.annotations.NullMarked;
 /**
  * The ranks bounded context as a first-class {@link FeatureModule}: rankup / prestige / autorank progression,
  * tracking the player's current rank with a DB-backed pointer of our own rather than reading a permission
- * plugin's group. Phase 1 stands up the module identity, the enable gate, the ladder ({@link RankLadders}) and
- * the {@code player_ranks} store; the {@code /rankup} and {@code /prestige} verbs, their requirement/action
- * evaluation, the autorank scan and the {@code /ranks} GUI land as the later phases do, contributed through the
- * adapter wiring.
+ * plugin's group. The module stands up the identity, the enable gate, the ladder ({@link RankLadders}) and the
+ * {@code player_ranks} store; the {@code /rankup} and {@code /prestige} verbs, their requirement/action evaluation,
+ * the autorank scan and the {@code /ranks} GUI are contributed through the adapter wiring.
  *
  * <p><b>Ships enabled by default.</b> The module is inert until an operator authors a ladder in
  * {@code ranks.conf}, so like the steady-state contexts {@link #enabled(ConfigStore)} defaults to {@code true};
@@ -24,8 +23,8 @@ import org.jspecify.annotations.NullMarked;
  *
  * <p>The {@code player_ranks} table ships in the persistence baseline (a {@code V##} migration under
  * {@code db/migration}, always applied by the persistence layer), so the module declares no extra Flyway
- * location of its own. Phase 1 publishes no command and registers no listener: the verbs arrive as their
- * behaviour phases land, and a disabled module wires zero either way (the {@code FeatureModule} contract). The
+ * location of its own. The module publishes no declarative command or listener, since the adapter wiring
+ * contributes them, and a disabled module wires zero either way (the {@code FeatureModule} contract). The
  * repository, ladder and read use case are constructed over the persistence DSL in the adapter wiring; the
  * lifecycle bookkeeping here keeps {@link #stop()} honest.
  */
@@ -48,7 +47,7 @@ public final class RanksModule implements FeatureModule {
 
     @Override
     public List<ListenerFactory> listeners() {
-        // No listener in Phase 1; the autorank scan and any interaction listeners land with the later phases.
+        // No declarative listener: the adapter wiring registers the autorank scan and any interaction listeners.
         return List.of();
     }
 
@@ -78,7 +77,7 @@ public final class RanksModule implements FeatureModule {
         this.running = false;
     }
 
-    /** True while the module is started; the later phases' background work observes this and exits on stop. */
+    /** True while the module is started; background work observes this and exits on stop. */
     public boolean isRunning() {
         return running;
     }

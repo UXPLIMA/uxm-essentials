@@ -15,15 +15,15 @@ import org.jspecify.annotations.Nullable;
  * As {@link CommandRegistration}s over the constructed
  * {@link ItemworldServices}. Collected in one greppable table so the literal/permission pairing matches the
  * permissions reference and its entries in {@code CommandSpecCatalog}; the plugin's
- * {@code LifecycleEvents.COMMANDS} handler registers each on the next fire. The remaining groups (powertool,
- * mob/entity, time/weather aliases, admin-fun) land with the second itemworld adapter and join this list in
- * the context wiring.
+ * {@code LifecycleEvents.COMMANDS} handler registers each on the next fire. The other groups (powertool,
+ * mob/entity, time/weather aliases, admin-fun) are built by their own adapter and join this list in the context
+ * wiring.
  *
  * <p>Every command here gates on its sub-feature group plus its per-command disable through
  * {@link ItemworldCommandSupport#enabled} before any mutation, validates its inputs at the boundary, and (for
  * the abusable bulk {@code /give}) audit-logs through {@link ItemworldServices#audit()}. The {@code /repair},
- * {@code /repairall}, {@code /hat} and {@code /more} verbs are owned here, not in playerstate (§15.6), so they
- * register here and the two modules do not double-register.
+ * {@code /repairall}, {@code /hat} and {@code /more} verbs act on items, so they are owned here and not in
+ * playerstate, and the two modules do not double-register.
  */
 @NullMarked
 public final class ItemworldGroupACommands {

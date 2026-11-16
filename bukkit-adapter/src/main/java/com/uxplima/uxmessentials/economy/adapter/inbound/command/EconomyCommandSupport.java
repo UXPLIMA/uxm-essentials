@@ -45,7 +45,7 @@ import org.jspecify.annotations.Nullable;
  * boundary concerns the economy commands repeat: resolving the optional {@code [currency]} argument against
  * the closed registry (an unknown id is an error listing the valid ids, never a silent default), parsing an
  * amount to the currency's precision, and running a provider call off the tick thread through the injected
- * {@code Scheduler} so a foreign provider can never wedge the command (§4.3, §6.2).
+ * {@code Scheduler} so a foreign provider can never wedge the command or the tick.
  */
 @NullMarked
 abstract class EconomyCommandSupport {

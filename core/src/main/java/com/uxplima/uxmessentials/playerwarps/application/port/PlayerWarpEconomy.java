@@ -22,7 +22,7 @@ import com.uxplima.uxmessentials.shared.domain.Unit;
  * teleport happen only once it succeeds.
  *
  * <p>The configured owner <em>cut</em> (the share the server keeps rather than passing to the owner) is the
- * implementation's concern (P4-T4 reads it from config), not a gate parameter: the gate passes only the
+ * implementation's concern (the economy adapter reads it from config), not a gate parameter: the gate passes only the
  * {@code price} and its {@code currencyId}, keeping this seam as narrow as {@code WarpEconomy}. The charge is a
  * guarded debit with no check-then-charge window, so two simultaneous uses can never both pass an affordability
  * probe and then overdraw.
@@ -64,7 +64,7 @@ public interface PlayerWarpEconomy {
      */
     boolean canAfford(PlayerRef who, BigDecimal amount, String currencyId);
 
-    /** Pay out the warp's accrued earnings to {@code to} (the owner), used by {@code /pwarp withdraw} (P4-T6). */
+    /** Pay out the warp's accrued earnings to {@code to} (the owner), used by {@code /pwarp withdraw}. */
     Result<Unit, ChargeError> withdraw(PlayerWarpId warp, PlayerRef to);
 
     /**

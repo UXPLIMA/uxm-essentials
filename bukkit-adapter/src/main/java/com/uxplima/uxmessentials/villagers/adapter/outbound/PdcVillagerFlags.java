@@ -15,14 +15,14 @@ import org.jspecify.annotations.Nullable;
 
 /**
  * The per-villager state the trade features persist on the villager entity itself: the instant it last restocked its
- * trades (the restock timer's clock) and whether trading is disabled for this individual villager (the Phase-2 trade
+ * trades (the restock timer's clock) and whether trading is disabled for this individual villager (the trade
  * manager's hook). Both are the sanctioned use for transient per-holder state. Stamped in the villager's PDC under a
  * single pre-created key each, so they survive a chunk reload and a server restart but never touch the database.
  *
  * <p>The last-restock is stored as epoch milliseconds ({@link PersistentDataType#LONG}); an absent stamp reads as
  * {@link Instant#EPOCH}, which the {@link com.uxplima.uxmessentials.villagers.domain.RestockPolicy} treats as always
- * due, so a freshly-seen villager restocks on the first sweep. The disable flag and the Phase-3 protection ("saver")
- * flag both ride the shared {@code (byte)} boolean convention through {@link PdcFlag}. The Phase-4 follow-owner flag
+ * due, so a freshly-seen villager restocks on the first sweep. The disable flag and the protection ("saver")
+ * flag both ride the shared {@code (byte)} boolean convention through {@link PdcFlag}. The follow-owner flag
  * stores the owner's UUID as a {@link PersistentDataType#STRING}, so the pairing survives a chunk reload and can be
  * inspected; an absent or unparseable value reads as "not following".
  *

@@ -38,7 +38,7 @@ import com.uxplima.uxmessentials.shared.domain.PlayerRef;
  * that stops drops the region and entity tasks it had queued without running their fallbacks, so {@link #stop} refunds
  * every claimed hop that has not ended yet, once: each hop ends through a single guard, whichever of the landing, the
  * miss, the retired task or the stop reaches it first. After a stop nothing new is claimed, and a row left unclaimed
- * waits for the origin's watchdog or the player's next join as before. The stop first waits, for a bounded time,
+ * waits for the origin's watchdog or the player's next join. The stop first waits, for a bounded time,
  * for the money work already running off the tick: a join that is claiming a row, and a refund or a settlement that
  * an ended hop handed to the async lane. Both would otherwise reach an economy that has already stopped.
  *

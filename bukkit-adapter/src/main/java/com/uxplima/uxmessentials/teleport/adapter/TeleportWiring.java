@@ -290,7 +290,7 @@ public final class TeleportWiring {
     /**
      * What the cross-server requests and staff teleports are built over. With {@code enabled} off, the teleport
      * {@code cross-server} block's default, no resolver is registered and no frame is listened to, so a player on
-     * another backend is reached by no teleport, as before.
+     * another backend is reached by no teleport.
      */
     private record CrossServer(
             boolean enabled,

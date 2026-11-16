@@ -8,7 +8,7 @@ import com.uxplima.uxmessentials.shared.domain.PlayerRef;
  * homes/warps verbs that delegate here, are blocked (docs/permissions.md, a jailed player is blocked
  * regardless of the teleport nodes). The teleport context does not own jail state; it asks this port.
  *
- * <p>The coupling is soft: when the moderation module is disabled (or has not yet landed) the wiring binds
+ * <p>The coupling is soft: when the moderation module is disabled the wiring binds
  * {@link #NEVER}, so teleport degrades to "no one is jailed" rather than failing. This mirrors the messaging
  * context's {@code MutePolicy} seam, the same degrade-when-the-other-module-is-off pattern.
  */

@@ -92,7 +92,7 @@ public final class MessagingSettingsView {
 
     /**
      * The setting drawn at {@code slot} for {@code viewer}, or empty when the slot carries none. Exposed so a
-     * test can assert the slot↔toggle mapping without opening a live menu, mirroring the bespoke panel's accessor.
+     * test can assert the slot↔toggle mapping without opening a live menu.
      */
     public java.util.Optional<EditableProperty> settingAt(int slot, PlayerRef viewer) {
         Objects.requireNonNull(viewer, "viewer");

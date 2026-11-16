@@ -111,7 +111,7 @@ public final class KitCategoryManagerMenu {
 
     /**
      * The bound category's lore as one string the renderer splits per line: the category's own lore lines, a spacer,
-     * its id, slot and parent, a spacer, then the edit hint. This is what the bespoke grid drew, line for line.
+     * its id, slot and parent, a spacer, then the edit hint.
      */
     private String lore(MenuContext ctx) {
         KitCategory category = categoryOf(ctx);
@@ -157,7 +157,7 @@ public final class KitCategoryManagerMenu {
 
     /**
      * Save a new category under the sanitized id and open its settings; a name with a space sanitizes to empty and is
-     * rejected, exactly as the old window did. Package-private so the create branch is unit-tested without an anvil.
+     * rejected. Package-private so the create branch is unit-tested without an anvil.
      */
     void create(Player player, PlayerRef viewer, String name) {
         String clean = sanitizeId(name);

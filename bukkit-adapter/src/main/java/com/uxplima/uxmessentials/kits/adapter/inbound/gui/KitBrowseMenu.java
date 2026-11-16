@@ -39,7 +39,7 @@ import org.jspecify.annotations.NullMarked;
  * Registers the read-only {@code /kit} browse menu with the menu engine and opens it. The same view the old
  * {@code KitMenuView} drew, now rendered off a spec: one tile per kit the viewer may claim, paged through the
  * content slots, with previous/next buttons on the bottom row. When categories are defined the tiles mix drill-in
- * category tiles (sorted by their slot) with the kits at the current tree level, exactly as the old view did;
+ * category tiles (sorted by their slot) with the kits at the current tree level;
  * clicking a category drills in, the back button steps up to the parent, a left click on a kit claims it through
  * the same {@link ClaimKit} use case the {@code /kit} command drives, and a right click opens the kit's bespoke
  * {@link KitPreviewView}. With no categories the legacy flat grid is the root level with no sub-categories, one
@@ -122,7 +122,7 @@ public final class KitBrowseMenu {
         bindings.placeholder("kit_browse_lore", ctx -> rowOf(ctx).lore());
         bindings.action("kits:browse-click", this::click);
         bindings.action("kits:browse-back", this::back);
-        // The back button shows only below the root, exactly as the old view only drew it when a category was open.
+        // The back button shows only below the root: at the root there is nothing to go back to.
         bindings.condition(
                 "kits:browse-has-parent",
                 (ctx, args) -> ctx.subject(BrowseLevel.class).categoryId().isPresent());
@@ -150,7 +150,7 @@ public final class KitBrowseMenu {
 
     /**
      * Resolve one browse level into its mixed, fully-rendered tiles: the sub-categories of {@code categoryId}
-     * sorted by their slot, then the kits at that level sorted by priority, reproducing the old view's ordering.
+     * sorted by their slot, then the kits at that level sorted by priority.
      * With no categories defined this is just the kits, so the legacy flat grid and the category root are one path.
      */
     private BrowseLevel level(PlayerRef viewer, List<KitDefinition> kits, Optional<String> categoryId) {
@@ -164,7 +164,7 @@ public final class KitBrowseMenu {
         return new BrowseLevel(kits, categoryId, rows);
     }
 
-    /** The categories whose parent is {@code categoryId}, sorted by their display slot like the old view. */
+    /** The categories whose parent is {@code categoryId}, sorted by their display slot. */
     private List<KitCategory> subCategories(Optional<String> categoryId) {
         return categoryRepository.all().stream()
                 .filter(category -> category.parentCategoryId().equals(categoryId))
@@ -203,7 +203,7 @@ public final class KitBrowseMenu {
 
     /**
      * Click a tile: drill into a clicked category by re-opening the browse spec at that category's level; left-click
-     * a kit to claim it through the same {@link ClaimKit} use case the old view used; right-click a kit to open its
+     * a kit to claim it through the same {@link ClaimKit} use case the {@code /kit} command drives; right-click a kit to open its
      * bespoke preview. The clicked tile's identity comes from the bound entry, never from re-reading the icon.
      */
     private void click(MenuActionContext ctx) {
@@ -217,7 +217,7 @@ public final class KitBrowseMenu {
         kitClick(ctx, level, row);
     }
 
-    /** Route a kit tile click: a right click previews, anything else claims, matching the old view's gesture split. */
+    /** Route a kit tile click: a right click previews, anything else claims. */
     private void kitClick(MenuActionContext ctx, BrowseLevel level, BrowseRow row) {
         Optional<KitDefinition> kit = findKit(level, row.id());
         if (kit.isEmpty()) {
@@ -248,7 +248,7 @@ public final class KitBrowseMenu {
     /**
      * Claim the clicked kit on the viewer's entity thread (the grant moves items into the live inventory).
      * {@link ClaimKit} gates the claim and sends the result message itself; the window closes only when the kit
-     * opts into close-on-claim, otherwise it stays open so the player can claim again: the old view's behaviour.
+     * opts into close-on-claim, otherwise it stays open so the player can claim again.
      */
     private void claim(Player player, PlayerRef viewer, KitDefinition kit) {
         scheduler.onEntity(viewer, () -> {
@@ -302,7 +302,7 @@ public final class KitBrowseMenu {
      *
      * <p>{@link #pinnedSlot()} returns that slot for a pinned category and {@code -1} for a kit or an unpinned
      * category; the engine pins a row only when the slot is one of the list's content slots, so a category whose
-     * configured slot falls outside the content grid flows like a kit: reproducing the old view's pin rule.
+     * configured slot falls outside the content grid flows like a kit, so a bad slot never hides a category.
      *
      * @param kind whether this tile drills into a category or claims/previews a kit
      * @param id the clicked identity, the category id to drill into, or the kit id to claim

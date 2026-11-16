@@ -584,8 +584,8 @@ public final class EconomyWiring {
                 settings.operationLogEnabled());
 
         PayPreferences preferences = WalletRepositories.payPreferences(persistence, settings.payToggleDefault());
-        // The expiry tells the payer, not just the console: a prompt that lapsed while they read the rules
-        // used to vanish in silence.
+        // The expiry tells the payer, not just the console, so a prompt that lapsed while they read the rules
+        // does not vanish in silence.
         Notifier payNotifier = new Notifier(kernel.messages(), kernel.messageSink());
         PendingPayRegistry pending = new SchedulerPendingPayRegistry(
                 kernel.scheduler(),
@@ -668,7 +668,7 @@ public final class EconomyWiring {
         // The bank menus open each other, so they cannot all be constructed before the navigation router that links
         // them. A holder supplies the router once it is built; each view holds the supplier as a final field and
         // dereferences it only on a click, keeping the cross-links constructor-injected and non-null (no
-        // post-construction setters). The bank list and the members list are now engine-rendered menus that register
+        // post-construction setters). The bank list and the members list are engine-rendered menus that register
         // their spec and bindings here once and open through the Menus façade; the actions hub stays bespoke.
         java.util.concurrent.atomic.AtomicReference<
                         com.uxplima.uxmessentials.economy.adapter.inbound.gui.BankNavigation>

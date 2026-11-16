@@ -10,7 +10,7 @@ import org.jspecify.annotations.NullMarked;
  * The running tally of one import, accumulated across the bounded executor's writers and rendered into
  * the {@code migration_import_finish} audit line. Counters are {@link LongAdder}s
  * because many writer threads increment them concurrently and only one thread reads the totals at the
- * end (§7). The same summary is produced by a dry run, so an operator can diff a dry run against the real
+ * end. The same summary is produced by a dry run, so an operator can diff a dry run against the real
  * run that follows.
  */
 @NullMarked

@@ -9,9 +9,8 @@ import com.uxplima.uxmessentials.shared.domain.message.MessageKey;
  * context: every message resolves through one of these.
  *
  * <p>Per the i18n contract a disabled module still ships its keys so the catalog stays whole and the
- * locale-parity guard sees the full {@code en} key set. This is the Phase-1 seed: the current-rank read line
- * and the rankup / prestige feedback the behaviour phases (P2, P3) resolve through. Later phases add their own
- * keys here as their verbs land. Ladder, requirement and action text is operator content in {@code ranks.conf},
+ * locale-parity guard sees the full {@code en} key set: the current-rank read line and the rankup and prestige
+ * feedback. Ladder, requirement and action text is operator content in {@code ranks.conf},
  * not a plugin string, so it never appears here.
  */
 public enum RanksMessageKey implements MessageKey {

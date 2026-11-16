@@ -26,7 +26,7 @@ import org.jspecify.annotations.NullMarked;
  * and each child carries a back-callback into the hub. One instance is built per module start by
  * {@code EconomyWiring}; the command's {@code guiRoot()} delegates here.
  *
- * <p>The hub is now an engine-rendered menu too; only its [Manage a player] entry opens the still-bespoke shared
+ * <p>The hub is an engine-rendered menu; only its [Manage a player] entry opens the bespoke shared
  * {@link PlayerPickerView}, a transitional cross-runtime seam, before routing the picked target back through the
  * engine manage screen. The bulk and history entries route straight through the {@link Menus} façade.
  */

@@ -21,7 +21,7 @@ import org.jspecify.annotations.NullMarked;
  * becomes a no-op. Each player's vanish is kept in the {@code player_vanish} table, part of the persistence baseline,
  * so the module owns no Flyway location of its own.
  *
- * <p>The {@code /vanish} command, the packet-hide view, and the join/quit listener are Bukkit-facing and land with the
+ * <p>The {@code /vanish} command, the packet-hide view, and the join/quit listener are Bukkit-facing and come from the
  * adapter wiring; a disabled module wires zero of them (the {@code FeatureModule} contract).
  */
 @NullMarked
@@ -43,7 +43,7 @@ public final class VanishModule implements FeatureModule {
 
     @Override
     public List<ListenerFactory> listeners() {
-        // The join/quit listener lands with the inbound adapter; a disabled module registers none here.
+        // The join/quit listener comes from the inbound adapter; a disabled module registers none here.
         return List.of();
     }
 

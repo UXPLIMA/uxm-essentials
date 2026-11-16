@@ -31,12 +31,12 @@ import org.jspecify.annotations.Nullable;
 /**
  * The teleport-sound selector a warp editor opens to pick a warp's departure or arrival sound: a three-row picker
  * with one icon per sound the warps file lists ({@link WarpPresets}), a custom-name button, a back button to the
- * editor, and a remove button. Clicking a sound runs the same set the old bespoke window did. The pick is saved through the editor's
+ * editor, and a remove button. Clicking a sound runs the editor's own set. The pick is saved through the editor's
  * per-warp queue off the tick, then the viewer is returned to the warp editor.
  *
  * <p>The window draws through the menu engine's selector runtime ({@link Menus#openSelector}), so it is a
  * holder-backed engine selector routed and torn down by the one menu listener and one {@code closeMenu}. The selector
- * serves both server and player warps: the edit names the warp and its (nullable) owner, so the single picker covers either kind exactly as before. The preset list is still exposed through {@link #getOptions()} so the engine-rendered server-warp sound menu can share
+ * serves both server and player warps: the edit names the warp and its (nullable) owner, so the single picker covers either kind. The preset list is also exposed through {@link #getOptions()} so the engine-rendered server-warp sound menu can share
  * the same options. Every visible string resolves from the warps catalog, except a sound's name, which the warps file
  * writes per language.
  */
@@ -145,7 +145,7 @@ public final class WarpSoundSelectorView {
                 () -> editorView.open(player, viewer, name, owner));
     }
 
-    /** Prompt for a custom sound name through the shared input seam, exactly as the old custom button did. */
+    /** Prompt for a custom sound name through the shared input seam. */
     private void custom(Player player, PlayerRef viewer, String name, @Nullable PlayerRef owner, boolean isDeparture) {
         player.closeInventory();
         MessageKey promptKey = isDeparture

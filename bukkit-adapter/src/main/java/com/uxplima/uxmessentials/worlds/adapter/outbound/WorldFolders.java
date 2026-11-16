@@ -28,7 +28,8 @@ import com.uxplima.uxmessentials.worlds.domain.DimensionNames;
  * one {@code level.dat}, and every world of it is a dimension under {@code <level>/dimensions/<namespace>/<key>}: the
  * overworld at {@code world/dimensions/minecraft/overworld}, a world made as {@code probeworld} at
  * {@code world/dimensions/minecraft/probeworld}. A loaded world says where it is. For one that is not loaded, the
- * dimension folder is tried first, then a folder beside the server the way a world used to be copied in, and a world
+ * dimension folder is tried first, then a folder beside the server, the layout older servers copy a world into,
+ * and a world
  * that is in neither place is answered with where a new one would go.
  *
  * <p>A dimension of a datapack lives under its own namespace, {@code world/dimensions/mypack/mining}, and the server

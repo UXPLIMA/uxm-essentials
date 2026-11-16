@@ -42,8 +42,8 @@ import org.jspecify.annotations.NullMarked;
  *
  * <p>A bare {@code /ranks} always answers. With the window on it opens the ladder panel; with the window
  * off it prints where the player stands, which is what {@code ranks.current} was written for. That branch
- * used to be wired only when the panel was present, so an operator who turned the GUI off left their
- * players no way to read their own rank at all and the line shipped in ten languages unsent.
+ * is wired whether or not the panel is present, so an operator who turns the GUI off still leaves their
+ * players a way to read their own rank.
  *
  * <p>When the ladder GUI is enabled ({@code modules.ranks.gui.enabled}), a bare {@code /ranks} opens the
  * {@link RanksPanelMenu ladder panel}. The player's current rank/prestige, the next rank's requirements and cost,

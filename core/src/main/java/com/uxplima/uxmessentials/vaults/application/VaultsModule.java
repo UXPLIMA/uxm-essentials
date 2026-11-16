@@ -47,8 +47,8 @@ public final class VaultsModule implements FeatureModule {
 
     @Override
     public List<ListenerFactory> listeners() {
-        // The InventoryClose save listener is Bukkit-facing and lands with the inbound adapter; a disabled or
-        // not-yet-adapted module registers none here.
+        // The InventoryClose save listener is Bukkit-facing and comes from the inbound adapter; a disabled
+        // module registers none here.
         return List.of();
     }
 

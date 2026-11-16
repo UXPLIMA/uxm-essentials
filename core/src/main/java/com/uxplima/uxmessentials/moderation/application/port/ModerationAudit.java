@@ -10,7 +10,7 @@ import com.uxplima.uxmessentials.shared.domain.PlayerRef;
  * Outbound port for the moderation audit trail. The {@code com.uxplima.uxmessentials.audit} channel.
  * Every state-mutating sanction emits exactly one structured
  * {@code event=<name> actor=<sender> key=value} line so an operator can route the channel to a retained file
- * and reconstruct moderation activity. The implementation lands with the bukkit-adapter; the use cases
+ * and reconstruct moderation activity. The implementation lives in the bukkit-adapter; the use cases
  * depend only on this contract.
  *
  * <p>The {@code actor} is the issuing staff member (or the console); {@code target} the affected player;

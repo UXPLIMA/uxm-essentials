@@ -152,9 +152,9 @@ public final class MenuEditorService {
     }
 
     /**
-     * Re-serialise the registered menu {@code name} back to its file and reload it. The editor's "Save" over the
-     * P0 write path. The spec (and its {@code command {}} block) round-trips through a {@link MenuEditSession} so the
-     * save exercises the same edit model the later phases mutate. Reports {@link EditOutcome#SOURCE_MISSING} for an
+     * Re-serialise the registered menu {@code name} back to its file and reload it: the editor's "Save". The spec
+     * (and its {@code command {}} block) round-trips through a {@link MenuEditSession} so the save exercises the same
+     * edit model every editor window mutates. Reports {@link EditOutcome#SOURCE_MISSING} for an
      * unregistered menu.
      */
     public EditOutcome save(String name) {

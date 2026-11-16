@@ -49,7 +49,7 @@ public final class PresenceModule implements FeatureModule {
     @Override
     public List<ListenerFactory> listeners() {
         // The move/chat activity listeners and the join/quit vanish-suppression listener are Bukkit-facing and
-        // land with the inbound adapter; a disabled or not-yet-adapted module registers none here.
+        // come from the inbound adapter; a disabled module registers none here.
         return List.of();
     }
 

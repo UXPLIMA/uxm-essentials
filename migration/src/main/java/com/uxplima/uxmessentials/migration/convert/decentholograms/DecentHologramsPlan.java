@@ -17,7 +17,7 @@ import org.jspecify.annotations.NullMarked;
  * The DecentHolograms source's lazy {@link ImportPlan}. It streams every {@code <name>.yml} under the
  * plugin's {@code holograms/} directory, parsing and mapping each on demand as the importer's bounded
  * executor drains it. A malformed or world-less file is dropped from the stream
- * (counted as skipped downstream), so one bad hologram file never aborts the run (§4).
+ * (counted as skipped downstream), so one bad hologram file never aborts the run.
  */
 @NullMarked
 final class DecentHologramsPlan implements ImportPlan {

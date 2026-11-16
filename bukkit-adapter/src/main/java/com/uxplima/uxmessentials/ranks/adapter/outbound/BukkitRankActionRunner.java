@@ -28,7 +28,7 @@ import org.jspecify.annotations.NullMarked;
  *
  * <p>Rankup runs on the player's own region thread (the {@code /rankup} command thread), which is where the
  * shared runner's Bukkit effects are safe, so the chain runs inline with no region hop. When the player is not
- * online (an autorank promotion of an offline player in a later phase) there is no viewer to act on, so the
+ * online (an autorank promotion of an offline player) there is no viewer to act on, so the
  * call is a no-op.
  */
 @NullMarked

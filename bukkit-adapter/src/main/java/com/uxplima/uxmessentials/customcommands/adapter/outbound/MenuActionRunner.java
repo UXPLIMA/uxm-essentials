@@ -99,7 +99,7 @@ public final class MenuActionRunner implements ActionRunner {
             audit(token, actor, allowed);
             Ref ref = Ref.parse(token);
             // The engine spends a live player, so an action for somebody who has left is dropped rather than run
-            // against a name. That is what the engine itself used to do when its own lookup missed.
+            // against a name, the same as the engine does when its own lookup misses.
             if (step.offset().isZero()) {
                 LivePlayers.of(actor).ifPresent(live -> menus.execute(live, ref, arguments));
             } else {

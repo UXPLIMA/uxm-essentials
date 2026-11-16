@@ -5,7 +5,7 @@ import java.util.Objects;
 /**
  * One stack a player has staked into a trade, represented abstractly so the domain never sees a Bukkit
  * {@code ItemStack}. The {@code handle} is an opaque token the adapter maps back to a real item snapshot at the
- * boundary (a serialised stack, a slot reference, or an escrow-row key in the cross-server phase); the domain treats
+ * boundary (a serialised stack, a slot reference, or an escrow-row key for a cross-server trade); the domain treats
  * it only as an identity and carries the {@code amount} so the model can reason about quantities without decoding it.
  *
  * @param handle the opaque, adapter-owned reference to the concrete item snapshot

@@ -8,8 +8,8 @@ import org.jspecify.annotations.NullMarked;
 /**
  * The permission capability the menu engine reads through the Vault hook: test group membership and a node,
  * grant or revoke a node, and read a primary group. It is a small typed seam over {@code UUID}/{@code String}.
- * The later permission actions ({@code [givepermission]}/{@code [takepermission]}, Phase 2) and group/node
- * requirements (Phase 3) consume it without ever touching a provider SDK.
+ * The permission actions ({@code [givepermission]}/{@code [takepermission]}) and the group and node
+ * requirements consume it without ever touching a provider SDK.
  *
  * <p>Vault routes permission changes through the underlying provider, so a caller must invoke this capability
  * on the viewer's entity thread (the menu engine's click and action chains already run there). This interface

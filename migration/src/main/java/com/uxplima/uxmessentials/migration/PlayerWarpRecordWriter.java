@@ -34,8 +34,8 @@ import org.jspecify.annotations.NullMarked;
 
 /**
  * The shared write path for every player-warp importer. Given an {@link ImportedPlayerWarp} it
- * lands the warp on the new surrogate-id {@code player_warps} schema through the player-warps ports, mirroring the P3
- * {@code PlayerWarpDataMigration} that copied the shipped legacy data:
+ * lands the warp on the surrogate-id {@code player_warps} schema through the player-warps ports, the same way
+ * {@code PlayerWarpDataMigration} copies the shipped legacy data:
  *
  * <ul>
  *   <li><b>Name.</b> The source name is coerced into the {@link PlayerWarpName} shape (lowercase {@code [a-z0-9_-]},
@@ -207,7 +207,8 @@ public final class PlayerWarpRecordWriter {
                 .mapToLong(ImportedPlayerWarp.Rating::stars)
                 .sum();
         double average = (double) sum / count;
-        // The Bayesian score lands with the live rate use case; the migration mirrors P3 and seeds it with the average.
+        // The Bayesian score is recomputed by the live rate use case; like the legacy data migration, the import
+        // seeds it with the average.
         return RatingSummary.of(sum, count, average, average);
     }
 

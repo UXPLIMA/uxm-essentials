@@ -131,7 +131,7 @@ public final class PlayerwarpsWiring {
      * Build the player-warps adapters and use cases over the kernel ports and the teleport engine. The warp
      * arrival-notification registry is shared from the warps module so a player-warp hop fires the same welcome
      * effects; when warps is disabled it is {@code null} and player-warps falls back to a private throwaway
-     * registry (no listener consumes it, exactly as before this was injected).
+     * registry that no listener consumes, so a player-warp hop fires no welcome effects.
      */
     public static Wired wire(
             Plugin plugin,
@@ -208,7 +208,7 @@ public final class PlayerwarpsWiring {
         // authorization (a member's role decides which edit verbs they may run), so it is built once and shared.
         WarpMemberStore memberStore = PlayerWarpRepositories.memberStore(persistence, kernel.log());
         WarpAuthorization warpAuthorization = new WarpAuthorization(memberStore);
-        // The ban and whitelist stores back both the ordered access gate (T3) and the management verbs (T6b-2),
+        // The ban and whitelist stores back both the ordered access gate and the management verbs,
         // so they are built once here and shared with the ManageBans / ManageWhitelist use cases below.
         WarpBanStore banStore = PlayerWarpRepositories.banStore(persistence);
         WarpWhitelistStore whitelistStore = PlayerWarpRepositories.whitelistStore(persistence, Clock.systemUTC());
@@ -299,7 +299,7 @@ public final class PlayerwarpsWiring {
                 Clock.systemUTC(),
                 ratingRewards);
         FavouritePlayerWarp favouritePlayerWarp = new FavouritePlayerWarp(repository, favouriteStore, notifier);
-        // The role-gated people/money verbs (T6b-2) all gate through the shared WarpAuthorization and reuse the
+        // The role-gated people/money verbs all gate through the shared WarpAuthorization and reuse the
         // member/whitelist/ban stores and the economy seam already built above: no new persistence, just use cases.
         ManageMembers manageMembers =
                 new ManageMembers(repository, warpAuthorization, memberStore, notifier, Clock.systemUTC());

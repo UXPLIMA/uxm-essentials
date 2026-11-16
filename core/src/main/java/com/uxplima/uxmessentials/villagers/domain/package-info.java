@@ -1,5 +1,5 @@
 /**
- * The villagers context's domain: the pure decisions behind villager trade management. Phase 1 holds
+ * The villagers context's domain: the pure decisions behind villager trade management, such as
  * {@link com.uxplima.uxmessentials.villagers.domain.RestockPolicy}, the timer rule that answers whether a
  * villager last restocked at some instant is due to restock again given the configured interval. The value
  * object owns only its own structural invariant (a positive interval); the villager, the merchant recipes,

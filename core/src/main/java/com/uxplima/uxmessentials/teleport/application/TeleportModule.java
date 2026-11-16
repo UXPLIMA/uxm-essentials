@@ -20,12 +20,11 @@ import org.jspecify.annotations.NullMarked;
  * kernel ports and the context's own ports, and {@code stop} drains them so a disabled module holds zero
  * runtime state.
  *
- * <p>This phase delivers the pure {@code :core} domain and application. The inbound adapters (the
+ * <p>This module holds the pure {@code :core} domain and application. The inbound adapters (the
  * Brigadier handlers, the move/death/expiry listeners) and the outbound adapters (the back store, the
- * pre-warmed RTP queue, the teleport executor) land in the bukkit-adapter and persistence-adapter
- * phases; until then {@link #listeners()} and {@link #migrations()} are empty by design rather than
- * half-wired, and {@link #start(ModuleContext)} only arms the lifecycle bookkeeping. The module is not
- * yet registered in {@code DefaultModuleRegistry}; it is wired in when its adapters arrive.
+ * pre-warmed RTP queue, the teleport executor) live in the bukkit-adapter and persistence-adapter, wired
+ * by the adapter wiring, so {@link #listeners()} and {@link #migrations()} are empty, and
+ * {@link #start(ModuleContext)} only arms the lifecycle bookkeeping.
  */
 @NullMarked
 public final class TeleportModule implements FeatureModule {
@@ -49,14 +48,14 @@ public final class TeleportModule implements FeatureModule {
     @Override
     public List<ListenerFactory> listeners() {
         // The move-cancel, death-capture, request-expiry, and join re-arm listeners are Bukkit-facing
-        // and land with the inbound adapter; a disabled or not-yet-adapted module registers none.
+        // and come from the inbound adapter; a disabled module registers none.
         return List.of();
     }
 
     @Override
     public List<MigrationSet> migrations() {
-        // The pre-warmed RTP queue's durable mirror (rtp_queue table) lands with the persistence
-        // adapter; until then the queue is in-memory and the module owns no migrations.
+        // The pre-warmed RTP queue's durable mirror (the rtp_pool table) ships in the persistence
+        // baseline, so the module owns no migrations of its own.
         return List.of();
     }
 
@@ -68,9 +67,9 @@ public final class TeleportModule implements FeatureModule {
     @Override
     public void start(ModuleContext ctx) {
         this.running = true;
-        // Use cases are constructed over ctx.kernel() and the context's own ports once those adapters
-        // are injected through the module context in the adapter phase. The lifecycle bookkeeping
-        // (running flag, in-flight counter) is armed here so stop() is already honest.
+        // The use cases are constructed over ctx.kernel() and the context's own ports in the adapter
+        // wiring. The lifecycle bookkeeping (running flag, in-flight counter) is armed here so stop() is
+        // honest even if the wiring fails part way.
     }
 
     @Override

@@ -49,8 +49,8 @@ import org.jspecify.annotations.Nullable;
  *
  * <p>The edited warp is handed in as the menu subject, its name, owner, and a display snapshot read off the
  * viewer's entity thread at open, so the title and every current-value line fill from the {@code warp_edit_*}
- * placeholders without the renderer touching a port. The panel holds no new domain logic: it replays the old
- * bespoke window's handlers verbatim through the engine. This is the warp category settings-panel pattern
+ * placeholders without the renderer touching a port. The panel holds no new domain logic: it runs the warp
+ * context's existing handlers through the engine. This is the warp category settings-panel pattern
  * (subject-carried state, the input seam, the engine sub-screens, and re-open after a mutation). The selector and
  * welcome collaborators are injected after this view to break their re-open cycle. Every visible string resolves
  * from the warps catalog.

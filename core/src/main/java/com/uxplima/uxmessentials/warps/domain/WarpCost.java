@@ -12,7 +12,7 @@ import java.util.Objects;
  * <p>The cost is a pure domain value: it carries no currency and no economy provider. Whether a cost is
  * actually charged is decided in the application layer, which soft-couples to the economy context only when
  * a provider is present; with no provider the cost is recorded on the warp but ignored at use time. This
- * keeps warps free of any hard dependency on the economy context (which lands in P3).
+ * keeps warps free of any hard dependency on the economy context.
  *
  * @param amount the price to use the warp; {@code BigDecimal.ZERO} for a free warp
  */

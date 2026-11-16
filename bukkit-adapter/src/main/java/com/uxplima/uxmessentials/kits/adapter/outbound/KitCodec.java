@@ -562,7 +562,7 @@ final class KitCodec {
      * Resolve a kit's effective claim actions. The new {@code claim-actions} block, when present, wins outright:
      * it is the typed, ordered action engine that supersedes the flat {@code commands}/{@code sound}/{@code
      * particles} keys, and when both are present the legacy keys are ignored with a one-line warn. When no new
-     * block is authored the legacy keys are mapped into actions so an unmodified kit behaves exactly as before
+     * block is authored the legacy keys are mapped into actions so a kit written for those keys keeps working:
      * {@code commands} become {@code CONSOLE_COMMAND} actions in order, then {@code sound} a {@code SOUND} action,
      * then {@code particles} a {@code PARTICLE} action.
      */

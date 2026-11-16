@@ -32,9 +32,8 @@ import org.jspecify.annotations.Nullable;
  *
  * <p>Bukkit-free like the spec model it holds: it references only the {@code spec/} records and the menu's
  * {@code command {}} value object, so it is exercised by plain JUnit and can be mutated off the tick thread. It carries
- * the whole menu surface (the menu-level fields, the item map, and the optional open-command block) even though the
- * P1 editor only wires the menu-level setters and the item CRUD; the later phases (slot grid, item and action editors)
- * mutate the rest through the same model.
+ * the whole menu surface (the menu-level fields, the item map, and the optional open-command block), so the overview,
+ * the slot grid, and the item and action editors all mutate one model.
  *
  * <p>Not thread-safe: a session belongs to one editing flow. Every mutation validates lazily through {@link #toSpec()},
  * which re-runs the {@link MenuSpec} constructor's row-bound and slot-fit checks, so an edit that would leave the menu

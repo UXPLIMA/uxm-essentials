@@ -15,7 +15,7 @@ import org.jspecify.annotations.Nullable;
  * the config radius shrank or the world border moved since it was queued.
  *
  * <p>{@link #biome} is the biome the column validated in, carried so the durable {@link RtpColumn} can persist
- * it (the P5 per-biome pool slice). It is {@code null} when the validating candidate carried no biome, the
+ * it for the per-biome pool slice. It is {@code null} when the validating candidate carried no biome, the
  * on-serve revalidation never re-reads it, so an absent biome only means the column is not indexed per biome.
  *
  * @param position the safe landing position
@@ -34,7 +34,7 @@ public record RtpSafeLocation(
         }
     }
 
-    /** A location with no recorded biome: the pre-P5 form, before the validated biome was threaded through. */
+    /** A location with no recorded biome, which the per-biome pool slice leaves out. */
     public RtpSafeLocation(Position position, double radius, Instant validatedAt) {
         this(position, radius, null, validatedAt);
     }

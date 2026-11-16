@@ -22,7 +22,7 @@ import com.uxplima.uxmessentials.teleport.domain.SearchBudget;
  * the persisted per-biome {@link BiomePoolSlice pool slice}. Columns already known to have validated in the biome,
  * so one async chunk read usually confirms a hit, and only if none still passes does it fall back to a live
  * biome-targeted {@link BudgetedSafeSearch}, whose sampling is hotspot-biased so a rare biome converges within the
- * P1 budget instead of random-hammering the radius. The re-probes are tick-sliced through the {@link Scheduler}
+ * search budget instead of random-hammering the radius. The re-probes are tick-sliced through the {@link Scheduler}
  * exactly like the startup pre-warm, so the slice pass never fires every chunk load at once.
  *
  * <p>Nothing here blocks. {@link #locate} returns a future the async chain completes with the found location or, once

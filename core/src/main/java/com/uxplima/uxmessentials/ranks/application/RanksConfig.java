@@ -8,7 +8,7 @@ import com.uxplima.uxmessentials.shared.application.port.ConfigStore;
 
 /**
  * The typed, immutable view of {@code modules/ranks/config.conf}: the module enable gate plus the two
- * feature switches, prestige and autorank, later phases (P3, P4) gate their behaviour on. The ladder itself
+ * feature switches, prestige and autorank, that gate those two behaviours. The ladder itself
  * lives in a sibling {@code ranks.conf} and is read by {@link RankLadders}, not here, so this record holds only
  * the module-level tunables. It is resolved once from the module's scoped {@link ConfigStore} on start and, per
  * the atomic-reload rule, swapped whole on reload, so a reader always sees one coherent snapshot.

@@ -216,7 +216,7 @@ public enum PlayerwarpsMessageKey implements MessageKey {
     PWARP_GUI_RATE_BACK_LORE("pwarp.gui.rate.back-lore"),
 
     // capability-gated single-warp management panel (pwarp-manage), opened from the detail panel's manage button. Each
-    // button is view-gated by the viewer's WarpRole capability and drives one P4 use case; the info tile reflects
+    // button is view-gated by the viewer's WarpRole capability and drives one use case; the info tile reflects
     // state.
     PWARP_GUI_MANAGE_TITLE("pwarp.gui.manage.title"),
     PWARP_GUI_MANAGE_ENTRY_NAME("pwarp.gui.manage.entry-name"),

@@ -29,7 +29,7 @@ import com.uxplima.uxmessentials.vanish.domain.VanishState;
  * <p>The roster is <em>network-wide</em>: the locally-hidden players (the {@link VanishStore}) are merged with the
  * cluster's network-vanish view (the {@link NetworkVanishStore}) so a caller sees hidden players on other backends
  * too, still scoped to their see level. A player present in both wins with their local level. With {@code cross-server}
- * off the network view is {@link NetworkVanishStore#empty() empty}, so the list is exactly the local roster as before.
+ * off the network view is {@link NetworkVanishStore#empty() empty}, so the list is exactly the local roster.
  */
 public final class ListVanished {
 

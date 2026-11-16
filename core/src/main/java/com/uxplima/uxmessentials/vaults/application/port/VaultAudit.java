@@ -10,7 +10,7 @@ import com.uxplima.uxmessentials.shared.domain.PlayerRef;
  * ({@code /vault <player> [n]}) lets staff open and inspect another player's vault, so every admin open emits
  * exactly one structured {@code event=vault_admin_open actor=<staff> owner=<player> idx=<n>} line an operator
  * can route to a retained file. A player opening their own vault is not audited: only the staff override is.
- * The implementation lands with the bukkit-adapter; the use cases depend only on this contract.
+ * The implementation lives in the bukkit-adapter; the use cases depend only on this contract.
  */
 public interface VaultAudit {
 

@@ -13,17 +13,17 @@ import org.jspecify.annotations.NullMarked;
 /**
  * The poses bounded context as a first-class {@link FeatureModule}: GSit-parity sitting and posing ({@code /sit},
  * player-sit stacking, {@code /lay} / {@code /bellyflop} / {@code /spin}, {@code /crawl}) built in, with no separate
- * plugin. The command surface, the interact/quit listeners, and the seat entities are Bukkit-facing and land with
- * the adapter wiring in the later phases; this Phase-0 skeleton stands up the module identity, the enable gate, and
- * the lifecycle bookkeeping so the state and settings can be wired behind it.
+ * plugin. The command surface, the interact/quit listeners, and the seat entities are Bukkit-facing and come from
+ * the adapter wiring; this module stands up the identity, the enable gate, and the lifecycle bookkeeping so the
+ * state and settings can be wired behind it.
  *
  * <p><b>Ships enabled by default.</b> The bundled config enables the common poses out of the box (player-sit is the
  * one opt-in verb), so {@link #enabled(ConfigStore)} defaults to {@code true} like the steady-state contexts; an
  * operator flips {@code modules.poses.enabled = false} to turn the feature off. It persists nothing: a pose is
  * transient in-memory state held in {@code PoseSessions}, so the module owns no Flyway location.
  *
- * <p>Phase 0 publishes no command and registers no listener: the verbs arrive as their behaviour phases land, and a
- * disabled module wires zero either way (the {@code FeatureModule} contract). The registry is cleared on
+ * <p>The module itself publishes no command and registers no listener, since the adapter wiring contributes them,
+ * and a disabled module wires zero either way (the {@code FeatureModule} contract). The registry is cleared on
  * {@link #stop()} in the adapter wiring so a disable or reload leaves no residual runtime state.
  */
 @NullMarked
@@ -45,8 +45,8 @@ public final class PoseModule implements FeatureModule {
 
     @Override
     public List<ListenerFactory> listeners() {
-        // The right-click-seat, right-click-player, and cancel-trigger listeners land with the inbound adapter; a
-        // disabled or not-yet-adapted module registers none here.
+        // The right-click-seat, right-click-player, and cancel-trigger listeners come from the inbound adapter; a
+        // disabled module registers none here.
         return List.of();
     }
 
@@ -77,7 +77,7 @@ public final class PoseModule implements FeatureModule {
         this.running = false;
     }
 
-    /** True while the module is started; the later phases' background work observes this and exits on stop. */
+    /** True while the module is started; background work observes this and exits on stop. */
     public boolean isRunning() {
         return running;
     }

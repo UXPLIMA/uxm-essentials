@@ -19,8 +19,8 @@ import com.uxplima.uxmessentials.shared.domain.PlayerRef;
  * is never a moment with two sessions for one player), and a stop removes it. Keyed by the player's UUID so a
  * reconnect with a fresh {@link PlayerRef} name still resolves the same entry.
  *
- * <p>Empty and fully usable from Phase 0: the later behaviour phases hang {@code /sit}, the listeners, and the seat
- * entities off it without changing its shape. On module stop the registry is {@link #clear() cleared} so a reload
+ * <p>{@code /sit} and the other verbs, the listeners, and the seat entities all hang off this one registry, so its
+ * shape is the same for every pose. On module stop the registry is {@link #clear() cleared} so a reload
  * leaves zero residual runtime state.
  */
 public final class PoseSessions {

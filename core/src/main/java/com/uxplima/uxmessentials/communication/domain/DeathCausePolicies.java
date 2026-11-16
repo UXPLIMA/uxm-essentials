@@ -11,13 +11,12 @@ import java.util.Objects;
  * answers one question, "which {@link MessagePolicy} renders this death?", through {@link #policyFor(DeathCause)},
  * which returns the cause's own policy when one is configured and the default otherwise.
  *
- * <p>This keeps the pre-per-cause behaviour intact: a file that authors only the single {@code death} block yields
- * a table with an empty per-cause map, so every death, whatever its cause, resolves through the default policy
- * exactly as before. A cause the adapter classifies as {@link DeathCause#OTHER} is never expected to carry its own
+ * <p>A file that authors only the single {@code death} block yields a table with an empty per-cause map, so every
+ * death, whatever its cause, resolves through the default policy. A cause the adapter classifies as {@link DeathCause#OTHER} is never expected to carry its own
  * entry, so it too falls through to the default.
  *
  * @param byCause the per-cause overrides, keyed by the death's cause; a cause absent here takes the default
- * @param defaultPolicy the policy applied to any cause with no override (and to the whole channel pre-migration)
+ * @param defaultPolicy the policy applied to any cause with no override
  */
 public record DeathCausePolicies(Map<DeathCause, MessagePolicy> byCause, MessagePolicy defaultPolicy) {
 

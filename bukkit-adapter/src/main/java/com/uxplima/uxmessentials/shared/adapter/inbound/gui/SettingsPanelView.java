@@ -56,7 +56,7 @@ public final class SettingsPanelView {
                         Objects.requireNonNull(builder.valueLore, "valueLore").key())
                 .backName(Objects.requireNonNull(builder.backName, "backName").key())
                 // The subject is always the viewer's own PlayerRef, so the property provider re-reads its
-                // settings closing over it on every draw exactly as the bespoke panel re-read them per open.
+                // settings closing over it on every draw, so a toggle shows its new state at once.
                 .properties(subject -> settingsFor((PlayerRef) Objects.requireNonNull(subject, "subject")))
                 .onBack(player -> onBack.accept(player, BukkitRefs.toRef(player)))
                 .build();

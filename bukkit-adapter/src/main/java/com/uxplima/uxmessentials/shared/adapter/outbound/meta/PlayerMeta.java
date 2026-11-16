@@ -12,8 +12,8 @@ import org.bukkit.plugin.Plugin;
 
 /**
  * A small, typed accessor over an online {@link Player}'s {@link org.bukkit.persistence.PersistentDataContainer},
- * storing every value as a {@link PersistentDataType#STRING}. The Phase-3 {@code has-meta} requirement reads it and
- * the Phase-7 anti-dupe marking writes it; {@link #add} layers a parse-then-store numeric view on top so a meta key
+ * storing every value as a {@link PersistentDataType#STRING}. The {@code has-meta} requirement reads it and the
+ * {@code meta-*} actions write it; {@link #add} layers a parse-then-store numeric view on top so a meta key
  * can be used as a counter.
  *
  * <p>This is for <b>online players only</b>. An offline player's PDC is not reachable through the Bukkit API
@@ -22,8 +22,7 @@ import org.bukkit.plugin.Plugin;
  *
  * <h2>NamespacedKey discipline</h2>
  * Operator-chosen key names are open-ended, so the {@link NamespacedKey} for each is built once on first use and
- * cached in a {@link ConcurrentHashMap}. The hot-path rule from CLAUDE.md forbids constructing a
- * {@link NamespacedKey} per call. Every key lives under the one {@code uxmessentials} namespace, with the name
+ * cached in a {@link ConcurrentHashMap}, so a click never builds a {@link NamespacedKey}. Every key lives under the one {@code uxmessentials} namespace, with the name
  * segment sanitised to the legal {@code [a-z0-9._-]} alphabet.
  */
 public final class PlayerMeta {

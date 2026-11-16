@@ -13,7 +13,7 @@ import com.uxplima.uxmessentials.warps.domain.WarpCost;
  * {@link PlayerWarp} transition reads {@link PlayerWarp#toBuilder()}, changes the one or two fields it owns, and
  * calls {@link #build()}, which routes through the canonical {@code PlayerWarp} constructor, so every null-check
  * still fires. It seeds every component from the source warp and exposes a setter only for the components the
- * transitions actually vary; a T5/T6 transition that needs to edit another facet adds its setter here rather than
+ * transitions actually vary; a transition that needs to edit another facet adds its setter here rather than
  * hand-copying all twenty-odd fields at the call site.
  */
 final class PlayerWarpBuilder {

@@ -51,16 +51,15 @@ public final class CatalogMessages implements Messages {
     /**
      * Fill the {@code {token}} arguments a template spells, asking {@code placeholders} for each one by name.
      *
-     * <p>It used to walk the map and replace every key it held. That is the same answer for a map that is already
-     * a set of values, and the wrong one for a map that resolves a token when it is asked for: uxmLib's menu
-     * renderer now hands over the placeholders a line names rather than every registered handler's output, so
-     * iterating it yields nothing for an {@code @key} line, whose words live in the catalog rather than in the
-     * line. Asking by name is what lets the catalog entry request the arguments it actually spells.
+     * <p>Walking the map and replacing every key it holds gives the same answer for a map that is already a set of
+     * values, and the wrong one for a map that resolves a token when it is asked for: uxmLib's menu renderer hands
+     * over the placeholders a line names rather than every registered handler's output, so iterating it yields
+     * nothing for an {@code @key} line, whose words live in the catalog rather than in the line. Asking by name is
+     * what lets the catalog entry request the arguments it actually spells.
      *
-     * <p>A token the map does not answer is left as written, which is what the walk did for an unknown key too, so
-     * an operator still sees the token they typed rather than a blank. A value is inserted literally: with the walk
-     * a value that itself contained a brace token could be substituted again by a later iteration, which made the
-     * result depend on map order and let one value rewrite another. It cannot now.
+     * <p>A token the map does not answer is left as written, so an operator still sees the token they typed rather
+     * than a blank. A value is inserted literally: a value that itself contains a brace token is never substituted
+     * again, so the result does not depend on map order and one value cannot rewrite another.
      */
     public static String fill(String template, Map<String, String> placeholders) {
         if (template.indexOf('{') < 0) {

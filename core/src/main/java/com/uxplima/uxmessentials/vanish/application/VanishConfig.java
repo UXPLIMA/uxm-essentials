@@ -8,7 +8,7 @@ import com.uxplima.uxmessentials.shared.application.port.Logger;
 import com.uxplima.uxmessentials.vanish.domain.VanishLevel;
 
 /**
- * The typed, immutable view of {@code modules/vanish/config.conf}: the module enable gate plus the Phase 3 behaviour
+ * The typed, immutable view of {@code modules/vanish/config.conf}: the module enable gate plus the behaviour
  * toggles that govern what a vanished player experiences. Resolved once from the module's scoped {@link ConfigStore}
  * when the module starts and, per the atomic-reload rule, swapped whole on reload, so a command or listener that reads
  * it mid-reload sees one coherent snapshot.
@@ -19,7 +19,7 @@ import com.uxplima.uxmessentials.vanish.domain.VanishLevel;
  * meant to move through the world unseen and untouched; {@code pickup-items} defaults off so a vanished player does not
  * silently vacuum drops, and each player flips their own preference with {@code /vanish pickup}.
  *
- * <p>The Phase 4 connection illusions default on too. {@code fake-join-quit} makes a vanishing player broadcast a fake
+ * <p>The connection illusions default on too. {@code fake-join-quit} makes a vanishing player broadcast a fake
  * "left the game" line (and a fake "joined the game" on reappear) so no viewer notices they merely went invisible; the
  * two staff variants let a different line (or nothing, when left blank) go to viewers who <em>can</em> see them. A
  * template that is an {@code @key} reference is read from the message catalogue in each viewer's language, which is

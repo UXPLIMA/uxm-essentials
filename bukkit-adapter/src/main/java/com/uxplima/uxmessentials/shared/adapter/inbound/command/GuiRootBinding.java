@@ -33,8 +33,8 @@ import org.jspecify.annotations.Nullable;
  * gui-off command keeps its bare root open for the usage fallback.
  *
  * <p>The opener runs for a player only. Anyone else, the console first, runs the root the command shipped with:
- * the console cannot see a screen, and {@code /banlist}, {@code /eco} and {@code /uxmess} used to answer it with
- * nothing at all or refuse it as player-only. A root that shipped with nothing to run gets its usage line from the
+ * the console cannot see a screen, and a GUI root would answer it with nothing at all or refuse it as
+ * player-only. A root that shipped with nothing to run gets its usage line from the
  * {@link UsageBinding}, through {@link GuiRoot#withFallback}.
  */
 @NullMarked

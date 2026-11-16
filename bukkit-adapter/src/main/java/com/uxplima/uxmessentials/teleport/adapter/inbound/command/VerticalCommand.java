@@ -114,8 +114,8 @@ public final class VerticalCommand extends TeleportCommandSupport implements Com
     }
 
     /**
-     * The lowest space in this column a player can stand in. It used to be the world's floor plus one, which on a
-     * flat world is inside the dirt.
+     * The lowest space in this column a player can stand in. The world's floor plus one is not it: on a flat world
+     * that is inside the dirt.
      */
     static Optional<Position> bottomTarget(Player sender, Location origin) {
         World world = sender.getWorld();

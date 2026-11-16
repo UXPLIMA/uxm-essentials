@@ -33,7 +33,7 @@ import org.jspecify.annotations.NullMarked;
  *
  * <p>Treasury's API is asynchronous/subscriber-based; each call is bridged to the synchronous port through
  * {@link EconomySubscriber#asFuture} and joined. Every port call already runs off the tick thread (the
- * command layer's {@code Scheduler.async} + {@code orTimeout} guard, §4.3), so the join never blocks a
+ * command layer's {@code Scheduler.async} + {@code orTimeout} guard), so the join never blocks a
  * region thread. Treasury currency identifiers are mapped to this plugin's {@link Currency} at this boundary
  * via {@link TreasuryCurrencies}; nothing above the adapter sees a Treasury type. A currency the configured
  * registry does not know is reported as {@code CURRENCY_UNSUPPORTED} rather than silently converted.

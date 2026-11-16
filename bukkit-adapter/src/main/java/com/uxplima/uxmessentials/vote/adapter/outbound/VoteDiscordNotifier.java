@@ -134,7 +134,7 @@ public final class VoteDiscordNotifier implements Consumer<DomainEvent> {
     }
 
     /**
-     * Build the top-voter leaderboard embed. Pure: one field per ranked player ("#1 Name" / vote count),
+     * Build the top-voter leaderboard embed. Pure: one field per ranked player (place and name, then the vote count),
      * with names resolved through {@code nameResolver}. The caller is responsible for passing a non-empty
      * ranking list.
      */

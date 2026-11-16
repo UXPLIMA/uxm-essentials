@@ -82,7 +82,8 @@ import org.jspecify.annotations.NullMarked;
  * the persistence repositories, the {@link ImportData} use case, and the inbound
  * {@link MigrationImportService} the {@code /uxmess import} node calls. Nothing it builds runs at plugin
  * enable, the importer fires only on the command, and the whole wiring is gated by the
- * {@link MigrationModule#enabled(ConfigStore)} switch, which ships disabled (§1, §9). A disabled module
+ * {@link MigrationModule#enabled(ConfigStore)} switch, which ships disabled because an import is a one-off
+ * cutover, not a steady-state feature. A disabled module
  * yields a service that reports the importer dormant and dispatches nothing.
  */
 @NullMarked
@@ -325,7 +326,7 @@ public final class MigrationWiring {
     }
 
     /**
-     * The shared player-warp import writer, built over the player-warps ports the P4 module owns, the same
+     * The shared player-warp import writer, built over the player-warps ports the player-warps module owns, the same
      * repository, password store, and social stores {@code /setpwarp} and the browse GUI use, so an imported warp
      * can never reach a state a live command could not. The AxPlayerWarps, Athelion and Olzie sources all funnel
      * through this one writer.

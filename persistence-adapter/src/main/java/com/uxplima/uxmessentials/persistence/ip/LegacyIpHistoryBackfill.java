@@ -81,7 +81,8 @@ public final class LegacyIpHistoryBackfill {
 
     /**
      * The last-seen address of a player who predates the legacy history table (or whose history rows were already
-     * folded in) is an association too, and {@code /alts} used to read it, so it comes across as well. The seen row
+     * folded in) is an association too, one {@code /alts} has to show, so it comes across as well. The seen
+     * row
      * itself stays where it is: it is what {@code /seen} and {@code /seenip} render.
      */
     private static int carryLastAddresses(DSLContext dsl, IpTokens tokens, boolean retainAddress) {

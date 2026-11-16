@@ -167,8 +167,8 @@ public final class WorldsWiring {
         // Every backend keeps its own rows in the shared table, keyed by its network name; the cache holds the whole
         // network's set so the list and the cross-server teleport read it from memory. A peer's change arrives as a
         // WorldChanged frame and reloads the set off the tick; the periodic resync covers a frame that was lost.
-        // A backend off a network, or under the shipped default name, keeps its worlds unscoped, as before servers were
-        // recorded, so naming the server later lets the claim copy them rather than hiding them under server-1.
+        // A backend off a network, or under the shipped default name, keeps its worlds unscoped, so naming the
+        // server later lets the claim copy them rather than hiding them under server-1.
         String localName = hops.server();
         String scope = WorldScope.of(networkEnabled, localName);
         CachedWorldRepository cache = WorldRepositories.cachedConcrete(persistence, scope);
@@ -200,7 +200,7 @@ public final class WorldsWiring {
         // With cross-server.enabled on, /worlds spawn and /worlds tp reach a world another backend runs by sending the
         // player there through the hop the bootstrap shares between every kind: the teleport rules run here before the
         // fee, and the fee comes back on every miss. Off, the resolver is not registered and only this backend's
-        // worlds can be reached, as before.
+        // worlds can be reached.
         WorldHops worldHops = WorldHops.local(scope);
         if (ctx.config().getBoolean("cross-server.enabled", false)) {
             hops.register(new WorldHopResolver(

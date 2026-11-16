@@ -9,7 +9,7 @@ import com.uxplima.uxmessentials.shared.domain.message.MessageKey;
  * context: the {@code /treefeller} and {@code /veinminer} toggles resolve their on/off notices through these.
  *
  * <p>Per the i18n contract a disabled module still ships its keys so the catalog stays whole and the locale-parity
- * guard sees the full {@code en} key set. Later phases add their own keys here as their mechanics land.
+ * guard sees the full {@code en} key set.
  */
 public enum SurvivalMessageKey implements MessageKey {
 

@@ -62,7 +62,7 @@ import org.jspecify.annotations.NullMarked;
  * UI so a manager never even sees the money or lifecycle controls. The gating is only presentation; each use case still
  * re-checks authority itself.
  *
- * <p>Each button routes through the same P4 use case the {@code /pwarp} verbs drive: metadata, access, password, and
+ * <p>Each button routes through the same use case the {@code /pwarp} verbs drive: metadata, access, password, and
  * price through {@link EditPlayerWarp}; the bank through {@link WithdrawEarnings}; ownership through
  * {@link TransferPlayerWarp}; delete (a recoverable archive) through {@link ArchivePlayerWarp}. A value-carrying click
  * id is single-segment ({@code pwarp-rename}, {@code pwarp-price}, ...) because the engine splits a value token on its
@@ -544,8 +544,8 @@ public final class PlayerWarpManageMenu {
      *
      * @param warp the warp the panel manages, snapshotted at open
      * @param viewerRole the role the viewer holds on the warp (OWNER / CO_OWNER / MANAGER), the capability gate reads it
-     * @param sponsorEnabled whether the P6 sponsor sub-feature is enabled; false until P6 wires the flag, so the sponsor
-     *     button never renders yet
+     * @param sponsorEnabled whether the sponsor sub-feature is enabled; the sponsor button renders only when it
+     *     is
      */
     public record Subject(PlayerWarp warp, WarpRole viewerRole, boolean sponsorEnabled) {
 

@@ -58,7 +58,7 @@ public final class WarpBrowseMenu {
     /** Disk-first then bundled, mirroring the GUI-layout loader, so an operator edit to the spec takes effect. */
     private static final String SPEC_RESOURCE = "modules/warps/gui/warp-browse.conf";
 
-    /** The single material every warp tile uses, since warps carry no item: matches the old view's fallback. */
+    /** The single material every warp tile uses, since warps carry no item. */
     private static final Material WARP_FALLBACK_ICON = Material.ENDER_PEARL;
 
     /** The kind a browse tile stands for, so one list source can mix drill-in categories and warp tiles. */
@@ -97,7 +97,7 @@ public final class WarpBrowseMenu {
         bindings.placeholder("warp_browse_lore", ctx -> rowOf(ctx).lore());
         bindings.action("warps:browse-click", this::click);
         bindings.action("warps:browse-back", this::back);
-        // The back button shows only below the root, exactly as the old view only drew it when a category was open.
+        // The back button shows only below the root: at the root there is nothing to go back to.
         bindings.condition(
                 "warps:browse-has-parent",
                 (ctx, args) -> ctx.subject(BrowseLevel.class).categoryId().isPresent());
@@ -124,7 +124,7 @@ public final class WarpBrowseMenu {
 
     /**
      * Resolve one browse level into its mixed, fully-rendered tiles: the sub-categories of {@code categoryId}
-     * sorted by their slot, then the warps at that level, reproducing the old view's ordering. With no categories
+     * sorted by their slot, then the warps at that level. With no categories
      * defined this is just the warps, so the legacy flat list and the category root are one path.
      */
     private BrowseLevel level(PlayerRef viewer, List<Warp> warps, Optional<String> categoryId) {
@@ -138,7 +138,7 @@ public final class WarpBrowseMenu {
         return new BrowseLevel(warps, categoryId, rows);
     }
 
-    /** The categories whose parent is {@code categoryId}, sorted by their display slot like the old view. */
+    /** The categories whose parent is {@code categoryId}, sorted by their display slot. */
     private List<WarpCategory> subCategories(Optional<String> categoryId) {
         return categoryRepository.all().stream()
                 .filter(category -> category.parentCategoryId().equals(categoryId))
@@ -183,7 +183,7 @@ public final class WarpBrowseMenu {
     }
 
     /**
-     * The warp tile's full lore as the catalog lines joined by {@code \n}, in the old view's order: the optional
+     * The warp tile's full lore as the catalog lines joined by {@code \n}, in this order: the optional
      * cost, the optional required permission, the location, then the click-to-warp hint. The engine's multi-line
      * placeholder expansion splits this back into one lore component per line, each rendered as MiniMessage.
      */
@@ -216,7 +216,7 @@ public final class WarpBrowseMenu {
 
     /**
      * Click a tile: drill into a clicked category by re-opening the browse spec at that category's level, or warp
-     * the viewer to a clicked warp through the same {@link UseWarp} use case the old view used. The clicked tile's
+     * the viewer to a clicked warp through the same {@link UseWarp} use case {@code /warp} runs. The clicked tile's
      * identity comes from the bound entry, never from re-reading the icon.
      */
     private void click(MenuActionContext ctx) {

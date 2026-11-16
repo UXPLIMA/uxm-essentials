@@ -18,7 +18,7 @@ import org.jspecify.annotations.NullMarked;
  * rewards for every online player once a configured threshold is reached; a vote for an offline player
  * is queued and paid out on their next join. It owns {@code /vote} (the configured vote links, plus a
  * {@code testreward} subcommand) and {@code /voteparty} (the party progress). The Votifier event
- * listener and the join handler are Bukkit-facing and land with the adapter wiring.
+ * listener and the join handler are Bukkit-facing and come from the adapter wiring.
  *
  * <p><b>Ships disabled by default.</b> A vote reaches the server through Votifier and pays out of a reward list
  * the operator writes, so a server that has installed neither has nothing for this to do and
@@ -51,8 +51,8 @@ public final class VoteModule implements FeatureModule {
 
     @Override
     public List<ListenerFactory> listeners() {
-        // The Votifier vote listener and the join handler are Bukkit-facing and land with the inbound adapter;
-        // a disabled or not-yet-adapted module registers none here.
+        // The Votifier vote listener and the join handler are Bukkit-facing and come from the inbound adapter;
+        // a disabled module registers none here.
         return List.of();
     }
 

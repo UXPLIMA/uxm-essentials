@@ -59,8 +59,8 @@ final class IntegrationsWiring {
     // server owner controls exactly who is told (the uxmLib notifier gates on the permission, not on op status).
     private static final String UPDATE_NOTIFY_PERMISSION = SharedPermissions.UPDATE_NOTIFY;
 
-    // What the notice says. uxmLib used to write this line itself and it stopped: a library that words a message
-    // decides how a plugin sounds, and that is the plugin's to decide. The library hands over one notice for every
+    // What the notice says. The plugin words this line, not uxmLib: a library that words a message decides how a
+    // plugin sounds, and that is the plugin's to decide. The library hands over one notice for every
     // operator it reaches and the console, so it is read in the server's own language rather than each reader's.
     private static UpdateAnnouncement updateAnnouncement(Messages messages) {
         PlayerRef server = PlayerRef.system("update");

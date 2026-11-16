@@ -184,8 +184,8 @@ public final class AcceptTeleport {
         return Result.ok();
     }
 
-    // /tpaccept, /tpdeny and /tpcancel with nothing waiting used to do nothing at all; tell the
-    // invoking player there is no pending request so the verb never fails silently.
+    // /tpaccept, /tpdeny and /tpcancel with nothing waiting tell the invoking player there is no
+    // pending request, so the verb never fails silently.
     private Result<Unit, TeleportError> noPending(PlayerRef invoker) {
         notifier.send(invoker, TeleportError.NO_PENDING_REQUEST.messageKey());
         return Result.err(TeleportError.NO_PENDING_REQUEST);

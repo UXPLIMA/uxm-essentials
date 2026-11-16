@@ -12,11 +12,11 @@ import org.jspecify.annotations.NullMarked;
 
 /**
  * The command-control bounded context as a first-class {@link FeatureModule}: PlHidePro / CommandWhitelist-parity
- * gating of which commands a player may run and see, built in with no separate plugin. Phase 1 is the command
- * whitelist/blacklist and the custom "unknown command" deny message; Phase 2 adds the tab-completion filter and the
- * plugin-hide (scrubbing disallowed and plugin-listing commands from the client command list, tab completion, and the
- * scrub-help output); Phase 3 adds the namespace-bypass block, so a {@code /minecraft:gamemode} escape is denied when
- * {@code /gamemode} is. The PlHidePro-parity extras layer on top: command-spam rate-limiting (kick/block/warn a player
+ * gating of which commands a player may run and see, built in with no separate plugin: the command
+ * whitelist/blacklist and the custom "unknown command" deny message, the tab-completion filter and the plugin-hide
+ * (scrubbing disallowed and plugin-listing commands from the client command list, tab completion, and the scrub-help
+ * output), and the namespace-bypass block, so a {@code /minecraft:gamemode} escape is denied when {@code /gamemode}
+ * is. The PlHidePro-parity extras layer on top: command-spam rate-limiting (kick/block/warn a player
  * who floods commands), the plugin-channel hider (strip non-allowed plugin-messaging channels from the client so mods
  * cannot fingerprint installed plugins), auto-lowercasing the base command label, and per-world overrides of the
  * command lists and hide behaviour. The gate and filters are client-agnostic - a Bedrock / Geyser player is gated like

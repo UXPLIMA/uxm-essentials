@@ -85,7 +85,7 @@ final class KitIconRenderer {
      * pre-built {@link ItemStack}: the icon's material name, its name as a MiniMessage source, and its full lore
      * as the rendered lines joined by {@code \n} for the engine's multi-line placeholder to expand back. They are
      * the exact name/material/lore the {@link #icon} path builds, the same resolveMaterial/resolveName/resolveLore
-     * passes feed both, so a tile drawn through the engine matches the tile the old view drew icon for icon. The
+     * passes feed both, so a tile drawn through the engine matches the {@link #icon} tile icon for icon. The
      * variant is resolved once here so the browse menu hands the same already-resolved kit to a later claim.
      */
     String kitMaterialName(PlayerRef viewer, KitDefinition variant) {
@@ -219,7 +219,7 @@ final class KitIconRenderer {
 
     /**
      * The kit icon's name as the MiniMessage source string the engine renders, factored out of {@link #resolveName}
-     * so the engine-rendered browse tile and the old ItemStack path resolve the identical text. An operator's
+     * so the engine-rendered browse tile and the ItemStack path resolve the identical text. An operator's
      * per-state override is free text with its cost/cooldown/PAPI tokens substituted; otherwise the per-state
      * catalog name is resolved in the viewer's locale, again with those tokens substituted.
      */
@@ -303,7 +303,7 @@ final class KitIconRenderer {
     /**
      * The kit icon's full lore as the catalog/override source lines, factored out of {@link #resolveLore} so the
      * engine-rendered browse tile (which joins these with {@code \n} and re-splits per line through its multi-line
-     * placeholder) and the old ItemStack path resolve the identical lore. The order is the old view's: the
+     * placeholder) and the ItemStack path resolve the identical lore. The order: the
      * per-state or display lore, then a status line per requirement, then the conditional cooldown/one-time/cost
      * lines and the claim hint, and finally the preview hint, unless the kit is locked, which shows its own lore.
      */

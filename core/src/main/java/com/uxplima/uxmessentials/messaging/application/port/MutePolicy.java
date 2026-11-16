@@ -8,7 +8,7 @@ import com.uxplima.uxmessentials.shared.domain.PlayerRef;
  * (docs/permissions.md: a muted player is blocked regardless of the messaging nodes). The messaging context
  * does not own mute state; it asks this port.
  *
- * <p>The coupling is soft: when the moderation module is disabled (or has not yet landed) the wiring binds
+ * <p>The coupling is soft: when the moderation module is disabled the wiring binds
  * {@link #NEVER}, so messaging degrades to "no one is muted" rather than failing. This is the same
  * degrade-when-the-other-module-is-off pattern the warps cost uses against economy.
  */

@@ -108,7 +108,7 @@ public final class SecurityWiring {
         RemovePin removePin = new RemovePin(repository, limiter);
         Clock clock = Clock.systemUTC();
 
-        // Phase 4: IP/alt guard + ClientID. The associations come from the kernel IP-history store (tokens only on
+        // IP/alt guard and ClientID. The associations come from the kernel IP-history store (tokens only on
         // the read side, so this guard never sees an address) and the kernel recorder that writes them; the guard
         // watches that recorder rather than capturing a join of its own. Alongside it are the session-only
         // client-brand registry, the staff notifier that fans an alt / flagged-client notice to the notify-perm
@@ -129,7 +129,7 @@ public final class SecurityWiring {
                 new ClientGuard(brands, config.clientId(), staffNotifier, kernel.scheduler(), kernel.messages());
         FindAlts findAlts = new FindAlts(ipHistory);
 
-        // Phase 2. Join verification: the DB-backed device-trust store, the transient freeze/lockout registry, the
+        // Join verification: the DB-backed device-trust store, the transient freeze/lockout registry, the
         // keypad GUI, and the controller that decides on join and drives every submitted PIN/code to an unfreeze,
         // re-prompt, or lockout kick. A submitted code is verified through VerifyTwoFactor (TOTP or PIN), off-thread.
         // Built ahead of the commands so /2fa force can drive an online target straight back into the freeze.
@@ -240,7 +240,7 @@ public final class SecurityWiring {
                 new ClientInfoCommand(
                         brands, kernel.playerLookup(), kernel.scheduler(), kernel.messages(), kernel.messageSink()));
 
-        // Phase 3. Op-command protection: a re-auth controller sharing the same keypad, a router that sends each
+        // Op-command protection: a re-auth controller sharing the same keypad, a router that sends each
         // keypad submission to whichever flow the player is in, and the command listener that blocks a protected
         // command until the player's re-auth window is fresh. The recent-verify check is in-memory; the verify is
         // off-thread. The op-protection sub-feature is gated by its own enabled flag, so a no-op costs nothing.
@@ -266,7 +266,7 @@ public final class SecurityWiring {
         keypad.register(menuBindings, router, plugin.getDataFolder().toPath(), kernel.log());
         // On an offline-mode server the login plugin owns the first half of the login, so the second factor waits for
         // it rather than racing it. The hook is reflective and finds nothing on a server with no login plugin, which
-        // leaves the plain join hook in charge exactly as before.
+        // leaves the plain join hook in charge.
         LoginPluginHandoff handoff = new LoginPluginHandoff(plugin, kernel.log());
         if (config.joinVerification().waitForLoginPlugin() && handoff.hook(controller::onAuthenticated)) {
             controller.deferToLoginPlugin();

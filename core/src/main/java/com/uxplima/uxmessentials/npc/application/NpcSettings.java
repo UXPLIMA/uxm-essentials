@@ -69,7 +69,7 @@ public final class NpcSettings {
 
     /**
      * The command labels an NPC's bound command or click action may not run (case-insensitive, matched on the
-     * first word). Empty by default: nothing is blocked, so a server that configures no list behaves as before.
+     * first word). Empty by default: nothing is blocked, so a server that configures no list runs every command.
      */
     public List<String> blockedCommands() {
         return config.getStringList("blocked-commands", List.of());

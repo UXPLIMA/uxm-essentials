@@ -10,7 +10,7 @@ import com.uxplima.uxmessentials.shared.domain.PlayerRef;
  * orchestrates the existing messaging module's {@code StaffAudience} and broadcaster through this port, the
  * same way {@code HelpOp} fans a help request out to staff.
  *
- * <p>The coupling is soft: when the messaging module is disabled (or has not yet landed) the wiring binds
+ * <p>The coupling is soft: when the messaging module is disabled the wiring binds
  * {@link #NONE}, so {@link #onlineStaff()} is empty and {@link #send} is a no-op: staff chat degrades
  * rather than fails: mirroring messaging's own {@code MutePolicy.NEVER}.
  */

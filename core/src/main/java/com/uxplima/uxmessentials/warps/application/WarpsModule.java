@@ -47,7 +47,7 @@ public final class WarpsModule implements FeatureModule {
 
     @Override
     public List<ListenerFactory> listeners() {
-        // The warps context registers no Bukkit listener; a disabled or not-yet-adapted module registers
+        // The warps context registers no Bukkit listener; a disabled module registers
         // none either.
         return List.of();
     }

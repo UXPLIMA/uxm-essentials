@@ -11,7 +11,7 @@ import org.jspecify.annotations.NullMarked;
  * The server a backend keeps its managed worlds under. Only a backend on a network under a name of its own records
  * one: off a network every backend is {@code server-1}, and so is one that never set its name, so worlds recorded
  * under it would vanish the day the operator names the server. Such a backend keeps its worlds under
- * {@value NetworkWorld#UNSCOPED}, exactly as before servers were recorded, and the claim copies them onto its real name
+ * {@value NetworkWorld#UNSCOPED}, the name every unnamed backend shares, and the claim copies them onto its real name
  * once it has one.
  */
 @NullMarked

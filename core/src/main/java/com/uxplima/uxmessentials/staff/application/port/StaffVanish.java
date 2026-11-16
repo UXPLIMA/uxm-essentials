@@ -8,7 +8,7 @@ import com.uxplima.uxmessentials.shared.domain.PlayerRef;
  * {@code ToggleVanish}/{@code PresenceStore} through this port so there is no second vanish state to keep in
  * sync.
  *
- * <p>The coupling is soft: when the presence module is disabled (or has not yet landed) the wiring binds
+ * <p>The coupling is soft: when the presence module is disabled the wiring binds
  * {@link #NONE}, so staff mode degrades to "vanish does nothing" rather than failing, the same
  * degrade-when-the-other-module-is-off pattern as messaging's {@code MutePolicy.NEVER}.
  */

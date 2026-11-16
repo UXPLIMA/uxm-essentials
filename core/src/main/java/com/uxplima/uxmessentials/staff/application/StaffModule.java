@@ -30,7 +30,7 @@ import org.jspecify.annotations.NullMarked;
  * <p>It persists the captured loadout, but that {@code staff_loadout} table ships in a persistence Flyway
  * migration the persistence layer always applies, so the module declares no extra migration location of its
  * own. The toggle command, the gadget hotbar swap, the right-click gadget listener, and the soft-couple port
- * bindings are Bukkit-facing and land with the adapter wiring once the module has started; the lifecycle
+ * bindings are Bukkit-facing and come from the adapter wiring once the module has started; the lifecycle
  * bookkeeping here keeps {@code stop()} honest.
  */
 @NullMarked
@@ -54,8 +54,8 @@ public final class StaffModule implements FeatureModule {
 
     @Override
     public List<ListenerFactory> listeners() {
-        // The gadget right-click and connection listeners are Bukkit-facing and land with the inbound
-        // adapter; a disabled or not-yet-adapted module registers none here.
+        // The gadget right-click and connection listeners are Bukkit-facing and come from the inbound
+        // adapter; a disabled module registers none here.
         return List.of();
     }
 

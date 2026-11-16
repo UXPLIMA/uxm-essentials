@@ -5,7 +5,7 @@
  * per-warp cost), render feedback through the {@code Messages}/{@code MessageSink} pair, and delegate the
  * actual teleport to the teleport context through the {@code WarpTeleporter} port, warps never
  * re-implements movement. The economy coupling is <em>soft</em>: the {@code WarpEconomy} seam is injected as
- * an {@code Optional}, so a warp's cost is charged when economy is wired (P3) and ignored gracefully when it
+ * an {@code Optional}, so a warp's cost is charged when economy is wired and ignored gracefully when it
  * is not. The {@code WarpsModule} declares the context's commands and enable gate. No Bukkit, Paper, Kyori,
  * or logging type appears here.
  */

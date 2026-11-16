@@ -29,7 +29,8 @@ import com.uxplima.uxmessentials.shared.domain.message.MessageKey;
  * and inherits the warning's {@code silent} flag, so a silent warn escalates silently. Its reason names the
  * warning count that tripped the step and that warning's own reason, so the history says what caused it. The reason is
  * kept as the catalog line and its arguments ({@link DrawnReason}), so every reader reads it in their own language;
- * the text drawn for the punished player is stored beside it for the audit log and older releases.
+ * the text drawn for the punished player is stored beside it for the audit log and for readers that cannot draw
+ * the catalog line.
  *
  * <p>A rung leaves the player under the stronger of its own sanction and the one of that kind already running:
  * a longer mute or ban replaces a shorter one, and a running one that lasts as long or longer (a permanent one

@@ -9,7 +9,7 @@ import com.uxplima.uxmessentials.playerwarps.domain.PlayerWarpId;
  * Outbound port for a warp's whitelist. The players allowed to teleport to a
  * {@link com.uxplima.uxmessentials.playerwarps.domain.WarpAccess#WHITELIST WHITELIST}-access warp. One row per
  * {@code (warp, player)}, so {@link #add} is idempotent: whitelisting an already-whitelisted player is a no-op,
- * not a duplicate row. The ordered access gate (P4-T3) consults {@link #contains} to decide a whitelist teleport.
+ * not a duplicate row. The ordered access gate consults {@link #contains} to decide a whitelist teleport.
  */
 public interface WarpWhitelistStore {
 

@@ -35,8 +35,8 @@ public abstract class AbstractHudModule implements FeatureModule {
 
     @Override
     public List<ListenerFactory> listeners() {
-        // The join/quit connection listener is Bukkit-facing and lands with the inbound adapter; a disabled or
-        // not-yet-adapted module registers none here.
+        // The join/quit connection listener is Bukkit-facing and comes from the inbound adapter; a disabled
+        // module registers none here.
         return List.of();
     }
 

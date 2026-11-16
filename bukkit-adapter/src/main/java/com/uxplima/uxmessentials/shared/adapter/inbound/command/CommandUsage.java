@@ -17,9 +17,9 @@ import org.jspecify.annotations.NullMarked;
  * The one usage line: {@code /pay <player> <amount> [currency] • Transfer funds to another player.}
  *
  * <p>The description is the catalogue's {@code describe.<command>} line in the reader's language, the root of a
- * nested command describing it, and the English the code passes stands in only where no catalogue has a line. Eight
- * command families used to write this line themselves with the English in the code, so a reader of another language
- * read English and the line missed the lettering the catalogue gives every other one.
+ * nested command describing it, and the English the code passes stands in only where no catalogue has a line. A
+ * command family that wrote this line itself with the English in the code would show a reader of another language
+ * English, without the lettering the catalogue gives every other line.
  */
 @NullMarked
 public final class CommandUsage {

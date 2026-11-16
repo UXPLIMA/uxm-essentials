@@ -1,6 +1,6 @@
 /**
  * Application layer of the custommenus bounded context: the {@code CustomMenusModule} that registers the {@code /menu}
- * command. The context is otherwise adapter-thin. It consumes the Phase-1 menu engine ({@code Menus} /
+ * command. The context is otherwise adapter-thin. It consumes the menu engine ({@code Menus} /
  * {@code MenuBindings}) rather than owning a domain aggregate.
  */
 @org.jspecify.annotations.NullMarked

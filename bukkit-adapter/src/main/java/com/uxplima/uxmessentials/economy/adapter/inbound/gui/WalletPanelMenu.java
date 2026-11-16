@@ -34,7 +34,7 @@ import org.jspecify.annotations.NullMarked;
  * {@code /uxmess gui} hub) with the menu engine and opens it. A three-row panel for one currency: a virtual-balance
  * display, a physical-banknotes tally, a button into the engine transaction-history list, and a close button. The
  * menu holds no new domain logic; it reads the balance and tallies the viewer's banknotes off the tick thread when
- * the panel opens, exactly as the old view did, and hands both in as the {@link WalletSubject} the two display
+ * the panel opens, and hands both in as the {@link WalletSubject} the two display
  * items render from, then registers the per-display placeholders and the history-open action and loads the
  * {@code economy-wallet} spec.
  *
@@ -114,7 +114,7 @@ public final class WalletPanelMenu {
                 () -> {});
     }
 
-    /** Open the read-only transaction-history list for the viewer, exactly as the old history button did. */
+    /** Open the read-only transaction-history list for the viewer. */
     private void openHistory(MenuActionContext ctx) {
         Player player = ctx.player();
         historyView.open(ctx.viewer(), player.getUniqueId(), player.getName());

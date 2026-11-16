@@ -50,8 +50,8 @@ import org.jspecify.annotations.NullMarked;
  * <p>All file work runs through the {@link MenuEditorService}, off the tick thread: a create / duplicate / rename /
  * delete is scheduled async, its typed outcome carried back to the viewer's entity thread to show a confirmation and
  * reopen the right window (the new menu's overview after a create, the list after a delete). The picker reads the live
- * loaded-name set fresh on each open, so a menu created or deleted here appears or disappears immediately. P1 wires the
- * menu-level CRUD only; the overview's slot-grid button is a placeholder the P2 grid editor fills in.
+ * loaded-name set fresh on each open, so a menu created or deleted here appears or disappears immediately. The
+ * overview's buttons open the slot-grid canvas and the menu-level property editor.
  */
 @NullMarked
 public final class MenuEditorView {
@@ -272,7 +272,7 @@ public final class MenuEditorView {
                 (player, reopen) -> promptRename(player, id, reopen));
     }
 
-    /** The overview button that opens the slot-grid canvas for this menu: the P2 editor's entry point. */
+    /** The overview button that opens the slot-grid canvas for this menu. */
     private EditableProperty gridButton(String id) {
         return new ActionProperty(
                 CustomMenusMessageKey.MENU_EDITOR_GRID.key(),
@@ -281,7 +281,7 @@ public final class MenuEditorView {
                 (player, reopen) -> openGrid.accept(player, id));
     }
 
-    /** The overview button that opens the menu-level property editor for this menu: the P5 editor's entry point. */
+    /** The overview button that opens the menu-level property editor for this menu. */
     private EditableProperty propertiesButton(String id) {
         return new ActionProperty(
                 CustomMenusMessageKey.MENU_EDITOR_PROPERTIES.key(),

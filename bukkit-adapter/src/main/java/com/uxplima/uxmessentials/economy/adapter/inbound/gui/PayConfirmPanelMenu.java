@@ -69,7 +69,7 @@ public final class PayConfirmPanelMenu {
         menus.open(viewer, SPEC_ID, new PendingPayment(target, amount));
     }
 
-    /** Run the payer's staged transfer off the tick thread, then close the window, exactly as the old confirm did. */
+    /** Run the payer's staged transfer off the tick thread, then close the window. */
     private void confirm(MenuActionContext ctx) {
         PlayerRef viewer = BukkitRefs.toRef(ctx.viewer());
         Player player = ctx.player();

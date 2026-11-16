@@ -33,10 +33,9 @@ import org.jooq.impl.DSL;
 import org.jspecify.annotations.NullMarked;
 
 /**
- * The jOOQ-backed {@link PlayerWarpBrowse}. The read side that answers the old browse's "verimsiz" (inefficient)
- * complaint. The previous browse GUI ran {@code SELECT *} over {@code player_warps}, rebuilt one {@code PlayerWarp}
- * aggregate per row, and paginated in Java; opening the browse got linearly slower as the server grew. This impl
- * instead issues one bounded query pair per page: a projection of only the card columns filtered, sorted, and
+ * The jOOQ-backed {@link PlayerWarpBrowse}. A browse that ran {@code SELECT *} over {@code player_warps}, rebuilt
+ * one {@code PlayerWarp} aggregate per row, and paginated in Java would get linearly slower as the server grew, so
+ * this issues one bounded query pair per page: a projection of only the card columns filtered, sorted, and
  * {@code LIMIT}/{@code OFFSET}-windowed, plus a {@code COUNT} over the same predicate for the total. It never loads
  * an aggregate and never reads the whole table, so a page over a hundred thousand warps costs the same as one over
  * eight.

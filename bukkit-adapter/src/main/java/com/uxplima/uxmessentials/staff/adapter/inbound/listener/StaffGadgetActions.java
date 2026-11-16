@@ -80,7 +80,7 @@ public final class StaffGadgetActions {
     /**
      * Open the COMPASS navigator: snapshot the visible online roster on the global region thread (iterating the
      * online list off it is illegal on Folia, and {@code canSee} is the looker's vanish-aware visibility), then hand
-     * it to the menu engine, which builds and opens on the looker's entity thread. Mirrors the old picker's open.
+     * it to the menu engine, which builds and opens on the looker's entity thread.
      */
     private void openNavigator(Player looker) {
         scheduler.onGlobal(() -> {
@@ -107,7 +107,7 @@ public final class StaffGadgetActions {
     /**
      * Open the EXAMINE picker: snapshot the online roster on the global region thread (iterating the online list off
      * it is illegal on Folia), then hand it to the menu engine, which builds and opens on the looker's entity
-     * thread. The picker lists every online player, as the old view did. Mirrors the old picker's open.
+     * thread. The picker lists every online player.
      */
     private void openExamine(Player who) {
         scheduler.onGlobal(() -> {

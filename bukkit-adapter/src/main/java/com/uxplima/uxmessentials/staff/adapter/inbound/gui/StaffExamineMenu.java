@@ -82,7 +82,7 @@ public final class StaffExamineMenu {
     /**
      * Left-click a head: close the picker, then, if the clicked player is still online, open their inventory
      * through the inspector and send the info line. Runs on the looker's entity thread (the engine dispatches
-     * actions there), so the target read and the inventory open are region-safe, mirroring the old view's click.
+     * actions there), so the target read and the inventory open are region-safe.
      */
     private void examine(MenuActionContext ctx) {
         PlayerRef looker = BukkitRefs.toRef(ctx.viewer());

@@ -3,7 +3,7 @@ package com.uxplima.uxmessentials.playerwarps.domain;
 /**
  * The modelled ways a player-warp charge can fail. The access gate maps any of these to a single
  * {@link PlayerWarpError#CANNOT_AFFORD} refusal. The payer only needs to know they were not admitted and no
- * money moved, while the outbound economy adapter (P4-T4) distinguishes them so it can log and, under a
+ * money moved, while the outbound economy adapter distinguishes them so it can log and, under a
  * foreign provider, decide whether a compensating credit is owed.
  *
  * <ul>

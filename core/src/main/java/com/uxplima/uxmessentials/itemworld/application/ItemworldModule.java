@@ -27,8 +27,8 @@ import org.jspecify.annotations.NullMarked;
  * surface validates inputs at the adapter boundary and applies them through the live item/entity/world. So
  * the module declares no migration location and the only runtime state is the transient powertool bindings the
  * adapter holds as PDC stamps; the lifecycle bookkeeping here keeps {@code stop()} honest. The {@code /repair
- * /repairall /hat /more} verbs overlap playerstate by name but are owned here: playerstate deferred them
- * (§15.6), so they register here and the two modules never double-register.
+ * /repairall /hat /more} verbs overlap playerstate by name but act on items, so they are owned here and the two
+ * modules never double-register.
  *
  * <p>On top of the module-level enable switch, each {@link SubFeatureGroup sub-feature group} is independently
  * disableable and every command carries a per-command disable, resolved from {@code itemworld.conf} through
@@ -57,7 +57,7 @@ public final class ItemworldModule implements FeatureModule {
     @Override
     public List<ListenerFactory> listeners() {
         // The powertool interact listener and the inventory-close write-back for the cleanup GUIs are
-        // Bukkit-facing and land with the inbound adapter; a disabled or not-yet-adapted module registers none here.
+        // Bukkit-facing and come from the inbound adapter; a disabled module registers none here.
         return List.of();
     }
 

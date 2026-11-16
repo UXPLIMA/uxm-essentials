@@ -21,7 +21,7 @@ import org.jspecify.annotations.Nullable;
  *
  * <p>The fetch asks Mojang directly rather than through {@code PlayerProfile.complete()}, which consults the session
  * service only on an online-mode server: completing a profile on a cracked server returns no textures at all, so every
- * tablist skin by name used to be blank there. Reading a live player's profile stays a Bukkit call because that is
+ * tablist skin by name would be blank there. Reading a live player's profile stays a Bukkit call because that is
  * where another plugin's skin would be.
  *
  * <p>Every read fails closed: an unknown name, an absent {@code textures} property, or a fetch failure returns empty so

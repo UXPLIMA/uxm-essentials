@@ -15,8 +15,7 @@ import org.jspecify.annotations.NullMarked;
 /**
  * The backend's {@code network} view: whether this backend opts into cross-server sync, its unique
  * {@code server-id} (the origin tag stamped into every outbound frame and the loop sentinel on inbound), the
- * bus channel name, the bounded outbound queue size, and, added in
- * Phase B, which {@link Transport} carries the bus and the canonical {@link Redis} connection block the Redis
+ * bus channel name, the bounded outbound queue size, which {@link Transport} carries the bus and the canonical {@link Redis} connection block the Redis
  * transport uses. These are restart-only. The channel, the captured server-id and the chosen transport are
  * bound once at enable, so a single immutable snapshot is read at wiring time.
  *

@@ -37,7 +37,7 @@ import org.jspecify.annotations.NullMarked;
  * thread. Each hologram carries no item of its own, so the icon is a fixed {@code ARMOR_STAND} literal in the spec;
  * the {@code hologram_name} / {@code hologram_lines} / {@code hologram_world} / {@code hologram_x} / {@code
  * hologram_y} / {@code hologram_z} placeholders fill that hologram's name, line count, world, and rounded
- * coordinates into the catalog entry. A left click runs {@code holograms:edit}, which opens the still-bespoke
+ * coordinates into the catalog entry. A left click runs {@code holograms:edit}, which opens the bespoke
  * {@link HologramEditorView} for the clicked hologram; the create button runs {@code holograms:create}, which
  * prompts for a name and creates a fresh text hologram at the operator's feet through the same {@link
  * HologramServices#create()} use case {@code /hologram create} drives, so the list adds no domain logic of its own.

@@ -55,8 +55,8 @@ import org.jspecify.annotations.NullMarked;
  * delegate, invalidate in the cache). The teleporter delegates execution to the teleport context, warps
  * never re-implements movement, which is why the wiring receives the already-constructed
  * {@link TeleportEngine}. The per-warp cost soft-couples to the economy context: the {@link WarpEconomy}
- * seam is injected as an {@link Optional}, currently {@link Optional#empty()} because economy lands in P3,
- * so a priced warp's cost is recorded but not charged until that bridge is wired.
+ * seam is injected as an {@link Optional}, {@link Optional#empty()} when economy is disabled, so a priced warp's
+ * cost is recorded but not charged without that bridge.
  *
  * <p>Cross-server sync rides the {@link Bus} handle: the wiring registers a {@link WarpSync} listener that
  * drops the cached warp set on a peer's change and wraps the cached repository so every local {@code /warp set}
@@ -187,7 +187,7 @@ public final class WarpsWiring {
                 playerWarpGoTo);
         // The sound and particle selectors render through the menu engine's selector runtime; both pick the warp's
         // departure/arrival effect through the same editable-warp loader the editor uses and reopen the editor on a
-        // pick, so a single picker covers server and player warps exactly as before.
+        // pick, so a single picker covers server and player warps.
         // Both pickers offer what the warps file lists, or what the plugin ships where the file predates the list.
         var presets = com.uxplima.uxmessentials.warps.adapter.inbound.gui.WarpPresets.read(
                 ctx.config(),

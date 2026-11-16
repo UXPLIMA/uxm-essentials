@@ -8,7 +8,7 @@ import com.uxplima.uxmessentials.shared.domain.PlayerRef;
  * seeing it, so the nametag tracks the same visibility graph the {@code /tpa} listing and {@code /msg} resolution
  * already honour.
  *
- * <p>The coupling is soft: when the presence module is disabled (or has not yet landed) the wiring binds
+ * <p>The coupling is soft: when the presence module is disabled the wiring binds
  * {@link #ALWAYS_VISIBLE}, so the nametag renderer degrades to "everyone can see everyone" rather than failing
  * mirroring messaging's {@code VanishVisibility}, whose {@code ALWAYS_VISIBLE} binding is the presence-off default.
  * Note the polarity is the renderer's natural one (can this viewer see the wearer?), the inverse of messaging's
