@@ -19,4 +19,12 @@ public interface WorldLookup {
 
     /** The loaded world with this persistent uid, if any. */
     Optional<WorldRef> findByUid(UUID uid);
+
+    /**
+     * The loaded world with this namespaced key, such as {@code minecraft:overworld}: how vanilla names a dimension.
+     * Empty by default, for a lookup that has no keys.
+     */
+    default Optional<WorldRef> findByKey(String key) {
+        return Optional.empty();
+    }
 }

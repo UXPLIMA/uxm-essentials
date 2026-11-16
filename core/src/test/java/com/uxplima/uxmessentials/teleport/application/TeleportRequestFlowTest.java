@@ -34,6 +34,7 @@ class TeleportRequestFlowTest {
 
     private final MutableClock clock = new MutableClock(NOW);
     private boolean jailed;
+    private boolean tagged;
     private final TeleportFakes.Requests requests = new TeleportFakes.Requests();
     private final TeleportFakes.Flags flags = new TeleportFakes.Flags();
     private final TeleportFakes.HeldWarmups warmups = new TeleportFakes.HeldWarmups();
@@ -43,7 +44,14 @@ class TeleportRequestFlowTest {
     private final TeleportSettings settings = new TeleportSettings(TeleportFakes.Config.of(
             "request-ttl-seconds", "60", "default-cooldown", "30", "cooldown-start-phase", "accept"));
     private final TeleportEngine engine = new TeleportEngine(
-            new ClockCooldowns(clock), warmups, hops, notifier.notifier(), events, settings, who -> jailed);
+            new ClockCooldowns(clock),
+            warmups,
+            hops,
+            notifier.notifier(),
+            events,
+            settings,
+            who -> jailed,
+            who -> tagged);
     private final RequestTeleport request =
             new RequestTeleport(requests, flags, notifier.notifier(), events, settings, who -> jailed, clock);
     private final AcceptTeleport accept = new AcceptTeleport(requests, engine, notifier.notifier(), events, clock);
@@ -173,5 +181,38 @@ class TeleportRequestFlowTest {
                 .contains(TeleportError.JAILED);
 
         assertThat(requests.all()).isEmpty();
+    }
+
+    @Test
+    void aMoverJailedAfterAskingIsKeptInPlaceWhenTheRequestIsAccepted() {
+        alexAsksSam();
+        jailed = true;
+
+        assertThat(accept.accept(SAM, SAMS_SPOT).asError()).contains(TeleportError.JAILED);
+        warmups.finish();
+
+        assertThat(warmups.pending()).isZero();
+        assertThat(hops.landed).isEmpty();
+        assertThat(requests.all()).isEmpty();
+        assertThat(notifier.sent()).contains(new RecordingNotifier.Sent(ALEX, "teleport.jailed", Map.of()));
+        jailed = false;
+        assertThat(alexIsOnCooldown()).isFalse();
+    }
+
+    @Test
+    void aCombatTaggedMoverOfAHereRequestIsKeptInPlaceAndTheRequesterIsTold() {
+        assertThat(request.request(ALEX, SAM, RequestDirection.TO_REQUESTER).isOk())
+                .isTrue();
+        tagged = true;
+
+        assertThat(accept.accept(SAM, Fixtures.at(0, 64, 0)).asError()).contains(TeleportError.COMBAT_TAGGED);
+        warmups.finish();
+
+        assertThat(hops.landed).isEmpty();
+        assertThat(notifier.sent())
+                .contains(
+                        new RecordingNotifier.Sent(SAM, "teleport.combat-tagged", Map.of()),
+                        new RecordingNotifier.Sent(ALEX, "teleport.tpa.mover-refused", Map.of("player", "Sam")))
+                .doesNotContain(new RecordingNotifier.Sent(ALEX, "teleport.tpa.accepted", Map.of("player", "Sam")));
     }
 }

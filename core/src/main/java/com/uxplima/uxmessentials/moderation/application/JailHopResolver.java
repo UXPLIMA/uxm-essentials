@@ -20,6 +20,7 @@ import com.uxplima.uxmessentials.shared.application.hop.HopResolver;
 import com.uxplima.uxmessentials.shared.application.hop.HopSettlement;
 import com.uxplima.uxmessentials.shared.application.hop.port.PendingHop;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
+import com.uxplima.uxmessentials.shared.domain.message.SharedMessageKey;
 
 /**
  * The jail side of the shared cross-server hop. A hop's target is the jail's name; on the target the jail is read
@@ -29,7 +30,9 @@ import com.uxplima.uxmessentials.shared.domain.PlayerRef;
  *
  * <p>A hop that ends without moving the player leaves them jailed where they are: staff hear about it through
  * {@link JailHopAlerts} and the backend holding the player tries again through {@link JailTransfer}. A misrouted hop
- * is the one exception: the backend the player reached applies the jail again on join, so it is not reported.
+ * is the one exception: the backend the player reached applies the jail again on join, so it is not reported. A hop
+ * turned away because another move of the player's is still under way is retried without a staff alert, since
+ * nothing is broken.
  */
 public final class JailHopResolver implements HopResolver {
 
@@ -42,6 +45,8 @@ public final class JailHopResolver implements HopResolver {
                     HopNotice.MISROUTED, ModerationMessageKey.JAIL_HOP_FAILED,
                     HopNotice.FAILED, ModerationMessageKey.JAIL_HOP_FAILED,
                     HopNotice.UNAVAILABLE, ModerationMessageKey.JAIL_HOP_FAILED,
+                    // The prisoner did not ask to move, so the line gives no advice to try again; the transfer retries.
+                    HopNotice.BUSY, SharedMessageKey.COMMON_HOP_BUSY_ORDERED,
                     // Never sent: a jail hop is never charged, so it is never refunded.
                     HopNotice.REFUNDED, ModerationMessageKey.JAIL_HOP_FAILED));
 
@@ -116,7 +121,11 @@ public final class JailHopResolver implements HopResolver {
         if (reason == HopNotice.MISROUTED || !stillJailedIn(who, label)) {
             return;
         }
-        alerts.failedHere(who, label);
+        // A hop turned away because another move of the player's is still under way is not a broken jail, so staff
+        // are not alerted; the transfer is only tried again once that move has ended.
+        if (reason != HopNotice.BUSY) {
+            alerts.failedHere(who, label);
+        }
         transfer.retryLater(who);
     }
 

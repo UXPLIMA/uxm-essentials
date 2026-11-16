@@ -236,8 +236,8 @@ public final class TeleportEngine {
     }
 
     /**
-     * The checks an accepted request's mover passes before a hop to another backend: jail and combat tag, each told to
-     * the player. No cooldown, since a local accepted request never checks one either; it only stamps.
+     * The checks an accepted request's mover passes, on this backend or before a hop to another: jail and combat tag,
+     * each told to the player. No cooldown, since an accepted request never checks one; it only stamps.
      */
     public Result<Unit, TeleportError> gateAcceptedRequest(PlayerRef mover) {
         Objects.requireNonNull(mover, "mover");
