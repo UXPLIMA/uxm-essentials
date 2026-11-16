@@ -37,18 +37,19 @@ import org.jspecify.annotations.Nullable;
  *
  * <p>A player has at most one custom command warmup, as with teleports. Running a command with a warmup while an
  * earlier one is still counting down replaces the earlier one rather than being refused: the earlier one ends as
- * {@link RunOutcome.WarmupReplaced}, releases its depth and is never charged, and only the latest one can run. A
- * repeat refused at an earlier gate (requirements, cooldown) starts no warmup and leaves the earlier one alone. The
- * replacing run is allowed one level past the depth ceiling, because the level the earlier warmup holds is released
- * before the replacement's warmup begins: a repeat is never turned away for the depth of the run it replaces.
+ * {@link RunOutcome.WarmupReplaced} and is never charged, and only the latest one can run. A repeat refused at an
+ * earlier gate (requirements, cooldown) starts no warmup and leaves the earlier one alone.
  *
  * <p>A warmup the player skips (a bypass node, or a zero tier) completes inside {@code begin}. The run then reports
  * what the chain did, never a countdown that is already over.
  *
  * <p>Depth is entered before the requirements are evaluated and released once the chain has run, which means a
  * command that calls itself through a {@code command:} action inside the same dispatch is refused at the configured
- * depth. A step scheduled behind a {@code delay:} runs later at depth zero: that is a fresh execution rather than a
- * re-entry, and treating it as one would make a delayed self-call impossible for no benefit.
+ * depth. Depth counts nesting inside one dispatch, so a run hands its level back as soon as its warmup begins: a
+ * warmup still counting down holds nothing, and an unrelated command the player runs meanwhile starts from depth
+ * zero. When the warmup completes, its chain runs as a fresh execution with a level of its own, as does a step
+ * scheduled behind a {@code delay:}; treating either as a re-entry would make a delayed self-call impossible for no
+ * benefit.
  *
  * <p>A priced command whose currency backend does not answer follows {@link FeeBackendPolicy}: it runs unpaid or is
  * refused. Either way the operator is told once when the backend goes missing and once when it answers again, not on
@@ -124,23 +125,19 @@ public final class RunCustomCommand {
         if (refused != null) {
             return report(actor, command, refused);
         }
-        if (!enterDepth(command, actor)) {
+        if (!depth.enter(actor.uuid())) {
             log.warn(
                     "custom command '{}' called itself past the allowed depth",
                     command.id().value());
             return report(actor, command, new RunOutcome.DepthExceeded());
         }
-        // The level is released once, by whichever comes first: this method on any path that did not hand it to a
-        // started warmup, or the warmup's own ending. A throw while the warmup is being set up therefore cannot leak
-        // it,
-        // and a warmup that ended inside begin cannot release it twice.
+        // The level is released once: before the warmup begins, since a countdown is no nesting, or on the way out.
         AtomicBoolean holding = new AtomicBoolean(true);
         Runnable release = () -> {
             if (holding.compareAndSet(true, false)) {
                 depth.exit(actor.uuid());
             }
         };
-        boolean handedOver = false;
         try {
             RunOutcome blocked = stateGates(command, actor, arguments, false);
             if (blocked != null) {
@@ -149,26 +146,15 @@ public final class RunCustomCommand {
             if (command.warmup().isZero()) {
                 return report(actor, command, finish(command, actor, arguments));
             }
+            release.run();
             AtomicReference<RunOutcome> ended = new AtomicReference<>();
-            beginWarmup(command, actor, arguments, ended, release);
-            handedOver = true;
+            beginWarmup(command, actor, arguments, ended);
             RunOutcome already = ended.get();
-            // A warmup that ended inside begin has reported its own outcome and released its depth already.
+            // A warmup that ended inside begin has reported its own outcome already.
             return already != null ? already : report(actor, command, new RunOutcome.WarmupStarted(command.warmup()));
         } finally {
-            if (!handedOver) {
-                release.run();
-            }
+            release.run();
         }
-    }
-
-    /**
-     * Claim a level of depth for this run. A run that starts a warmup while the actor is still waiting on another one
-     * replaces it, and the level the earlier one holds is released before the new warmup needs its own.
-     */
-    private boolean enterDepth(CustomCommand command, PlayerRef actor) {
-        boolean replacing = !command.warmup().isZero() && warmingUp.containsKey(actor.uuid());
-        return replacing ? depth.enterReplacing(actor.uuid()) : depth.enter(actor.uuid());
     }
 
     /**
@@ -247,15 +233,11 @@ public final class RunCustomCommand {
 
     /**
      * Start the shared warmup, deferring the charge and the chain to the moment it completes. The actor's earlier
-     * warmup, if any, is superseded first. Exactly one of the three callbacks runs; each forgets this warmup, runs
-     * {@code release} for the depth this run holds and leaves the outcome it reported in {@code ended}.
+     * warmup, if any, is superseded first. Exactly one of the three callbacks runs; each forgets this warmup and leaves
+     * the outcome it reported in {@code ended}.
      */
     private void beginWarmup(
-            CustomCommand command,
-            PlayerRef actor,
-            Map<String, String> arguments,
-            AtomicReference<RunOutcome> ended,
-            Runnable release) {
+            CustomCommand command, PlayerRef actor, Map<String, String> arguments, AtomicReference<RunOutcome> ended) {
         UUID who = actor.uuid();
         WarmupHandle earlier = warmingUp.remove(who);
         if (earlier != null) {
@@ -276,20 +258,14 @@ public final class RunCustomCommand {
                 kind,
                 () -> {
                     forget.run();
-                    try {
-                        ended.set(report(actor, command, finish(command, actor, arguments)));
-                    } finally {
-                        release.run();
-                    }
+                    ended.set(report(actor, command, finishAfterWarmup(command, actor, arguments)));
                 },
                 () -> {
                     forget.run();
-                    release.run();
                     ended.set(report(actor, command, new RunOutcome.WarmupCancelled()));
                 },
                 () -> {
                     forget.run();
-                    release.run();
                     ended.set(report(actor, command, new RunOutcome.WarmupReplaced()));
                 });
         self.set(handle);
@@ -309,6 +285,24 @@ public final class RunCustomCommand {
         if (handle.isComplete() || handle.isCancelled()) {
             // It ended between the check and the put, after its own callback had nothing to forget.
             warmingUp.remove(who, handle);
+        }
+    }
+
+    /**
+     * The chain of a warmup that completed, run as a fresh execution with a level of its own, so a {@code command:} it
+     * dispatches is counted from there.
+     */
+    private RunOutcome finishAfterWarmup(CustomCommand command, PlayerRef actor, Map<String, String> arguments) {
+        if (!depth.enter(actor.uuid())) {
+            log.warn(
+                    "custom command '{}' finished its warmup past the allowed depth",
+                    command.id().value());
+            return new RunOutcome.DepthExceeded();
+        }
+        try {
+            return finish(command, actor, arguments);
+        } finally {
+            depth.exit(actor.uuid());
         }
     }
 
