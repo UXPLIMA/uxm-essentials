@@ -3,6 +3,17 @@
 What an operator edits when a release renames something an operator's own files or permission grants depend on, or
 needs a setting it did not need before.
 
+## Money is paid only in a currency the server knows
+
+A player warp rating reward (`ratings.rewards.*` in the player warps config) whose currency id this server does not
+know is no longer paid in the default currency: the log has `event=pwarp_rate_reward_credit_failed` and the player
+it was for gets nothing. `default` still pays the default currency. Check the ids in those rewards against your
+currencies.
+
+On a network, a paid hop is now refunded, and a player warp owner paid, in exactly the currency it was taken in.
+Define the same currency ids on every backend; a backend that does not know one logs the refund instead of paying it
+in its own default. See [network.md](network.md).
+
 ## Velocity bus frames need a shared secret
 
 A network on `network.transport = "velocity"` or `"both"` now signs every frame it sends through the proxy, so a

@@ -218,7 +218,9 @@ paid at once, in a currency that can be paid to an offline player.
 
 The owner is always paid in the currency the visitor paid, which a `default` price takes on the visitor's server. A
 bank holds one currency at a time: a share in another currency than the bank already holds is paid straight to the
-owner when that currency can be paid to an offline player, and otherwise the visitor gets the fee back.
+owner when that currency can be paid to an offline player or the owner is on that server, and otherwise the visitor
+gets the fee back. Money going back to a bank that has since filled with another currency, after a failed
+`/pwarp withdraw` or rent the owner could not cover, is paid to the owner the same way.
 
 A player who gets a warp's password wrong `password-attempts.max-attempts` times (3) within
 `password-attempts.lockout-seconds` (60) is locked out of that warp's password for `lockout-seconds`, the right

@@ -1,13 +1,25 @@
 package com.uxplima.uxmessentials.persistence.playerwarps;
 
+import static com.uxplima.uxmessentials.persistence.jooq.tables.PlayerWarps.PLAYER_WARPS;
 import static org.assertj.core.api.Assertions.assertThat;
 
+import java.lang.reflect.InvocationHandler;
+import java.lang.reflect.InvocationTargetException;
+import java.lang.reflect.Method;
+import java.lang.reflect.Proxy;
 import java.math.BigDecimal;
 import java.nio.file.Path;
+import java.sql.Connection;
+import java.sql.PreparedStatement;
+import java.sql.SQLException;
 import java.time.Instant;
+import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Set;
 import java.util.UUID;
 
@@ -37,6 +49,7 @@ import com.uxplima.uxmessentials.shared.domain.Result;
 import com.uxplima.uxmessentials.shared.domain.Unit;
 import com.uxplima.uxmessentials.shared.domain.WorldRef;
 import org.jooq.DSLContext;
+import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
@@ -67,8 +80,17 @@ class JooqPlayerWarpEconomyCurrencyTest {
     private final Bank bank = new Bank();
 
     private DSLContext dsl;
+    /** The same database, read through connections that run {@link #afterNextBankRead}. */
+    private DSLContext racing;
+
     private PlayerWarpId market;
     private boolean offlineWrites = true;
+    /** The players on the settling server. */
+    private final Set<UUID> here = new HashSet<>();
+
+    private final RecordingLogger log = new RecordingLogger();
+    /** Runs once right after the next read of the warp bank, as a concurrent write landing between read and write. */
+    private @Nullable Runnable afterNextBankRead;
 
     @BeforeEach
     void open() {
@@ -76,6 +98,9 @@ class JooqPlayerWarpEconomyCurrencyTest {
         data.setUrl("jdbc:sqlite:" + folder.resolve("data.db"));
         new FlywayMigrationRunner(data, DatabaseBackend.SQLITE, "").migrate(List.of());
         dsl = DslContextProvider.create(data, DatabaseBackend.SQLITE.dialect(), "");
+        RacingDataSource racingData = new RacingDataSource();
+        racingData.setUrl("jdbc:sqlite:" + folder.resolve("data.db"));
+        racing = DslContextProvider.create(racingData, DatabaseBackend.SQLITE.dialect(), "");
         market = new JooqPlayerWarpRepository(dsl)
                 .save(PlayerWarp.create(
                         SAM,
@@ -89,12 +114,22 @@ class JooqPlayerWarpEconomyCurrencyTest {
     /** A server's player warp economy, whose default currency is {@code byDefault}. */
     private JooqPlayerWarpEconomy serverWith(Currency byDefault) {
         return new JooqPlayerWarpEconomy(
-                dsl,
+                racing,
                 bank,
                 CurrencyRegistry.of(List.of(COINS, GEMS), byDefault.id()),
                 CurrencyBackendRegistry.of(List.of(new Native())),
                 NO_CUT,
-                new SilentLogger());
+                here::contains,
+                log);
+    }
+
+    /** Set the bank as another server's write would, behind the economy under test. */
+    private void bankHolds(String amount, Currency currency) {
+        dsl.update(PLAYER_WARPS)
+                .set(PLAYER_WARPS.EARNED_AMOUNT, new BigDecimal(amount))
+                .set(PLAYER_WARPS.EARNED_CURRENCY, currency.id().value())
+                .where(PLAYER_WARPS.ID.eq(market.value()))
+                .execute();
     }
 
     @Test
@@ -137,17 +172,89 @@ class JooqPlayerWarpEconomyCurrencyTest {
     }
 
     @Test
-    void aShareThatCannotBeBankedOrPaidOfflinePaysNobodySoTheVisitorIsRefunded() {
+    void aShareThatCannotBeBankedOrReachAnOfflineOwnerPaysNobodySoTheVisitorIsRefunded() {
         offlineWrites = false;
         JooqPlayerWarpEconomy survival = serverWith(GEMS);
-        survival.accrue(market, new BigDecimal("30"), "gems");
+        bankHolds("30", GEMS);
 
         Result<Unit, ChargeError> accrued = survival.accrue(market, FEE, "coins");
-        survival.withdraw(market, SAM);
 
         assertThat(accrued.errorOrThrow()).isEqualTo(ChargeError.ACCRUAL_FAILED);
         assertThat(bank.balance(SAM, COINS).amount()).isEqualByComparingTo("0");
+        assertThat(log.warnings()).anyMatch(line -> line.contains("bank_currency_mismatch_not_offline"));
+    }
+
+    @Test
+    void aShareThatCannotBeBankedIsPaidToAnOwnerWhoIsOnThisServerEvenInAnOnlineOnlyCurrency() {
+        offlineWrites = false;
+        here.add(SAM.uuid());
+        JooqPlayerWarpEconomy survival = serverWith(GEMS);
+        bankHolds("30", GEMS);
+
+        assertThat(survival.accrue(market, FEE, "coins").isOk()).isTrue();
+
+        assertThat(bank.balance(SAM, COINS).amount()).isEqualByComparingTo("10");
+    }
+
+    @Test
+    void aFailedPayoutReturningToABankNowInAnotherCurrencyIsPaidToTheOwnerAndTheBankKeepsItsOwn() {
+        JooqPlayerWarpEconomy survival = serverWith(GEMS);
+        bankHolds("30", GEMS);
+        // The first payout is refused, and meanwhile the emptied bank fills with coins from another landing.
+        bank.refuseNextCreditTo(SAM, () -> bankHolds("10", COINS));
+
+        Result<Unit, ChargeError> withdrawn = survival.withdraw(market, SAM);
+        survival.withdraw(market, SAM);
+
+        assertThat(withdrawn.isErr()).isTrue();
         assertThat(bank.balance(SAM, GEMS).amount()).isEqualByComparingTo("30");
+        assertThat(bank.balance(SAM, COINS).amount()).isEqualByComparingTo("10");
+        assertThat(log.errors()).noneMatch(line -> line.contains("playerwarp_reaccrue_lost"));
+    }
+
+    @Test
+    void aFailedPayoutThatCanGoNowhereIsLoggedWithItsAmountAndCurrency() {
+        offlineWrites = false;
+        JooqPlayerWarpEconomy survival = serverWith(GEMS);
+        bankHolds("30", GEMS);
+        bank.refuseNextCreditTo(SAM, () -> bankHolds("10", COINS));
+
+        survival.withdraw(market, SAM);
+
+        assertThat(bank.balance(SAM, GEMS).amount()).isEqualByComparingTo("0");
+        assertThat(log.errors())
+                .anyMatch(line -> line.contains("playerwarp_reaccrue_lost")
+                        && line.contains("currency=gems")
+                        && line.contains("amount=30"));
+    }
+
+    @Test
+    void aWithdrawWhoseBankRefilledToTheSameAmountInAnotherCurrencyPaysNothingInTheOneItRead() {
+        JooqPlayerWarpEconomy survival = serverWith(GEMS);
+        bankHolds("30", GEMS);
+        // Between the read and the zeroing, the gems are paid out elsewhere and 30 coins arrive.
+        afterNextBankRead = () -> bankHolds("30", COINS);
+
+        survival.withdraw(market, SAM);
+        assertThat(bank.balance(SAM, GEMS).amount()).isEqualByComparingTo("0");
+
+        survival.withdraw(market, SAM);
+        assertThat(bank.balance(SAM, COINS).amount()).isEqualByComparingTo("30");
+    }
+
+    @Test
+    void rentFromABankThatRefilledToTheSameAmountInAnotherCurrencyIsNotTakenFromIt() {
+        JooqPlayerWarpEconomy survival = serverWith(GEMS);
+        bankHolds("30", GEMS);
+        bank.credit(SAM, Money.of(GEMS, new BigDecimal("5")));
+        afterNextBankRead = () -> bankHolds("30", COINS);
+
+        Result<Unit, ChargeError> rent = survival.collectRent(market, SAM, FEE, "gems");
+        survival.withdraw(market, SAM);
+
+        assertThat(rent.errorOrThrow()).isEqualTo(ChargeError.INSUFFICIENT_FUNDS);
+        assertThat(bank.balance(SAM, COINS).amount()).isEqualByComparingTo("30");
+        assertThat(bank.balance(SAM, GEMS).amount()).isEqualByComparingTo("5");
     }
 
     @Test
@@ -171,6 +278,46 @@ class JooqPlayerWarpEconomyCurrencyTest {
         assertThat(survival.refund(ALEX, FEE, "default").isOk()).isTrue();
 
         assertThat(bank.balance(ALEX, GEMS).amount()).isEqualByComparingTo("10");
+    }
+
+    /** Runs {@link #afterNextBankRead} once a select has finished, before the economy's next statement. */
+    private final class RacingDataSource extends SQLiteDataSource {
+
+        @Override
+        public Connection getConnection() throws SQLException {
+            Connection real = super.getConnection();
+            return proxy(Connection.class, (self, method, args) -> {
+                Object result = call(method, real, args);
+                if (method.getName().equals("prepareStatement")
+                        && args != null
+                        && args[0] instanceof String sql
+                        && sql.trim().toLowerCase(Locale.ROOT).startsWith("select")) {
+                    PreparedStatement statement = (PreparedStatement) Objects.requireNonNull(result, "statement");
+                    return proxy(PreparedStatement.class, (inner, closing, closeArgs) -> {
+                        Object closed = call(closing, statement, closeArgs);
+                        Runnable next = afterNextBankRead;
+                        if (closing.getName().equals("close") && next != null) {
+                            afterNextBankRead = null;
+                            next.run();
+                        }
+                        return closed;
+                    });
+                }
+                return result;
+            });
+        }
+
+        private static <T> T proxy(Class<T> type, InvocationHandler handler) {
+            return type.cast(Proxy.newProxyInstance(type.getClassLoader(), new Class<?>[] {type}, handler));
+        }
+
+        private static @Nullable Object call(Method method, Object target, Object @Nullable [] args) throws Throwable {
+            try {
+                return method.invoke(target, args);
+            } catch (InvocationTargetException thrown) {
+                throw thrown.getCause();
+            }
+        }
     }
 
     /** The one backend every currency here lives on; whether it can write an offline wallet is the test's choice. */
@@ -223,9 +370,17 @@ class JooqPlayerWarpEconomyCurrencyTest {
     }
 
     /** Balances per player and currency; a debit past the balance is refused. */
-    private static final class Bank implements EconomyProvider {
+    private final class Bank implements EconomyProvider {
 
         private final Map<String, BigDecimal> held = new HashMap<>();
+        private @Nullable PlayerRef refused;
+        private @Nullable Runnable onRefusal;
+
+        /** Refuse the next credit to {@code who}, running {@code meanwhile} first as a concurrent write would land. */
+        void refuseNextCreditTo(PlayerRef who, Runnable meanwhile) {
+            this.refused = who;
+            this.onRefusal = meanwhile;
+        }
 
         private static String key(PlayerRef owner, Currency currency) {
             return owner.uuid() + "/" + currency.id().value();
@@ -246,6 +401,16 @@ class JooqPlayerWarpEconomyCurrencyTest {
 
         @Override
         public Result<Unit, TransferError> credit(PlayerRef owner, Money amount) {
+            Runnable meanwhile = onRefusal;
+            if (owner.equals(refused) && meanwhile != null) {
+                refused = null;
+                onRefusal = null;
+                meanwhile.run();
+                return Result.err(TransferError.TARGET_DISABLED);
+            }
+            if (!offlineWrites && !here.contains(owner.uuid())) {
+                return Result.err(TransferError.PLAYER_OFFLINE);
+            }
             held.merge(key(owner, amount.currency()), amount.amount(), BigDecimal::add);
             return Result.ok();
         }
@@ -276,16 +441,31 @@ class JooqPlayerWarpEconomyCurrencyTest {
         }
     }
 
-    private static final class SilentLogger implements Logger {
+    private static final class RecordingLogger implements Logger {
+
+        private final List<String> warnings = new ArrayList<>();
+        private final List<String> errors = new ArrayList<>();
+
+        List<String> warnings() {
+            return List.copyOf(warnings);
+        }
+
+        List<String> errors() {
+            return List.copyOf(errors);
+        }
 
         @Override
         public void info(String message, Object... args) {}
 
         @Override
-        public void warn(String message, Object... args) {}
+        public void warn(String message, Object... args) {
+            warnings.add(message + " " + java.util.Arrays.toString(args));
+        }
 
         @Override
-        public void error(String message, Throwable cause) {}
+        public void error(String message, Throwable cause) {
+            errors.add(message);
+        }
 
         @Override
         public void debug(String message, Object... args) {}
