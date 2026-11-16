@@ -163,7 +163,7 @@ public final class PhysicalWalletRepositoryDecorator implements WalletRepository
             return;
         }
         if (!players.isOnline(owner.uuid())) {
-            pendingRepo.queueCredit(owner.uuid(), balance.currency().id().value(), balance.amount());
+            pendingRepo.queueCredit(owner, balance.currency().id().value(), balance.amount());
             return;
         }
         boolean applied = applyOnEntity(owner, player -> {
@@ -198,7 +198,7 @@ public final class PhysicalWalletRepositoryDecorator implements WalletRepository
             return delegate.credit(owner, amount);
         }
         if (!players.isOnline(owner.uuid())) {
-            pendingRepo.queueCredit(owner.uuid(), amount.currency().id().value(), amount.amount());
+            pendingRepo.queueCredit(owner, amount.currency().id().value(), amount.amount());
             return Result.ok();
         }
         return onEntity(owner, player -> calculations.credit(player, amount), Result.err(TransferError.PLAYER_OFFLINE));
@@ -226,7 +226,7 @@ public final class PhysicalWalletRepositoryDecorator implements WalletRepository
                 return creditResult;
             }
         } else {
-            pendingRepo.queueCredit(to.uuid(), amount.currency().id().value(), amount.amount());
+            pendingRepo.queueCredit(to, amount.currency().id().value(), amount.amount());
         }
         return Result.ok();
     }
@@ -263,7 +263,7 @@ public final class PhysicalWalletRepositoryDecorator implements WalletRepository
             if (back.isErr()) {
                 // Refused (for example a max-balance clamp): the owed amount waits in the queue in the currency it
                 // was taken in, and the next join delivers it.
-                pendingRepo.queueCredit(owner.uuid(), amount.currency().id().value(), amount.amount());
+                pendingRepo.queueCredit(owner, amount.currency().id().value(), amount.amount());
                 log.warn(
                         "event=physical_rollback_queued player={} amount={} currency={} reason={}",
                         owner.uuid(),
@@ -278,7 +278,7 @@ public final class PhysicalWalletRepositoryDecorator implements WalletRepository
                         owner, player -> calculations.credit(player, amount), Result.err(TransferError.PLAYER_OFFLINE))
                 : Result.err(TransferError.PLAYER_OFFLINE);
         if (back.isErr()) {
-            pendingRepo.queueCredit(owner.uuid(), amount.currency().id().value(), amount.amount());
+            pendingRepo.queueCredit(owner, amount.currency().id().value(), amount.amount());
         }
     }
 

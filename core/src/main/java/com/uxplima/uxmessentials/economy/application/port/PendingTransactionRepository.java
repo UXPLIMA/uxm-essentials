@@ -4,6 +4,8 @@ import java.math.BigDecimal;
 import java.util.List;
 import java.util.UUID;
 
+import com.uxplima.uxmessentials.shared.domain.PlayerRef;
+
 /**
  * Port representing the pending queue for physical transactions destined for offline players.
  */
@@ -11,9 +13,10 @@ public interface PendingTransactionRepository {
 
     /**
      * Queues a credit transaction for an offline player.
-     * If there is an existing pending credit for the same player and currency, they can accumulate.
+     * If there is an existing pending credit for the same player and currency, they can accumulate. The player's
+     * name travels with the credit because the queue may be the first record the economy keeps of them.
      */
-    void queueCredit(UUID playerUuid, String currencyId, BigDecimal amount);
+    void queueCredit(PlayerRef player, String currencyId, BigDecimal amount);
 
     /**
      * Takes the player's pending transactions off the queue and returns them. Each row is handed to exactly one

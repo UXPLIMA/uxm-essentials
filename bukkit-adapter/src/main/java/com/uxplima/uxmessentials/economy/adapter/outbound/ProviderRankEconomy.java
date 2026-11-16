@@ -56,7 +56,7 @@ public final class ProviderRankEconomy extends AbstractProviderEconomy implement
         Objects.requireNonNull(who, "who");
         Objects.requireNonNull(amount, "amount");
         // Resolved exactly as the charge and the deposit are, so the queued credit is in the currency that was taken.
-        pending.queueCredit(who.uuid(), resolve(currencyId).id().value(), amount);
+        pending.queueCredit(who, resolve(currencyId).id().value(), amount);
     }
 
     @Override

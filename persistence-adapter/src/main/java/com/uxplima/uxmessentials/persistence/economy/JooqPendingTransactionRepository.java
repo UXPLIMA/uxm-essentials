@@ -11,6 +11,7 @@ import java.util.function.ToIntFunction;
 
 import com.uxplima.uxmessentials.economy.application.port.PendingTransactionRepository;
 import com.uxplima.uxmessentials.persistence.runtime.JooqRepository;
+import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import org.jooq.DSLContext;
 import org.jspecify.annotations.NullMarked;
 
@@ -32,20 +33,26 @@ public final class JooqPendingTransactionRepository extends JooqRepository imple
     }
 
     @Override
-    public void queueCredit(UUID playerUuid, String currencyId, BigDecimal amount) {
-        Objects.requireNonNull(playerUuid, "playerUuid");
+    public void queueCredit(PlayerRef player, String currencyId, BigDecimal amount) {
+        Objects.requireNonNull(player, "player");
         Objects.requireNonNull(currencyId, "currencyId");
         Objects.requireNonNull(amount, "amount");
 
+        long now = System.currentTimeMillis();
         write(dsl -> {
+            // The row references the owner, and a credit can be queued for a player the economy has never seen
+            // (a refund, or a payment to someone who never joined), so the owner is written first.
+            WalletLegs.upsertOwner(dsl, player, now);
             dsl.insertInto(ECONOMY_PENDING_PHYSICAL_TRANSACTIONS)
                     .set(
                             ECONOMY_PENDING_PHYSICAL_TRANSACTIONS.ID,
                             UUID.randomUUID().toString())
-                    .set(ECONOMY_PENDING_PHYSICAL_TRANSACTIONS.PLAYER_UUID, playerUuid.toString())
+                    .set(
+                            ECONOMY_PENDING_PHYSICAL_TRANSACTIONS.PLAYER_UUID,
+                            player.uuid().toString())
                     .set(ECONOMY_PENDING_PHYSICAL_TRANSACTIONS.CURRENCY, currencyId)
                     .set(ECONOMY_PENDING_PHYSICAL_TRANSACTIONS.AMOUNT, amount)
-                    .set(ECONOMY_PENDING_PHYSICAL_TRANSACTIONS.CREATED_AT, System.currentTimeMillis())
+                    .set(ECONOMY_PENDING_PHYSICAL_TRANSACTIONS.CREATED_AT, now)
                     .execute();
             return null;
         });

@@ -14,6 +14,7 @@ import java.util.concurrent.atomic.AtomicBoolean;
 import com.uxplima.uxmessentials.economy.application.port.PendingTransactionRepository.PendingTransaction;
 import com.uxplima.uxmessentials.persistence.testing.EveryBackend;
 import com.uxplima.uxmessentials.persistence.testing.TestDatabase;
+import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import org.jooq.DSLContext;
 import org.jooq.ExecuteContext;
 import org.jooq.ExecuteListener;
@@ -21,11 +22,12 @@ import org.jooq.ExecuteType;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
-/** Queued credits through the real migrations on a SQLite file: each row is paid by exactly one take. */
+/** Queued credits through the real migrations: each row is paid by exactly one take. */
 @EveryBackend
 class JooqPendingTransactionRepositoryTest {
 
     private static final UUID ALEX = UUID.fromString("00000000-0000-0000-0000-0000000000a1");
+    private static final PlayerRef ALEX_REF = new PlayerRef(ALEX, "Alex");
 
     private DSLContext dsl;
     private JooqPendingTransactionRepository repository;
@@ -38,8 +40,8 @@ class JooqPendingTransactionRepositoryTest {
 
     @Test
     void aTakeReturnsTheQueuedRowsOnce() {
-        repository.queueCredit(ALEX, "coins", new BigDecimal("5"));
-        repository.queueCredit(ALEX, "gems", new BigDecimal("2"));
+        repository.queueCredit(ALEX_REF, "coins", new BigDecimal("5"));
+        repository.queueCredit(ALEX_REF, "gems", new BigDecimal("2"));
 
         assertThat(amounts(repository.getAndClearPending(ALEX))).containsExactlyInAnyOrder("coins:5", "gems:2");
         assertThat(repository.getAndClearPending(ALEX)).isEmpty();
@@ -47,8 +49,8 @@ class JooqPendingTransactionRepositoryTest {
 
     @Test
     void aTakeThatRunsBetweenAnotherTakesReadAndDeleteGetsEachRowOnlyOnce() {
-        repository.queueCredit(ALEX, "coins", new BigDecimal("5"));
-        repository.queueCredit(ALEX, "coins", new BigDecimal("7"));
+        repository.queueCredit(ALEX_REF, "coins", new BigDecimal("5"));
+        repository.queueCredit(ALEX_REF, "coins", new BigDecimal("7"));
         List<PendingTransaction> second = new ArrayList<>();
         JooqPendingTransactionRepository first =
                 afterFirstRead(() -> second.addAll(repository.getAndClearPending(ALEX)));
@@ -63,7 +65,7 @@ class JooqPendingTransactionRepositoryTest {
     @Test
     void twoTakesAtOnceNeverReturnTheSameRowTwice() throws Exception {
         for (int i = 1; i <= 20; i++) {
-            repository.queueCredit(ALEX, "coins", BigDecimal.valueOf(i));
+            repository.queueCredit(ALEX_REF, "coins", BigDecimal.valueOf(i));
         }
         CountDownLatch start = new CountDownLatch(1);
         CompletableFuture<List<PendingTransaction>> left = CompletableFuture.supplyAsync(() -> take(start));
@@ -80,9 +82,9 @@ class JooqPendingTransactionRepositoryTest {
 
     @Test
     void aCreditQueuedDuringATakeStaysQueuedForTheNextTake() {
-        repository.queueCredit(ALEX, "coins", new BigDecimal("5"));
+        repository.queueCredit(ALEX_REF, "coins", new BigDecimal("5"));
         JooqPendingTransactionRepository taking =
-                afterFirstRead(() -> repository.queueCredit(ALEX, "coins", new BigDecimal("9")));
+                afterFirstRead(() -> repository.queueCredit(ALEX_REF, "coins", new BigDecimal("9")));
 
         assertThat(amounts(taking.getAndClearPending(ALEX))).containsExactly("coins:5");
         assertThat(amounts(repository.getAndClearPending(ALEX))).containsExactly("coins:9");

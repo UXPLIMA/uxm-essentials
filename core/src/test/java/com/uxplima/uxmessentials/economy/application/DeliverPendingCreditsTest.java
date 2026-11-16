@@ -50,9 +50,9 @@ class DeliverPendingCreditsTest {
 
     @Test
     void queuedCreditsArePaidOncePerCurrencyAndLeaveTheQueue() {
-        queue.queueCredit(ALEX.uuid(), "coins", new BigDecimal("10"));
-        queue.queueCredit(ALEX.uuid(), "coins", new BigDecimal("5"));
-        queue.queueCredit(ALEX.uuid(), "gems", new BigDecimal("2"));
+        queue.queueCredit(ALEX, "coins", new BigDecimal("10"));
+        queue.queueCredit(ALEX, "coins", new BigDecimal("5"));
+        queue.queueCredit(ALEX, "gems", new BigDecimal("2"));
 
         credits.deliver(ALEX);
 
@@ -68,8 +68,8 @@ class DeliverPendingCreditsTest {
 
     @Test
     void aRefusedCreditGoesBackOnTheQueueInItsOwnCurrency() {
-        queue.queueCredit(ALEX.uuid(), "coins", new BigDecimal("500"));
-        queue.queueCredit(ALEX.uuid(), "gems", new BigDecimal("2"));
+        queue.queueCredit(ALEX, "coins", new BigDecimal("500"));
+        queue.queueCredit(ALEX, "gems", new BigDecimal("2"));
 
         credits.deliver(ALEX);
 
@@ -82,7 +82,7 @@ class DeliverPendingCreditsTest {
     @Test
     void aCreditThatThrowsGoesBackOnTheQueue() {
         bank.breakCredits(GEMS);
-        queue.queueCredit(ALEX.uuid(), "gems", new BigDecimal("2"));
+        queue.queueCredit(ALEX, "gems", new BigDecimal("2"));
 
         credits.deliver(ALEX);
 
@@ -93,7 +93,7 @@ class DeliverPendingCreditsTest {
 
     @Test
     void anUnknownCurrencyStaysQueued() {
-        queue.queueCredit(ALEX.uuid(), "tokens", new BigDecimal("3"));
+        queue.queueCredit(ALEX, "tokens", new BigDecimal("3"));
 
         credits.deliver(ALEX);
 
@@ -102,7 +102,7 @@ class DeliverPendingCreditsTest {
 
     @Test
     void aQueueThatCannotBeReadKeepsItsRowsAndPaysNothing() {
-        queue.queueCredit(ALEX.uuid(), "coins", new BigDecimal("10"));
+        queue.queueCredit(ALEX, "coins", new BigDecimal("10"));
         queue.readsFail = true;
 
         credits.deliver(ALEX);
@@ -114,7 +114,7 @@ class DeliverPendingCreditsTest {
 
     @Test
     void aPlayerWhoLeftBeforeDeliveryKeepsTheirRowsAndIsToldNothing() {
-        queue.queueCredit(ALEX.uuid(), "coins", new BigDecimal("10"));
+        queue.queueCredit(ALEX, "coins", new BigDecimal("10"));
         online.remove(ALEX.uuid());
 
         credits.deliver(ALEX);
@@ -149,7 +149,7 @@ class DeliverPendingCreditsTest {
         boolean readsFail;
 
         @Override
-        public void queueCredit(UUID playerUuid, String currencyId, BigDecimal amount) {
+        public void queueCredit(PlayerRef player, String currencyId, BigDecimal amount) {
             rows.add(currencyId + "=" + amount.toPlainString());
         }
 
