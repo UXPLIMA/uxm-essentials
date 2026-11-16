@@ -14,6 +14,7 @@ import org.bukkit.entity.Player;
 import net.kyori.adventure.text.Component;
 
 import com.uxplima.uxmessentials.playerwarps.application.ArchivePlayerWarp;
+import com.uxplima.uxmessentials.playerwarps.application.PlayerWarpWorldLimit;
 import com.uxplima.uxmessentials.playerwarps.application.SetPlayerWarpVisibility;
 import com.uxplima.uxmessentials.playerwarps.application.port.PlayerWarpRepository;
 import com.uxplima.uxmessentials.playerwarps.domain.IconSpec;
@@ -72,6 +73,8 @@ public final class PlayerWarpEditorView {
     private final EntityEditorView<OwnedWarp> view;
     /** The server a warp moved here records; empty off a network or under the default name, which clears it. */
     private final Optional<String> recordedServer;
+    /** Asked before a move into another world, so the editor cannot walk past the owner's limit for that world. */
+    private final PlayerWarpWorldLimit worldLimit;
 
     public PlayerWarpEditorView(
             Menus menus,
@@ -85,9 +88,11 @@ public final class PlayerWarpEditorView {
             EntityEditorLayout layout,
             PlayerWarpEditorSubLayouts sub,
             BiConsumer<Player, PlayerRef> onBack,
-            Optional<String> recordedServer) {
+            Optional<String> recordedServer,
+            PlayerWarpWorldLimit worldLimit) {
         Objects.requireNonNull(menus, "menus");
         this.recordedServer = Objects.requireNonNull(recordedServer, "recordedServer");
+        this.worldLimit = Objects.requireNonNull(worldLimit, "worldLimit");
         this.guiText = Objects.requireNonNull(guiText, "guiText");
         this.scheduler = Objects.requireNonNull(scheduler, "scheduler");
         this.repository = Objects.requireNonNull(repository, "repository");
@@ -287,8 +292,11 @@ public final class PlayerWarpEditorView {
                 "",
                 (player, reopen) -> {
                     Position at = BukkitRefs.toPosition(Objects.requireNonNull(player.getLocation(), "location"));
+                    PlayerRef viewer = BukkitRefs.toRef(player);
                     scheduler.async(() -> {
-                        mutate(owner, name, warp -> warp.movedTo(at, recordedServer, Instant.now()));
+                        current(owner, name)
+                                .filter(warp -> worldLimit.admitsMove(viewer, warp, at.world()))
+                                .ifPresent(warp -> repository.save(warp.movedTo(at, recordedServer, Instant.now())));
                         scheduler.entity(player, reopen);
                     });
                 },

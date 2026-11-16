@@ -158,7 +158,8 @@ Contents: [economy](#economy) · [homes](#homes) · [kits](#kits) · [playerstat
 | `uxmessentials.pwarp.description` | /pwarp description <name> [text] to set or clear a player warp's description. | true |
 | `uxmessentials.pwarp.displayname` | /pwarp displayname <name> [text] to set or clear a player warp's display name. | true |
 | `uxmessentials.pwarp.icon` | /pwarp icon <name> [icon] to set or clear a player warp's browse icon. | true |
-| `uxmessentials.pwarp.limit.<n>` | How many player warps you may own; the largest tier held wins. | true |
+| `uxmessentials.pwarp.limit.<n>` | How many player warps you may own across every world; the largest tier held wins. | true |
+| `uxmessentials.pwarp.limit.<world>.<n>` | How many player warps you may own in one world, counting only your warps there; the largest tier held wins. The limit across every world still applies. | true |
 | `uxmessentials.pwarp.members` | /pwarp members <name> add\|remove <player> to grant or revoke a co-owner or manager on one of your warps. | true |
 | `uxmessentials.pwarp.move` | /pwarp move <name> to re-anchor one of your player warps at your location. | true |
 | `uxmessentials.pwarp.password` | /pwarp password <name> <password>\|clear to set or clear a player warp's password. | true |
@@ -240,7 +241,7 @@ Contents: [economy](#economy) · [homes](#homes) · [kits](#kits) · [playerstat
 | `uxmessentials.rtp.gui` | /rtp gui to open the random-teleport world picker. | true |
 | `uxmessentials.rtp.others` | /rtp <player> to force another online player to random teleport (staff). | op |
 | `uxmessentials.rtp.cooldown.<seconds>` | The wait between random teleports, in seconds; a held tier sets the wait, the shortest held wins and 0 removes it; with none held the configured wait applies. | true |
-| `uxmessentials.rtp.radius.<blocks>` | How far from the world centre /rtp may drop you; the largest tier held wins. | true |
+| `uxmessentials.rtp.radius.<blocks>` | How far from the world centre /rtp biome may search; the largest tier held wins. It only narrows rtp.max-radius, never widens it. | true |
 | `uxmessentials.rtp.use` | /rtp random teleport from the pre-warmed safe-location queue. | true |
 | `uxmessentials.bypass.join-spawn` | Exempt the player from automatic first-join/every-join spawn movement. | false |
 | `uxmessentials.spawn.named` | /spawn <name> to teleport to a named spawn. | true |

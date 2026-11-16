@@ -46,9 +46,11 @@ import com.uxplima.uxmessentials.playerwarps.application.ListPlayerWarps;
 import com.uxplima.uxmessentials.playerwarps.application.ManageBans;
 import com.uxplima.uxmessentials.playerwarps.application.ManageMembers;
 import com.uxplima.uxmessentials.playerwarps.application.ManageWhitelist;
+import com.uxplima.uxmessentials.playerwarps.application.PasswordAttempts;
 import com.uxplima.uxmessentials.playerwarps.application.PlayerWarpHopResolver;
 import com.uxplima.uxmessentials.playerwarps.application.PlayerWarpHops;
 import com.uxplima.uxmessentials.playerwarps.application.PlayerWarpQuota;
+import com.uxplima.uxmessentials.playerwarps.application.PlayerWarpWorldLimit;
 import com.uxplima.uxmessentials.playerwarps.application.PurgeArchivedRentWarps;
 import com.uxplima.uxmessentials.playerwarps.application.RatePlayerWarp;
 import com.uxplima.uxmessentials.playerwarps.application.RatingRewardConfig;
@@ -195,9 +197,9 @@ public final class PlayerwarpsWiring {
         // UsePlayerWarp is built once so the /pwarp command, the browse menu, and the shared warp editor's "go to"
         // button all teleport through the same path; the go-to handle the warps editor reads is bound to it here.
         // The ordered access gate reads the ban/member/whitelist/password stores and rate-limits password attempts
-        // through the shared Cooldowns port. The economy seam is the jOOQ bridge over the resolved provider, a
-        // priced warp charges the visitor and banks the owner's cut through it; when economy is disabled it stays
-        // empty and a priced warp teleports for free (the WarpEconomy soft-coupling precedent).
+        // per player and warp, by the password-attempts block. The economy seam is the jOOQ bridge over the resolved
+        // provider, a priced warp charges the visitor and banks the owner's cut through it; when economy is disabled
+        // it stays empty and a priced warp teleports for free (the WarpEconomy soft-coupling precedent).
         Optional<PlayerWarpEconomy> economy =
                 playerWarpEconomy(ctx, persistence, kernel, economyProvider, economyCurrencies, economyBackends);
         // The member store backs both the ordered access gate (a member reaches a private warp) and the management
@@ -215,7 +217,7 @@ public final class PlayerwarpsWiring {
         // across the proxy instead of hopped locally, through the hop the bootstrap shares between every kind. The
         // gate charges here, the hop records the pending row and connects the player, and the target backend
         // completes it on join (or refunds). Off, the resolver is not registered, the departures are empty and the
-        // gate fails a remote warp closed (unavailable + refund) rather than a broken local hop.
+        // gate refuses a remote warp before the charge rather than starting a broken local hop.
         String localServerId = bus.publisher().serverId();
         // The use gate judges a local warp's landing and the hop resolver a remote one's, on the backend holding it.
         WarpSafetyChecker safety = new BukkitWarpSafetyChecker();
@@ -243,10 +245,10 @@ public final class PlayerwarpsWiring {
                 memberStore,
                 whitelistStore,
                 passwordStore,
-                kernel.cooldowns(),
+                passwordAttempts(ctx),
                 economy,
                 localServerId,
-                new PlayerWarpHops(departures, hops.charges(), hopResolver),
+                new PlayerWarpHops(departures, hops.charges(), hopResolver, notifier),
                 Clock.systemUTC(),
                 paid,
                 kernel.log());
@@ -297,8 +299,10 @@ public final class PlayerwarpsWiring {
         WithdrawEarnings withdrawEarnings = new WithdrawEarnings(repository, warpAuthorization, notifier, economy);
         // The single-warp edit verbs and the ownership transfer gate through the same shared WarpAuthorization and
         // reuse the repository, notifier, and password store built above: no new persistence, just use cases.
+        // Every path that moves a warp into another world asks the owner's limit for that world, as a new warp does.
+        PlayerWarpWorldLimit worldLimit = new PlayerWarpWorldLimit(quota, repository, notifier);
         EditPlayerWarp editPlayerWarp = new EditPlayerWarp(
-                repository, warpAuthorization, notifier, passwordStore, Clock.systemUTC(), recordedServer);
+                repository, warpAuthorization, notifier, passwordStore, Clock.systemUTC(), recordedServer, worldLimit);
         TransferPlayerWarp transferPlayerWarp =
                 new TransferPlayerWarp(repository, warpAuthorization, notifier, Clock.systemUTC());
         // The sponsorship sub-group: an owner buys a paid, time-limited pinned browse slot through the same
@@ -323,7 +327,8 @@ public final class PlayerwarpsWiring {
                 guiLayouts,
                 textInput,
                 menus,
-                recordedServer);
+                recordedServer,
+                worldLimit);
         listMenu.register(menuBindings, plugin.getDataFolder().toPath(), kernel.log());
         // The paged public browse bare /pwarp opens: one card per public warp read a page at a time through the
         // browse read model. The read model is the jOOQ LIMIT/OFFSET+COUNT projection, never a full-table scan, so
@@ -687,7 +692,8 @@ public final class PlayerwarpsWiring {
             GuiLayouts guiLayouts,
             TextInput textInput,
             Menus menus,
-            Optional<String> recordedServer) {
+            Optional<String> recordedServer,
+            PlayerWarpWorldLimit worldLimit) {
         PlayerWarpEditorSubLayouts subLayouts = PlayerWarpEditorSubLayouts.load(
                 plugin.getDataFolder().toPath(), "playerwarps", "pwarp-editor", kernel.log());
         EntityEditorLayout editorLayout =
@@ -705,7 +711,8 @@ public final class PlayerwarpsWiring {
                 editorLayout,
                 subLayouts,
                 (player, viewer) -> listHolder[0].open(player, viewer),
-                recordedServer);
+                recordedServer,
+                worldLimit);
         PlayerWarpListMenu listMenu = new PlayerWarpListMenu(
                 menus,
                 kernel.scheduler(),
@@ -784,6 +791,20 @@ public final class PlayerwarpsWiring {
                 transferPlayerWarp,
                 buySponsorship,
                 sponsorConfig);
+    }
+
+    /**
+     * The wrong-password limit, the module's {@code password-attempts} block. At least one attempt is always allowed;
+     * a lockout of 0 is the only way to turn the limit off.
+     */
+    private static PasswordAttempts passwordAttempts(ModuleContext ctx) {
+        int maxAttempts = Math.max(
+                1, ctx.config().getInt("password-attempts.max-attempts", PasswordAttempts.DEFAULT_MAX_ATTEMPTS));
+        long lockoutSeconds = Math.max(
+                0L,
+                ctx.config()
+                        .getLong("password-attempts.lockout-seconds", PasswordAttempts.DEFAULT_LOCKOUT.toSeconds()));
+        return new PasswordAttempts(maxAttempts, Duration.ofSeconds(lockoutSeconds), Clock.systemUTC());
     }
 
     private static int defaultLimit(ModuleContext ctx) {

@@ -37,6 +37,9 @@ public enum CustomCommandsMessageKey implements MessageKey {
     /** Gate 7: the player moved, so the warmup was cancelled. */
     CUSTOMCOMMAND_WARMUP_CANCELLED("customcommand.warmup-cancelled"),
 
+    /** Gate 7: the player ran another command with a warmup, so this earlier one was dropped for it. */
+    CUSTOMCOMMAND_WARMUP_REPLACED("customcommand.warmup-replaced"),
+
     /** Gate 8: the player cannot pay; {@code {cost}} is the formatted price. */
     CUSTOMCOMMAND_CANNOT_AFFORD("customcommand.cannot-afford"),
 

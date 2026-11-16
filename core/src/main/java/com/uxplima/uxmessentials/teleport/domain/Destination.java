@@ -5,24 +5,26 @@ import java.util.Objects;
 import java.util.Optional;
 import java.util.UUID;
 
+import com.uxplima.uxmessentials.shared.domain.OwnCooldown;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmessentials.shared.domain.Position;
 import org.jspecify.annotations.Nullable;
 
 /**
  * Where a teleport will land, resolved to a fixed {@link Position} by the time the flow commits.
- * Supports optional warmup/cooldown overrides passed by specific triggers (like warps).
+ * Supports an optional warmup override and an {@link OwnCooldown} passed by specific triggers (like warps): a
+ * destination with its own cooldown runs it on its own clock.
  */
 public record Destination(
         Position position,
         @Nullable PlayerRef followTarget,
         Optional<Duration> warmupOverride,
-        Optional<Duration> cooldownOverride) {
+        Optional<OwnCooldown> ownCooldown) {
 
     public Destination {
         Objects.requireNonNull(position, "position");
         Objects.requireNonNull(warmupOverride, "warmupOverride");
-        Objects.requireNonNull(cooldownOverride, "cooldownOverride");
+        Objects.requireNonNull(ownCooldown, "ownCooldown");
     }
 
     /** A fixed-coordinate destination with no live follow target. */
@@ -30,10 +32,10 @@ public record Destination(
         return new Destination(position, null, Optional.empty(), Optional.empty());
     }
 
-    /** A fixed-coordinate destination with custom warmup and cooldown overrides. */
+    /** A fixed-coordinate destination with its own warmup and its own cooldown, when it sets them. */
     public static Destination at(
-            Position position, Optional<Duration> warmupOverride, Optional<Duration> cooldownOverride) {
-        return new Destination(position, null, warmupOverride, cooldownOverride);
+            Position position, Optional<Duration> warmupOverride, Optional<OwnCooldown> ownCooldown) {
+        return new Destination(position, null, warmupOverride, ownCooldown);
     }
 
     /** A destination that tracks {@code target}'s live location, seeded with their last-known position. */

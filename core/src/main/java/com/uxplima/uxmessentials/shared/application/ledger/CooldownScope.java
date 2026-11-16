@@ -1,5 +1,9 @@
 package com.uxplima.uxmessentials.shared.application.ledger;
 
+import java.nio.charset.StandardCharsets;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
+import java.util.HexFormat;
 import java.util.Locale;
 import java.util.Objects;
 
@@ -9,6 +13,9 @@ import java.util.Objects;
  * network cooldowns read.
  */
 public final class CooldownScope {
+
+    /** Five bytes, ten hex characters: enough that two names a server holds do not meet by chance. */
+    private static final int HASH_BYTES = 5;
 
     private CooldownScope() {}
 
@@ -23,5 +30,25 @@ public final class CooldownScope {
             out.append(legal ? c : '_');
         }
         return out.toString();
+    }
+
+    /**
+     * {@code name} as a stored stamp name that two different names never share. A name {@link #normalize} keeps as it
+     * is stays as it is; any other is folded and given a short hash of the name as typed, since folding alone would
+     * turn {@code my shop} and {@code my!shop}, or two names in another alphabet of the same length, into one stamp.
+     * The hash adds eleven characters, so a folded name stays well inside the stored column.
+     */
+    public static String distinct(String name) {
+        String folded = normalize(name);
+        return folded.equals(name) ? name : folded + "-" + shortHash(name);
+    }
+
+    private static String shortHash(String name) {
+        try {
+            byte[] digest = MessageDigest.getInstance("SHA-256").digest(name.getBytes(StandardCharsets.UTF_8));
+            return HexFormat.of().formatHex(digest, 0, HASH_BYTES);
+        } catch (NoSuchAlgorithmException missing) {
+            throw new IllegalStateException("every Java runtime ships SHA-256", missing);
+        }
     }
 }

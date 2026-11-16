@@ -42,7 +42,7 @@ public final class RepositoryPlayerwarpsPlaceholders implements PlayerwarpsPlace
 
     @Override
     public int limit(PlayerRef who) {
-        PlayerWarpLimit limit = quota.resolve(Objects.requireNonNull(who, "who"), null);
+        PlayerWarpLimit limit = quota.resolve(Objects.requireNonNull(who, "who"));
         return limit.unlimited() ? -1 : limit.cap();
     }
 

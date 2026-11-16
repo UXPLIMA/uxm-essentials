@@ -113,8 +113,8 @@ public final class PlayerWarpQueries implements UxmPlayerWarpsQuery {
     public CompletableFuture<Optional<Integer>> limit(UUID ownerId) {
         Objects.requireNonNull(ownerId, "ownerId");
         return AsyncQueries.supply(scheduler, () -> {
-            // No world: the per-world form of the node only narrows the answer, and a query has no world in hand.
-            PlayerWarpLimit resolved = quota.resolve(ApiValues.subject(players, ownerId), null);
+            // The limit across every world; a world's own node caps only the warps in that world.
+            PlayerWarpLimit resolved = quota.resolve(ApiValues.subject(players, ownerId));
             return resolved.unlimited() ? Optional.<Integer>empty() : Optional.of(resolved.cap());
         });
     }

@@ -132,6 +132,14 @@ public final class DestinationPermissions {
         return WARP_USE_PREFIX + warp;
     }
 
+    /**
+     * The head of the player-warp quota in one world; the number held is appended to it. It caps the owner's warps in
+     * {@code world} only, beside the {@link #PWARP_LIMIT} cap on all of them.
+     */
+    public static String pwarpWorldLimit(String world) {
+        return PWARP_LIMIT + "." + world;
+    }
+
     /** The node a player needs to enter {@code world} when it is restricted. */
     public static String worldEnter(String world) {
         return WORLD_PREFIX + world + ".enter";
@@ -325,7 +333,13 @@ public final class DestinationPermissions {
                         PLAYERWARPS),
                 PermissionSpec.family(
                         PWARP_LIMIT + ".<n>",
-                        "How many player warps you may own; the largest tier held wins.",
+                        "How many player warps you may own across every world; the largest tier held wins.",
+                        PermissionDefault.TRUE,
+                        PermissionShape.QUOTA,
+                        PLAYERWARPS),
+                PermissionSpec.family(
+                        pwarpWorldLimit("<world>") + ".<n>",
+                        "How many player warps you may own in one world, counting only your warps there; the largest tier held wins. The limit across every world still applies.",
                         PermissionDefault.TRUE,
                         PermissionShape.QUOTA,
                         PLAYERWARPS),

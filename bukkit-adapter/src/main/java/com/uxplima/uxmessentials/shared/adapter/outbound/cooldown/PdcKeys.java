@@ -25,11 +25,18 @@ final class PdcKeys {
 
     private final Plugin plugin;
     private final String prefix;
+    private final String namespace;
     private final ConcurrentHashMap<String, NamespacedKey> cache = new ConcurrentHashMap<>();
 
     PdcKeys(Plugin plugin, String prefix) {
         this.plugin = Objects.requireNonNull(plugin, "plugin");
         this.prefix = Objects.requireNonNull(prefix, "prefix");
+        this.namespace = new NamespacedKey(plugin, prefix).getNamespace();
+    }
+
+    /** The namespace every key here is built in: the plugin's own. */
+    String namespace() {
+        return namespace;
     }
 
     /** The cached key for {@code name}, building it once on first request. */

@@ -4,12 +4,14 @@ import java.math.BigDecimal;
 import java.time.Duration;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Optional;
 import java.util.UUID;
 import java.util.concurrent.CompletionStage;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Consumer;
 
+import com.uxplima.uxmessentials.shared.application.ledger.CooldownScope;
 import com.uxplima.uxmessentials.shared.application.message.Notifier;
 import com.uxplima.uxmessentials.shared.application.port.Cooldowns;
 import com.uxplima.uxmessentials.shared.application.port.Cooldowns.CooldownKind;
@@ -17,9 +19,11 @@ import com.uxplima.uxmessentials.shared.application.port.DomainEventPublisher;
 import com.uxplima.uxmessentials.shared.application.port.DomainGate;
 import com.uxplima.uxmessentials.shared.application.port.Logger;
 import com.uxplima.uxmessentials.shared.application.port.Warmups;
+import com.uxplima.uxmessentials.shared.application.port.Warmups.CancelCause;
 import com.uxplima.uxmessentials.shared.application.port.Warmups.WarmupHandle;
 import com.uxplima.uxmessentials.shared.application.port.Warmups.WarmupKind;
 import com.uxplima.uxmessentials.shared.application.teleport.TeleportOutcome;
+import com.uxplima.uxmessentials.shared.domain.OwnCooldown;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmessentials.shared.domain.Position;
 import com.uxplima.uxmessentials.shared.domain.Result;
@@ -644,10 +648,33 @@ public final class TeleportEngine {
                 mover,
                 warmupKind,
                 onComplete,
+                (CancelCause cause) ->
+                        onWarmupCancelled(mover, kind, reasonOf(cause), reported, TeleportOutcome.CANCELLED),
                 () -> onWarmupCancelled(
-                        mover, kind, TeleportMessageKey.WARMUP_CANCELLED, reported, TeleportOutcome.CANCELLED),
-                () -> onWarmupCancelled(
-                        mover, kind, TeleportMessageKey.WARMUP_REPLACED, reported, TeleportOutcome.SUPERSEDED));
+                        mover, kind, WarmupCancelReason.SUPERSEDED, reported, TeleportOutcome.SUPERSEDED));
+    }
+
+    private static WarmupCancelReason reasonOf(CancelCause cause) {
+        return switch (cause) {
+            case MOVED -> WarmupCancelReason.MOVED;
+            case ROTATED -> WarmupCancelReason.ROTATED;
+            case DAMAGED -> WarmupCancelReason.DAMAGED;
+            case INTERACTED -> WarmupCancelReason.INTERACTED;
+            case QUIT -> WarmupCancelReason.QUIT;
+            case ABORTED -> WarmupCancelReason.ABORTED;
+        };
+    }
+
+    private static TeleportMessageKey noticeOf(WarmupCancelReason reason) {
+        return switch (reason) {
+            case MOVED -> TeleportMessageKey.WARMUP_CANCELLED;
+            case ROTATED -> TeleportMessageKey.WARMUP_ROTATED;
+            case DAMAGED -> TeleportMessageKey.WARMUP_DAMAGED;
+            case INTERACTED -> TeleportMessageKey.WARMUP_INTERACTED;
+            case QUIT -> TeleportMessageKey.WARMUP_QUIT;
+            case SUPERSEDED -> TeleportMessageKey.WARMUP_REPLACED;
+            case ABORTED -> TeleportMessageKey.WARMUP_ABORTED;
+        };
     }
 
     private void hop(
@@ -676,13 +703,14 @@ public final class TeleportEngine {
     }
 
     private void onWarmupCancelled(
-            PlayerRef mover, TeleportKind kind, TeleportMessageKey notice, OneOutcome reported, TeleportOutcome ended) {
-        // A warmup stopped by a move and one replaced by the player's next teleport both end here and differ only in
-        // what the player is told, so whatever a cancel has to undo is done once, whichever way it was stopped. The
-        // outcome is reported even when the notice fails, since a caller gives a charge back on it.
+            PlayerRef mover, TeleportKind kind, WarmupCancelReason reason, OneOutcome reported, TeleportOutcome ended) {
+        // Every way a warmup is stopped (a move, a hit, the player leaving, the player's next teleport) ends here and
+        // differs only in what the player and listeners are told, so whatever a cancel has to undo is done once,
+        // whichever way it was stopped. The outcome is reported even when the notice fails, since a caller gives a
+        // charge back on it.
         try {
-            notifier.send(mover, notice);
-            events.publish(new WarmupCancelled(mover, kind, WarmupCancelReason.ABORTED));
+            notifier.send(mover, noticeOf(reason));
+            events.publish(new WarmupCancelled(mover, kind, reason));
         } finally {
             reported.report(ended);
         }
@@ -713,20 +741,25 @@ public final class TeleportEngine {
      * resolves the shared {@code uxmessentials.tp.cooldown.<n>} permission tiers. A verb whose config
      * override is set ({@code cooldowns.<verb> >= 0}) gets its own stamp scope ({@code tp.<verb>}) so it
      * rate-limits independently, with the override as its fallback default; a verb left at {@code -1}
-     * keeps the shared {@code tp} stamp and the shared {@code default-cooldown}, preserving prior behaviour. On the
-     * shared clock a held tier sets the wait; a verb or destination with its own value keeps that value as a ceiling
-     * the tier can only lower ({@link Cooldowns.TierRule#CAP}), since one tier spans all those values.
+     * keeps the shared {@code tp} stamp and the shared {@code default-cooldown}, preserving prior behaviour. A
+     * destination with its own cooldown (a warp's editor value) stamps under its own clock ({@code tp.<clock>}), so
+     * two warps that each set one never hold each other back. On the shared clock a held tier sets the wait; a verb
+     * or destination with its own value keeps that value as a ceiling the tier can only lower
+     * ({@link Cooldowns.TierRule#CAP}), since one tier spans all those values.
      */
     private CooldownKind cooldownKind(TeleportKind kind, Destination destination) {
-        if (kind == TeleportKind.RANDOM && destination.cooldownOverride().isEmpty()) {
+        Optional<OwnCooldown> own = destination.ownCooldown();
+        if (kind == TeleportKind.RANDOM && own.isEmpty()) {
             // A random teleport carries no destination-level override, so its stamp resolves the same rtp-specific
             // tier the pre-search gate checked: keeping gateRandom's check and onLanded's stamp on one node.
             return randomCooldownKind();
         }
-        if (destination.cooldownOverride().isPresent()) {
-            long seconds = destination.cooldownOverride().get().toSeconds();
+        if (own.isPresent()) {
             return CooldownKind.scoped(
-                    FEATURE, FEATURE + "." + verbScope(kind), seconds, mapPhase(settings.cooldownStartPhase()));
+                    FEATURE,
+                    FEATURE + "." + CooldownScope.distinct(own.get().clock()),
+                    own.get().length().toSeconds(),
+                    mapPhase(settings.cooldownStartPhase()));
         }
         long override = settings.verbCooldownOverrideSeconds(kind);
         Cooldowns.CooldownStartPhase phase = mapPhase(settings.cooldownStartPhase());

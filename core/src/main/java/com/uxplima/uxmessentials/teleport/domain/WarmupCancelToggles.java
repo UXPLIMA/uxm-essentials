@@ -41,7 +41,7 @@ public record WarmupCancelToggles(
             case ROTATED -> cancelOnRotate;
             case DAMAGED -> cancelOnDamage;
             case INTERACTED -> cancelOnInteract;
-            case ABORTED -> true;
+            case ABORTED, QUIT, SUPERSEDED -> true;
         };
     }
 
