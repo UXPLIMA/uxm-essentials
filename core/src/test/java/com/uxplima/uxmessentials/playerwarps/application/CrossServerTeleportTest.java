@@ -3,6 +3,7 @@ package com.uxplima.uxmessentials.playerwarps.application;
 import static com.uxplima.uxmessentials.testing.Fixtures.ALEX;
 import static com.uxplima.uxmessentials.testing.Fixtures.NOW;
 import static com.uxplima.uxmessentials.testing.Fixtures.SAM;
+import static com.uxplima.uxmessentials.testing.Fixtures.WORLD;
 import static com.uxplima.uxmessentials.testing.Fixtures.at;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -64,6 +65,7 @@ import com.uxplima.uxmessentials.teleport.domain.Destination;
 import com.uxplima.uxmessentials.teleport.domain.TeleportKind;
 import com.uxplima.uxmessentials.testing.ClockCooldowns;
 import com.uxplima.uxmessentials.testing.FakePermissions;
+import com.uxplima.uxmessentials.testing.HeldHops;
 import com.uxplima.uxmessentials.testing.ManualWarmups;
 import com.uxplima.uxmessentials.testing.MemoryHopStore;
 import com.uxplima.uxmessentials.testing.MutableClock;
@@ -107,6 +109,8 @@ class CrossServerTeleportTest {
     private final ClockCooldowns cooldowns = new ClockCooldowns(clock);
     private final List<String> connects = new ArrayList<>();
     private final FakePermissions permissions = new FakePermissions();
+    /** The target's thread hops, which a test can hold to run them one task at a time, as Folia does. */
+    private final HeldHops targetLanes = new HeldHops(scheduler);
     /** Backends whose blocks read unsafe at the warp, as an origin without its world does. */
     private final Set<String> unsafeOn = new HashSet<>();
     /** Backends whose safety check throws instead of answering. */
@@ -140,7 +144,7 @@ class CrossServerTeleportTest {
                 safetyOn(server),
                 permissions,
                 notifier.notifier(),
-                scheduler,
+                targetLanes,
                 server);
     }
 
@@ -596,10 +600,70 @@ class CrossServerTeleportTest {
         lobbyGate().useFor(ALEX, MARKET_NAME);
         survival.onArrival(ALEX);
         scheduler.advance(SETTLE);
+        scheduler.advance(TTL);
 
         assertThat(moves.made).isEmpty();
         assertThat(wallet()).isEqualByComparingTo(START);
         assertThat(vault()).isEqualByComparingTo("0");
+        assertThat(purse.refunds).isOne();
+    }
+
+    @Test
+    void aLandingInAWorldThatIsNotLoadedOnTheTargetIsRefundedOnce() {
+        lobbyGate().useFor(ALEX, MARKET_NAME);
+        scheduler.unload(WORLD);
+
+        survival.onArrival(ALEX);
+        scheduler.advance(SETTLE);
+        scheduler.advance(TTL);
+
+        assertThat(moves.made).isEmpty();
+        assertThat(wallet()).isEqualByComparingTo(START);
+        assertThat(vault()).isEqualByComparingTo("0");
+        assertThat(purse.refunds).isOne();
+        assertThat(store.rows()).isEmpty();
+        assertThat(notifier.keys())
+                .containsExactly(
+                        "pwarp.cross-server.sending", "pwarp.cross-server.failed", "pwarp.cross-server.refunded");
+    }
+
+    @Test
+    void aVisitorWhoLeavesBetweenTheSafetyCheckAndTheMoveIsRefundedOnce() {
+        targetLanes.hold();
+        lobbyGate().useFor(ALEX, MARKET_NAME);
+        survival.onArrival(ALEX);
+        scheduler.advance(SETTLE);
+
+        targetLanes.runNext();
+        scheduler.offline(ALEX);
+        targetLanes.runAll();
+        scheduler.advance(TTL);
+
+        assertThat(moves.made).isEmpty();
+        assertThat(wallet()).isEqualByComparingTo(START);
+        assertThat(vault()).isEqualByComparingTo("0");
+        assertThat(purse.refunds).isOne();
+    }
+
+    @Test
+    void aMoveThatThrowsOnTheVisitorsOwnThreadIsRefundedOnceAndStillReported() {
+        targetLanes.hold();
+        moves.throwsOnArrive = true;
+        lobbyGate().useFor(ALEX, MARKET_NAME);
+        survival.onArrival(ALEX);
+        scheduler.advance(SETTLE);
+
+        targetLanes.runAll();
+        scheduler.advance(TTL);
+
+        assertThat(moves.made).isEmpty();
+        assertThat(wallet()).isEqualByComparingTo(START);
+        assertThat(vault()).isEqualByComparingTo("0");
+        assertThat(purse.refunds).isOne();
+        assertThat(targetLanes.thrown())
+                .as("the failure still reaches the scheduler, which logs it")
+                .singleElement()
+                .satisfies(failure -> assertThat(failure).hasMessage("the jail lookup failed"));
     }
 
     @Test
@@ -965,6 +1029,9 @@ class CrossServerTeleportTest {
         /** Make every local teleport throw where it starts, as a launch that fails on the caller's thread does. */
         private boolean throwsOnTeleport;
 
+        /** Make every arrival throw, as a jail or combat lookup that fails on the player's thread does. */
+        private boolean throwsOnArrive;
+
         @Override
         public boolean admits(PlayerRef who, PlayerWarp warp) {
             TeleportEngine through = engine;
@@ -1011,6 +1078,9 @@ class CrossServerTeleportTest {
 
         @Override
         public void arrive(PlayerRef who, PlayerWarp warp, Runnable onLanded, Runnable onMissed) {
+            if (throwsOnArrive) {
+                throw new IllegalStateException("the jail lookup failed");
+            }
             if (refuses) {
                 onMissed.run();
                 return;

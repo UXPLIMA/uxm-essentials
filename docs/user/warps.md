@@ -249,7 +249,9 @@ With `cross-server.enabled = true`, a visit to a warp of another server runs the
 safety check, takes the fee and sends the visitor through the proxy, with no warmup. Only the warp's server has its
 world, so it judges the spot when the visitor lands. It moves them on join and pays the owner then. It refunds the
 visitor and pays the owner nothing if they never arrive, if the warp is gone, no longer active or moved, if its world
-is not loaded there, or if the spot is unsafe and the visitor lacks `uxmessentials.bypass.safety.pwarp`.
+is not loaded there, or if the spot is unsafe and the visitor lacks `uxmessentials.bypass.safety.pwarp`. That node is
+checked on the warp's server, so with per-server permissions (LuckPerms server contexts) grant it there. A refused
+visitor stays on the warp's server, where the proxy put them, not at the warp.
 
 With the switch off, a visit to a warp of another server is refused as unavailable. The fee is taken first and given
 straight back, and the jail, combat and cooldown checks do not run for it.

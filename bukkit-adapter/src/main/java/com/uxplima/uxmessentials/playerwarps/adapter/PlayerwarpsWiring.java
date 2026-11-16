@@ -94,6 +94,7 @@ import com.uxplima.uxmessentials.shared.application.port.ConfigStore;
 import com.uxplima.uxmessentials.shared.application.teleport.PaidTeleports;
 import com.uxplima.uxmessentials.teleport.application.TeleportEngine;
 import com.uxplima.uxmessentials.teleport.application.TeleportHopGate;
+import com.uxplima.uxmessentials.warps.adapter.outbound.BukkitWarpSafetyChecker;
 import com.uxplima.uxmessentials.warps.application.port.WarpSafetyChecker;
 import com.uxplima.uxmlib.gui.input.TextInput;
 import com.uxplima.uxmlib.menu.EntityEditorLayout;
@@ -217,7 +218,7 @@ public final class PlayerwarpsWiring {
         // gate fails a remote warp closed (unavailable + refund) rather than a broken local hop.
         String localServerId = bus.publisher().serverId();
         // The use gate judges a local warp's landing and the hop resolver a remote one's, on the backend holding it.
-        WarpSafetyChecker safety = new com.uxplima.uxmessentials.warps.adapter.outbound.BukkitWarpSafetyChecker();
+        WarpSafetyChecker safety = new BukkitWarpSafetyChecker();
         PlayerWarpHopResolver hopResolver = new PlayerWarpHopResolver(
                 repository,
                 teleporter,

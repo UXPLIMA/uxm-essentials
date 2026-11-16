@@ -14,6 +14,7 @@ import com.uxplima.uxmessentials.playerwarps.domain.PlayerwarpsMessageKey;
 import com.uxplima.uxmessentials.playerwarps.domain.WarpStatus;
 import com.uxplima.uxmessentials.shared.application.hop.HopCharge;
 import com.uxplima.uxmessentials.shared.application.hop.HopKind;
+import com.uxplima.uxmessentials.shared.application.hop.HopLanding;
 import com.uxplima.uxmessentials.shared.application.hop.HopNotice;
 import com.uxplima.uxmessentials.shared.application.hop.HopNotices;
 import com.uxplima.uxmessentials.shared.application.hop.HopResolution;
@@ -111,17 +112,14 @@ public final class PlayerWarpHopResolver implements HopResolver {
      * can never run), a player who left, or a failure on the way. The claimed hop always ends in exactly one outcome.
      */
     private void land(PlayerRef who, PlayerWarp warp, Runnable onLanded, Runnable onMissed) {
-        scheduler.onRegion(
-                warp.location(),
-                () -> {
-                    boolean safe = isSafe(warp);
-                    try {
-                        scheduler.onEntity(who, () -> arriveIfAllowed(who, warp, safe, onLanded, onMissed), onMissed);
-                    } catch (RuntimeException unscheduled) {
-                        onMissed.run();
-                    }
-                },
-                onMissed);
+        Runnable judge = () -> {
+            boolean safe = isSafe(warp);
+            scheduler.onEntity(
+                    who,
+                    HopLanding.missOnFailure(() -> arriveIfAllowed(who, warp, safe, onLanded, onMissed), onMissed),
+                    onMissed);
+        };
+        scheduler.onRegion(warp.location(), HopLanding.missOnFailure(judge, onMissed), onMissed);
     }
 
     private void arriveIfAllowed(PlayerRef who, PlayerWarp warp, boolean safe, Runnable onLanded, Runnable onMissed) {
