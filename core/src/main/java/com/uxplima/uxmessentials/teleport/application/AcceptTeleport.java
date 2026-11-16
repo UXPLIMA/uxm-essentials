@@ -85,9 +85,8 @@ public final class AcceptTeleport {
             remote.accepted(accepted.request());
             return Result.ok();
         }
-        beginMoverWarmup(accepted.request(), anchorPosition);
         notifier.send(request.requester(), TeleportMessageKey.TPA_ACCEPTED, Map.of("player", target.name()));
-        return Result.ok();
+        return beginMoverWarmup(accepted.request(), anchorPosition);
     }
 
     /** Deny the oldest request aimed at {@code target}; the requester's cooldown is untouched. */
@@ -157,11 +156,20 @@ public final class AcceptTeleport {
                 Map.of("player", request.requester().name()));
     }
 
-    private void beginMoverWarmup(TeleportRequest request, Position anchorPosition) {
+    /**
+     * The mover passes the same jail and combat check as the mover of a request accepted on another backend, so an
+     * accepted request is no way out of a jail or a fight. A refused mover is told why by the check and stays put.
+     */
+    private Result<Unit, TeleportError> beginMoverWarmup(TeleportRequest request, Position anchorPosition) {
         PlayerRef mover = request.mover();
+        Result<Unit, TeleportError> admitted = engine.gateAcceptedRequest(mover);
+        if (admitted.isErr()) {
+            return admitted;
+        }
         engine.stampForPhase(mover, CooldownStartPhase.ACCEPT);
         Destination destination = Destination.following(request.anchor(), anchorPosition);
         engine.beginGatedWarmup(mover, destination, TeleportKind.REQUEST);
+        return Result.ok();
     }
 
     // /tpaccept, /tpdeny and /tpcancel with nothing waiting used to do nothing at all; tell the

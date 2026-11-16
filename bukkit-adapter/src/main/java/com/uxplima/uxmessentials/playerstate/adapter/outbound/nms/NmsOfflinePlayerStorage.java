@@ -32,7 +32,7 @@ import net.minecraft.world.level.storage.ValueInput;
 import net.minecraft.world.level.storage.ValueOutput;
 
 /**
- * The {@link OfflinePlayerStorage} implementation, and the plugin's one deliberate piece of NMS. It reads and
+ * The {@link OfflinePlayerStorage} implementation, and one of the plugin's two deliberate pieces of NMS. It reads and
  * writes an offline player's {@code playerdata/<uuid>.dat} the same way the server itself does, reusing the very
  * codecs {@link net.minecraft.world.entity.player.Player} and {@link net.minecraft.world.entity.LivingEntity}
  * persist with, so the on-disk shape stays exactly correct across the data-component model:

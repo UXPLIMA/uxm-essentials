@@ -29,7 +29,7 @@ import org.jspecify.annotations.NullMarked;
  * coordinates and flips the pending warmup), the optional damage- and interact-cancel axes, the
  * {@code /back} capture for both deaths and vanilla teleports (gated by the {@link BackCapturePolicy} so
  * an ender pearl does not clobber the return point), and the per-player cleanup on quit. Each handler is
- * cheap-rejection-first: a move within the same block never touches the tracker.
+ * cheap-rejection-first: a move within the same block that does not turn the head never touches the tracker.
  *
  * <p>Events fire on the player's region thread, so the warmup tracker's {@code computeIfPresent} and the
  * {@code /back} capture run where the live position is valid: no scheduler hop is needed here.
@@ -55,8 +55,8 @@ public final class TeleportListeners implements Listener {
 
     @EventHandler(priority = EventPriority.MONITOR, ignoreCancelled = true)
     public void onMove(PlayerMoveEvent event) {
-        if (event.getTo() == null || sameBlock(event)) {
-            return; // sub-block jitter (look-only or within-block) never cancels a warmup
+        if (event.getTo() == null || (sameBlock(event) && !event.hasChangedOrientation())) {
+            return; // within-block jitter never cancels a warmup; a turn reaches the tracker for rotate-cancel
         }
         warmupTracker.onMove(event.getPlayer().getUniqueId(), BukkitRefs.toPosition(event.getTo()));
     }

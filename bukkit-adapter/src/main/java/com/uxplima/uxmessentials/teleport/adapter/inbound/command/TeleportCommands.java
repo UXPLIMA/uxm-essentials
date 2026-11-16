@@ -85,19 +85,29 @@ public final class TeleportCommands {
                 new RemoveSpawnCommand(s, m),
                 new MirrorSpawnCommand(s, m),
                 // admin direct tp
-                new AdminTpCommand(s, m, "tp", TeleportPermissions.TP_USE, "Teleport to a player", Pull.GO),
-                new AdminTpCommand(s, m, "tphere", TeleportPermissions.TP_USE, "Pull a player to you", Pull.BRING),
-                new AdminTpCommand(s, m, "goto", TeleportPermissions.TP_USE, "Teleport to a player", Pull.GO),
-                new AdminTpCommand(s, m, "bring", TeleportPermissions.TP_USE, "Pull a player to you", Pull.BRING),
+                new AdminTpCommand(s, m, "tp", TeleportPermissions.TP_USE, "Teleport to a player", Pull.GO, false),
+                new AdminTpCommand(
+                        s, m, "tphere", TeleportPermissions.TP_USE, "Pull a player to you", Pull.BRING, false),
+                new AdminTpCommand(s, m, "goto", TeleportPermissions.TP_USE, "Teleport to a player", Pull.GO, false),
+                new AdminTpCommand(
+                        s, m, "bring", TeleportPermissions.TP_USE, "Pull a player to you", Pull.BRING, false),
                 new TpRandomPlayerCommand(s, m),
                 new AdminTpCommand(
-                        s, m, "tpo", TeleportPermissions.TP_OTHERS, "Teleport overriding no-tp flags", Pull.GO),
+                        s, m, "tpo", TeleportPermissions.TP_OTHERS, "Teleport overriding no-tp flags", Pull.GO, true),
                 new AdminTpCommand(
-                        s, m, "tpohere", TeleportPermissions.TP_OTHERS, "Pull a player overriding flags", Pull.BRING),
+                        s,
+                        m,
+                        "tpohere",
+                        TeleportPermissions.TP_OTHERS,
+                        "Pull a player overriding flags",
+                        Pull.BRING,
+                        true),
                 new TpPosCommand(s, m),
                 new TpAllCommand(s, m),
-                new TpOfflineCommand(s, m, "tpoffline", "Teleport to a player's logout point"),
-                new TpOfflineCommand(s, m, "tpofflinehere", "Bring a player from their logout point"),
+                new TpOfflineCommand(
+                        s, m, "tpoffline", "Teleport to a player's logout point", TpOfflineCommand.Pull.GO),
+                new TpOfflineCommand(
+                        s, m, "tpofflinehere", "Bring a player from their logout point", TpOfflineCommand.Pull.BRING),
                 // vertical / positional
                 new VerticalCommand(s, m, "top", "Teleport to the highest block above", Kind.TOP),
                 new VerticalCommand(s, m, "bottom", "Teleport to the lowest safe block", Kind.BOTTOM),

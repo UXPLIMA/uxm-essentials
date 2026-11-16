@@ -102,6 +102,13 @@ public enum TeleportMessageKey implements MessageKey {
     TP_CROSS_SERVER_REFUSED("teleport.tp.cross-server.refused"),
     TP_CROSS_SERVER_NO_ANSWER("teleport.tp.cross-server.no-answer"),
     TP_NO_TARGET_BLOCK("teleport.tp.no-target-block"),
+    // a staff /tp refused by the target's /tptoggle; /tpo overrides it
+    TP_TOGGLED_OFF("teleport.tp.toggled-off"),
+    // /tpoffline and /tpofflinehere, read from and written to the logout position this server keeps
+    TPOFFLINE_ONLINE("teleport.tpoffline.online"),
+    TPOFFLINE_UNKNOWN("teleport.tpoffline.unknown"),
+    TPOFFLINE_WORLD_MISSING("teleport.tpoffline.world-missing"),
+    TPOFFLINE_MOVED("teleport.tpoffline.moved"),
     TPRANDOM_NONE("teleport.tprandom.none"),
 
     // a jailed player may not self-teleport. The moderation context's JailGate denies it here

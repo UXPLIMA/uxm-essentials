@@ -28,6 +28,7 @@ import com.uxplima.uxmessentials.shared.domain.WorldRef;
 import com.uxplima.uxmessentials.teleport.adapter.TeleportRefs;
 import com.uxplima.uxmessentials.teleport.adapter.TeleportServices;
 import com.uxplima.uxmessentials.teleport.application.CrossServerStaffTeleport.Named;
+import com.uxplima.uxmessentials.teleport.application.StaffTeleportGate;
 import com.uxplima.uxmessentials.teleport.domain.Destination;
 import com.uxplima.uxmessentials.teleport.domain.TeleportKind;
 import com.uxplima.uxmessentials.teleport.domain.TeleportMessageKey;
@@ -40,9 +41,10 @@ import org.jspecify.annotations.Nullable;
  * The staff direct-teleport verbs ({@code /tp}, {@code /tphere}, {@code /tpo}, {@code /tpohere}) handled
  * without a warmup or cooldown (a staff hop is instant). {@link Pull#GO} moves the invoking player to the
  * target ({@code /tp}, {@code /tpo}); {@link Pull#BRING} moves the target to the invoking player
- * ({@code /tphere}, {@code /tpohere}). The {@code o} variants exist to override no-teleport flags; those
- * flags gate only {@code /tpa} requests, so the override variants share this handler and differ only in
- * the permission node.
+ * ({@code /tphere}, {@code /tpohere}). A player who refuses teleports with {@code /tptoggle} stops the plain
+ * verbs; the {@code o} variants override that switch and otherwise behave the same. The switch is read on the
+ * target's own entity thread, where its stored data belongs. The coordinate forms move nobody but the named player
+ * to a point and are not checked, so console automation keeps working.
  */
 @NullMarked
 public final class AdminTpCommand extends TeleportCommandSupport implements CommandRegistration {
@@ -57,6 +59,8 @@ public final class AdminTpCommand extends TeleportCommandSupport implements Comm
     private final String permission;
     private final String description;
     private final Pull pull;
+    private final boolean overridesToggle;
+    private final StaffTeleportGate gate;
 
     public AdminTpCommand(
             TeleportServices services,
@@ -64,12 +68,15 @@ public final class AdminTpCommand extends TeleportCommandSupport implements Comm
             String literal,
             String permission,
             String description,
-            Pull pull) {
+            Pull pull,
+            boolean overridesToggle) {
         super(services, messages);
         this.literal = Objects.requireNonNull(literal, "literal");
         this.permission = Objects.requireNonNull(permission, "permission");
         this.description = Objects.requireNonNull(description, "description");
         this.pull = Objects.requireNonNull(pull, "pull");
+        this.overridesToggle = overridesToggle;
+        this.gate = new StaffTeleportGate(services.flags(), services.notifier());
     }
 
     /** The node for the coordinate form of {@code /tp x y z [world]}, gated by the position node. */
@@ -135,27 +142,28 @@ public final class AdminTpCommand extends TeleportCommandSupport implements Comm
             return 0;
         }
         move(sender, target.get());
-        services.notifier().send(ref(sender), TeleportMessageKey.TP_DONE);
         return Command.SINGLE_SUCCESS;
     }
 
     private void move(Player sender, Player target) {
-        if (pull == Pull.GO) {
-            // GO reads the TARGET's live location to send the actor there. On Folia the target's position is
-            // owned by the target's region thread, not the sender's, so resolve it on the target's entity thread,
-            // snapshot it to an immutable Position, and only then hand it to the executor (which teleports the
-            // sender Folia-safely). BRING reads the sender's OWN location, which is region-local here.
-            PlayerRef actor = ref(sender);
-            PlayerRef subject = ref(target);
-            services.scheduler().onEntity(subject, () -> {
-                Player live = org.bukkit.Bukkit.getPlayer(subject.uuid());
-                if (live != null && live.isOnline()) {
-                    hop(actor, TeleportRefs.positionOf(live));
-                }
-            });
-        } else {
-            hop(ref(target), TeleportRefs.positionOf(sender));
-        }
+        // The target's position and its /tptoggle switch belong to the target's entity thread, not the sender's, so
+        // both are read there. GO snapshots the target's live location and sends the actor to it; BRING carries
+        // the sender's OWN location, read here where the sender is region-local, and moves the target to it.
+        PlayerRef actor = ref(sender);
+        PlayerRef subject = ref(target);
+        Position actorPosition = TeleportRefs.positionOf(sender);
+        services.scheduler().onEntity(subject, () -> {
+            Player live = org.bukkit.Bukkit.getPlayer(subject.uuid());
+            if (live == null || !live.isOnline() || !gate.admits(actor, subject, overridesToggle)) {
+                return;
+            }
+            if (pull == Pull.GO) {
+                hop(actor, TeleportRefs.positionOf(live));
+            } else {
+                hop(subject, actorPosition);
+            }
+            services.notifier().send(actor, TeleportMessageKey.TP_DONE);
+        });
     }
 
     private void hop(PlayerRef who, Position to) {
@@ -182,12 +190,19 @@ public final class AdminTpCommand extends TeleportCommandSupport implements Comm
         PlayerRef subjectRef = ref(subject.get());
         PlayerRef destinationRef = ref(destination.get());
         PlayerRef feedbackActor = actor(ctx);
-        services.scheduler().onEntity(destinationRef, () -> {
-            Player live = org.bukkit.Bukkit.getPlayer(destinationRef.uuid());
-            if (live != null && live.isOnline()) {
-                hop(subjectRef, TeleportRefs.positionOf(live));
-                services.notifier().send(feedbackActor, TeleportMessageKey.TP_DONE);
+        // Each player's /tptoggle is read on that player's own thread: the subject's first, then the destination's
+        // along with where the destination stands.
+        services.scheduler().onEntity(subjectRef, () -> {
+            if (!gate.admits(feedbackActor, subjectRef, overridesToggle)) {
+                return;
             }
+            services.scheduler().onEntity(destinationRef, () -> {
+                Player live = org.bukkit.Bukkit.getPlayer(destinationRef.uuid());
+                if (live != null && live.isOnline() && gate.admits(feedbackActor, destinationRef, overridesToggle)) {
+                    hop(subjectRef, TeleportRefs.positionOf(live));
+                    services.notifier().send(feedbackActor, TeleportMessageKey.TP_DONE);
+                }
+            });
         });
         return Command.SINGLE_SUCCESS;
     }

@@ -70,6 +70,7 @@ import com.uxplima.uxmessentials.teleport.adapter.outbound.TeleportArrivalHud;
 import com.uxplima.uxmessentials.teleport.adapter.outbound.TrackingWarmups;
 import com.uxplima.uxmessentials.teleport.adapter.outbound.VanillaFallbackSpawnDirectory;
 import com.uxplima.uxmessentials.teleport.adapter.outbound.WorldGuardRegions;
+import com.uxplima.uxmessentials.teleport.adapter.outbound.nms.PlayerDataLogoutPositions;
 import com.uxplima.uxmessentials.teleport.application.AcceptTeleport;
 import com.uxplima.uxmessentials.teleport.application.AsyncSafeLocationFinder;
 import com.uxplima.uxmessentials.teleport.application.BiomePoolSlice;
@@ -82,6 +83,7 @@ import com.uxplima.uxmessentials.teleport.application.CrossServerRequests;
 import com.uxplima.uxmessentials.teleport.application.CrossServerStaffTeleport;
 import com.uxplima.uxmessentials.teleport.application.HotspotBiasedSampler;
 import com.uxplima.uxmessentials.teleport.application.ListPendingRequests;
+import com.uxplima.uxmessentials.teleport.application.OfflineTeleport;
 import com.uxplima.uxmessentials.teleport.application.PlayerHopResolver;
 import com.uxplima.uxmessentials.teleport.application.PlayerHops;
 import com.uxplima.uxmessentials.teleport.application.RequestTeleport;
@@ -406,6 +408,13 @@ public final class TeleportWiring {
         return new TeleportServices.Builder()
                 .crossServerRequests(crossServerRequests)
                 .crossServerStaff(crossServerStaff)
+                .offlineTeleport(new OfflineTeleport(
+                        new PlayerDataLogoutPositions(kernel.log()),
+                        kernel.playerLookup(),
+                        kernel.worldLookup(),
+                        executor,
+                        kernel.scheduler(),
+                        notifier))
                 .engine(engine)
                 .notifier(notifier)
                 .settings(settings)
