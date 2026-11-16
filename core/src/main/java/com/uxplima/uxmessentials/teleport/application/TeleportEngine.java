@@ -4,12 +4,14 @@ import java.math.BigDecimal;
 import java.time.Duration;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Optional;
 import java.util.UUID;
 import java.util.concurrent.CompletionStage;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Consumer;
 
+import com.uxplima.uxmessentials.shared.application.ledger.CooldownScope;
 import com.uxplima.uxmessentials.shared.application.message.Notifier;
 import com.uxplima.uxmessentials.shared.application.port.Cooldowns;
 import com.uxplima.uxmessentials.shared.application.port.Cooldowns.CooldownKind;
@@ -21,6 +23,7 @@ import com.uxplima.uxmessentials.shared.application.port.Warmups.CancelCause;
 import com.uxplima.uxmessentials.shared.application.port.Warmups.WarmupHandle;
 import com.uxplima.uxmessentials.shared.application.port.Warmups.WarmupKind;
 import com.uxplima.uxmessentials.shared.application.teleport.TeleportOutcome;
+import com.uxplima.uxmessentials.shared.domain.OwnCooldown;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmessentials.shared.domain.Position;
 import com.uxplima.uxmessentials.shared.domain.Result;
@@ -738,20 +741,25 @@ public final class TeleportEngine {
      * resolves the shared {@code uxmessentials.tp.cooldown.<n>} permission tiers. A verb whose config
      * override is set ({@code cooldowns.<verb> >= 0}) gets its own stamp scope ({@code tp.<verb>}) so it
      * rate-limits independently, with the override as its fallback default; a verb left at {@code -1}
-     * keeps the shared {@code tp} stamp and the shared {@code default-cooldown}, preserving prior behaviour. On the
-     * shared clock a held tier sets the wait; a verb or destination with its own value keeps that value as a ceiling
-     * the tier can only lower ({@link Cooldowns.TierRule#CAP}), since one tier spans all those values.
+     * keeps the shared {@code tp} stamp and the shared {@code default-cooldown}, preserving prior behaviour. A
+     * destination with its own cooldown (a warp's editor value) stamps under its own clock ({@code tp.<clock>}), so
+     * two warps that each set one never hold each other back. On the shared clock a held tier sets the wait; a verb
+     * or destination with its own value keeps that value as a ceiling the tier can only lower
+     * ({@link Cooldowns.TierRule#CAP}), since one tier spans all those values.
      */
     private CooldownKind cooldownKind(TeleportKind kind, Destination destination) {
-        if (kind == TeleportKind.RANDOM && destination.cooldownOverride().isEmpty()) {
+        Optional<OwnCooldown> own = destination.ownCooldown();
+        if (kind == TeleportKind.RANDOM && own.isEmpty()) {
             // A random teleport carries no destination-level override, so its stamp resolves the same rtp-specific
             // tier the pre-search gate checked: keeping gateRandom's check and onLanded's stamp on one node.
             return randomCooldownKind();
         }
-        if (destination.cooldownOverride().isPresent()) {
-            long seconds = destination.cooldownOverride().get().toSeconds();
+        if (own.isPresent()) {
             return CooldownKind.scoped(
-                    FEATURE, FEATURE + "." + verbScope(kind), seconds, mapPhase(settings.cooldownStartPhase()));
+                    FEATURE,
+                    FEATURE + "." + CooldownScope.distinct(own.get().clock()),
+                    own.get().length().toSeconds(),
+                    mapPhase(settings.cooldownStartPhase()));
         }
         long override = settings.verbCooldownOverrideSeconds(kind);
         Cooldowns.CooldownStartPhase phase = mapPhase(settings.cooldownStartPhase());
