@@ -1,6 +1,7 @@
 package com.uxplima.uxmessentials.shared.adapter.outbound.hop;
 
 import java.time.Clock;
+import java.time.Duration;
 import java.util.Objects;
 
 import org.bukkit.event.Listener;
@@ -29,6 +30,12 @@ import com.uxplima.uxmessentials.shared.application.port.Scheduler;
  * is bound, or with the teleport context off, there is no warmup to replace.
  */
 public final class CrossServerHops {
+
+    /**
+     * How long a stop waits for hop money work already running off the tick, the same bound the network claims
+     * drain uses: long enough for a database round trip, short enough not to hold a shutdown up.
+     */
+    private static final Duration STOP_DRAIN = Duration.ofSeconds(10);
 
     private final HopResolvers resolvers;
     private final HopCharges charges;
@@ -93,6 +100,11 @@ public final class CrossServerHops {
     /** Let every departure replace the warmups {@code warmups} tracks; called once when the teleport context wires. */
     public void bindLocalWarmups(LocalWarmups warmups) {
         localWarmups = Objects.requireNonNull(warmups, "warmups");
+    }
+
+    /** Refund every hop this backend claimed and has not moved yet, as the plugin stops; see {@link HopArrival#stop}. */
+    public void stopArrivals() {
+        arrival.stop(STOP_DRAIN);
     }
 
     /** The join listener that ends a hop on this backend. */

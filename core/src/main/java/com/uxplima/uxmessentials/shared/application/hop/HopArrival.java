@@ -5,7 +5,11 @@ import java.time.Duration;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.Set;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicInteger;
 
 import com.uxplima.uxmessentials.shared.application.hop.port.PendingHop;
 import com.uxplima.uxmessentials.shared.application.hop.port.PendingHopStore;
@@ -30,6 +34,14 @@ import com.uxplima.uxmessentials.shared.domain.PlayerRef;
  * refunded by the origin's watchdog or by the player's next join. Reads that can fail run before the claim for
  * the same reason.
  *
+ * <p>Once claimed, a hop is held in memory until it has ended, since no other backend can see it any more. A backend
+ * that stops drops the region and entity tasks it had queued without running their fallbacks, so {@link #stop} refunds
+ * every claimed hop that has not ended yet, once: each hop ends through a single guard, whichever of the landing, the
+ * miss, the retired task or the stop reaches it first. After a stop nothing new is claimed, and a row left unclaimed
+ * waits for the origin's watchdog or the player's next join as before. The stop first waits, for a bounded time,
+ * for the money work already running off the tick: a join that is claiming a row, and a refund or a settlement that
+ * an ended hop handed to the async lane. Both would otherwise reach an economy that has already stopped.
+ *
  * <p>Every store read runs off the tick thread through the {@link Scheduler} port; only the move is marshalled onto
  * the player's entity region (Folia-safe), and the money work goes back to the async lane, or runs in place when a
  * disabling backend's lane refuses it.
@@ -44,6 +56,12 @@ public final class HopArrival {
     private final String localServerId;
     private final Duration arrivalDelay;
     private final AbandonedHops abandoned;
+    private final Set<Claimed> claimed = ConcurrentHashMap.newKeySet();
+    private volatile boolean stopped;
+    /** Money work running off the tick that a stop waits for; see {@link #stop}. */
+    private final AtomicInteger inFlight = new AtomicInteger();
+
+    private final Object drained = new Object();
 
     public HopArrival(
             PendingHopStore store,
@@ -73,6 +91,17 @@ public final class HopArrival {
 
     /** Off-tick: defer a fresh row aimed here to the delayed move; claim and refund an expired or misrouted one. */
     private void triage(PlayerRef who) {
+        if (!admit()) {
+            return; // a stopped backend claims nothing; the row waits for the origin's watchdog or the next join
+        }
+        try {
+            triageAdmitted(who);
+        } finally {
+            leave();
+        }
+    }
+
+    private void triageAdmitted(PlayerRef who) {
         Optional<PendingHop> found = store.find(who.uuid());
         if (found.isEmpty()) {
             return;
@@ -107,6 +136,17 @@ public final class HopArrival {
 
     /** Off-tick after the settling delay: claim the row, then move the player or refund and notify failure. */
     private void complete(PlayerRef who, PendingHop pending, HopResolver resolver) {
+        if (!admit()) {
+            return; // left unclaimed, for the origin's watchdog or the player's next join
+        }
+        try {
+            completeAdmitted(who, pending, resolver);
+        } finally {
+            leave();
+        }
+    }
+
+    private void completeAdmitted(PlayerRef who, PendingHop pending, HopResolver resolver) {
         HopResolution resolution = resolver.resolve(pending);
         if (store.clear(pending) != 1) {
             return;
@@ -121,16 +161,79 @@ public final class HopArrival {
             charges.fail(resolver, who, pending.charge(), HopNotice.FAILED, Map.of(), label);
             return;
         }
+        Claimed hop = new Claimed(who, pending, resolver, label);
+        claimed.add(hop);
+        if (stopped) {
+            // The stop began after this join was admitted. Its wait for this work is bounded, so it may already have
+            // looked for claimed hops; this one gives the money back itself, and the guard keeps that to one refund.
+            hop.refundAtStop();
+            return;
+        }
         try {
             // A player who left during the settling delay, or a backend that is shutting down, never moved them,
             // so the retired branch refunds.
-            scheduler.onEntity(
-                    who,
-                    () -> move(who, pending, resolver, landing.get(), label),
-                    () -> offTick(() -> charges.refund(resolver, who, pending.charge(), label)));
+            scheduler.onEntity(who, () -> move(hop, landing.get()), () -> {
+                if (hop.end()) {
+                    offTick(hop::refundCharge);
+                }
+            });
         } catch (RuntimeException scheduleFailure) {
             log.error("event=cross_server_hop_move_unscheduled player=" + who.uuid(), scheduleFailure);
-            charges.fail(resolver, who, pending.charge(), HopNotice.FAILED, Map.of(), label);
+            hop.fail();
+        }
+    }
+
+    /**
+     * Stop claiming hops, wait at most {@code drainTimeout} for the money work already running off the tick, then
+     * refund every hop this backend claimed that has not ended yet, in place: the tasks that would end them are
+     * dropped with the plugin. Called while the plugin is disabling, before the economies stop.
+     *
+     * <p>A hop whose move had already started is refunded too, since the stop cannot tell whether the server will
+     * still finish it; it is logged apart so an operator can check whether the player was also moved.
+     */
+    public void stop(Duration drainTimeout) {
+        Objects.requireNonNull(drainTimeout, "drainTimeout");
+        stopped = true;
+        awaitInFlight(drainTimeout);
+        for (Claimed hop : Set.copyOf(claimed)) {
+            hop.refundAtStop();
+        }
+    }
+
+    /** Enter the money work a stop waits for, or refuse once the stop has begun; a true answer needs {@link #leave}. */
+    private boolean admit() {
+        inFlight.incrementAndGet();
+        if (stopped) {
+            leave();
+            return false;
+        }
+        return true;
+    }
+
+    private void leave() {
+        if (inFlight.decrementAndGet() == 0) {
+            synchronized (drained) {
+                drained.notifyAll();
+            }
+        }
+    }
+
+    private void awaitInFlight(Duration timeout) {
+        long deadline = System.nanoTime() + timeout.toNanos();
+        synchronized (drained) {
+            while (inFlight.get() > 0) {
+                long left = deadline - System.nanoTime();
+                if (left <= 0) {
+                    log.warn("event=cross_server_hop_drain_incomplete pending={}", inFlight.get());
+                    return;
+                }
+                try {
+                    TimeUnit.NANOSECONDS.timedWait(drained, left);
+                } catch (InterruptedException interrupted) {
+                    Thread.currentThread().interrupt();
+                    return;
+                }
+            }
         }
     }
 
@@ -139,26 +242,101 @@ public final class HopArrival {
      * that was refused or missed. The guard keeps that to one outcome even if a move reports a miss and then
      * throws as well.
      */
-    private void move(PlayerRef who, PendingHop pending, HopResolver resolver, HopLanding landing, String label) {
-        AtomicBoolean settled = new AtomicBoolean();
+    private void move(Claimed hop, HopLanding landing) {
+        // Marked before the check, so a stop that ends the hop from here on logs it as possibly moved.
+        hop.moving = true;
+        if (hop.ended.get()) {
+            // A stop or a retired branch already gave the money back; moving now would be a free teleport.
+            return;
+        }
         Runnable landed = () -> {
-            if (settled.compareAndSet(false, true)) {
-                if (pending.settlement().isPresent()) {
-                    offTick(() -> charges.settle(resolver, who, pending, label));
+            if (hop.end()) {
+                if (hop.pending.settlement().isPresent()) {
+                    offTick(() -> charges.settle(hop.resolver, hop.who, hop.pending, hop.label));
                 }
-                charges.tell(resolver, who, HopNotice.ARRIVED, Map.of(), label);
+                charges.tell(hop.resolver, hop.who, HopNotice.ARRIVED, Map.of(), hop.label);
             }
         };
         Runnable missed = () -> {
-            if (settled.compareAndSet(false, true)) {
-                offTick(() -> charges.fail(resolver, who, pending.charge(), HopNotice.FAILED, Map.of(), label));
+            if (hop.end()) {
+                offTick(hop::failCharge);
             }
         };
         try {
-            landing.land(who, landed, missed);
+            landing.land(hop.who, landed, missed);
         } catch (RuntimeException moveFailure) {
-            log.error("event=cross_server_hop_move_failed player=" + who.uuid(), moveFailure);
+            log.error("event=cross_server_hop_move_failed player=" + hop.who.uuid(), moveFailure);
             missed.run();
+        }
+    }
+
+    /**
+     * One hop this backend claimed, until it ends. {@link #end} lets exactly one ending through, so the money is
+     * settled, given back or failed once, whichever ending comes first.
+     */
+    private final class Claimed {
+
+        private final PlayerRef who;
+        private final PendingHop pending;
+        private final HopResolver resolver;
+        private final String label;
+        private final AtomicBoolean ended = new AtomicBoolean();
+        /**
+         * Set once the move has been handed to the landing. From then on the server may still finish it after a stop,
+         * so a refund at stop is logged apart from one of a hop that never began to move.
+         */
+        private volatile boolean moving;
+
+        Claimed(PlayerRef who, PendingHop pending, HopResolver resolver, String label) {
+            this.who = who;
+            this.pending = pending;
+            this.resolver = resolver;
+            this.label = label;
+        }
+
+        /** True for the first ending only, which is then the one that settles the money. */
+        boolean end() {
+            if (!ended.compareAndSet(false, true)) {
+                return false;
+            }
+            claimed.remove(this);
+            return true;
+        }
+
+        /** End here because the backend is stopping, giving the charge back in place. */
+        void refundAtStop() {
+            if (!end()) {
+                return;
+            }
+            if (moving) {
+                log.warn(
+                        "event=cross_server_hop_stop_refund player={} target={} outcome=refunded_after_move_started",
+                        who.uuid(),
+                        label);
+            } else {
+                log.info(
+                        "event=cross_server_hop_stop_refund player={} target={} outcome=refunded_unmoved",
+                        who.uuid(),
+                        label);
+            }
+            refundCharge();
+        }
+
+        /** End here as refused or missed, giving the charge back in place with the failure line. */
+        void fail() {
+            if (end()) {
+                failCharge();
+            }
+        }
+
+        /** The money of a hop that ended unmoved. Run only by the caller whose {@link #end} won. */
+        void refundCharge() {
+            charges.refund(resolver, who, pending.charge(), label);
+        }
+
+        /** The money of a hop whose move was refused or missed. Run only by the caller whose {@link #end} won. */
+        void failCharge() {
+            charges.fail(resolver, who, pending.charge(), HopNotice.FAILED, Map.of(), label);
         }
     }
 
@@ -167,11 +345,27 @@ public final class HopArrival {
      * refund or a settlement is never dropped with the task.
      */
     private void offTick(Runnable work) {
+        // Counted until it has run, wherever it runs, so a stop waits for it rather than closing the economy under it.
+        inFlight.incrementAndGet();
+        Runnable counted = () -> {
+            try {
+                work.run();
+            } finally {
+                leave();
+            }
+        };
+        boolean handed = false;
         try {
-            scheduler.async(work);
+            scheduler.async(counted);
+            handed = true;
         } catch (RuntimeException rejected) {
             log.warn("event=cross_server_hop_async_rejected reason={}", rejected.toString());
-            work.run();
+            handed = true;
+            counted.run();
+        } finally {
+            if (!handed) {
+                leave(); // the submit threw an Error: the work will never run, so a stop must not wait for it
+            }
         }
     }
 }

@@ -9,11 +9,13 @@ import java.util.List;
 import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
+import java.util.concurrent.Executor;
 
 import com.uxplima.uxmessentials.shared.application.port.Scheduler;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmessentials.shared.domain.Position;
 import com.uxplima.uxmessentials.shared.domain.WorldRef;
+import org.jspecify.annotations.Nullable;
 
 /**
  * Runs async work at once and delayed work when the test moves the clock past it. Entity work runs only for a
@@ -31,6 +33,9 @@ public final class SteppedScheduler implements Scheduler {
     private long scheduled;
     private boolean rejectsAsync;
     private boolean rejectsDelayed;
+    private @Nullable Executor asyncLane;
+    private boolean holdsEntityWork;
+    private final List<Runnable> heldEntityWork = new ArrayList<>();
 
     public SteppedScheduler(MutableClock clock) {
         this.clock = clock;
@@ -51,6 +56,24 @@ public final class SteppedScheduler implements Scheduler {
 
     public void rejectAsync(boolean rejects) {
         this.rejectsAsync = rejects;
+    }
+
+    /** Queue entity work with a fallback until {@link #releaseEntityWork}, as a busy region thread would. */
+    public void holdEntityWork() {
+        this.holdsEntityWork = true;
+    }
+
+    /** Run the entity work held so far, in order, and stop holding. */
+    public void releaseEntityWork() {
+        holdsEntityWork = false;
+        List<Runnable> held = List.copyOf(heldEntityWork);
+        heldEntityWork.clear();
+        held.forEach(Runnable::run);
+    }
+
+    /** Hand async work to {@code lane} instead of running it at once, as a real thread pool that is busy would. */
+    public void asyncOn(Executor lane) {
+        this.asyncLane = lane;
     }
 
     public void rejectDelayed(boolean rejects) {
@@ -109,6 +132,10 @@ public final class SteppedScheduler implements Scheduler {
 
     @Override
     public void onEntity(PlayerRef player, Runnable task, Runnable retired) {
+        if (holdsEntityWork) {
+            heldEntityWork.add(task);
+            return;
+        }
         if (online.contains(player.uuid())) {
             task.run();
         } else {
@@ -120,6 +147,11 @@ public final class SteppedScheduler implements Scheduler {
     public void async(Runnable task) {
         if (rejectsAsync) {
             throw new IllegalStateException("the async lane is closed");
+        }
+        Executor lane = asyncLane;
+        if (lane != null) {
+            lane.execute(task);
+            return;
         }
         task.run();
     }
