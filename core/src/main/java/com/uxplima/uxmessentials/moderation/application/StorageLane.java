@@ -5,6 +5,7 @@ import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
+import java.util.function.Consumer;
 import java.util.function.Supplier;
 
 import com.uxplima.uxmessentials.shared.application.message.Notifier;
@@ -66,7 +67,7 @@ public final class StorageLane {
         Objects.requireNonNull(target, "target");
         Objects.requireNonNull(work, "work");
         PermissionSnapshot answers = LanePermissions.capture(permissions, actor, target);
-        after(target.uuid(), () -> guarded(actor, answers, work));
+        after(target.uuid(), actor, () -> guarded(actor, answers, work), dropped -> {});
     }
 
     /**
@@ -81,26 +82,36 @@ public final class StorageLane {
         CompletableFuture<T> answer = new CompletableFuture<>();
         after(
                 target.uuid(),
+                actor,
                 () -> PermissionScope.runWith(answers, () -> {
                     try {
                         answer.complete(work.get());
                     } catch (RuntimeException failure) {
                         answer.completeExceptionally(failure);
                     }
-                }));
+                }),
+                answer::completeExceptionally);
         return answer;
     }
 
     /**
      * Queue {@code task} behind the last task for {@code key}. The chain is only linked inside {@code compute}; the
-     * gate that lets it start is opened after, so no work ever runs while the map entry is locked.
+     * gate that lets it start is opened after, so no work ever runs while the map entry is locked. The task itself
+     * never throws, so a failed link means the scheduler refused it (it does while the server shuts down): that is
+     * logged and handed to {@code dropped}.
      */
-    private void after(UUID key, Runnable task) {
+    private void after(UUID key, PlayerRef actor, Runnable task, Consumer<Throwable> dropped) {
         CompletableFuture<Void> gate = new CompletableFuture<>();
         CompletableFuture<Void> tail =
                 tails.compute(key, (unused, previous) -> chained(gate, previous).thenRunAsync(task, scheduler::async));
         gate.complete(null);
-        var unused = tail.whenComplete((ignored, failure) -> tails.remove(key, tail));
+        var unused = tail.whenComplete((ignored, failure) -> {
+            tails.remove(key, tail);
+            if (failure != null) {
+                log.error("event=moderation_lane_dropped actor=" + actor.name(), failure);
+                dropped.accept(failure);
+            }
+        });
     }
 
     private static CompletableFuture<@Nullable Object> chained(

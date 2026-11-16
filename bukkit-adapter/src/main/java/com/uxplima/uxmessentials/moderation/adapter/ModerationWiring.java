@@ -9,6 +9,7 @@ import java.util.Optional;
 import org.bukkit.event.Listener;
 import org.bukkit.plugin.Plugin;
 
+import com.uxplima.uxmessentials.messaging.application.port.MutePolicy;
 import com.uxplima.uxmessentials.moderation.adapter.inbound.command.ModerationCommands;
 import com.uxplima.uxmessentials.moderation.adapter.inbound.command.ModerationGuiCommand;
 import com.uxplima.uxmessentials.moderation.adapter.inbound.gui.JailGuiViews;
@@ -123,6 +124,8 @@ import com.uxplima.uxmessentials.shared.application.module.KernelPorts;
 import com.uxplima.uxmessentials.shared.application.module.ModuleContext;
 import com.uxplima.uxmessentials.shared.application.port.IpHistoryStore;
 import com.uxplima.uxmessentials.shared.application.port.IpTokens;
+import com.uxplima.uxmessentials.shared.application.port.MessageSink;
+import com.uxplima.uxmessentials.shared.application.port.Messages;
 import com.uxplima.uxmessentials.shared.application.port.NetworkPresence;
 import com.uxplima.uxmessentials.shared.application.port.Permissions;
 import com.uxplima.uxmlib.gui.input.TextInput;
@@ -359,7 +362,6 @@ public final class ModerationWiring {
                         repository,
                         kernel,
                         settings,
-                        guard,
                         commandSpyStore,
                         mutedCommands,
                         mutePolicy,
@@ -661,11 +663,12 @@ public final class ModerationWiring {
             ModerationRepository repository,
             KernelPorts kernel,
             ModerationSettings settings,
-            ModerationGuard guard,
             InMemoryCommandSpyStore commandSpyStore,
             MutedCommandPolicy mutedCommands,
             OnlineMutes mutes,
             Clock clock) {
+        // The listeners answer on the event's own thread, never the storage lane's, so they read permissions live.
+        ModerationGuard live = new ModerationGuard(kernel.permissions());
         return List.of(
                 new OnlineMutesListener(mutes),
                 new ModerationLoginListener(services.loginEnforcement()),
@@ -676,14 +679,22 @@ public final class ModerationWiring {
                         kernel.messageSink(),
                         clock,
                         settings.freezeNoticeInterval()),
-                new MutedCommandListener(mutes, mutedCommands, guard, kernel.messages(), kernel.messageSink()),
+                new MutedCommandListener(mutes, mutedCommands, live, kernel.messages(), kernel.messageSink()),
                 new MutedCommandNamesRefresh(mutedCommands),
-                new MutedChatListener(
+                mutedChat(
                         new RepositoryMutePolicy(repository, clock),
-                        guard::isExempt,
+                        kernel.permissions(),
                         kernel.messages(),
                         kernel.messageSink()),
                 new CommandSpyListener(commandSpyStore, kernel.messages(), kernel.messageSink()));
+    }
+
+    /**
+     * The public chat mute check. Chat arrives on its own async thread, where the lane's permission reader has no
+     * answer and would count every speaker as exempt, so this one reads the live permissions, as Paper allows there.
+     */
+    static MutedChatListener mutedChat(MutePolicy mutes, Permissions live, Messages messages, MessageSink sink) {
+        return new MutedChatListener(mutes, new ModerationGuard(live)::isExempt, messages, sink);
     }
 
     /**

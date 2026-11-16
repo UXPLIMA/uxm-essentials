@@ -7,6 +7,8 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 import java.time.Duration;
 import java.util.Optional;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.RejectedExecutionException;
 
 import com.uxplima.uxmessentials.moderation.application.port.SanctionSync;
 import com.uxplima.uxmessentials.moderation.domain.AddressStrictness;
@@ -15,6 +17,9 @@ import com.uxplima.uxmessentials.moderation.domain.TempbanState;
 import com.uxplima.uxmessentials.shared.application.IpAlts;
 import com.uxplima.uxmessentials.shared.application.permission.EnforcementPermissions;
 import com.uxplima.uxmessentials.shared.application.port.Permissions.QuotaResult;
+import com.uxplima.uxmessentials.shared.application.port.Scheduler;
+import com.uxplima.uxmessentials.shared.domain.PlayerRef;
+import com.uxplima.uxmessentials.shared.domain.Position;
 import com.uxplima.uxmessentials.shared.domain.message.SharedMessageKey;
 import com.uxplima.uxmessentials.testing.FakePermissions;
 import com.uxplima.uxmessentials.testing.MutableClock;
@@ -117,6 +122,19 @@ class StorageLaneTest {
     }
 
     @Test
+    void workTheSchedulerRefusesIsLoggedAndFailsTheCallersFuture() {
+        StorageLane closing = new StorageLane(new RefusingScheduler(), notifier.notifier(), permissions, log);
+
+        closing.run(ALEX, SAM, () -> {});
+        CompletableFuture<String> answer = closing.supply(ALEX, SAM, () -> "stored");
+
+        assertThat(answer).isCompletedExceptionally();
+        assertThat(log.errors())
+                .containsExactly(
+                        "event=moderation_lane_dropped actor=Alex", "event=moderation_lane_dropped actor=Alex");
+    }
+
+    @Test
     void anExemptTargetStaysExemptWhenTheLiveReadLaterSaysOtherwise() {
         permissions.grant(SAM, ModerationGuard.EXEMPT_NODE);
         lane.run(ALEX, SAM, () -> ban.ban(ALEX, SAM, Optional.of("cheating"), false));
@@ -159,5 +177,34 @@ class StorageLaneTest {
         scheduler.runAll();
 
         assertThat(records.loadMute(SAM)).isEqualTo(MuteState.none());
+    }
+
+    /** A scheduler that is shutting down: it refuses every task. */
+    private static final class RefusingScheduler implements Scheduler {
+
+        @Override
+        public void onGlobal(Runnable task) {
+            throw new RejectedExecutionException("shutting down");
+        }
+
+        @Override
+        public void onRegion(Position position, Runnable task) {
+            throw new RejectedExecutionException("shutting down");
+        }
+
+        @Override
+        public void onEntity(PlayerRef player, Runnable task) {
+            throw new RejectedExecutionException("shutting down");
+        }
+
+        @Override
+        public void async(Runnable task) {
+            throw new RejectedExecutionException("shutting down");
+        }
+
+        @Override
+        public void asyncAfter(Duration delay, Runnable task) {
+            throw new RejectedExecutionException("shutting down");
+        }
     }
 }
