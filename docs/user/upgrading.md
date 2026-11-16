@@ -1,6 +1,25 @@
 # Upgrading
 
-What an operator edits when a release renames something an operator's own files or permission grants depend on.
+What an operator edits when a release renames something an operator's own files or permission grants depend on, or
+needs a setting it did not need before.
+
+## Velocity bus frames need a shared secret
+
+A network on `network.transport = "velocity"` or `"both"` now signs every frame it sends through the proxy, so a
+player's client cannot write one. Until `network.bus.secret` is set, those carriers send and accept nothing through
+the proxy: cross-server messages, presence, teleport requests and cache updates stop on that carrier. The start log
+names the key and `/uxmess doctor` reads `proxy OFF`. Redis is not affected.
+
+1. Make one secret of 32 or more random characters, for example with `openssl rand -hex 32`. An example value from
+   the documentation, fewer than 8 different characters, or a short pattern repeated, is refused like an empty one.
+2. Put it in `config.conf` of every backend, under `network.bus.secret`. The update adds the empty key to your file.
+   The proxy needs nothing new.
+3. Upgrade every backend and the proxy jar together, then restart. A backend still on the old release sends unsigned
+   frames, which the upgraded ones refuse; it still reads the signed frames they send.
+4. Run `/uxmess doctor` on each backend once players are on: the bus line reads connected without `REFUSED`.
+
+Keep the clocks of the backends in time: a frame signed more than 60 seconds away from the receiving clock is
+refused. See [signed frames](network.md#signed-frames).
 
 ## Database kit claims apply on a single server
 

@@ -17,13 +17,23 @@ class BusTransportHealthCheckTest {
     private static final long NOW = 1_700_000_000_000L;
     private static final Duration WINDOW = Duration.ofSeconds(90);
 
-    private static final BusHealth.ProxyLink NOT_STARTED = new BusHealth.ProxyLink(false, OptionalLong.empty(), false);
-    private static final BusHealth.ProxyLink NEVER_ANSWERED =
-            new BusHealth.ProxyLink(true, OptionalLong.empty(), false);
-    private static final BusHealth.ProxyLink NOBODY_ONLINE = new BusHealth.ProxyLink(true, OptionalLong.empty(), true);
+    private static final BusHealth.ProxyLink NOT_STARTED = link(false, OptionalLong.empty(), false);
+    private static final BusHealth.ProxyLink NEVER_ANSWERED = link(true, OptionalLong.empty(), false);
+    private static final BusHealth.ProxyLink NOBODY_ONLINE = link(true, OptionalLong.empty(), true);
+    private static final BusHealth.ProxyLink NO_SECRET =
+            new BusHealth.ProxyLink(false, false, OptionalLong.empty(), false, 0, OptionalLong.empty());
+
+    private static BusHealth.ProxyLink link(boolean registered, OptionalLong answer, boolean waitingForPlayer) {
+        return new BusHealth.ProxyLink(true, registered, answer, waitingForPlayer, 0, OptionalLong.empty());
+    }
 
     private static BusHealth.ProxyLink answered(long millisAgo) {
-        return new BusHealth.ProxyLink(true, OptionalLong.of(NOW - millisAgo), false);
+        return link(true, OptionalLong.of(NOW - millisAgo), false);
+    }
+
+    private static BusHealth.ProxyLink answeredButRefused(long refusedMillisAgo) {
+        return new BusHealth.ProxyLink(
+                true, true, OptionalLong.of(NOW - 5_000), false, 3, OptionalLong.of(NOW - refusedMillisAgo));
     }
 
     private static HealthResult check(String transport, Optional<BusHealth.ProxyLink> proxy, Optional<Boolean> redis) {
@@ -93,6 +103,26 @@ class BusTransportHealthCheckTest {
 
         assertThat(result.status()).isEqualTo(HealthStatus.WARN);
         assertThat(result.message()).contains("not registered");
+    }
+
+    @Test
+    void withoutASecretTheProxyCarrierIsOffAndTheLineNamesTheKey() {
+        HealthResult result = check("velocity", Optional.of(NO_SECRET), Optional.empty());
+
+        assertThat(result.status()).isEqualTo(HealthStatus.WARN);
+        assertThat(result.message()).contains("proxy OFF", "network.bus.secret").doesNotContain("not registered");
+    }
+
+    @Test
+    void framesRefusedWithinTheWindowAreAWarningEvenWhileTheProxyAnswers() {
+        HealthResult recent = check("velocity", Optional.of(answeredButRefused(10_000)), Optional.empty());
+        HealthResult old = check("velocity", Optional.of(answeredButRefused(WINDOW.toMillis() + 1)), Optional.empty());
+
+        assertThat(recent.status()).isEqualTo(HealthStatus.WARN);
+        assertThat(recent.message())
+                .contains("proxy connected", "REFUSED 3 frame(s), last 10s ago", "network.bus.secret");
+        assertThat(old.status()).isEqualTo(HealthStatus.OK);
+        assertThat(old.message()).doesNotContain("REFUSED");
     }
 
     @Test

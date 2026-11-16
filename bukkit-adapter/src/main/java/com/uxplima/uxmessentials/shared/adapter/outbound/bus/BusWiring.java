@@ -56,6 +56,7 @@ public final class BusWiring {
                             + " backends left on the same name drop each other's sync frames.",
                     network.serverId());
         }
+        network.busSecretProblem().ifPresent(problem -> log.warn("{}", problem));
         RemoteSyncRegistry registry = new RemoteSyncRegistry();
         Carriers carriers = selectTransport(plugin, network, scheduler, log);
         BusTransport transport = carriers.transport();
@@ -127,7 +128,13 @@ public final class BusWiring {
     private static PluginMessagingTransport pluginMessaging(
             Plugin plugin, NetworkConfig network, Scheduler scheduler, Logger log) {
         return new PluginMessagingTransport(
-                plugin, scheduler, network.channel(), network.outboundQueueSize(), network.peerLivenessWindow(), log);
+                plugin,
+                scheduler,
+                network.channel(),
+                network.outboundQueueSize(),
+                network.peerLivenessWindow(),
+                network.busSecret(),
+                log);
     }
 
     /**
@@ -283,7 +290,11 @@ public final class BusWiring {
             core.start();
             // The heartbeat starts after the channel is up so the first ping rides a live transport.
             heartbeat.start();
-            log.info("network sync enabled on channel {} as server-id {}", network.channel(), network.serverId());
+            log.info(
+                    "network sync enabled on channel {} as server-id {}{}",
+                    network.channel(),
+                    network.serverId(),
+                    network.busSecretProblem().isPresent() ? "; proxy carrier OFF (set network.bus.secret)" : "");
         }
 
         void stop() {

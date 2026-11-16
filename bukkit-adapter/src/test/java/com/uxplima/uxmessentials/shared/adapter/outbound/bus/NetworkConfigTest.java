@@ -121,6 +121,34 @@ class NetworkConfigTest {
     }
 
     @Test
+    void anEnabledProxyCarrierWithoutAUsableSecretIsAProblemThatNamesTheKeyButNotTheSecret() throws IOException {
+        String secret = "a-network-secret-of-32-characters-or-more";
+        String shortSecret = "only-ten-c";
+
+        assertThat(read("enabled = true").busSecretProblem())
+                .hasValueSatisfying(problem -> assertThat(problem).contains("network.bus.secret", "is not set"));
+        NetworkConfig tooShort = read("enabled = true\nbus { secret = \"" + shortSecret + "\" }");
+        assertThat(tooShort.busSecretProblem())
+                .hasValueSatisfying(problem ->
+                        assertThat(problem).contains("shorter than 32").doesNotContain(shortSecret));
+        assertThat(tooShort.toString()).doesNotContain(shortSecret);
+
+        NetworkConfig set = read("enabled = true\nbus { secret = \"  " + secret + "  \" }");
+        assertThat(set.busSecretProblem()).isEmpty();
+        assertThat(set.busSecret().usable()).isTrue();
+        assertThat(set.toString()).doesNotContain(secret);
+    }
+
+    @Test
+    void aBackendThatDoesNotUseTheProxyCarrierNeedsNoSecret() throws IOException {
+        assertThat(read("enabled = false").busSecretProblem()).isEmpty();
+        assertThat(read("enabled = true\ntransport = \"redis\"").busSecretProblem())
+                .isEmpty();
+        assertThat(read("enabled = true\ntransport = \"both\"").busSecretProblem())
+                .isPresent();
+    }
+
+    @Test
     void theNewNameWinsWhenAFileHasBoth() throws IOException {
         assertThat(read("server-name = \"new\"\n  server-id = \"old\"").serverId())
                 .isEqualTo("new");
