@@ -1,8 +1,10 @@
 package com.uxplima.uxmessentials.economy.adapter.inbound.command;
 
 import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Set;
 
 import org.bukkit.Material;
 import org.bukkit.entity.Player;
@@ -62,21 +64,38 @@ public final class SellAllCommand extends EconomyCommandSupport implements Comma
     }
 
     /**
-     * Sell every plain stack the player carries: take them here, on the seller's own thread, ask for the sale off the
-     * tick, and give back every item the sale does not buy. Armour, the off hand and renamed stacks are left alone,
-     * since {@code removeItem} would not find them and they would be paid for and kept.
+     * Sell every plain stack the player carries that has a worth. The stacks are counted here, on the seller's own
+     * thread, the worth is read off the tick (it can reach storage), and only the priced stacks are then taken, back
+     * on the seller's thread, so an unpriced stack never leaves the inventory and never has to be given back or kept
+     * for a seller who left. The sale itself runs off the tick and gives back every taken item it does not buy.
+     * Armour, the off hand and renamed stacks are left alone, since {@code removeItem} would not find them and they
+     * would be paid for and kept.
      */
     void sell(Player sender) {
+        PlayerRef seller = ref(sender);
+        Map<Material, Integer> carried = plainStacks(sender);
+        List<String> ids = carried.keySet().stream().map(SellAllCommand::id).toList();
+        services.scheduler()
+                .async(() -> services.sellAll()
+                        .priced(seller, ids)
+                        .ifPresent(priced -> services.scheduler()
+                                .onEntity(seller, () -> takeAndSell(sender, seller, carried, priced))));
+    }
+
+    /** On the seller's own thread: take the priced stacks counted earlier and hand them to the sale. */
+    private void takeAndSell(Player sender, PlayerRef seller, Map<Material, Integer> carried, Set<String> priced) {
         Map<Material, Integer> taken = new LinkedHashMap<>();
-        for (Map.Entry<Material, Integer> plain : plainStacks(sender).entrySet()) {
+        for (Map.Entry<Material, Integer> plain : carried.entrySet()) {
+            if (!priced.contains(id(plain.getKey()))) {
+                continue;
+            }
             int got = SoldItems.take(sender, plain.getKey(), plain.getValue());
             if (got > 0) {
                 taken.put(plain.getKey(), got);
             }
         }
-        PlayerRef seller = ref(sender);
         Map<String, Integer> byId = new LinkedHashMap<>();
-        taken.forEach((material, count) -> byId.put(material.name().toLowerCase(Locale.ROOT), count));
+        taken.forEach((material, count) -> byId.put(id(material), count));
         services.returnUnsoldItems()
                 .sell(
                         seller,
@@ -84,6 +103,10 @@ public final class SellAllCommand extends EconomyCommandSupport implements Comma
                         (items, paid) -> services.sellAll()
                                 .sellAll(seller, items, paid::paid)
                                 .sold());
+    }
+
+    private static String id(Material material) {
+        return material.name().toLowerCase(Locale.ROOT);
     }
 
     /** The plain stacks of the player's own storage, counted by material: no armour, no off hand, no renamed item. */

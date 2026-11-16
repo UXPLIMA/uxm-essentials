@@ -1,10 +1,13 @@
 package com.uxplima.uxmessentials.economy.application;
 
 import java.math.BigDecimal;
+import java.util.Collection;
 import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.Set;
 import java.util.function.Consumer;
 
 import com.uxplima.uxmessentials.economy.application.port.EconomyProvider;
@@ -56,6 +59,29 @@ public final class SellAll {
         this.defaultCurrency = Objects.requireNonNull(defaultCurrency, "defaultCurrency");
         this.currencies = java.util.List.copyOf(currencies);
         this.log = Objects.requireNonNull(log, "log");
+    }
+
+    /**
+     * The materials among {@code materials} that have a worth, so a caller takes only what a sale can pay for. The
+     * worth chain can read storage, so this runs off the tick. Empty when the worth could not be read: that is logged
+     * and {@code seller} is told the sale failed, and since nothing has been taken yet nothing needs to go back.
+     */
+    public Optional<Set<String>> priced(PlayerRef seller, Collection<String> materials) {
+        Objects.requireNonNull(seller, "seller");
+        Objects.requireNonNull(materials, "materials");
+        Set<String> priced = new LinkedHashSet<>();
+        try {
+            for (String material : materials) {
+                if (worth.unitPrice(material).isPresent()) {
+                    priced.add(material);
+                }
+            }
+        } catch (RuntimeException failure) {
+            log.error("event=sellall_worth_failed seller=" + seller.uuid(), failure);
+            notifySafely(seller, () -> notifier.send(seller, EconomyMessageKey.SELL_FAILED));
+            return Optional.empty();
+        }
+        return Optional.of(priced);
     }
 
     /** Sell every priced material in {@code materials} (id → count) for {@code seller}, crediting the total per currency. */

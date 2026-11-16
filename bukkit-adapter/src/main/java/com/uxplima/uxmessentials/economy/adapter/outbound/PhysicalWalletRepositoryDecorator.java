@@ -42,7 +42,9 @@ import org.jspecify.annotations.NullMarked;
  * inline rather than scheduling onto itself and blocking. That self-schedule-and-wait is a deadlock, and was
  * the cause of the {@code /baltop} marshalling timeouts. Off the owning thread the bounded wait is the standard
  * anti-corruption bridge; the entity branch passes a retired callback so a player who logs off mid-flight
- * releases the wait immediately instead of letting it run to the timeout.
+ * releases the wait immediately instead of letting it run to the timeout. A wait that does run out abandons work
+ * that has not started, so a credit or debit the caller was told failed never lands later (see
+ * {@link EntityHandoff}).
  *
  * <p>Online players read/write their active inventory; an offline player's credit is queued in the pending
  * transactions table and an offline debit/transfer is refused, exactly as before. The {@link PlayerLookup} port
@@ -65,6 +67,17 @@ public final class PhysicalWalletRepositoryDecorator implements WalletRepository
     private final PlayerLookup players;
     private final Logger log;
     private final AtomicLong lastTimeoutWarnAt = new AtomicLong(Long.MIN_VALUE);
+    private final EntityHandoff.Outcomes handoffOutcomes = new EntityHandoff.Outcomes() {
+        @Override
+        public void timedOut() {
+            warnTimeout();
+        }
+
+        @Override
+        public void failed(Throwable failure) {
+            log.error("physical wallet inventory work failed", failure);
+        }
+    };
 
     public PhysicalWalletRepositoryDecorator(
             WalletRepository delegate,
@@ -182,8 +195,8 @@ public final class PhysicalWalletRepositoryDecorator implements WalletRepository
             Result<Unit, TransferError> creditResult = onEntity(
                     to, player -> calculations.credit(player, amount), Result.err(TransferError.PLAYER_OFFLINE));
             if (creditResult.isErr()) {
-                // Roll the debit back on the sender's thread; the move commits both legs or neither.
-                onEntity(from, player -> calculations.credit(player, amount), Result.ok());
+                // Roll the debit back; the move commits both legs or neither.
+                restore(from, amount);
                 return creditResult;
             }
         } else {
@@ -207,10 +220,36 @@ public final class PhysicalWalletRepositoryDecorator implements WalletRepository
         }
         Result<Unit, TransferError> credited = credit(owner, credit);
         if (credited.isErr()) {
-            credit(owner, debit);
+            restore(owner, debit);
             return credited;
         }
         return Result.ok();
+    }
+
+    /**
+     * Give back {@code amount} that was already taken from {@code owner} for a move that then failed. When the
+     * holder's thread cannot take it now (they left, or it did not answer in time and the credit was abandoned), it
+     * is queued for their next join, so the refund lands exactly once instead of being lost.
+     */
+    private void restore(PlayerRef owner, Money amount) {
+        if (!amount.currency().isPhysical()) {
+            Result<Unit, TransferError> back = delegate.credit(owner, amount);
+            if (back.isErr()) {
+                log.warn(
+                        "event=physical_rollback_refused player={} amount={} currency={}; the player is owed that amount",
+                        owner.uuid(),
+                        amount.amount(),
+                        amount.currency().id().value());
+            }
+            return;
+        }
+        Result<Unit, TransferError> back = players.isOnline(owner.uuid())
+                ? onEntity(
+                        owner, player -> calculations.credit(player, amount), Result.err(TransferError.PLAYER_OFFLINE))
+                : Result.err(TransferError.PLAYER_OFFLINE);
+        if (back.isErr()) {
+            pendingRepo.queueCredit(owner.uuid(), amount.currency().id().value(), amount.amount());
+        }
     }
 
     @Override
@@ -306,23 +345,15 @@ public final class PhysicalWalletRepositoryDecorator implements WalletRepository
             Player player = Bukkit.getPlayer(owner.uuid());
             return player == null || !player.isOnline() ? fallback : work.apply(player);
         }
-        CompletableFuture<T> future = new CompletableFuture<>();
+        EntityHandoff<T> handoff = new EntityHandoff<>();
         scheduler.onEntity(
                 owner,
-                () -> {
+                () -> handoff.run(() -> {
                     Player player = Bukkit.getPlayer(owner.uuid());
-                    if (player == null || !player.isOnline()) {
-                        future.complete(fallback);
-                        return;
-                    }
-                    try {
-                        future.complete(work.apply(player));
-                    } catch (RuntimeException failure) {
-                        future.completeExceptionally(failure);
-                    }
-                },
-                () -> future.complete(fallback));
-        return await(future, fallback);
+                    return player == null || !player.isOnline() ? fallback : work.apply(player);
+                }),
+                () -> handoff.retire(fallback));
+        return handoff.await(MARSHAL_TIMEOUT, fallback, handoffOutcomes);
     }
 
     /** Run a side-effecting {@code work} on {@code owner}'s entity thread and wait for it to finish. */
@@ -334,24 +365,19 @@ public final class PhysicalWalletRepositoryDecorator implements WalletRepository
             }
             return;
         }
-        CompletableFuture<Boolean> future = new CompletableFuture<>();
+        EntityHandoff<Boolean> handoff = new EntityHandoff<>();
         scheduler.onEntity(
                 owner,
-                () -> {
+                () -> handoff.run(() -> {
                     Player player = Bukkit.getPlayer(owner.uuid());
                     if (player == null || !player.isOnline()) {
-                        future.complete(Boolean.FALSE);
-                        return;
+                        return Boolean.FALSE;
                     }
-                    try {
-                        work.accept(player);
-                        future.complete(Boolean.TRUE);
-                    } catch (RuntimeException failure) {
-                        future.completeExceptionally(failure);
-                    }
-                },
-                () -> future.complete(Boolean.FALSE));
-        await(future, Boolean.FALSE);
+                    work.accept(player);
+                    return Boolean.TRUE;
+                }),
+                () -> handoff.retire(Boolean.FALSE));
+        handoff.await(MARSHAL_TIMEOUT, Boolean.FALSE, handoffOutcomes);
     }
 
     /**

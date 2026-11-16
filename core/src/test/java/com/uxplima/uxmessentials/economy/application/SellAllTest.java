@@ -10,6 +10,7 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
 
 import com.uxplima.uxmessentials.economy.application.port.EconomyProvider;
 import com.uxplima.uxmessentials.economy.domain.Currency;
@@ -35,6 +36,7 @@ class SellAllTest {
         WorthSource worth = material -> switch (material) {
             case "coal" -> Optional.of(Worth.of(BigDecimal.ONE, "dollars"));
             case "diamond" -> Optional.of(Worth.of(BigDecimal.TEN, "gems"));
+            case "unreadable" -> throw new IllegalStateException("worth overrides are unreachable");
             default -> Optional.empty();
         };
         EconomyNotifier notifier = new EconomyNotifier(
@@ -85,5 +87,22 @@ class SellAllTest {
         assertThat(outcome.sold()).isEqualTo(Map.of("coal", 10, "diamond", 2));
         assertThat(paid).containsExactly(Map.of("coal", 10), Map.of("diamond", 2));
         assertThat(bank.balance(ALEX, GEMS).amount()).isEqualByComparingTo("20");
+    }
+
+    @Test
+    void onlyMaterialsWithAWorthAreOfferedForTheSale() {
+        Optional<Set<String>> priced = sellAll(bank).priced(ALEX, List.of("coal", "dirt", "diamond", "stick"));
+
+        assertThat(priced).contains(Set.of("coal", "diamond"));
+        assertThat(lines).isEmpty();
+    }
+
+    @Test
+    void aWorthThatCannotBeReadOffersNothingAndTellsTheSeller() {
+        Optional<Set<String>> priced = sellAll(bank).priced(ALEX, List.of("coal", "unreadable"));
+
+        assertThat(priced).isEmpty();
+        assertThat(lines).containsExactly("wallet.sell-failed");
+        assertThat(log.errors()).hasSize(1);
     }
 }
