@@ -49,6 +49,9 @@ final class JailNetworkFakes {
 
         private final Map<UUID, JailState> jails = new HashMap<>();
 
+        /** Every last-seen write, in order: name, address and instant. */
+        final List<String> seen = new ArrayList<>();
+
         @Override
         public JailState loadJail(PlayerRef target) {
             return jails.getOrDefault(target.uuid(), JailState.none());
@@ -161,7 +164,7 @@ final class JailNetworkFakes {
 
         @Override
         public void recordSeen(PlayerRef who, Optional<String> ip, Instant at) {
-            throw new UnsupportedOperationException();
+            seen.add(who.name() + " " + ip.orElse("-") + " " + at);
         }
 
         @Override
