@@ -8,6 +8,7 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.UUID;
+import java.util.function.Predicate;
 
 import com.uxplima.uxmessentials.moderation.application.port.ModerationAudit;
 import com.uxplima.uxmessentials.moderation.application.port.ModerationRepository;
@@ -30,10 +31,14 @@ import com.uxplima.uxmessentials.shared.domain.Result;
  * {@code /tempbanip <player|ip> <duration> [reason]}: ban an address until a wall-clock expiry. This is the
  * timed sibling of {@code /banip}: the duration is mandatory (a permanent IP ban is {@code /banip}), so a
  * blank or malformed span is refused as {@link ModerationError#BAD_DURATION} with nothing written. On a valid
- * span the {@link IpBan} is upserted with its {@code until} instant, alt-detection runs, and the events and
+ * span the {@link IpBan} is stored with its {@code until} instant, alt-detection runs, and the events and
  * audit line, the kick of everyone on the address and the peer announcement mirror {@code /banip}; the
  * existing login listener already honours the {@code until} expiry, so
  * the address is admitted again once the span passes.
+ *
+ * <p>An IP ban already in force that would outlast this one, a permanent {@code /banip} above all, is never cut
+ * short: the request is refused with {@link ModerationError#LONGER_BAN_RUNNING} and the actor is told which ban
+ * runs. The write is compare and set, like {@code /banip}.
  *
  * <p>Like {@code /banip} this takes an already-resolved {@link BanIp.Target} from the command adapter (which
  * decides whether the argument was a player name or a literal IP), so the domain never parses an address.
@@ -96,7 +101,19 @@ public final class TempBanIp {
             PlayerRef actor, BanIp.Target target, Duration span, Optional<String> reason) {
         Instant now = clock.instant();
         IpBan ban = new IpBan(target.ip(), Optional.of(now.plus(span)), reason, target.uuid(), Issuer.of(actor), now);
-        repository.saveIpBan(ban);
+        Predicate<IpBan> longer = GuardedWrite.outlasting(ban.until(), IpBan::until);
+        if (GuardedWrite.store(GuardedWrite.ipBan(repository, ban), now, longer)
+                instanceof GuardedWrite.Kept<IpBan> kept) {
+            audit.ipBanned(
+                    actor,
+                    target.ip(),
+                    target.uuid(),
+                    Optional.of(SanctionDuration.format(span)),
+                    false,
+                    SanctionStrength.HELD);
+            GuardedWrite.tellIpBanKept(notifier, actor, kept.running(), now);
+            return Result.err(ModerationError.LONGER_BAN_RUNNING);
+        }
         history.banIp(actor, target.uuid(), target.ip(), reason, Optional.of(now.plus(span)));
         IpBanKick.kickEveryoneOn(ban, Optional.of(actor.uuid()), guard, sanctions, notifier);
         List<UUID> alts = ipAlts.onAddress(target.ip(), target.uuid().orElse(NO_UUID));

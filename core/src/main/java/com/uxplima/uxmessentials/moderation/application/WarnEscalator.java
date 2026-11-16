@@ -25,13 +25,15 @@ import com.uxplima.uxmessentials.shared.domain.message.MessageKey;
  * use cases, never back through a warn, so escalation cannot recurse: a tempban from the 5th warning is a
  * plain tempban, it does not re-enter the ladder. It is issued under a stable system actor (so the audit and
  * broadcast attribute it to the server's rule, not the staff member who happened to land the final warning),
- * and inherits the warning's {@code silent} flag, so a silent warn escalates silently.
+ * and inherits the warning's {@code silent} flag, so a silent warn escalates silently. Its reason names the
+ * warning count that tripped the step and that warning's own reason, so the history says what caused it.
  *
  * <p>A rung leaves the player under the stronger of its own sanction and the one of that kind already running:
  * a longer mute or ban replaces a shorter one, and a running one that lasts as long or longer (a permanent one
  * above all) is never cut short. Rungs fire while an earlier rung's sanction still runs, so this is the normal
- * case on a tight ladder rather than an edge. Because the use cases answer the system actor, the staff member
- * hears the real outcome from here: applied, extended, already under a stronger sanction, or failed.
+ * case on a tight ladder rather than an edge. What the use cases say about the sanction (that it landed, or why it
+ * was refused) goes to the staff member who gave the warning, and this then tells them how the step landed:
+ * applied, extended, already under a stronger sanction, or failed.
  */
 public final class WarnEscalator {
 
@@ -56,41 +58,60 @@ public final class WarnEscalator {
 
     /**
      * Apply the escalation rung that {@code newWarnCount} trips, if any, against {@code target}; tell
-     * {@code actor} which action the rung carried and how it landed. A {@code silent} warning escalates
-     * silently. No rung for the count is a no-op.
+     * {@code actor} which action the rung carried and how it landed. {@code warnReason} is the reason of the warning
+     * that reached the count. A {@code silent} warning escalates silently. No rung for the count is a no-op.
      */
-    public void escalate(PlayerRef actor, PlayerRef target, int newWarnCount, boolean silent) {
+    public void escalate(
+            PlayerRef actor, PlayerRef target, int newWarnCount, Optional<String> warnReason, boolean silent) {
         Objects.requireNonNull(actor, "actor");
         Objects.requireNonNull(target, "target");
+        Objects.requireNonNull(warnReason, "warnReason");
         Optional<EscalationStep> step = ladder.stepFor(newWarnCount);
         if (step.isEmpty()) {
             return;
         }
         EscalationStep rung = step.get();
-        Result<EscalationOutcome, ModerationError> outcome = applyAction(target, rung, silent);
+        Optional<String> reason = Optional.of(reasonFor(target, newWarnCount, warnReason));
+        Result<EscalationOutcome, ModerationError> outcome = applyAction(actor, target, rung, reason, silent);
         notifier.send(
                 actor,
                 messageFor(outcome),
                 Map.of("action", rung.action().name().toLowerCase(Locale.ROOT)));
     }
 
+    /**
+     * The reason a step's sanction is stored, shown and announced with: the count that tripped it and the reason of
+     * the warning that reached it. It is drawn in the punished player's language, since they read it on the kick
+     * screen and in the mute notice.
+     */
+    private String reasonFor(PlayerRef target, int count, Optional<String> warnReason) {
+        String total = Integer.toString(count);
+        return warnReason
+                .filter(reason -> !reason.isBlank())
+                .map(reason -> notifier.render(
+                        target,
+                        ModerationMessageKey.MOD_WARN_ESCALATION_REASON,
+                        Map.of("count", total, "reason", reason)))
+                .orElseGet(() -> notifier.render(
+                        target, ModerationMessageKey.MOD_WARN_ESCALATION_REASON_BARE, Map.of("count", total)));
+    }
+
     private Result<EscalationOutcome, ModerationError> applyAction(
-            PlayerRef target, EscalationStep rung, boolean silent) {
-        Optional<String> noReason = Optional.empty();
+            PlayerRef told, PlayerRef target, EscalationStep rung, Optional<String> reason, boolean silent) {
         String span = rung.duration().map(SanctionDuration::format).orElse("");
         return switch (rung.action()) {
-            case MUTE -> mute.escalate(SYSTEM_ACTOR, target, "", noReason, silent);
-            case TEMPMUTE -> mute.escalate(SYSTEM_ACTOR, target, span, noReason, silent);
+            case MUTE -> mute.escalate(SYSTEM_ACTOR, told, target, "", reason, silent);
+            case TEMPMUTE -> mute.escalate(SYSTEM_ACTOR, told, target, span, reason, silent);
             // A kick has nothing to outlast: it either happened or it did not.
-            case KICK -> kick.kick(SYSTEM_ACTOR, target, noReason, silent).map(done -> EscalationOutcome.APPLIED);
-            case TEMPBAN -> tempBan.escalate(SYSTEM_ACTOR, target, span, noReason, silent);
-            case BAN -> ban.escalate(SYSTEM_ACTOR, target, noReason, silent);
+            case KICK -> kick.kick(SYSTEM_ACTOR, told, target, reason, silent).map(done -> EscalationOutcome.APPLIED);
+            case TEMPBAN -> tempBan.escalate(SYSTEM_ACTOR, told, target, span, reason, silent);
+            case BAN -> ban.escalate(SYSTEM_ACTOR, told, target, reason, silent);
         };
     }
 
     /**
-     * The line the staff member reads. A refusal itself went to the system actor, so here it only says the rung
-     * did not land; the console holds the reason.
+     * The line the staff member reads after the use case's own: it ties that line to the warning step, and says so
+     * when the step was held or did not land.
      */
     private static MessageKey messageFor(Result<EscalationOutcome, ModerationError> outcome) {
         return outcome.asValue()

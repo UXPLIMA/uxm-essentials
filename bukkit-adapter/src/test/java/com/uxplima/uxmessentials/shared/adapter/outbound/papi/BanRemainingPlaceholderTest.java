@@ -151,6 +151,21 @@ class BanRemainingPlaceholderTest {
         }
 
         @Override
+        public boolean replaceMute(PlayerRef target, MuteState expected, MuteState replacement) {
+            throw new UnsupportedOperationException();
+        }
+
+        @Override
+        public Optional<IpBan> loadIpBan(String ip) {
+            throw new UnsupportedOperationException();
+        }
+
+        @Override
+        public boolean replaceIpBan(Optional<IpBan> expected, IpBan replacement) {
+            throw new UnsupportedOperationException();
+        }
+
+        @Override
         public boolean replaceTempban(PlayerRef target, TempbanState expected, TempbanState.Active replacement) {
             throw new UnsupportedOperationException();
         }

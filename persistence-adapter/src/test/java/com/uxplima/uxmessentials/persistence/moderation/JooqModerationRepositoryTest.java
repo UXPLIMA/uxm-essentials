@@ -10,7 +10,9 @@ import java.util.Optional;
 import java.util.UUID;
 
 import com.uxplima.uxmessentials.moderation.application.port.ModerationRepository;
+import com.uxplima.uxmessentials.moderation.domain.IpBan;
 import com.uxplima.uxmessentials.moderation.domain.Issuer;
+import com.uxplima.uxmessentials.moderation.domain.MuteState;
 import com.uxplima.uxmessentials.moderation.domain.TempbanState;
 import com.uxplima.uxmessentials.persistence.runtime.DatabaseBackend;
 import com.uxplima.uxmessentials.persistence.runtime.DslContextProvider;
@@ -23,8 +25,9 @@ import org.junit.jupiter.api.io.TempDir;
 import org.sqlite.SQLiteDataSource;
 
 /**
- * A conditional ban write through the real migrations on a SQLite file: it lands only while the row is still the one
- * the caller read, so a ban written by another server in between is never overwritten by a decision made without it.
+ * A conditional ban, mute or IP ban write through the real migrations on a SQLite file: it lands only while the row
+ * is still the one the caller read, so a sanction written by another server in between is never overwritten by a
+ * decision made without it.
  */
 class JooqModerationRepositoryTest {
 
@@ -32,6 +35,7 @@ class JooqModerationRepositoryTest {
             new PlayerRef(UUID.fromString("00000000-0000-0000-0000-0000000000a1"), "Alex");
     private static final PlayerRef SAM = new PlayerRef(UUID.fromString("00000000-0000-0000-0000-0000000000a2"), "Sam");
     private static final Instant NOW = Instant.parse("2030-01-01T00:00:00Z");
+    private static final String ADDRESS = "203.0.113.7";
 
     @TempDir
     Path folder;
@@ -108,6 +112,95 @@ class JooqModerationRepositoryTest {
 
         assertThat(inserted.reason()).contains("x".repeat(256));
         assertThat(updated.reason()).contains("x".repeat(256));
+    }
+
+    @Test
+    void aMuteDecidedOnNoRowIsStoredAndDoesNotLandOverOneWrittenSince() {
+        MuteState hour = MuteState.timed(NOW.plus(Duration.ofHours(1)), Issuer.of(ALEX), Optional.of("spam"), NOW);
+        MuteState permanent = MuteState.permanent(Issuer.of(ALEX), Optional.of("slurs"), NOW);
+
+        assertThat(first.replaceMute(SAM, MuteState.none(), permanent)).isTrue();
+        assertThat(second.replaceMute(SAM, MuteState.none(), hour)).isFalse();
+
+        assertThat(second.loadMute(SAM)).isEqualTo(permanent);
+    }
+
+    @Test
+    void aMuteDecidedOnAPermanentRowStillThereReplacesIt() {
+        first.saveMute(SAM, MuteState.permanent(Issuer.of(ALEX), Optional.empty(), NOW));
+        MuteState read = first.loadMute(SAM);
+        MuteState day =
+                MuteState.timed(NOW.plus(Duration.ofDays(1)), Issuer.of(ALEX), Optional.of("spam"), NOW.plusSeconds(5));
+
+        assertThat(first.replaceMute(SAM, read, day)).isTrue();
+
+        assertThat(second.loadMute(SAM)).isEqualTo(day);
+    }
+
+    @Test
+    void aMuteDecidedOnARowThatChangedSinceDoesNotLand() {
+        first.saveMute(SAM, MuteState.timed(NOW.plus(Duration.ofHours(1)), Issuer.of(ALEX), Optional.empty(), NOW));
+        MuteState read = first.loadMute(SAM);
+        MuteState permanent = MuteState.permanent(Issuer.of(ALEX), Optional.of("slurs"), NOW.plusSeconds(1));
+        second.saveMute(SAM, permanent);
+
+        assertThat(first.replaceMute(
+                        SAM,
+                        read,
+                        MuteState.timed(NOW.plus(Duration.ofDays(1)), Issuer.of(ALEX), Optional.empty(), NOW)))
+                .isFalse();
+
+        assertThat(first.loadMute(SAM)).isEqualTo(permanent);
+    }
+
+    @Test
+    void anIpBanDecidedOnNoRowIsStoredAndDoesNotLandOverOneWrittenSince() {
+        IpBan permanent = ipBan(Optional.empty(), "alts", NOW);
+
+        assertThat(first.replaceIpBan(Optional.empty(), permanent)).isTrue();
+        assertThat(second.replaceIpBan(Optional.empty(), ipBan(Optional.of(NOW.plusSeconds(60)), "spam", NOW)))
+                .isFalse();
+
+        assertThat(second.loadIpBan(ADDRESS)).contains(permanent);
+    }
+
+    @Test
+    void anIpBanDecidedOnAPermanentRowStillThereReplacesIt() {
+        first.saveIpBan(ipBan(Optional.empty(), "alts", NOW));
+        Optional<IpBan> read = first.loadIpBan(ADDRESS);
+        IpBan again = ipBan(Optional.empty(), "alts again", NOW.plusSeconds(5));
+
+        assertThat(first.replaceIpBan(read, again)).isTrue();
+
+        assertThat(second.loadIpBan(ADDRESS)).contains(again);
+    }
+
+    @Test
+    void anIpBanDecidedOnARowThatChangedSinceDoesNotLand() {
+        first.saveIpBan(ipBan(Optional.of(NOW.plusSeconds(3600)), "spam", NOW));
+        Optional<IpBan> read = first.loadIpBan(ADDRESS);
+        IpBan permanent = ipBan(Optional.empty(), "alts", NOW.plusSeconds(1));
+        second.saveIpBan(permanent);
+
+        assertThat(first.replaceIpBan(read, ipBan(Optional.of(NOW.plusSeconds(86_400)), "spam", NOW)))
+                .isFalse();
+
+        assertThat(first.loadIpBan(ADDRESS)).contains(permanent);
+    }
+
+    @Test
+    void aLapsedIpBanIsStillTheRowAWriteIsDecidedOn() {
+        IpBan lapsed = ipBan(Optional.of(NOW.minusSeconds(60)), "old", NOW.minusSeconds(3600));
+        first.saveIpBan(lapsed);
+
+        assertThat(first.activeIpBan(ADDRESS, NOW)).isEmpty();
+        assertThat(first.loadIpBan(ADDRESS)).contains(lapsed);
+        assertThat(first.replaceIpBan(Optional.of(lapsed), ipBan(Optional.empty(), "new", NOW)))
+                .isTrue();
+    }
+
+    private static IpBan ipBan(Optional<Instant> until, String reason, Instant at) {
+        return new IpBan(ADDRESS, until, Optional.of(reason), Optional.empty(), Issuer.of(ALEX), at);
     }
 
     private ModerationRepository openStore() {
