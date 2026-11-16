@@ -94,6 +94,7 @@ import com.uxplima.uxmessentials.shared.application.module.KernelPorts;
 import com.uxplima.uxmessentials.shared.application.module.ModuleContext;
 import com.uxplima.uxmessentials.shared.application.port.ConfigStore;
 import com.uxplima.uxmessentials.shared.application.teleport.PaidTeleports;
+import com.uxplima.uxmessentials.shared.domain.WorldBlacklist;
 import com.uxplima.uxmessentials.teleport.application.TeleportEngine;
 import com.uxplima.uxmessentials.teleport.application.TeleportHopGate;
 import com.uxplima.uxmessentials.warps.adapter.outbound.BukkitWarpSafetyChecker;
@@ -260,6 +261,7 @@ public final class PlayerwarpsWiring {
                     viewer, owner, com.uxplima.uxmessentials.playerwarps.domain.PlayerWarpName.of(name)));
         }
         // Build the use cases, then the management GUI over them, then the services holder carrying both editors.
+        WorldBlacklist worldBlacklist = worldBlacklist(ctx.config());
         SetPlayerWarp setPlayerWarp = new SetPlayerWarp(
                 repository,
                 quota,
@@ -267,7 +269,7 @@ public final class PlayerwarpsWiring {
                 kernel.events(),
                 kernel.gate(),
                 Clock.systemUTC(),
-                ctx.config().getStringList("world-blacklist", List.of()),
+                worldBlacklist,
                 recordedServer);
         ArchivePlayerWarp archivePlayerWarp = new ArchivePlayerWarp(
                 repository, warpAuthorization, notifier, kernel.events(), kernel.gate(), Clock.systemUTC());
@@ -300,7 +302,7 @@ public final class PlayerwarpsWiring {
         // The single-warp edit verbs and the ownership transfer gate through the same shared WarpAuthorization and
         // reuse the repository, notifier, and password store built above: no new persistence, just use cases.
         // Every path that moves a warp into another world asks the owner's limit for that world, as a new warp does.
-        PlayerWarpWorldLimit worldLimit = new PlayerWarpWorldLimit(quota, repository, notifier);
+        PlayerWarpWorldLimit worldLimit = new PlayerWarpWorldLimit(quota, repository, notifier, worldBlacklist);
         EditPlayerWarp editPlayerWarp = new EditPlayerWarp(
                 repository, warpAuthorization, notifier, passwordStore, Clock.systemUTC(), recordedServer, worldLimit);
         TransferPlayerWarp transferPlayerWarp =
@@ -841,6 +843,14 @@ public final class PlayerwarpsWiring {
         boolean enabled = cfg.getBoolean("ratings.rewards.enabled", false);
         return new RatingRewardConfig(
                 enabled, rewardSpec(cfg, "ratings.rewards.rater"), rewardSpec(cfg, "ratings.rewards.owner"));
+    }
+
+    /**
+     * The worlds no player warp may be created or moved into, from the playerwarps config. The importer reads it here
+     * too, so an imported warp is held to the same list.
+     */
+    public static WorldBlacklist worldBlacklist(ConfigStore playerwarpsConfig) {
+        return WorldBlacklist.of(playerwarpsConfig.getStringList("world-blacklist", List.of()));
     }
 
     /** Read one {@code {money, currency, command}} reward block into a normalised {@link RewardSpec}. */

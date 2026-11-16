@@ -40,6 +40,7 @@ import com.uxplima.uxmessentials.migration.ImportMode;
 import com.uxplima.uxmessentials.migration.ImportOptions;
 import com.uxplima.uxmessentials.migration.ImportRecord;
 import com.uxplima.uxmessentials.migration.RecordOutcome;
+import com.uxplima.uxmessentials.migration.RecordResult;
 import com.uxplima.uxmessentials.migration.convert.map.ImportedHologram;
 import com.uxplima.uxmessentials.migration.convert.map.ImportedKit;
 import com.uxplima.uxmessentials.migration.convert.map.ImportedUser;
@@ -60,6 +61,7 @@ import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmessentials.shared.domain.Position;
 import com.uxplima.uxmessentials.shared.domain.Result;
 import com.uxplima.uxmessentials.shared.domain.Unit;
+import com.uxplima.uxmessentials.shared.domain.WorldBlacklist;
 import com.uxplima.uxmessentials.shared.domain.WorldRef;
 import com.uxplima.uxmessentials.shared.network.HologramChanged;
 import com.uxplima.uxmessentials.shared.network.NetworkMessage;
@@ -104,6 +106,7 @@ class LiveImportTest {
     private final Databases databases = new Databases();
     private final RecordingBus bus = new RecordingBus();
     private final DeferringScheduler scheduler = new DeferringScheduler();
+    private WorldBlacklist warpWorlds = WorldBlacklist.none();
 
     private MigrationWiring.Writers writers() {
         return MigrationWiring.writers(
@@ -116,6 +119,8 @@ class LiveImportTest {
                         Duration.ZERO,
                         new UntouchedImportPorts.KitClaims(),
                         COINS,
+                        () -> warpWorlds,
+                        WorldBlacklist::none,
                         CLOCK,
                         log),
                 bus,
@@ -181,6 +186,24 @@ class LiveImportTest {
     }
 
     @Test
+    void aWarpInAWorldTheWarpsModuleBarsIsSkippedByTheLiveAndTheDryRunWriter() {
+        CachedWarpRepository live = liveWarps();
+        warpWorlds = WorldBlacklist.of(List.of(WORLD.name()));
+        ImportRecord barred = warpRecord(warp("market", FOUNDER, 10));
+        AnnouncingRecordWriter writer = writers().live();
+
+        RecordResult fromLive = writer.write(barred, OVERWRITE);
+        RecordResult fromDryRun = writers().dryRun().write(barred, OVERWRITE);
+        writer.announce();
+
+        assertThat(fromLive.outcome()).isEqualTo(RecordOutcome.SKIPPED);
+        assertThat(fromLive.notes()).contains("held_back=world_blacklist");
+        assertThat(fromDryRun).isEqualTo(fromLive);
+        assertThat(live.find(WarpName.of("market"))).isEmpty();
+        assertThat(bus.published).as("nothing changed, so nothing is announced").isEmpty();
+    }
+
+    @Test
     void underSkipAWarpTheModuleAlreadyHoldsIsKept() {
         CachedWarpRepository live = liveWarps();
         Warp existing = warp("market", STAFF, 1);
@@ -218,7 +241,7 @@ class LiveImportTest {
                 new Notifier((viewer, key, placeholders) -> key.key(), (viewer, text) -> {}),
                 events,
                 Clock.fixed(NOW.plusSeconds(60), ZoneOffset.UTC),
-                List.of(),
+                WorldBlacklist.none(),
                 Optional.of("lobby"));
         Position moved = Position.of(WORLD, 50, 70, 50);
 

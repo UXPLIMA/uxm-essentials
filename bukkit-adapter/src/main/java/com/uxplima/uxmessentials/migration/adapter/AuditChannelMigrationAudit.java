@@ -55,8 +55,8 @@ public final class AuditChannelMigrationAudit implements MigrationAudit {
         RecordOutcome outcome = result.outcome();
         switch (rec) {
             case ImportRecord.UserRecord user -> recordUser(source, user, result);
-            case ImportRecord.WarpRecord warp -> recordWarp(source, warp, outcome);
-            case ImportRecord.PlayerWarpRecord warp -> recordPlayerWarp(source, warp, outcome);
+            case ImportRecord.WarpRecord warp -> recordWarp(source, warp, result);
+            case ImportRecord.PlayerWarpRecord warp -> recordPlayerWarp(source, warp, result);
             case ImportRecord.KitRecord kit -> recordKit(source, kit, outcome);
             case ImportRecord.ModerationRecord moderation -> recordModeration(source, moderation, outcome);
             case ImportRecord.BanRecord ban -> recordBan(source, ban, outcome);
@@ -107,23 +107,26 @@ public final class AuditChannelMigrationAudit implements MigrationAudit {
         return result.notes().isEmpty() ? "" : " " + String.join(" ", result.notes());
     }
 
-    private void recordPlayerWarp(SourceId source, ImportRecord.PlayerWarpRecord rec, RecordOutcome outcome) {
+    // The notes after ok= say why a warp was held back, such as a world on world-blacklist.
+    private void recordPlayerWarp(SourceId source, ImportRecord.PlayerWarpRecord rec, RecordResult result) {
         audit.info(
-                "event=migration_import_player_warp source={} warp={} owner={} conflict={} ok={}",
+                "event=migration_import_player_warp source={} warp={} owner={} conflict={} ok={}{}",
                 source,
                 rec.warp().name(),
                 rec.warp().owner(),
-                outcome.token(),
-                outcome.ok());
+                result.outcome().token(),
+                result.outcome().ok(),
+                notes(result));
     }
 
-    private void recordWarp(SourceId source, ImportRecord.WarpRecord rec, RecordOutcome outcome) {
+    private void recordWarp(SourceId source, ImportRecord.WarpRecord rec, RecordResult result) {
         audit.info(
-                "event=migration_import_warp source={} warp={} conflict={} ok={}",
+                "event=migration_import_warp source={} warp={} conflict={} ok={}{}",
                 source,
                 rec.warp().warp().name().value(),
-                outcome.token(),
-                outcome.ok());
+                result.outcome().token(),
+                result.outcome().ok(),
+                notes(result));
     }
 
     private void recordKit(SourceId source, ImportRecord.KitRecord rec, RecordOutcome outcome) {

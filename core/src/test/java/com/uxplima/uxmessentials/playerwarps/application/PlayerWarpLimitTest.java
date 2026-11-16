@@ -5,7 +5,6 @@ import static com.uxplima.uxmessentials.testing.Fixtures.CLOCK;
 import static com.uxplima.uxmessentials.testing.Fixtures.WORLD;
 import static org.assertj.core.api.Assertions.assertThat;
 
-import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
@@ -16,6 +15,7 @@ import com.uxplima.uxmessentials.shared.application.port.Permissions.QuotaResult
 import com.uxplima.uxmessentials.shared.domain.Position;
 import com.uxplima.uxmessentials.shared.domain.Result;
 import com.uxplima.uxmessentials.shared.domain.Unit;
+import com.uxplima.uxmessentials.shared.domain.WorldBlacklist;
 import com.uxplima.uxmessentials.shared.domain.WorldRef;
 import com.uxplima.uxmessentials.testing.FakePermissions;
 import com.uxplima.uxmessentials.testing.RecordingEvents;
@@ -43,7 +43,7 @@ class PlayerWarpLimitTest {
                 notifier.notifier(),
                 new RecordingEvents(),
                 CLOCK,
-                List.of(),
+                WorldBlacklist.none(),
                 Optional.empty());
     }
 
@@ -138,7 +138,7 @@ class PlayerWarpLimitTest {
                 new PlayerWarpFakes.Passwords(),
                 CLOCK,
                 Optional.empty(),
-                new PlayerWarpWorldLimit(quota, warps, notifier.notifier()));
+                new PlayerWarpWorldLimit(quota, warps, notifier.notifier(), WorldBlacklist.none()));
     }
 
     @Test

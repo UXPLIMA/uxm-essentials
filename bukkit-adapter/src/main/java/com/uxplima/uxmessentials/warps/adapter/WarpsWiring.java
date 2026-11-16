@@ -18,8 +18,10 @@ import com.uxplima.uxmessentials.shared.adapter.outbound.hop.CrossServerHops;
 import com.uxplima.uxmessentials.shared.application.message.Notifier;
 import com.uxplima.uxmessentials.shared.application.module.KernelPorts;
 import com.uxplima.uxmessentials.shared.application.module.ModuleContext;
+import com.uxplima.uxmessentials.shared.application.port.ConfigStore;
 import com.uxplima.uxmessentials.shared.application.port.NetworkPresence;
 import com.uxplima.uxmessentials.shared.application.teleport.PaidTeleports;
+import com.uxplima.uxmessentials.shared.domain.WorldBlacklist;
 import com.uxplima.uxmessentials.shared.network.WarpChanged;
 import com.uxplima.uxmessentials.teleport.application.TeleportEngine;
 import com.uxplima.uxmessentials.teleport.application.TeleportHopGate;
@@ -238,7 +240,7 @@ public final class WarpsWiring {
                 kernel.events(),
                 kernel.gate(),
                 Clock.systemUTC(),
-                ctx.config().getStringList("world-blacklist", List.of()),
+                worldBlacklist(ctx.config()),
                 recordedServer);
         // The admin warp manager renders through the always-on menu engine. The create flow that opens a fresh warp's
         // editor is pulled out so the engine-rendered manager can drive it. A one-element holder breaks the cycle: the
@@ -314,6 +316,14 @@ public final class WarpsWiring {
                 cached);
     }
 
+    /**
+     * The worlds no server warp may be created or moved into, from the warps config. The importer reads it here too,
+     * so an imported warp is held to the same list.
+     */
+    public static WorldBlacklist worldBlacklist(ConfigStore warpsConfig) {
+        return WorldBlacklist.of(warpsConfig.getStringList("world-blacklist", List.of()));
+    }
+
     private static WarpServices assemble(
             KernelPorts kernel,
             WarpRepository repository,
@@ -326,20 +336,15 @@ public final class WarpsWiring {
             SetWarpServer setWarpServer,
             Optional<String> recordedServer) {
         Clock clock = Clock.systemUTC();
+        WorldBlacklist worldBlacklist = worldBlacklist(ctx.config());
         return new WarpServices(
                 useWarp,
                 new SetWarp(
-                        repository,
-                        notifier,
-                        kernel.events(),
-                        kernel.gate(),
-                        clock,
-                        ctx.config().getStringList("world-blacklist", List.of()),
-                        recordedServer),
+                        repository, notifier, kernel.events(), kernel.gate(), clock, worldBlacklist, recordedServer),
                 new DelWarp(repository, notifier, kernel.events(), kernel.gate()),
                 new ListWarps(repository, kernel.permissions(), notifier),
                 new WarpInfo(repository, notifier),
-                new MoveWarp(repository, notifier, recordedServer),
+                new MoveWarp(repository, notifier, worldBlacklist, recordedServer),
                 browseMenu,
                 kernel.playerLookup(),
                 repository,
