@@ -178,7 +178,7 @@ public final class KitCategoryManagerMenu {
     }
 
     private String none(PlayerRef viewer) {
-        return messages.resolve(viewer, KitsMessageKey.KIT_EDITOR_VALUE_NONE, Map.of());
+        return messages.fragment(viewer, KitsMessageKey.KIT_EDITOR_VALUE_NONE, Map.of());
     }
 
     private String text(PlayerRef viewer, KitsMessageKey key, Map<String, String> placeholders) {

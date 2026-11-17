@@ -96,13 +96,11 @@ public final class PermissionSanctionBroadcast implements SanctionBroadcast {
         }
         Map<String, String> read = new HashMap<>(placeholders);
         if (placeholders.containsValue(PERMANENT)) {
-            String word = messages.resolve(reader, ModerationMessageKey.MOD_GUI_VALUE_PERMANENT, Map.of());
+            String word = messages.fragment(reader, ModerationMessageKey.MOD_GUI_VALUE_PERMANENT, Map.of());
             read.replaceAll((name, value) -> PERMANENT.equals(value) ? word : value);
         }
-        drawn.ifPresent(reason -> read.put(
-                "reason",
-                SanctionReasons.read(messages, reader, Optional.empty(), Optional.of(reason))
-                        .orElse("")));
+        drawn.ifPresent(reason ->
+                read.put("reason", SanctionReasons.shown(messages, reader, Optional.empty(), Optional.of(reason))));
         return read;
     }
 

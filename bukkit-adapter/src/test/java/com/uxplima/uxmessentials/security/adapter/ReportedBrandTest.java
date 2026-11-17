@@ -4,12 +4,14 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.ComponentIteratorType;
-import net.kyori.adventure.text.minimessage.MiniMessage;
 import net.kyori.adventure.text.serializer.plain.PlainTextComponentSerializer;
 
+import com.uxplima.uxmessentials.shared.adapter.outbound.message.CatalogMessages;
+import com.uxplima.uxmessentials.shared.adapter.outbound.style.StyledText;
 import org.junit.jupiter.api.Test;
 
 /** A client brand is what the client wrote, so staff read it as words and nothing in it runs. */
@@ -19,8 +21,10 @@ class ReportedBrandTest {
     void aClickTagInABrandIsShownAsWordsAndRunsNothing() {
         String hostile = "<click:run_command:'/lp user x parent set admin'>vanilla</click>";
 
-        Component line = MiniMessage.miniMessage().deserialize("Client: " + ReportedBrand.shown(hostile));
+        Component line = StyledText.render(
+                CatalogMessages.fill("Client: {brand}", Map.of("brand", ReportedBrand.shown(hostile))));
 
+        // Escaped once, by the line: the words as the client wrote them, with no backslash in sight.
         assertThat(PlainTextComponentSerializer.plainText().serialize(line)).isEqualTo("Client: " + hostile);
         List<Component> parts = new ArrayList<>();
         line.iterator(ComponentIteratorType.DEPTH_FIRST).forEachRemaining(parts::add);

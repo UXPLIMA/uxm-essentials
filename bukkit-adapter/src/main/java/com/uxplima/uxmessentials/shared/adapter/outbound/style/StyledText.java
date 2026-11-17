@@ -11,6 +11,7 @@ import net.kyori.adventure.text.format.Style;
 import net.kyori.adventure.text.minimessage.tag.resolver.TagResolver;
 
 import com.uxplima.uxmessentials.shared.adapter.outbound.papi.PlaceholderShield;
+import com.uxplima.uxmessentials.shared.application.message.TrustedMarkup;
 import com.uxplima.uxmessentials.shared.domain.message.TypedText;
 import com.uxplima.uxmlib.gui.style.MenuTitles;
 import com.uxplima.uxmlib.text.Text;
@@ -41,8 +42,10 @@ public final class StyledText {
         TagResolver[] all = new TagResolver[extra.length + 1];
         all[0] = StyleTags.resolver();
         System.arraycopy(extra, 0, all, 1, extra.length);
-        Component drawn = Text.mini(StyleTokens.expand(source, StyleTags.theme(), false), all);
-        return PlaceholderShield.marked(source) ? exactActions(drawn) : drawn;
+        // A trusted-markup token is never drawn, whatever text carried it this far.
+        String clean = TrustedMarkup.strip(source);
+        Component drawn = Text.mini(StyleTokens.expand(clean, StyleTags.theme(), false), all);
+        return PlaceholderShield.marked(clean) ? exactActions(drawn) : drawn;
     }
 
     /**

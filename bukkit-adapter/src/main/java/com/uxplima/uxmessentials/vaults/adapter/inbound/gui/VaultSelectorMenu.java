@@ -13,7 +13,6 @@ import org.bukkit.entity.Player;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.GuiLayout;
 import com.uxplima.uxmessentials.shared.adapter.outbound.BukkitRefs;
 import com.uxplima.uxmessentials.shared.adapter.outbound.EngineLog;
-import com.uxplima.uxmessentials.shared.adapter.outbound.style.StyledText;
 import com.uxplima.uxmessentials.shared.application.port.Logger;
 import com.uxplima.uxmessentials.shared.application.port.MessageSink;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
@@ -171,7 +170,7 @@ public final class VaultSelectorMenu {
 
     /**
      * The entry's fully-resolved name source string, ready for the renderer to style. An owned entry shows the
-     * player's clamped, tag-escaped custom name (or the default index name when none is set); a locked entry shows
+     * player's clamped custom name (or the default index name when none is set); a locked entry shows
      * the locked label. The placeholder resolves the catalog itself because the key differs by owned/locked/named,
      * which a single static {@code @key} could not express.
      */
@@ -194,10 +193,7 @@ public final class VaultSelectorMenu {
                     Integer.toString(summary.index()));
         }
         return resolve(
-                BukkitRefs.toRef(ctx.viewer()),
-                VaultsMessageKey.VAULT_SELECTOR_NAMED_ENTRY,
-                "name",
-                displaySafe(custom));
+                BukkitRefs.toRef(ctx.viewer()), VaultsMessageKey.VAULT_SELECTOR_NAMED_ENTRY, "name", clamped(custom));
     }
 
     /**
@@ -217,10 +213,9 @@ public final class VaultSelectorMenu {
         return messages.resolve(BukkitRefs.toRef(ctx.viewer()), VaultsMessageKey.VAULT_SELECTOR_ENTRY_LORE, Map.of());
     }
 
-    /** Clamp the stored name to a sane menu width and escape MiniMessage tags so it cannot inject markup. */
-    private String displaySafe(String name) {
-        String clamped = name.length() > MAX_DISPLAY_NAME ? name.substring(0, MAX_DISPLAY_NAME) : name;
-        return StyledText.escape(clamped);
+    /** The stored name cut to a sane menu width; the line it goes into escapes it. */
+    private static String clamped(String name) {
+        return name.length() > MAX_DISPLAY_NAME ? name.substring(0, MAX_DISPLAY_NAME) : name;
     }
 
     private String resolve(PlayerRef viewer, MessageKey key, String token, String value) {

@@ -58,12 +58,11 @@ public final class ListBans {
                 "issuer",
                 ban.issuer().name(),
                 "reason",
-                SanctionReasons.read(notifier::render, viewer, ban.reason(), ban.drawnReason())
-                        .orElse(""),
+                SanctionReasons.shown(notifier::render, viewer, ban.reason(), ban.drawnReason()),
                 "expires",
                 Ban.endOf(ban)
                         .map(Instant::toString)
-                        .orElseGet(
-                                () -> notifier.render(viewer, ModerationMessageKey.MOD_GUI_VALUE_PERMANENT, Map.of())));
+                        .orElseGet(() ->
+                                notifier.fragment(viewer, ModerationMessageKey.MOD_GUI_VALUE_PERMANENT, Map.of())));
     }
 }

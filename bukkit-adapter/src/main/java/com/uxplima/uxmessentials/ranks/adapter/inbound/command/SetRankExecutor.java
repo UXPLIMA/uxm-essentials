@@ -27,6 +27,7 @@ import com.uxplima.uxmessentials.ranks.domain.RanksMessageKey;
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandFeedback;
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandSuggestions;
 import com.uxplima.uxmessentials.shared.adapter.outbound.BukkitRefs;
+import com.uxplima.uxmessentials.shared.application.message.TrustedMarkup;
 import com.uxplima.uxmessentials.shared.application.port.Logger;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
 import com.uxplima.uxmessentials.shared.application.port.PlayerLookup;
@@ -183,7 +184,11 @@ final class SetRankExecutor {
             reply(
                     sender,
                     RanksMessageKey.RANKS_SETRANK_SUCCESS,
-                    Map.of("player", who.name(), "rank", set.get().displayName()));
+                    Map.of(
+                            "player",
+                            who.name(),
+                            "rank",
+                            TrustedMarkup.of(set.get().displayName())));
         } catch (RuntimeException failure) {
             log.error("failed to set the rank of player " + who.uuid(), failure);
             reply(sender, SharedMessageKey.COMMAND_ERROR, Map.of());

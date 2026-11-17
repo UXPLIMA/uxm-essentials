@@ -12,7 +12,6 @@ import org.bukkit.event.player.PlayerCommandPreprocessEvent;
 import com.uxplima.uxmessentials.moderation.application.port.CommandSpyStore;
 import com.uxplima.uxmessentials.moderation.domain.ModerationMessageKey;
 import com.uxplima.uxmessentials.shared.adapter.outbound.BukkitRefs;
-import com.uxplima.uxmessentials.shared.adapter.outbound.style.StyledText;
 import com.uxplima.uxmessentials.shared.application.port.MessageSink;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
@@ -28,9 +27,8 @@ import org.jspecify.annotations.NullMarked;
  * spying the listener short-circuits before resolving the runner, so an idle server pays nothing.
  *
  * <p>The runner's name and the command they typed are player-controlled and flow into a MiniMessage template
- * downstream, so both are run through {@link StyledText#escape} here before substitution, otherwise a
- * player could type a command containing MiniMessage markup (including a clickable {@code run_command}) and
- * have it rendered, and clicked, in staff chat.
+ * downstream. The catalogue line escapes both as it fills them in, so a command containing MiniMessage markup
+ * (including a clickable {@code run_command}) reads as the words typed in staff chat, never as a click.
  */
 @NullMarked
 public final class CommandSpyListener implements Listener {
@@ -54,8 +52,8 @@ public final class CommandSpyListener implements Listener {
         Player runner = event.getPlayer();
         PlayerRef runnerRef = BukkitRefs.toRef(runner);
         Map<String, String> placeholders = Map.of(
-                "player", StyledText.escape(runner.getName()),
-                "command", StyledText.escape(event.getMessage()));
+                "player", runner.getName(),
+                "command", event.getMessage());
         for (PlayerRef spy : spies) {
             if (!spy.uuid().equals(runnerRef.uuid())) {
                 sink.deliver(spy, messages.resolve(spy, ModerationMessageKey.COMMANDSPY_OBSERVED, placeholders));

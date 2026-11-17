@@ -187,7 +187,7 @@ final class NpcEquipmentProperty implements EditableProperty {
     private String describe(PlayerRef viewer, @org.jspecify.annotations.Nullable String token) {
         return EquipmentPayloads.resolve(token)
                 .map(item -> item.getType().name())
-                .orElseGet(() -> messages.resolve(viewer, NpcMessageKey.NPC_GUI_EQUIP_EMPTY, Map.of()));
+                .orElseGet(() -> messages.fragment(viewer, NpcMessageKey.NPC_GUI_EQUIP_EMPTY, Map.of()));
     }
 
     /** The slot's display word, its enum name, the same word {@code /npc equip} uses. */

@@ -71,7 +71,6 @@ import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandFeedback;
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandRegistration;
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.OffTickNames;
 import com.uxplima.uxmessentials.shared.adapter.outbound.BukkitRefs;
-import com.uxplima.uxmessentials.shared.adapter.outbound.style.StyledText;
 import com.uxplima.uxmessentials.shared.application.permission.ContentPermissions;
 import com.uxplima.uxmessentials.shared.application.port.PlayerLookup;
 import com.uxplima.uxmessentials.shared.application.port.Scheduler;
@@ -1242,9 +1241,7 @@ public final class GuardCommand implements CommandRegistration {
                             "node",
                             step.node() == null ? "-" : step.node().value(),
                             "rule",
-                            step.rule() == null
-                                    ? "-"
-                                    : StyledText.escape(step.rule().toString()),
+                            step.rule() == null ? "-" : step.rule().toString(),
                             "result",
                             step.result().name().toLowerCase(Locale.ROOT),
                             "mark",
@@ -1504,7 +1501,7 @@ public final class GuardCommand implements CommandRegistration {
                 "backups [restore <file>]")) {
             String node = nodes.get(line.split(" ", 2)[0]);
             if (node != null && sender.hasPermission(node)) {
-                feedback.send(sender, GuardMessageKey.HELP_LINE, Map.of("usage", StyledText.escape("/guard " + line)));
+                feedback.send(sender, GuardMessageKey.HELP_LINE, Map.of("usage", "/guard " + line));
             }
         }
     }
@@ -1740,14 +1737,11 @@ public final class GuardCommand implements CommandRegistration {
     }
 
     private void line(CommandSender sender, String label, String value) {
-        feedback.send(
-                sender,
-                GuardMessageKey.INFO_LINE,
-                Map.of("label", StyledText.escape(label), "value", StyledText.escape(value)));
+        feedback.send(sender, GuardMessageKey.INFO_LINE, Map.of("label", label, "value", value));
     }
 
     private void line(CommandSender sender, GuardMessageKey key, String value) {
-        feedback.send(sender, key, Map.of("value", StyledText.escape(value)));
+        feedback.send(sender, key, Map.of("value", value));
     }
 
     private List<String> regionIds(CommandSender sender) {

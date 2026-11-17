@@ -4,6 +4,7 @@ import java.util.Objects;
 import java.util.Optional;
 
 import com.uxplima.uxmessentials.moderation.domain.DrawnReason;
+import com.uxplima.uxmessentials.shared.application.message.TrustedMarkup;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 
@@ -38,6 +39,21 @@ public final class SanctionReasons {
         Objects.requireNonNull(drawn, "drawn");
         return drawn.map(reason -> capped(messages.resolve(reader, reason.line(), reason.args())))
                 .or(() -> text);
+    }
+
+    /**
+     * {@link #read} for a reason filled into another line: a drawn reason is catalogue markup and goes in as written
+     * ({@link TrustedMarkup}), a typed one is escaped there like any other value. Empty when there is no reason.
+     */
+    public static String shown(
+            Messages messages, PlayerRef reader, Optional<String> text, Optional<DrawnReason> drawn) {
+        Objects.requireNonNull(messages, "messages");
+        Objects.requireNonNull(reader, "reader");
+        Objects.requireNonNull(text, "text");
+        Objects.requireNonNull(drawn, "drawn");
+        return drawn.map(reason -> TrustedMarkup.of(capped(messages.resolve(reader, reason.line(), reason.args()))))
+                .or(() -> text)
+                .orElse("");
     }
 
     /** {@code reason} cut to {@link #MAX_REASON} characters, never splitting a surrogate pair. */

@@ -156,7 +156,7 @@ public final class Jail {
                 "duration",
                         parsed.duration()
                                 .map(SanctionDuration::format)
-                                .orElseGet(() -> notifier.render(
+                                .orElseGet(() -> notifier.fragment(
                                         target, ModerationMessageKey.MOD_GUI_VALUE_PERMANENT, Map.of())),
                 "reason", reason.orElse(""));
         notifier.send(target, ModerationMessageKey.JAIL_NOTIFY_TARGET, ph);

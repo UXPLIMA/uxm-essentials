@@ -20,6 +20,7 @@ import com.mojang.brigadier.tree.LiteralCommandNode;
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandDescriptions;
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandFeedback;
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandRegistration;
+import com.uxplima.uxmessentials.shared.application.message.TrustedMarkup;
 import com.uxplima.uxmessentials.shared.application.permission.SharedPermissions;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
 import com.uxplima.uxmessentials.shared.domain.message.SharedMessageKey;
@@ -136,8 +137,9 @@ public final class HelpCommand implements CommandRegistration {
     }
 
     private void sendFooter(CommandSender sender, int page, int pages) {
-        String prev = page > 1 ? resolve(sender, SharedMessageKey.HELP_FOOTER_PREV, page - 1) : " ";
-        String next = page < pages ? resolve(sender, SharedMessageKey.HELP_FOOTER_NEXT, page + 1) : " ";
+        String prev = page > 1 ? TrustedMarkup.of(resolve(sender, SharedMessageKey.HELP_FOOTER_PREV, page - 1)) : " ";
+        String next =
+                page < pages ? TrustedMarkup.of(resolve(sender, SharedMessageKey.HELP_FOOTER_NEXT, page + 1)) : " ";
         feedback.send(
                 sender,
                 SharedMessageKey.HELP_FOOTER,

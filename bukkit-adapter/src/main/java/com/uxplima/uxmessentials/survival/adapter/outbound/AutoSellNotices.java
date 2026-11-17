@@ -18,6 +18,7 @@ import net.kyori.adventure.text.Component;
 
 import com.uxplima.uxmessentials.shared.adapter.outbound.BukkitRefs;
 import com.uxplima.uxmessentials.shared.adapter.outbound.style.StyledText;
+import com.uxplima.uxmessentials.shared.application.message.TrustedMarkup;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
 import com.uxplima.uxmessentials.shared.application.port.Scheduler;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
@@ -128,7 +129,8 @@ public final class AutoSellNotices {
         SurvivalMessageKey key = mode == SaleNotice.CHAT
                 ? SurvivalMessageKey.SURVIVAL_AUTOSELL_SOLD
                 : SurvivalMessageKey.SURVIVAL_AUTOSELL_SOLD_BAR;
-        String line = messages.resolve(viewer, key, Map.of("items", list.toString(), "amount", sales.format(total)));
+        String line = messages.resolve(
+                viewer, key, Map.of("items", TrustedMarkup.of(list.toString()), "amount", sales.format(total)));
         Component rendered = StyledText.render(line);
         if (mode == SaleNotice.CHAT) {
             live.sendMessage(rendered);
@@ -143,7 +145,7 @@ public final class AutoSellNotices {
      * quote, so it is safe to inline into the tag.
      */
     private static String itemName(Material material) {
-        return "<lang:'" + material.translationKey() + "'>";
+        return TrustedMarkup.of("<lang:'" + material.translationKey() + "'>");
     }
 
     /** The stacks folded into one count per material, insertion-ordered so the receipt reads in mining order. */

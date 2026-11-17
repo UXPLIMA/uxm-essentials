@@ -180,7 +180,7 @@ public final class BankListMenu {
                     player.sendMessage(text(
                             viewer,
                             EconomyMessageKey.BANK_CREATE_SUCCESS,
-                            Map.of("id", bank.id(), "name", StyledText.escape(bank.name()))));
+                            Map.of("id", bank.id(), "name", bank.name())));
                 } else {
                     player.sendMessage(text(viewer, res.errorOrThrow().messageKey(), Map.of()));
                 }

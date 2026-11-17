@@ -557,7 +557,7 @@ public final class AnnouncementEditorView {
     }
 
     private String enabledWord(PlayerRef viewer, boolean enabled) {
-        return messages.resolve(
+        return messages.fragment(
                 viewer,
                 enabled
                         ? CommunicationMessageKey.ANNOUNCE_EDITOR_VALUE_ON

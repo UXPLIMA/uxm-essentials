@@ -23,6 +23,7 @@ import com.uxplima.uxmessentials.ranks.domain.RanksMessageKey;
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandFeedback;
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandRegistration;
 import com.uxplima.uxmessentials.shared.adapter.outbound.BukkitRefs;
+import com.uxplima.uxmessentials.shared.application.message.TrustedMarkup;
 import com.uxplima.uxmessentials.shared.application.permission.EconomyPermissions;
 import com.uxplima.uxmessentials.shared.application.port.Logger;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
@@ -152,8 +153,8 @@ public final class RanksCommand implements CommandRegistration {
     }
 
     private void sendStanding(Player player, PlayerRef viewer, Optional<RankStanding> standing) {
-        String rank = standing.map(held -> held.rank().displayName())
-                .orElseGet(() -> messages.resolve(viewer, RanksMessageKey.RANKS_GUI_MAX, Map.of()));
+        String rank = standing.map(held -> TrustedMarkup.of(held.rank().displayName()))
+                .orElseGet(() -> messages.fragment(viewer, RanksMessageKey.RANKS_GUI_MAX, Map.of()));
         String prestige =
                 Integer.toString(standing.map(held -> held.prestige().level()).orElse(0));
         feedback.send(

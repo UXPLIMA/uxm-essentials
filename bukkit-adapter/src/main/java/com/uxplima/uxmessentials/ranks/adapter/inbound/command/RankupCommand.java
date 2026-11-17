@@ -19,6 +19,7 @@ import com.uxplima.uxmessentials.ranks.domain.RanksMessageKey;
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandFeedback;
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandRegistration;
 import com.uxplima.uxmessentials.shared.adapter.outbound.BukkitRefs;
+import com.uxplima.uxmessentials.shared.application.message.TrustedMarkup;
 import com.uxplima.uxmessentials.shared.application.permission.EconomyPermissions;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
@@ -91,6 +92,6 @@ public final class RankupCommand implements CommandRegistration {
     }
 
     private static String displayName(RankupResult result) {
-        return result.newRank().map(Rank::displayName).orElseThrow();
+        return TrustedMarkup.of(result.newRank().map(Rank::displayName).orElseThrow());
     }
 }

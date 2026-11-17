@@ -11,6 +11,7 @@ import com.uxplima.uxmessentials.messaging.application.port.MessageDelivery;
 import com.uxplima.uxmessentials.messaging.domain.MailItem;
 import com.uxplima.uxmessentials.messaging.domain.MessageBody;
 import com.uxplima.uxmessentials.messaging.domain.MessagingMessageKey;
+import com.uxplima.uxmessentials.shared.application.message.TrustedMarkup;
 import com.uxplima.uxmessentials.shared.application.port.MessageSink;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
@@ -20,10 +21,11 @@ import org.jspecify.annotations.NullMarked;
 /**
  * The {@link MessageDelivery} implementation: it resolves each messaging line through the kernel
  * {@link Messages} catalog in the viewer's locale and delivers it through the {@link MessageSink} (which
- * hops to the viewer's region thread and silently no-ops when offline). The message body is passed as a
- * literal {@code {message}} placeholder; the catalog template decides the framing ("to X", "from X"), and
- * whether MiniMessage tags inside the body render is governed upstream by the {@code uxmessentials.msg.color}
- * node: this adapter passes the body through as the sender supplied it.
+ * hops to the viewer's region thread and silently no-ops when offline). The message body is passed as the
+ * {@code {message}} placeholder; the catalog template decides the framing ("to X", "from X"). Whether tags inside the
+ * body render was settled when the body was made, by the {@code uxmessentials.msg.color} node: a body from a player
+ * without it holds its tags escaped already. So the body goes into the line as written ({@link TrustedMarkup}),
+ * where a value is otherwise escaped, and is escaped once either way.
  */
 @NullMarked
 public final class BukkitMessageDelivery implements MessageDelivery {
@@ -41,12 +43,12 @@ public final class BukkitMessageDelivery implements MessageDelivery {
 
     @Override
     public void deliverMessage(PlayerRef sender, PlayerRef recipient, MessageBody body) {
-        send(recipient, MessagingMessageKey.MSG_RECEIVED, two("player", sender.name(), "message", body.value()));
+        send(recipient, MessagingMessageKey.MSG_RECEIVED, two("player", sender.name(), "message", shown(body)));
     }
 
     @Override
     public void echoSent(PlayerRef sender, PlayerRef recipient, MessageBody body) {
-        send(sender, MessagingMessageKey.MSG_SENT, two("player", recipient.name(), "message", body.value()));
+        send(sender, MessagingMessageKey.MSG_SENT, two("player", recipient.name(), "message", shown(body)));
     }
 
     @Override
@@ -63,19 +65,19 @@ public final class BukkitMessageDelivery implements MessageDelivery {
     public void deliverMailLine(PlayerRef reader, MailItem item) {
         Map<String, String> placeholders = new HashMap<>();
         placeholders.put("player", item.sender().name());
-        placeholders.put("message", item.body().value());
+        placeholders.put("message", shown(item.body()));
         placeholders.put("sent", format(item.sentAt()));
         send(reader, MessagingMessageKey.MAIL_READ_ENTRY, placeholders);
     }
 
     @Override
     public void deliverHelpOp(PlayerRef requester, PlayerRef viewer, MessageBody body) {
-        send(viewer, MessagingMessageKey.HELPOP_RECEIVED, two("player", requester.name(), "message", body.value()));
+        send(viewer, MessagingMessageKey.HELPOP_RECEIVED, two("player", requester.name(), "message", shown(body)));
     }
 
     @Override
     public void deliverRemoteHelpOp(PlayerRef requester, String server, PlayerRef viewer, MessageBody body) {
-        Map<String, String> placeholders = two("player", requester.name(), "message", body.value());
+        Map<String, String> placeholders = two("player", requester.name(), "message", shown(body));
         placeholders.put("server", server);
         send(viewer, MessagingMessageKey.HELPOP_RECEIVED_REMOTE, placeholders);
     }
@@ -85,12 +87,16 @@ public final class BukkitMessageDelivery implements MessageDelivery {
         Map<String, String> placeholders = new HashMap<>();
         placeholders.put("from", sender.name());
         placeholders.put("to", recipient.name());
-        placeholders.put("message", body.value());
+        placeholders.put("message", shown(body));
         send(observer, MessagingMessageKey.MSG_SPY, placeholders);
     }
 
     private void send(PlayerRef viewer, MessageKey key, Map<String, String> placeholders) {
         sink.deliver(viewer, messages.resolve(viewer, key, placeholders));
+    }
+
+    private static String shown(MessageBody body) {
+        return TrustedMarkup.of(body.value());
     }
 
     private static Map<String, String> two(String k1, String v1, String k2, String v2) {

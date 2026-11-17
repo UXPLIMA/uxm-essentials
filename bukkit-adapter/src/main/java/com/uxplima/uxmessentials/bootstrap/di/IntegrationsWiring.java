@@ -68,9 +68,9 @@ final class IntegrationsWiring {
                         server,
                         SharedMessageKey.ADMIN_UPDATE_AVAILABLE,
                         Map.of(
-                                "name", StyledText.escape(pluginName),
-                                "current", StyledText.escape(currentVersion),
-                                "latest", StyledText.escape(release.version()))))
+                                "name", pluginName,
+                                "current", currentVersion,
+                                "latest", release.version())))
                 .appendSpace()
                 .append(StyledText.render(messages.resolve(server, SharedMessageKey.ADMIN_UPDATE_OPEN, Map.of()))
                         .clickEvent(ClickEvent.openUrl(release.url())));

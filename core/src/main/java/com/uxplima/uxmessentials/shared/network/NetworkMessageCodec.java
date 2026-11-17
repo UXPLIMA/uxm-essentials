@@ -16,6 +16,7 @@ import java.util.Objects;
 import java.util.Set;
 import java.util.UUID;
 
+import com.uxplima.uxmessentials.shared.application.message.TrustedMarkup;
 import com.uxplima.uxmessentials.shared.domain.PresenceTraits;
 
 /**
@@ -145,15 +146,20 @@ public final class NetworkMessageCodec {
         return bytes;
     }
 
+    /** A string onto the wire. A trusted-markup token is never sent: it means something only on the server that made it. */
+    private static void writeText(DataOutputStream out, String text) throws IOException {
+        out.writeUTF(TrustedMarkup.strip(text));
+    }
+
     private static void writeBody(DataOutputStream out, NetworkMessage message) throws IOException {
-        out.writeUTF(message.originServer());
+        writeText(out, message.originServer());
         switch (message) {
             case BalanceChanged balance -> {
                 writeUuid(out, balance.owner());
-                out.writeUTF(balance.currencyId());
+                writeText(out, balance.currencyId());
             }
             case HomeChanged home -> writeUuid(out, home.owner());
-            case WarpChanged warp -> out.writeUTF(warp.warp());
+            case WarpChanged warp -> writeText(out, warp.warp());
             case VaultChanged vault -> {
                 writeUuid(out, vault.owner());
                 out.writeInt(vault.vaultIndex());
@@ -161,8 +167,8 @@ public final class NetworkMessageCodec {
             case BanChanged ban -> writeUuid(out, ban.target());
             case MuteChanged mute -> writeUuid(out, mute.target());
             case PlayerWarpChanged playerWarp -> writeUuid(out, playerWarp.owner());
-            case HologramChanged hologram -> out.writeUTF(hologram.name());
-            case NpcChanged npc -> out.writeUTF(npc.name());
+            case HologramChanged hologram -> writeText(out, hologram.name());
+            case NpcChanged npc -> writeText(out, npc.name());
             case IgnoreChanged ignore -> writeUuid(out, ignore.owner());
             case PlayerSettingsChanged settings -> writeUuid(out, settings.player());
             case ServerPing ping -> {
@@ -176,15 +182,15 @@ public final class NetworkMessageCodec {
             }
             case TradeSignalFrame trade -> {
                 writeUuid(out, trade.tradeId());
-                out.writeUTF(trade.signal());
+                writeText(out, trade.signal());
                 writeUuid(out, trade.fromUuid());
-                out.writeUTF(trade.fromName());
+                writeText(out, trade.fromName());
                 writeUuid(out, trade.toUuid());
-                out.writeUTF(trade.toName());
+                writeText(out, trade.toName());
             }
             case VanishStateChanged vanish -> {
                 writeUuid(out, vanish.player());
-                out.writeUTF(vanish.playerName());
+                writeText(out, vanish.playerName());
                 out.writeBoolean(vanish.vanished());
                 out.writeInt(vanish.level());
                 // Written last: a peer on the older layout stops reading after the level and never sees it.
@@ -193,17 +199,17 @@ public final class NetworkMessageCodec {
                 out.writeLong(vanish.sequence());
             }
             case GuardChanged guard -> {
-                out.writeUTF(guard.scope());
-                out.writeUTF(guard.world());
-                out.writeUTF(guard.region());
+                writeText(out, guard.scope());
+                writeText(out, guard.world());
+                writeText(out, guard.region());
             }
-            case IpBanChanged ipBan -> out.writeUTF(ipBan.ip());
+            case IpBanChanged ipBan -> writeText(out, ipBan.ip());
             case RankChanged rank -> writeUuid(out, rank.player());
             case PresenceChanged presence -> {
                 out.writeLong(presence.session());
                 out.writeLong(presence.sequence());
                 writeUuid(out, presence.player());
-                out.writeUTF(presence.playerName());
+                writeText(out, presence.playerName());
                 out.writeBoolean(presence.online());
                 writeTraits(out, presence.traits());
             }
@@ -216,7 +222,7 @@ public final class NetworkMessageCodec {
                 out.writeInt(snapshot.players().size());
                 for (PresenceSnapshot.Member member : snapshot.players()) {
                     writeUuid(out, member.player());
-                    out.writeUTF(member.name());
+                    writeText(out, member.name());
                 }
                 for (PresenceSnapshot.Member member : snapshot.players()) {
                     writeTraits(out, member.traits());
@@ -224,37 +230,37 @@ public final class NetworkMessageCodec {
             }
             case PrivateMessageFrame privateMessage -> {
                 writeUuid(out, privateMessage.messageId());
-                out.writeUTF(privateMessage.targetServer());
+                writeText(out, privateMessage.targetServer());
                 writeUuid(out, privateMessage.senderUuid());
-                out.writeUTF(privateMessage.senderName());
+                writeText(out, privateMessage.senderName());
                 out.writeInt(privateMessage.senderSeeLevel());
                 writeUuid(out, privateMessage.targetUuid());
-                out.writeUTF(privateMessage.targetName());
-                out.writeUTF(privateMessage.body());
+                writeText(out, privateMessage.targetName());
+                writeText(out, privateMessage.body());
                 out.writeBoolean(privateMessage.reply());
             }
             case PrivateMessageAnswerFrame answer -> {
                 writeUuid(out, answer.messageId());
-                out.writeUTF(answer.outcome());
+                writeText(out, answer.outcome());
                 writeUuid(out, answer.senderUuid());
-                out.writeUTF(answer.senderName());
+                writeText(out, answer.senderName());
                 writeUuid(out, answer.targetUuid());
-                out.writeUTF(answer.targetName());
-                out.writeUTF(answer.body());
+                writeText(out, answer.targetName());
+                writeText(out, answer.body());
                 out.writeBoolean(answer.afk());
-                out.writeUTF(answer.afkReason());
+                writeText(out, answer.afkReason());
             }
             case HelpOpFrame helpOp -> {
                 writeUuid(out, helpOp.requestId());
                 writeUuid(out, helpOp.requesterUuid());
-                out.writeUTF(helpOp.requesterName());
-                out.writeUTF(helpOp.body());
+                writeText(out, helpOp.requesterName());
+                writeText(out, helpOp.body());
             }
             case StaffChatFrame staffChat -> {
                 writeUuid(out, staffChat.messageId());
                 writeUuid(out, staffChat.senderUuid());
-                out.writeUTF(staffChat.senderName());
-                out.writeUTF(staffChat.message());
+                writeText(out, staffChat.senderName());
+                writeText(out, staffChat.message());
             }
             case JailChanged jail -> {
                 writeUuid(out, jail.frameId());
@@ -264,72 +270,72 @@ public final class NetworkMessageCodec {
             case JailHopFailed failed -> {
                 writeUuid(out, failed.frameId());
                 writeUuid(out, failed.target());
-                out.writeUTF(failed.targetName());
-                out.writeUTF(failed.jail());
+                writeText(out, failed.targetName());
+                writeText(out, failed.jail());
             }
             case TeleportRequestFrame request -> {
                 writeUuid(out, request.requestId());
                 writeUuid(out, request.requesterUuid());
-                out.writeUTF(request.requesterName());
+                writeText(out, request.requesterName());
                 writeUuid(out, request.targetUuid());
-                out.writeUTF(request.targetName());
-                out.writeUTF(request.targetServer());
-                out.writeUTF(request.direction());
+                writeText(out, request.targetName());
+                writeText(out, request.targetServer());
+                writeText(out, request.direction());
                 out.writeInt(request.seeLevel());
                 out.writeLong(request.ttlMillis());
             }
             case TeleportAnswerFrame answer -> {
                 writeUuid(out, answer.requestId());
-                out.writeUTF(answer.answer());
-                out.writeUTF(answer.toServer());
+                writeText(out, answer.answer());
+                writeText(out, answer.toServer());
                 writeUuid(out, answer.aboutUuid());
-                out.writeUTF(answer.aboutName());
-                out.writeUTF(answer.detail());
+                writeText(out, answer.aboutName());
+                writeText(out, answer.detail());
             }
             case StaffTeleportFrame staff -> {
                 writeUuid(out, staff.requestId());
                 writeUuid(out, staff.actorUuid());
-                out.writeUTF(staff.actorName());
+                writeText(out, staff.actorName());
                 writeUuid(out, staff.subjectUuid());
-                out.writeUTF(staff.subjectName());
+                writeText(out, staff.subjectName());
                 writeUuid(out, staff.destinationUuid());
-                out.writeUTF(staff.destinationName());
-                out.writeUTF(staff.subjectServer());
+                writeText(out, staff.destinationName());
+                writeText(out, staff.subjectServer());
                 out.writeInt(staff.seeLevel());
             }
             case WorldChanged world -> {
                 writeUuid(out, world.changeId());
-                out.writeUTF(world.server());
-                out.writeUTF(world.world());
+                writeText(out, world.server());
+                writeText(out, world.world());
             }
             case FreezeChanged freeze -> {
                 writeUuid(out, freeze.frameId());
                 writeUuid(out, freeze.target());
-                out.writeUTF(freeze.targetName());
+                writeText(out, freeze.targetName());
                 out.writeBoolean(freeze.frozen());
                 out.writeLong(freeze.changedAtMillis());
-                out.writeUTF(freeze.heldOn());
+                writeText(out, freeze.heldOn());
             }
             case FreezeReset reset -> out.writeLong(reset.clearedAtMillis());
-            case AllBalancesChanged swept -> out.writeUTF(swept.currencyId());
+            case AllBalancesChanged swept -> writeText(out, swept.currencyId());
             case PermissionQueryFrame query -> {
                 writeUuid(out, query.queryId());
-                out.writeUTF(query.toServer());
+                writeText(out, query.toServer());
                 writeUuid(out, query.player());
-                out.writeUTF(query.node());
-                out.writeUTF(query.step());
+                writeText(out, query.node());
+                writeText(out, query.step());
             }
             case MailArrivedFrame mail -> {
                 writeUuid(out, mail.noticeId());
                 writeUuid(out, mail.recipientUuid());
-                out.writeUTF(mail.recipientName());
-                out.writeUTF(mail.senderName());
+                writeText(out, mail.recipientName());
+                writeText(out, mail.senderName());
             }
             case ProxyConnectionFrame connected -> {
                 writeUuid(out, connected.frameId());
                 writeUuid(out, connected.player());
                 writeUuid(out, connected.connection());
-                out.writeUTF(connected.server());
+                writeText(out, connected.server());
                 out.writeBoolean(connected.switched());
             }
             case PlayerSkinChanged skin -> writeUuid(out, skin.player());
@@ -337,27 +343,27 @@ public final class NetworkMessageCodec {
             case InventoryRestoreKept kept -> writeUuid(out, kept.player());
             case BroadcastFrame broadcast -> {
                 writeUuid(out, broadcast.broadcastId());
-                out.writeUTF(broadcast.body());
+                writeText(out, broadcast.body());
             }
             case VoteRewardsQueued queued -> {
                 writeUuid(out, queued.voteId());
                 writeUuid(out, queued.player());
-                out.writeUTF(queued.service());
+                writeText(out, queued.service());
                 out.writeLong(queued.sentAt().toEpochMilli());
                 out.writeBoolean(queued.bothCarriers());
             }
             case StaffActionFrame action -> {
                 writeUuid(out, action.frameId());
-                out.writeUTF(action.action());
-                out.writeUTF(action.toServer());
+                writeText(out, action.action());
+                writeText(out, action.toServer());
                 writeUuid(out, action.target());
-                out.writeUTF(action.targetName());
-                out.writeUTF(action.actorName());
-                out.writeUTF(action.key());
+                writeText(out, action.targetName());
+                writeText(out, action.actorName());
+                writeText(out, action.key());
                 out.writeInt(action.values().size());
                 for (Map.Entry<String, String> value : action.values().entrySet()) {
-                    out.writeUTF(value.getKey());
-                    out.writeUTF(value.getValue());
+                    writeText(out, value.getKey());
+                    writeText(out, value.getValue());
                 }
             }
             case PlayerNoticesKept kept -> writeUuid(out, kept.recipient());

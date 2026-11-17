@@ -31,7 +31,6 @@ final class IpBanKick {
                         ModerationMessageKey.BANIP_KICK,
                         Map.of(
                                 "reason",
-                                SanctionReasons.read(notifier::render, player, ban.reason(), ban.drawnReason())
-                                        .orElse(""))));
+                                SanctionReasons.shown(notifier::render, player, ban.reason(), ban.drawnReason()))));
     }
 }

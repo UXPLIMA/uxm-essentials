@@ -54,7 +54,7 @@ public final class ChargeReceipts {
         if (amount.amount().signum() <= 0) {
             return;
         }
-        String label = messages.resolve(who, what, Map.of());
+        String label = messages.fragment(who, what, Map.of());
         String receipt = messages.resolve(
                 who, EconomyMessageKey.CHARGED, Map.of("amount", MoneyFormat.withSymbol(amount), "what", label));
         if (receipt.isBlank()) {

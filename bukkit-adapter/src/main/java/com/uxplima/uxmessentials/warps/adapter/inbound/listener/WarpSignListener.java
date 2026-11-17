@@ -18,7 +18,6 @@ import net.kyori.adventure.text.serializer.plain.PlainTextComponentSerializer;
 
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandFeedback;
 import com.uxplima.uxmessentials.shared.adapter.outbound.BukkitRefs;
-import com.uxplima.uxmessentials.shared.adapter.outbound.style.StyledText;
 import com.uxplima.uxmessentials.shared.application.permission.DestinationPermissions;
 import com.uxplima.uxmessentials.shared.application.port.ConfigStore;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
@@ -143,8 +142,7 @@ public final class WarpSignListener implements Listener {
      * text, so a line that would add or change a word (a translator's extra word) is passed over for the bare header.
      */
     private Component activeHeader(Player player, String header) {
-        Component drawn =
-                feedback.render(player, WarpsMessageKey.WARP_SIGN_HEADER, Map.of("header", StyledText.escape(header)));
+        Component drawn = feedback.render(player, WarpsMessageKey.WARP_SIGN_HEADER, Map.of("header", header));
         return plain(drawn).equals(header) ? drawn : Component.text(header);
     }
 

@@ -217,7 +217,7 @@ public final class LoanDashboardMenu {
         }
         long hours = remainingMs / (60 * 60 * 1000);
         long mins = (remainingMs % (60 * 60 * 1000)) / (60 * 1000);
-        String remaining = resolve(
+        String remaining = messages.fragment(
                 viewer,
                 EconomyMessageKey.LOAN_GUI_LOAN_NEXT_DEBIT_REMAINING,
                 Map.of("hours", Long.toString(hours), "minutes", Long.toString(mins)));

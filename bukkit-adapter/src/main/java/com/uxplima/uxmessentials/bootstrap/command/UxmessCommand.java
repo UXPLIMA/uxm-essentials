@@ -17,7 +17,6 @@ import com.mojang.brigadier.context.CommandContext;
 import com.mojang.brigadier.tree.LiteralCommandNode;
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandFeedback;
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandRegistration;
-import com.uxplima.uxmessentials.shared.adapter.outbound.style.StyledText;
 import com.uxplima.uxmessentials.shared.application.health.HealthCheck;
 import com.uxplima.uxmessentials.shared.application.health.HealthReport;
 import com.uxplima.uxmessentials.shared.application.health.HealthStatus;
@@ -74,7 +73,6 @@ public final class UxmessCommand implements CommandRegistration, AutoCloseable {
     /** The arguments of the import line, which are command syntax and the same in every language. */
     private static final String IMPORT_ARGUMENTS = "<source> [--dry-run]";
 
-    /** Escapes data, a module id or a check's own message, before it is placed in a catalogue line. */
     private final ModuleRegistry registry;
 
     private final ConfigStore config;
@@ -330,9 +328,9 @@ public final class UxmessCommand implements CommandRegistration, AutoCloseable {
         checkLine(sender, key, entry.name(), entry.result().message());
     }
 
-    /** One check, repair or reload step: its name and its own message are data, so both are escaped. */
+    /** One check, repair or reload step: its name and its own message are data, which the line escapes. */
     private void checkLine(CommandSender sender, SharedMessageKey key, String name, String message) {
-        feedback.send(sender, key, Map.of("name", escape(name), "message", escape(message)));
+        feedback.send(sender, key, Map.of("name", name, "message", message));
     }
 
     /**
@@ -340,7 +338,7 @@ public final class UxmessCommand implements CommandRegistration, AutoCloseable {
      * language: {@code Result: <state> command=<name> <counter>=<n>}.
      */
     private void result(CommandSender sender, String summary) {
-        feedback.send(sender, SharedMessageKey.ADMIN_RESULT, Map.of("line", escape(resultLine(summary))));
+        feedback.send(sender, SharedMessageKey.ADMIN_RESULT, Map.of("line", resultLine(summary)));
     }
 
     private static String resultLine(String summary) {
@@ -355,7 +353,7 @@ public final class UxmessCommand implements CommandRegistration, AutoCloseable {
         feedback.send(sender, SharedMessageKey.ADMIN_HELP_HELP);
         feedback.send(sender, SharedMessageKey.ADMIN_HELP_GUI);
         feedback.send(sender, SharedMessageKey.ADMIN_HELP_RELOAD);
-        feedback.send(sender, SharedMessageKey.ADMIN_HELP_IMPORT, Map.of("args", escape(IMPORT_ARGUMENTS)));
+        feedback.send(sender, SharedMessageKey.ADMIN_HELP_IMPORT, Map.of("args", IMPORT_ARGUMENTS));
         feedback.send(sender, SharedMessageKey.ADMIN_HELP_PERMISSIONS);
         feedback.send(sender, SharedMessageKey.ADMIN_HELP_PLACEHOLDERS);
         return Command.SINGLE_SUCCESS;
@@ -370,7 +368,7 @@ public final class UxmessCommand implements CommandRegistration, AutoCloseable {
         String requested = ctx.getArgument("module", String.class);
         FeatureModule module = resolve(requested);
         if (module == null) {
-            feedback.send(sender, SharedMessageKey.ADMIN_RELOAD_UNKNOWN, Map.of("module", escape(requested)));
+            feedback.send(sender, SharedMessageKey.ADMIN_RELOAD_UNKNOWN, Map.of("module", requested));
             return 0;
         }
         return runReload(sender, module.id());
@@ -520,11 +518,7 @@ public final class UxmessCommand implements CommandRegistration, AutoCloseable {
     private void sendModuleLine(CommandSender sender, FeatureModule module) {
         SharedMessageKey key =
                 module.enabled(config) ? SharedMessageKey.ADMIN_STATUS_ON : SharedMessageKey.ADMIN_STATUS_OFF;
-        feedback.send(sender, key, Map.of("module", escape(module.id().value())));
-    }
-
-    private static String escape(String text) {
-        return StyledText.escape(text);
+        feedback.send(sender, key, Map.of("module", module.id().value()));
     }
 
     private @Nullable FeatureModule resolve(String requested) {

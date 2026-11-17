@@ -40,15 +40,15 @@ public final class CommandUsage {
         Objects.requireNonNull(usage, "usage");
         Objects.requireNonNull(english, "english");
         // The three values are text and never markup: the usage is syntax, and an argument named after a colour
-        // role, <value>, was read as that colour and vanished from the line. Escaped against the theme's roles too,
-        // because MiniMessage has never heard of them.
+        // role, <value>, would be read as that colour and vanish from the line. The line escapes them as it fills
+        // them in, against the theme's roles too.
         PlayerRef reader =
                 sender instanceof Player player ? BukkitRefs.toRef(player) : PlayerRef.system(sender.getName());
         String described = CommandDescriptions.of(messages, reader, root(command), english);
         Map<String, String> placeholders = Map.of(
-                "command", StyledText.escape(command),
-                "usage", StyledText.escape(usage),
-                "description", StyledText.escape(described));
+                "command", command,
+                "usage", usage,
+                "description", described);
         String rendered = messages.resolve(reader, SharedMessageKey.COMMAND_USAGE, placeholders);
         sender.sendMessage(StyledText.render(rendered));
     }

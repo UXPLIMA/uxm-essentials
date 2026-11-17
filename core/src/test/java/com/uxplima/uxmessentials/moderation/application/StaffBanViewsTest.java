@@ -15,6 +15,7 @@ import java.util.UUID;
 import com.uxplima.uxmessentials.moderation.domain.Issuer;
 import com.uxplima.uxmessentials.moderation.domain.ModerationMessageKey;
 import com.uxplima.uxmessentials.moderation.domain.TempbanState;
+import com.uxplima.uxmessentials.shared.application.message.TrustedMarkup;
 import com.uxplima.uxmessentials.shared.application.port.PlayerLookup;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmessentials.testing.RecordingNotifier;
@@ -26,7 +27,8 @@ import org.junit.jupiter.api.Test;
  */
 class StaffBanViewsTest {
 
-    private static final String PERMANENT = ModerationMessageKey.MOD_GUI_VALUE_PERMANENT.key();
+    /** The reader's word for no end, a catalogue line of its own, so it goes into the line as written. */
+    private static final String PERMANENT = TrustedMarkup.of(ModerationMessageKey.MOD_GUI_VALUE_PERMANENT.key());
 
     private final SanctionRecords records = new SanctionRecords();
     private final RecordingNotifier notifier = new RecordingNotifier();

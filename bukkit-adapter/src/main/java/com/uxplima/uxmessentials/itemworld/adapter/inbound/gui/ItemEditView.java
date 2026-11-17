@@ -607,7 +607,7 @@ public final class ItemEditView {
     }
 
     private String onOffWord(PlayerRef viewer, boolean on) {
-        return messages.resolve(
+        return messages.fragment(
                 viewer,
                 on ? ItemworldMessageKey.ITEMEDIT_GUI_VALUE_ON : ItemworldMessageKey.ITEMEDIT_GUI_VALUE_OFF,
                 Map.of());

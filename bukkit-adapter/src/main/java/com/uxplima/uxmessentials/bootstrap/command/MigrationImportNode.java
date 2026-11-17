@@ -19,7 +19,6 @@ import com.uxplima.uxmessentials.migration.adapter.MigrationImportService;
 import com.uxplima.uxmessentials.migration.convert.SourceDescriptor;
 import com.uxplima.uxmessentials.migration.convert.SourceId;
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandFeedback;
-import com.uxplima.uxmessentials.shared.adapter.outbound.style.StyledText;
 import com.uxplima.uxmessentials.shared.application.permission.SharedPermissions;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
 import com.uxplima.uxmessentials.shared.domain.message.SharedMessageKey;
@@ -85,7 +84,7 @@ public final class MigrationImportNode {
         feedback.send(
                 Sender.audience(ctx.getSource()),
                 SharedMessageKey.ADMIN_IMPORT_USAGE,
-                Map.of("args", escape(ARGUMENTS), "sources", escape(joinedBuiltIds())));
+                Map.of("args", ARGUMENTS, "sources", joinedBuiltIds()));
         return Command.SINGLE_SUCCESS;
     }
 
@@ -97,9 +96,9 @@ public final class MigrationImportNode {
                     sender,
                     SharedMessageKey.ADMIN_IMPORT_SOURCE,
                     Map.of(
-                            "source", escape(descriptor.sourceId().value()),
-                            "name", escape(descriptor.displayName()),
-                            "surfaces", escape(String.join(", ", descriptor.surfaces()))));
+                            "source", descriptor.sourceId().value(),
+                            "name", descriptor.displayName(),
+                            "surfaces", String.join(", ", descriptor.surfaces())));
         }
         return Command.SINGLE_SUCCESS;
     }
@@ -114,16 +113,14 @@ public final class MigrationImportNode {
         Optional<SourceId> resolved = service.resolve(raw);
         if (resolved.isEmpty()) {
             feedback.send(
-                    sender,
-                    SharedMessageKey.ADMIN_IMPORT_UNKNOWN,
-                    Map.of("source", escape(raw), "sources", escape(joinedBuiltIds())));
+                    sender, SharedMessageKey.ADMIN_IMPORT_UNKNOWN, Map.of("source", raw, "sources", joinedBuiltIds()));
             return 0;
         }
         service.dispatch(sender.getName(), resolved.get(), mode);
         feedback.send(
                 sender,
                 mode.isDryRun() ? SharedMessageKey.ADMIN_IMPORT_STARTED_DRY : SharedMessageKey.ADMIN_IMPORT_STARTED,
-                Map.of("source", escape(resolved.get().value())));
+                Map.of("source", resolved.get().value()));
         return Command.SINGLE_SUCCESS;
     }
 
@@ -131,9 +128,5 @@ public final class MigrationImportNode {
         List<String> ids =
                 service.builtSourceIds().stream().map(SourceId::value).toList();
         return String.join(", ", ids);
-    }
-
-    private static String escape(String text) {
-        return StyledText.escape(text);
     }
 }

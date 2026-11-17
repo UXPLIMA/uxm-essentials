@@ -47,9 +47,8 @@ public final class CheckBan {
                             "player", target.name(),
                             "actor", active.issuer().name(),
                             "reason",
-                                    SanctionReasons.read(
-                                                    notifier::render, viewer, active.reason(), active.drawnReason())
-                                            .orElse(""),
+                                    SanctionReasons.shown(
+                                            notifier::render, viewer, active.reason(), active.drawnReason()),
                             "expiry", expiry(viewer, active)));
             return;
         }
@@ -59,6 +58,6 @@ public final class CheckBan {
     private String expiry(PlayerRef viewer, TempbanState.Active ban) {
         return Ban.endOf(ban)
                 .map(Instant::toString)
-                .orElseGet(() -> notifier.render(viewer, ModerationMessageKey.MOD_GUI_VALUE_PERMANENT, Map.of()));
+                .orElseGet(() -> notifier.fragment(viewer, ModerationMessageKey.MOD_GUI_VALUE_PERMANENT, Map.of()));
     }
 }

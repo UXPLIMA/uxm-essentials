@@ -145,10 +145,7 @@ public final class LoginEnforcement {
             return Decision.deny(render(
                     who,
                     ModerationMessageKey.BANIP_KICK,
-                    Map.of(
-                            "reason",
-                            SanctionReasons.read(notifier::render, who, ban.reason(), ban.drawnReason())
-                                    .orElse(""))));
+                    Map.of("reason", SanctionReasons.shown(notifier::render, who, ban.reason(), ban.drawnReason()))));
         }
         // An account that already joined keeps joining: the option stops new look-alikes, it does not pick between
         // accounts the server already has.

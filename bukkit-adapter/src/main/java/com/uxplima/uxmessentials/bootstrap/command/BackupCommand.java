@@ -15,7 +15,6 @@ import com.mojang.brigadier.tree.LiteralCommandNode;
 import com.uxplima.uxmessentials.migration.adapter.DataDirBackupSnapshot;
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandFeedback;
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandRegistration;
-import com.uxplima.uxmessentials.shared.adapter.outbound.style.StyledText;
 import com.uxplima.uxmessentials.shared.application.permission.SharedPermissions;
 import com.uxplima.uxmessentials.shared.application.port.Logger;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
@@ -44,7 +43,6 @@ public final class BackupCommand implements CommandRegistration {
     private static final String PERMISSION = SharedPermissions.ADMIN_BACKUP;
     private static final String DESCRIPTION = "Snapshot the plugin's data directory on demand.";
 
-    /** Escapes a path, which is data and may hold any character, before it is placed in a catalogue line. */
     private final DataDirBackupSnapshot snapshot;
 
     private final Scheduler scheduler;
@@ -83,10 +81,7 @@ public final class BackupCommand implements CommandRegistration {
             DataDirBackupSnapshot.Snapshot result = snapshot.takeSnapshot();
             Path location = result.location();
             scheduler.onGlobal(() -> {
-                feedback.send(
-                        sender,
-                        SharedMessageKey.ADMIN_BACKUP_DONE,
-                        Map.of("location", StyledText.escape(location.toString())));
+                feedback.send(sender, SharedMessageKey.ADMIN_BACKUP_DONE, Map.of("location", location.toString()));
                 feedback.send(sender, SharedMessageKey.ADMIN_BACKUP_SCOPE);
             });
         } catch (RuntimeException failure) {

@@ -405,9 +405,7 @@ public final class GuardRuntime {
                             "node",
                             step.node() == null ? "-" : step.node().value(),
                             "rule",
-                            step.rule() == null
-                                    ? "-"
-                                    : StyledText.escape(step.rule().toString()),
+                            step.rule() == null ? "-" : step.rule().toString(),
                             "result",
                             result),
                     "chat");
@@ -505,10 +503,7 @@ public final class GuardRuntime {
                                 "action", action.value(),
                                 "region", step.region().id().value(),
                                 "node", step.node() == null ? "-" : step.node().value(),
-                                "rule",
-                                        step.rule() == null
-                                                ? "-"
-                                                : StyledText.escape(step.rule().toString()),
+                                "rule", step.rule() == null ? "-" : step.rule().toString(),
                                 "result", step.result().name().toLowerCase(Locale.ROOT)),
                         "chat");
             }

@@ -23,6 +23,7 @@ import com.uxplima.uxmessentials.shared.adapter.inbound.gui.GuiLayout;
 import com.uxplima.uxmessentials.shared.adapter.outbound.papi.PlaceholderApiSupport;
 import com.uxplima.uxmessentials.shared.adapter.outbound.style.StyledText;
 import com.uxplima.uxmessentials.shared.adapter.outbound.style.Tiles;
+import com.uxplima.uxmessentials.shared.application.message.TrustedMarkup;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmessentials.shared.domain.message.MessageKey;
@@ -56,7 +57,7 @@ final class KitIconRenderer {
 
     ItemStack categoryIcon(PlayerRef viewer, KitCategory category) {
         Component name =
-                text(viewer, KitsMessageKey.KIT_MENU_CATEGORY_NAME, Map.of("category", category.displayName()));
+                text(viewer, KitsMessageKey.KIT_MENU_CATEGORY_NAME, Map.of("category", categoryName(category)));
         List<Component> loreLines = new ArrayList<>();
         if (!category.displayLore().isEmpty()) {
             for (String customLine : category.displayLore()) {
@@ -112,7 +113,12 @@ final class KitIconRenderer {
 
     String categoryNameSource(PlayerRef viewer, KitCategory category) {
         return messages.resolve(
-                viewer, KitsMessageKey.KIT_MENU_CATEGORY_NAME, Map.of("category", category.displayName()));
+                viewer, KitsMessageKey.KIT_MENU_CATEGORY_NAME, Map.of("category", categoryName(category)));
+    }
+
+    /** A category's name is the operator's own markup, styled like the category's lore. */
+    private static String categoryName(KitCategory category) {
+        return TrustedMarkup.of(category.displayName());
     }
 
     /** The category tile's lore: its own display lore when set, else the catalog drill-in hint, joined by {@code \n}. */

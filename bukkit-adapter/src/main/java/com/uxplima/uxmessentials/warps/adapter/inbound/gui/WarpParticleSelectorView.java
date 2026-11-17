@@ -15,6 +15,7 @@ import net.kyori.adventure.text.Component;
 
 import com.uxplima.uxmessentials.shared.adapter.outbound.style.StyledText;
 import com.uxplima.uxmessentials.shared.adapter.outbound.style.Tiles;
+import com.uxplima.uxmessentials.shared.application.message.TrustedMarkup;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmessentials.shared.domain.message.MessageKey;
@@ -201,7 +202,8 @@ public final class WarpParticleSelectorView {
         WarpPresets.Preset preset = option.preset();
         if (preset.namedByLine()) {
             String line = preset.line();
-            return messages.resolve(viewer, () -> line, Map.of()).strip();
+            return TrustedMarkup.of(
+                    messages.resolve(viewer, () -> line, Map.of()).strip());
         }
         return preset.nameIn(
                 messages.resolve(viewer, SharedMessageKey.LANG_CODE, Map.of()).strip());
