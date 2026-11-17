@@ -19,10 +19,12 @@ import com.uxplima.uxmessentials.shared.application.IpAlts;
 import com.uxplima.uxmessentials.shared.application.permission.EnforcementPermissions;
 import com.uxplima.uxmessentials.shared.application.port.Permissions.QuotaResult;
 import com.uxplima.uxmessentials.shared.application.port.Scheduler;
+import com.uxplima.uxmessentials.shared.application.port.StoredPermissions.Answer;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmessentials.shared.domain.Position;
 import com.uxplima.uxmessentials.shared.domain.message.SharedMessageKey;
 import com.uxplima.uxmessentials.testing.FakePermissions;
+import com.uxplima.uxmessentials.testing.FakeStoredPermissions;
 import com.uxplima.uxmessentials.testing.MutableClock;
 import com.uxplima.uxmessentials.testing.OnlineLookup;
 import com.uxplima.uxmessentials.testing.QueuedScheduler;
@@ -51,7 +53,8 @@ class StorageLaneTest {
     private boolean liveReadable = true;
     private final LanePermissions reader = new LanePermissions(permissions, () -> liveReadable, log);
     private final OnlineLookup lookup = new OnlineLookup().with(ALEX, SAM);
-    private final StorageLane lane = new StorageLane(scheduler, notifier.notifier(), permissions, lookup, log);
+    private final FakeStoredPermissions stored = new FakeStoredPermissions();
+    private final StorageLane lane = new StorageLane(scheduler, notifier.notifier(), permissions, stored, lookup, log);
     private final Ban ban = new Ban(
             records,
             online,
@@ -127,7 +130,8 @@ class StorageLaneTest {
 
     @Test
     void workTheSchedulerRefusesIsLoggedAndFailsTheCallersFuture() {
-        StorageLane closing = new StorageLane(new RefusingScheduler(), notifier.notifier(), permissions, lookup, log);
+        StorageLane closing =
+                new StorageLane(new RefusingScheduler(), notifier.notifier(), permissions, stored, lookup, log);
 
         closing.run(ALEX, SAM, () -> {});
         CompletableFuture<String> answer = closing.supply(ALEX, SAM, () -> "stored");
@@ -141,7 +145,7 @@ class StorageLaneTest {
     @Test
     void onTheTargetsOwnThreadTheirImmunityIsReadWhenAskedAndKept() {
         StorageLane owning =
-                new StorageLane(new OwningScheduler(scheduler), notifier.notifier(), permissions, lookup, log);
+                new StorageLane(new OwningScheduler(scheduler), notifier.notifier(), permissions, stored, lookup, log);
         permissions.grant(SAM, ModerationGuard.EXEMPT_NODE);
         owning.run(ALEX, SAM, () -> ban.ban(ALEX, SAM, Optional.of("cheating"), false));
         permissions.revoke(SAM, ModerationGuard.EXEMPT_NODE);
@@ -221,14 +225,78 @@ class StorageLaneTest {
     }
 
     @Test
-    void anOfflineTargetHasNoImmunityToReadAndIsBannedAsBefore() {
+    void aTargetWhoIsNotHereAndHoldsTheNodeInStorageIsNotBanned() {
         lookup.leave(SAM);
+        stored.answer(SAM, Answer.HELD);
+        lane.run(ALEX, SAM, () -> ban.ban(ALEX, SAM, Optional.of("cheating"), false));
+
+        scheduler.runAll();
+
+        assertThat(records.loadTempban(SAM)).isEqualTo(TempbanState.none());
+        assertThat(notifier.keys()).contains(ModerationMessageKey.TARGET_EXEMPT.key());
+    }
+
+    @Test
+    void aTargetWhoIsNotHereAndDoesNotHoldTheNodeInStorageIsBanned() {
+        lookup.leave(SAM);
+        stored.answer(SAM, Answer.NOT_HELD);
         lane.run(ALEX, SAM, () -> ban.ban(ALEX, SAM, Optional.of("cheating"), false));
 
         scheduler.runAll();
 
         assertThat(records.loadTempban(SAM)).isInstanceOf(TempbanState.Active.class);
+        assertThat(log.warnings()).isEmpty();
+    }
+
+    @Test
+    void aTargetWhoseStoredNodeNothingHereCanReadIsNotBannedAndTheStaffMemberIsToldWhy() {
+        lookup.leave(SAM);
+        lane.run(ALEX, SAM, () -> ban.ban(ALEX, SAM, Optional.of("cheating"), false));
+
+        scheduler.runAll();
+
+        assertThat(records.loadTempban(SAM)).isEqualTo(TempbanState.none());
+        assertThat(notifier.keys()).contains(ModerationMessageKey.TARGET_EXEMPTION_UNKNOWN.key());
         assertThat(notifier.keys()).doesNotContain(ModerationMessageKey.TARGET_EXEMPTION_UNREAD.key());
+        assertThat(log.warnings())
+                .containsExactly("event=moderation_exemption_unknowable actor={} target={} [Alex, Sam]");
+    }
+
+    @Test
+    void aStoredReadThatFailsKeepsAnApiSanctionOffTheTargetAndAsksToTryAgain() {
+        lookup.leave(SAM);
+        stored.answer(SAM, Answer.NO_ANSWER);
+        CompletableFuture<Boolean> banned = lane.supply(
+                ALEX,
+                SAM,
+                () -> ban.ban(ALEX, SAM, Optional.of("cheating"), false).isOk());
+
+        scheduler.runAll();
+
+        assertThat(banned).isCompletedWithValue(false);
+        assertThat(notifier.keys()).contains(ModerationMessageKey.TARGET_EXEMPTION_UNREAD.key());
+    }
+
+    @Test
+    void theBanWaitsForTheStoredAnswerAndLaterWorkAboutTheTargetWaitsBehindIt() {
+        lookup.leave(SAM);
+        stored.hold(SAM);
+        java.util.List<String> order = new java.util.ArrayList<>();
+        lane.run(ALEX, SAM, () -> {
+            ban.ban(ALEX, SAM, Optional.of("cheating"), false);
+            order.add("ban");
+        });
+        lane.background(SAM, () -> order.add("bookkeeping"));
+
+        scheduler.runAll();
+        assertThat(order).isEmpty();
+        assertThat(records.loadTempban(SAM)).isEqualTo(TempbanState.none());
+
+        stored.release(SAM, Answer.NOT_HELD);
+        scheduler.runAll();
+
+        assertThat(order).containsExactly("ban", "bookkeeping");
+        assertThat(records.loadTempban(SAM)).isInstanceOf(TempbanState.Active.class);
     }
 
     @Test
