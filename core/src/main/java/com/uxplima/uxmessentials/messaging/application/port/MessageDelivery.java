@@ -24,8 +24,11 @@ public interface MessageDelivery {
     /** Echo a sent private message back to its {@code sender} (the "to <recipient>" confirmation line). */
     void echoSent(PlayerRef sender, PlayerRef recipient, MessageBody body);
 
-    /** Notify an online {@code recipient} that new {@code item} mail arrived (subject to the notify cooldown). */
-    void notifyNewMail(PlayerRef recipient, MailItem item);
+    /** Tell {@code recipient}, when they are online here, that mail from {@code senderName} arrived. */
+    void notifyNewMail(PlayerRef recipient, String senderName);
+
+    /** Tell {@code recipient} how much of their mail they have not read yet. */
+    void notifyUnreadMail(PlayerRef recipient, long unread);
 
     /** Render one mail item to its reader during {@code /mail read}. */
     void deliverMailLine(PlayerRef reader, MailItem item);

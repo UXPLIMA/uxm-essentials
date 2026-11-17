@@ -9,14 +9,17 @@ import com.uxplima.uxmessentials.messaging.application.HelpOp;
 import com.uxplima.uxmessentials.messaging.application.RelayPrivateMessage;
 import com.uxplima.uxmessentials.messaging.application.RemoteAnswer;
 import com.uxplima.uxmessentials.messaging.application.RemoteHelpOp;
+import com.uxplima.uxmessentials.messaging.application.RemoteMail;
 import com.uxplima.uxmessentials.messaging.application.RemoteMessage;
 import com.uxplima.uxmessentials.messaging.application.RemoteOutcome;
+import com.uxplima.uxmessentials.messaging.application.SendMail;
 import com.uxplima.uxmessentials.messaging.application.port.MessagingNetwork;
 import com.uxplima.uxmessentials.messaging.domain.MessageBody;
 import com.uxplima.uxmessentials.shared.adapter.outbound.bus.BusPublisher;
 import com.uxplima.uxmessentials.shared.application.port.Logger;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmessentials.shared.network.HelpOpFrame;
+import com.uxplima.uxmessentials.shared.network.MailArrivedFrame;
 import com.uxplima.uxmessentials.shared.network.NetworkMessage;
 import com.uxplima.uxmessentials.shared.network.PrivateMessageAnswerFrame;
 import com.uxplima.uxmessentials.shared.network.PrivateMessageFrame;
@@ -24,8 +27,8 @@ import org.jspecify.annotations.NullMarked;
 import org.jspecify.annotations.Nullable;
 
 /**
- * The {@link MessagingNetwork} over the shared cross-server bus: private messages, their answers and help requests
- * leave as frames through the {@link BusPublisher}, and the frames peers send come back through {@link #onFrame},
+ * The {@link MessagingNetwork} over the shared cross-server bus: private messages, their answers, help requests and
+ * new-mail notices leave as frames through the {@link BusPublisher}, and the frames peers send come back through {@link #onFrame},
  * which the wiring registers with the bus. That runs on the bus's off-tick dispatch thread; the use cases it feeds do
  * their own hop to a player's or the global thread before they touch the server.
  *
@@ -39,6 +42,7 @@ public final class BusMessagingNetwork implements MessagingNetwork {
     private final Logger log;
     private volatile @Nullable RelayPrivateMessage relay;
     private volatile @Nullable HelpOp helpOp;
+    private volatile @Nullable SendMail sendMail;
 
     /** Outcomes already reported as unknown: a peer on a newer build sends them with every answer during an upgrade. */
     private final Set<String> reportedUnknown = ConcurrentHashMap.newKeySet();
@@ -49,9 +53,10 @@ public final class BusMessagingNetwork implements MessagingNetwork {
     }
 
     /** Hand inbound traffic to these use cases from now on. */
-    public void bind(RelayPrivateMessage relay, HelpOp helpOp) {
+    public void bind(RelayPrivateMessage relay, HelpOp helpOp, SendMail sendMail) {
         this.relay = Objects.requireNonNull(relay, "relay");
         this.helpOp = Objects.requireNonNull(helpOp, "helpOp");
+        this.sendMail = Objects.requireNonNull(sendMail, "sendMail");
     }
 
     @Override
@@ -97,17 +102,34 @@ public final class BusMessagingNetwork implements MessagingNetwork {
                 request.body().value()));
     }
 
+    @Override
+    public void announce(RemoteMail mail) {
+        Objects.requireNonNull(mail, "mail");
+        publisher.publish(new MailArrivedFrame(
+                publisher.serverId(),
+                mail.id(),
+                mail.recipient().uuid(),
+                mail.recipient().name(),
+                mail.senderName()));
+    }
+
     /** Register this with the bus registry: turn a peer's messaging frame into a use case call. */
     public void onFrame(NetworkMessage message) {
         RelayPrivateMessage boundRelay = relay;
         HelpOp boundHelpOp = helpOp;
-        if (boundRelay == null || boundHelpOp == null) {
+        SendMail boundSendMail = sendMail;
+        if (boundRelay == null || boundHelpOp == null || boundSendMail == null) {
             return;
         }
         switch (message) {
             case PrivateMessageFrame frame -> onMessage(boundRelay, frame);
             case PrivateMessageAnswerFrame frame -> onAnswer(boundRelay, frame);
             case HelpOpFrame frame -> onHelpOp(boundHelpOp, frame);
+            case MailArrivedFrame frame ->
+                boundSendMail.receive(new RemoteMail(
+                        frame.noticeId(),
+                        new PlayerRef(frame.recipientUuid(), frame.recipientName()),
+                        frame.senderName()));
             default -> {
                 // A frame of another context.
             }

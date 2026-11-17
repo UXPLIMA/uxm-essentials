@@ -53,6 +53,7 @@ public enum MessagingMessageKey implements MessageKey {
     // /mail
     MAIL_SENT("mail.sent"),
     MAIL_NEW_NOTIFY("mail.new-notify"),
+    MAIL_UNREAD_JOIN("mail.unread-join"),
     MAIL_READ_HEADER("mail.read.header"),
     MAIL_READ_ENTRY("mail.read.entry"),
     MAIL_EMPTY("mail.empty"),

@@ -307,6 +307,12 @@ public final class NetworkMessageCodec {
                 out.writeUTF(query.node());
                 out.writeUTF(query.step());
             }
+            case MailArrivedFrame mail -> {
+                writeUuid(out, mail.noticeId());
+                writeUuid(out, mail.recipientUuid());
+                out.writeUTF(mail.recipientName());
+                out.writeUTF(mail.senderName());
+            }
             case ProxyConnectionFrame connected -> {
                 writeUuid(out, connected.frameId());
                 writeUuid(out, connected.player());
@@ -417,6 +423,7 @@ public final class NetworkMessageCodec {
             case ALL_BALANCES_CHANGED -> new AllBalancesChanged(origin, in.readUTF());
             case PERMISSION_QUERY ->
                 new PermissionQueryFrame(origin, readUuid(in), in.readUTF(), readUuid(in), in.readUTF(), in.readUTF());
+            case MAIL_ARRIVED -> new MailArrivedFrame(origin, readUuid(in), readUuid(in), in.readUTF(), in.readUTF());
             case PROXY_CONNECTION ->
                 new ProxyConnectionFrame(
                         origin, readUuid(in), readUuid(in), readUuid(in), in.readUTF(), in.readBoolean());
