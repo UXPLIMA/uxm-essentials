@@ -9,7 +9,6 @@ import org.bukkit.event.inventory.InventoryCloseEvent;
 import org.bukkit.event.inventory.InventoryOpenEvent;
 import org.bukkit.event.player.PlayerQuitEvent;
 
-import com.uxplima.uxmessentials.security.adapter.VerificationSessions;
 import com.uxplima.uxmlib.menu.Menus;
 import org.jspecify.annotations.NullMarked;
 
@@ -38,12 +37,10 @@ public final class PinKeypadWindowListener implements Listener {
 
     private final Menus menus;
     private final PinKeypadView view;
-    private final VerificationSessions sessions;
 
-    public PinKeypadWindowListener(Menus menus, PinKeypadView view, VerificationSessions sessions) {
+    public PinKeypadWindowListener(Menus menus, PinKeypadView view) {
         this.menus = Objects.requireNonNull(menus, "menus");
         this.view = Objects.requireNonNull(view, "view");
-        this.sessions = Objects.requireNonNull(sessions, "sessions");
     }
 
     @EventHandler
@@ -57,18 +54,9 @@ public final class PinKeypadWindowListener implements Listener {
             // and the replacement is on its way, so neither the suppress flag nor the tracking is touched.
             return;
         }
-        if (view.consumeSuppress(viewer)) {
-            // A deliberate handoff (to the TOTP prompt) or teardown (verify success, lockout, module stop): leave it.
-            view.forget(viewer);
-            return;
-        }
-        if (sessions.isPending(viewer)) {
-            // Still frozen and they escaped the window: reopen it so verification cannot be skipped.
-            view.reopen(viewer);
-        } else {
-            // A non-pending close that was not a deliberate teardown (a re-auth escape, a quit): drop the tracking.
-            view.forget(viewer);
-        }
+        // A deliberate handoff or teardown is left alone, a still-frozen player is shown the pad again, anything else
+        // drops the tracking: the same rule a typed prompt's close follows, so it lives on the view.
+        view.closed(viewer);
     }
 
     // Sees cancelled opens too: a refused open is no longer in flight either, so it settles the count like a landed

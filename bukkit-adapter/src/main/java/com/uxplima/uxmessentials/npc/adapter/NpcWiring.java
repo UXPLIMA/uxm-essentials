@@ -211,8 +211,14 @@ public final class NpcWiring {
         // completes here and can be scoped back.
         java.util.function.Supplier<List<String>> npcNames =
                 () -> repository.all().stream().map(npc -> npc.name().value()).toList();
-        List<CommandRegistration> commands = List.of(
-                new NpcCommand(services, npcNames, skinByName, kernel.messages(), listMenu, kernel.scheduler()));
+        List<CommandRegistration> commands = List.of(new NpcCommand(
+                services,
+                npcNames,
+                skinByName,
+                kernel.messages(),
+                listMenu,
+                kernel.scheduler(),
+                kernel.playerLookup()));
         ClickCommandRunner commandRunner = new FilteredClickCommandRunner(
                 new BukkitClickCommandRunner(), BlockedCommands.of(settings.blockedCommands()), kernel.log());
         BukkitServerConnector connector = new BukkitServerConnector(plugin, kernel.log());

@@ -3,6 +3,7 @@ package com.uxplima.uxmessentials.shared.application.port;
 import java.util.Optional;
 import java.util.UUID;
 
+import com.uxplima.uxmessentials.shared.domain.NameCase;
 import com.uxplima.uxmessentials.shared.domain.NameMatch;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 
@@ -42,9 +43,20 @@ public interface PlayerLookup {
         return findOnlineByName(name);
     }
 
-    /** Like {@link #findByName}, but says when the name could mean several accounts. */
+    /**
+     * Like {@link #findByName}, but says when the name could mean several accounts. Off the tick it may read the
+     * durable name store to settle a name typed in another case.
+     */
     default NameMatch matchByName(String name) {
         return NameMatch.of(findByName(name));
+    }
+
+    /**
+     * Like {@link #matchByName}, answered from memory only on any thread, for a caller that must answer at once and
+     * cannot tell whether its thread may wait on storage. A name that only storage could settle answers unknown.
+     */
+    default NameMatch matchByNameFromMemory(String name) {
+        return matchByName(name);
     }
 
     /** The player with this UUID, online or resolvable from the profile cache. */
@@ -52,4 +64,13 @@ public interface PlayerLookup {
 
     /** True when the player with this UUID is currently connected. */
     boolean isOnline(UUID uuid);
+
+    /**
+     * Whether names that differ only in case are one account or two on this server, as it stands now. It can change
+     * while the server runs (the first offline-mode login settles it), so a caller asks each time rather than once.
+     * The default is a single owner per name, as a test fake that knows no case variants behaves.
+     */
+    default NameCase nameCase() {
+        return NameCase.INSENSITIVE;
+    }
 }

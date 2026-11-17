@@ -14,6 +14,8 @@ import java.util.function.Consumer;
 
 import com.uxplima.uxmessentials.shared.application.port.NetworkPresenceBroadcast;
 import com.uxplima.uxmessentials.shared.application.port.PlayerNameIndex;
+import com.uxplima.uxmessentials.shared.domain.NameCase;
+import com.uxplima.uxmessentials.shared.domain.NameMatch;
 import com.uxplima.uxmessentials.shared.domain.OnlinePlayer;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmessentials.testing.MutableClock;
@@ -28,6 +30,7 @@ class NetworkPresenceTest {
     private static final PlayerRef ALEX = new PlayerRef(UUID.randomUUID(), "Alex");
 
     private final MutableClock clock = new MutableClock(Instant.parse("2026-11-15T12:00:00Z"));
+    private NameCase nameCase = NameCase.INSENSITIVE;
     private final Backend lobby = new Backend("lobby-1");
     private final Backend survival = new Backend("survival-1");
 
@@ -44,6 +47,7 @@ class NetworkPresenceTest {
 
     @Test
     void offlineModeCaseVariantsOnlineTogetherAreFoundOnlyByTheirOwnSpelling() {
+        nameCase = NameCase.SENSITIVE;
         PlayerRef lowerSteve = new PlayerRef(UUID.randomUUID(), "steve");
         lobby.track.joined(STEVE);
         lobby.track.joined(lowerSteve);
@@ -51,6 +55,20 @@ class NetworkPresenceTest {
         assertThat(lobby.roster.findByName("Steve")).contains(new OnlinePlayer(STEVE, "lobby-1"));
         assertThat(lobby.roster.findByName("steve")).contains(new OnlinePlayer(lowerSteve, "lobby-1"));
         assertThat(lobby.roster.findByName("STEVE")).isEmpty();
+        assertThat(lobby.roster.matchByName("STEVE")).isInstanceOf(NameMatch.Ambiguous.class);
+    }
+
+    @Test
+    void offlineModeAVariantOnlineElsewhereIsNotTheAccountSpelledAsTyped() {
+        nameCase = NameCase.SENSITIVE;
+        PlayerRef lowerSteve = new PlayerRef(UUID.randomUUID(), "steve");
+        lobby.track.joined(lowerSteve);
+        lobby.out.deliverAll(survival.track);
+
+        assertThat(survival.roster.findByName("steve")).contains(new OnlinePlayer(lowerSteve, "lobby-1"));
+        // Steve, offline, is another account; the steve online on the lobby is not who /msg Steve means.
+        assertThat(survival.roster.findByName("Steve")).isEmpty();
+        assertThat(survival.roster.matchByName("Steve")).isEqualTo(NameMatch.unknown());
     }
 
     @Test
@@ -329,7 +347,7 @@ class NetworkPresenceTest {
 
         Backend(String name) {
             this.out = new Outbox(name);
-            this.roster = new NetworkRoster(name, clock, LIVENESS);
+            this.roster = new NetworkRoster(name, clock, LIVENESS, () -> nameCase);
             this.track = new TrackNetworkPresence(roster, out, names, clock);
         }
     }

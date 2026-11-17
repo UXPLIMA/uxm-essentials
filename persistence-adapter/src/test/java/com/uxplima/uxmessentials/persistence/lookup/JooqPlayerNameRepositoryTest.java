@@ -47,13 +47,14 @@ class JooqPlayerNameRepositoryTest {
     }
 
     @Test
-    void everyAccountUnderANameInAnyCaseIsFoundAndNoOtherName() {
+    void theAccountsUnderANameInAnyCaseAreFoundNewestFirstUpToTheLimit() {
         UUID upper = new UUID(0L, 4L);
         names.upsert(new PlayerName(ALEX, "Alex", 100L));
         names.upsert(new PlayerName(upper, "ALEX", 200L));
         names.upsert(new PlayerName(new UUID(0L, 5L), "Alexa", 300L));
 
-        assertThat(names.underName("aLeX"))
+        assertThat(names.underName("aLeX", 10))
                 .containsExactly(new PlayerName(upper, "ALEX", 200L), new PlayerName(ALEX, "Alex", 100L));
+        assertThat(names.underName("alex", 1)).containsExactly(new PlayerName(upper, "ALEX", 200L));
     }
 }

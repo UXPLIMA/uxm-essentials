@@ -1,16 +1,22 @@
 package com.uxplima.uxmessentials.security.adapter.inbound.gui;
 
 import java.nio.file.Path;
+import java.time.Duration;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicLong;
+import java.util.function.Predicate;
 
 import org.bukkit.Bukkit;
 import org.bukkit.entity.Player;
 
+import com.uxplima.uxmessentials.security.adapter.PinEntryPrompt;
+import com.uxplima.uxmessentials.security.adapter.SecureEntryInput;
 import com.uxplima.uxmessentials.security.adapter.VerificationFeedback;
 import com.uxplima.uxmessentials.security.domain.SecurityMessageKey;
 import com.uxplima.uxmessentials.shared.adapter.outbound.BukkitRefs;
@@ -44,6 +50,13 @@ import org.jspecify.annotations.Nullable;
  * handoff, or a module stop) is flagged through {@link #suppressNextClose} / {@link #closeFor} so it is not fought.
  * Every live-player touch runs on the viewer's own region thread through the engine and the injected {@link Scheduler},
  * so it stays Folia-safe.
+ *
+ * <p>A player the {@link PinEntryPrompt} says types their entry (a Bedrock player) never sees the window. A form is sent
+ * once and gone after one button, so a pad that redraws after each tap would close on the first digit and leave them
+ * frozen with nothing to press. They are asked for the whole entry in one prompt instead, and the rest of this view
+ * treats that prompt as it treats the window: a submission goes to the same {@link KeypadActions}, a refused one is
+ * asked again ({@link #retry}), a close while still frozen asks again, and a deliberate close drops it. No open is in
+ * flight for such a prompt, so nothing waits on an inventory event that a form never raises.
  */
 @NullMarked
 public final class PinKeypadView {
@@ -69,10 +82,26 @@ public final class PinKeypadView {
     /** The most digits the pad accepts, comfortably above an 8-digit PIN and a 6-digit code. */
     private static final int MAX_ENTRY = 12;
 
+    /** A typed prompt gone sooner than this was most likely never on the player's screen at all. */
+    private static final Duration QUICK_CLOSE = Duration.ofSeconds(1);
+
+    /** The wait before asking again after the first quick close; it doubles with each one in a row. */
+    private static final Duration FIRST_BACKOFF = Duration.ofMillis(500);
+
+    /** The longest wait between two asks. The freeze's entry timeout still ends the whole thing. */
+    private static final Duration MAX_BACKOFF = Duration.ofSeconds(4);
+
+    /** How many quick closes in a row are a prompt that cannot be shown rather than a player in a hurry. */
+    private static final int STREAK_WORTH_LOGGING = 3;
+
     private final Menus menus;
+    private final PinEntryPrompt typed;
+    private final Predicate<UUID> frozen;
+    private final Predicate<UUID> wanted;
     private final Messages messages;
     private final VerificationFeedback feedback;
     private final Scheduler scheduler;
+    private final Logger log;
 
     /** viewer UUID -> their open keypad's viewer + totp flag; the tracking that lets closeAll close and reopen rebuild. */
     private final Map<UUID, Tracked> open = new ConcurrentHashMap<>();
@@ -92,11 +121,49 @@ public final class PinKeypadView {
      */
     private final Map<UUID, Integer> inFlight = new ConcurrentHashMap<>();
 
-    public PinKeypadView(Menus menus, Messages messages, VerificationFeedback feedback, Scheduler scheduler) {
+    /**
+     * viewer UUID -> the token of the typed prompt they are answering. A callback carrying any other token belongs to
+     * a prompt this view has since dropped (a deliberate close, a quit, a module stop) and is ignored, so a form the
+     * player answers late can neither submit nor reopen anything.
+     */
+    private final Map<UUID, Long> typing = new ConcurrentHashMap<>();
+
+    private final AtomicLong promptTokens = new AtomicLong();
+
+    /** viewer UUID -> when their open typed prompt was asked for, from {@link System#nanoTime}. */
+    private final Map<UUID, Long> askedAt = new ConcurrentHashMap<>();
+
+    /** viewer UUID -> how many of their typed prompts in a row closed within {@link #QUICK_CLOSE}. */
+    private final Map<UUID, Integer> quickCloses = new ConcurrentHashMap<>();
+
+    /** Whether the backoff has been logged yet; once is enough to point an operator at the input mode. */
+    private final AtomicBoolean backoffLogged = new AtomicBoolean();
+
+    /** Where a typed entry goes; set by {@link #register}, because the router is built after this view. */
+    private volatile @Nullable KeypadActions actions;
+
+    /**
+     * @param typed which players type their entry instead of tapping the window, and how they are asked
+     * @param frozen whether a player is still held by the join freeze, so a close of their entry has to ask again
+     * @param wanted whether any flow still waits on an entry from a player: the join freeze or a pending re-auth
+     */
+    public PinKeypadView(
+            Menus menus,
+            PinEntryPrompt typed,
+            Predicate<UUID> frozen,
+            Predicate<UUID> wanted,
+            Messages messages,
+            VerificationFeedback feedback,
+            Scheduler scheduler,
+            Logger log) {
         this.menus = Objects.requireNonNull(menus, "menus");
+        this.typed = Objects.requireNonNull(typed, "typed");
+        this.frozen = Objects.requireNonNull(frozen, "frozen");
+        this.wanted = Objects.requireNonNull(wanted, "wanted");
         this.messages = Objects.requireNonNull(messages, "messages");
         this.feedback = Objects.requireNonNull(feedback, "feedback");
         this.scheduler = Objects.requireNonNull(scheduler, "scheduler");
+        this.log = Objects.requireNonNull(log, "log");
     }
 
     /** Register the keypad's per-button actions, its masked-display / digit-label placeholders, and the spec itself. */
@@ -105,6 +172,7 @@ public final class PinKeypadView {
         Objects.requireNonNull(actions, "actions");
         Objects.requireNonNull(dataFolder, "dataFolder");
         Objects.requireNonNull(log, "log");
+        this.actions = actions;
         bindings.placeholder("security_keypad_entry", this::entryDisplay);
         for (int value = 0; value <= 9; value++) {
             int digit = value;
@@ -135,7 +203,15 @@ public final class PinKeypadView {
     public void openCreate(Player player, PlayerRef viewer) {
         Objects.requireNonNull(player, "player");
         Objects.requireNonNull(viewer, "viewer");
-        open.put(viewer.uuid(), new Tracked(viewer, false, true));
+        openCreate(player, viewer, false);
+    }
+
+    private void openCreate(Player player, PlayerRef viewer, boolean confirming) {
+        if (typed.typesEntry(player)) {
+            askTyped(player, new Tracked(viewer, false, true, confirming, true));
+            return;
+        }
+        open.put(viewer.uuid(), new Tracked(viewer, false, true, false, false));
         markOpening(viewer.uuid());
         menus.open(player, CREATE_SPEC_ID, new PinSession(viewer, false));
     }
@@ -145,18 +221,38 @@ public final class PinKeypadView {
      * steps without leaving the window: the submit action clears the entry and redraws the pad in place, so the next
      * step is already on screen and opening a second one would only tear down a window to build the same window
      * again. An open already in flight counts as being there, so two steps in quick succession still open one pad.
+     *
+     * <p>A typed entry is gone once it is submitted, so a player who types is asked again here, for the step named by
+     * {@code confirming}: the same PIN again, or a fresh first entry.
      */
-    public void ensureCreateOpen(Player player, PlayerRef viewer) {
+    public void ensureCreateOpen(Player player, PlayerRef viewer, boolean confirming) {
         Objects.requireNonNull(player, "player");
         Objects.requireNonNull(viewer, "viewer");
         UUID id = viewer.uuid();
+        if (typed.typesEntry(player)) {
+            askTyped(player, new Tracked(viewer, false, true, confirming, true));
+            return;
+        }
         if (inFlight.containsKey(id)
                 || menus.currentMenu(id)
                         .filter(info -> CREATE_SPEC_ID.equals(info.specId()))
                         .isPresent()) {
             return;
         }
-        openCreate(player, viewer);
+        openCreate(player, viewer, false);
+    }
+
+    /**
+     * Ask {@code viewer} again after a submission was refused. The keypad window is still on screen with an empty
+     * entry, so for a keypad player this does nothing; a typed entry is gone once submitted, so it is asked for again.
+     */
+    public void retry(Player player, PlayerRef viewer) {
+        Objects.requireNonNull(player, "player");
+        Objects.requireNonNull(viewer, "viewer");
+        Tracked tracked = open.get(viewer.uuid());
+        if (tracked != null && tracked.typed()) {
+            askTyped(player, tracked);
+        }
     }
 
     /** Close the viewer's keypad, flagging the close so it is not reopened; the deliberate-close path (the close
@@ -164,8 +260,39 @@ public final class PinKeypadView {
     public void closeFor(PlayerRef viewer) {
         Objects.requireNonNull(viewer, "viewer");
         UUID id = viewer.uuid();
+        Tracked tracked = open.get(id);
+        if (tracked != null && tracked.typed()) {
+            // Dropping the token is what ends a typed prompt: whatever the player answers later is ignored. An anvil
+            // or sign prompt is also taken off their screen; a form or a chat prompt has nothing to close.
+            boolean asking = typing.remove(id) != null;
+            forget(id);
+            if (asking) {
+                scheduler.onEntity(viewer, () -> closeLive(id));
+            }
+            return;
+        }
         suppressReopen.add(id);
         scheduler.onEntity(viewer, () -> closeLive(id));
+    }
+
+    /**
+     * Whether {@code viewer} is being asked for a PIN or code right now: a keypad window or a typed prompt is up, or
+     * one is about to be asked again after a refused or dismissed entry. Tracking that no flow waits on any more (the
+     * freeze was lifted under an open prompt) does not count, so it cannot hold the player's chat.
+     */
+    public boolean isEntering(UUID viewer) {
+        Objects.requireNonNull(viewer, "viewer");
+        return open.containsKey(viewer) && wanted.test(viewer);
+    }
+
+    /**
+     * Close {@code viewer}'s keypad or prompt if this view has one up for them, and otherwise leave whatever they have
+     * open alone: for a caller that cannot know whether the player was being asked at all.
+     */
+    public void closeIfAsking(PlayerRef viewer) {
+        if (open.containsKey(Objects.requireNonNull(viewer, "viewer").uuid())) {
+            closeFor(viewer);
+        }
     }
 
     /** Close every open keypad and drop all tracking, so a module disable leaves no locked window. */
@@ -176,6 +303,9 @@ public final class PinKeypadView {
         open.clear();
         suppressReopen.clear();
         inFlight.clear();
+        typing.clear();
+        askedAt.clear();
+        quickCloses.clear();
     }
 
     /** Flag the viewer's next keypad close as a deliberate handoff (to the TOTP prompt), so it is not reopened. */
@@ -199,11 +329,32 @@ public final class PinKeypadView {
             return;
         }
         Player live = Bukkit.getPlayer(viewer);
+        if (tracked.typed() && live != null) {
+            askTyped(live, tracked);
+            return;
+        }
         if (tracked.creating() && live != null) {
-            openCreate(live, tracked.viewer());
+            openCreate(live, tracked.viewer(), false);
             return;
         }
         show(tracked.viewer(), tracked.totpEnabled());
+    }
+
+    /**
+     * Settle a keypad entry that has gone off the player's screen, whether a window they closed or a typed prompt they
+     * dismissed. A deliberate close is left alone, a player still frozen is asked again so verification cannot be
+     * skipped, and any other close (a re-auth abandoned, a quit) drops the tracking.
+     */
+    void closed(UUID viewer) {
+        if (consumeSuppress(viewer)) {
+            forget(viewer);
+            return;
+        }
+        if (frozen.test(viewer)) {
+            reopen(viewer);
+        } else {
+            forget(viewer);
+        }
     }
 
     /**
@@ -223,12 +374,110 @@ public final class PinKeypadView {
     void forget(UUID viewer) {
         open.remove(viewer);
         inFlight.remove(viewer);
+        typing.remove(viewer);
+        askedAt.remove(viewer);
+        quickCloses.remove(viewer);
     }
 
     private void show(PlayerRef viewer, boolean totpEnabled) {
-        open.put(viewer.uuid(), new Tracked(viewer, totpEnabled, false));
+        Player live = LivePlayers.of(viewer).orElse(null);
+        if (live != null && typed.typesEntry(live)) {
+            askTyped(live, new Tracked(viewer, totpEnabled, false, false, true));
+            return;
+        }
+        open.put(viewer.uuid(), new Tracked(viewer, totpEnabled, false, false, false));
         markOpening(viewer.uuid());
-        LivePlayers.of(viewer).ifPresent(live -> menus.open(live, SPEC_ID, new PinSession(viewer, totpEnabled)));
+        if (live != null) {
+            menus.open(live, SPEC_ID, new PinSession(viewer, totpEnabled));
+        }
+    }
+
+    /**
+     * Ask a player who types for their entry. Only one prompt is out per player: asking while one is still open
+     * would make the seam replace it, and the replaced anvil's close would arrive as the player dismissing it.
+     */
+    private void askTyped(Player player, Tracked tracked) {
+        UUID id = tracked.viewer().uuid();
+        Tracked previous = open.put(id, tracked);
+        Long showing = typing.get(id);
+        if (showing != null) {
+            if (previous != null && stepOf(previous) == stepOf(tracked)) {
+                return;
+            }
+            // The prompt on screen asks the wrong question (a verify prompt still up when a reset sends the player to
+            // create a PIN). Dropping its token makes its answer count for nothing, and the new prompt replaces it.
+            typing.remove(id, showing);
+        }
+        long token = promptTokens.incrementAndGet();
+        typing.put(id, token);
+        askedAt.put(id, System.nanoTime());
+        typed.prompt(
+                player,
+                tracked.viewer(),
+                stepOf(tracked),
+                entered -> typedSubmitted(player, tracked.viewer(), token, entered),
+                () -> typedClosed(id, token),
+                () -> Long.valueOf(token).equals(typing.get(id)));
+    }
+
+    private void typedSubmitted(Player player, PlayerRef viewer, long token, String entered) {
+        KeypadActions target = actions;
+        if (!typing.remove(viewer.uuid(), token) || target == null) {
+            return;
+        }
+        askedAt.remove(viewer.uuid());
+        quickCloses.remove(viewer.uuid());
+        // Only what the keypad could have entered counts as the keypad's digits: fullwidth digits become ASCII and
+        // spaces go, and anything else reaches the policy or the verify as typed and is refused there.
+        target.submit(player, viewer, SecureEntryInput.normalise(entered));
+    }
+
+    private static PinEntryPrompt.Step stepOf(Tracked tracked) {
+        if (!tracked.creating()) {
+            return PinEntryPrompt.Step.VERIFY;
+        }
+        return tracked.confirming() ? PinEntryPrompt.Step.CONFIRM : PinEntryPrompt.Step.CREATE;
+    }
+
+    /**
+     * A typed prompt went away without an answer. Normally that is the player dismissing it and is settled like a closed
+     * window. A prompt gone within {@link #QUICK_CLOSE} of being asked for, while the player is still held, may be one
+     * the client could not show at all, and asking again at once would ask again every tick; so each such close in a
+     * row waits twice as long before the next ask, up to {@link #MAX_BACKOFF}. The freeze's entry timeout still bounds
+     * the whole wait, so a player who truly cannot answer is still let go when it runs out.
+     */
+    private void typedClosed(UUID viewer, long token) {
+        if (!typing.remove(viewer, token)) {
+            return;
+        }
+        Long asked = askedAt.remove(viewer);
+        boolean quick = asked != null && System.nanoTime() - asked < QUICK_CLOSE.toNanos();
+        Tracked tracked = open.get(viewer);
+        if (!quick || tracked == null || suppressReopen.contains(viewer) || !frozen.test(viewer)) {
+            quickCloses.remove(viewer);
+            closed(viewer);
+            return;
+        }
+        int streak = quickCloses.merge(viewer, 1, Integer::sum);
+        Duration delay = backoff(streak);
+        if (streak >= STREAK_WORTH_LOGGING && backoffLogged.compareAndSet(false, true)) {
+            log.warn(
+                    "event=security_pin_prompt_backoff player={} closes_in_a_row={} delay_ms={} hint=check the input"
+                            + " mode of security.verify-pin and security.create-pin in text-input.conf",
+                    tracked.viewer().name(),
+                    streak,
+                    delay.toMillis());
+        }
+        scheduler.laterEntity(tracked.viewer(), delay, () -> {
+            if (frozen.test(viewer)) {
+                reopen(viewer);
+            }
+        });
+    }
+
+    private static Duration backoff(int streak) {
+        Duration delay = FIRST_BACKOFF.multipliedBy(1L << Math.min(streak - 1, 8));
+        return delay.compareTo(MAX_BACKOFF) > 0 ? MAX_BACKOFF : delay;
     }
 
     private void markOpening(UUID viewer) {
@@ -301,10 +550,12 @@ public final class PinKeypadView {
     }
 
     /**
-     * The per-viewer tracking a close/reopen needs: who is at the window, whether their code button shows, and which
-     * of the two pads they are on, so a reopened window is the one they were actually using.
+     * The per-viewer tracking a close/reopen needs: who is at the window, whether their code button shows, which of
+     * the two pads they are on (and, for a typed new PIN, which of its two entries), and whether they type rather than
+     * tap, so what is shown again is what they were actually using.
      */
-    private record Tracked(PlayerRef viewer, boolean totpEnabled, boolean creating) {}
+    private record Tracked(
+            PlayerRef viewer, boolean totpEnabled, boolean creating, boolean confirming, boolean typed) {}
 
     /**
      * The per-viewer keypad state carried as the open menu's subject: who is verifying, whether they hold a TOTP

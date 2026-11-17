@@ -30,8 +30,6 @@ import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.Consumer;
 import java.util.function.Function;
 
-import org.bukkit.Bukkit;
-import org.bukkit.OfflinePlayer;
 import org.bukkit.configuration.ConfigurationSection;
 import org.bukkit.configuration.file.YamlConfiguration;
 
@@ -52,7 +50,9 @@ import com.uxplima.uxmessentials.guard.domain.RoleName;
 import com.uxplima.uxmessentials.guard.domain.Rule;
 import com.uxplima.uxmessentials.guard.domain.Shape;
 import com.uxplima.uxmessentials.guard.domain.Target;
+import com.uxplima.uxmessentials.shared.application.port.PlayerLookup;
 import com.uxplima.uxmessentials.shared.application.port.Scheduler;
+import com.uxplima.uxmessentials.shared.domain.NameMatch;
 import com.uxplima.uxmessentials.shared.domain.ServerScope;
 import org.jspecify.annotations.Nullable;
 import org.yaml.snakeyaml.LoaderOptions;
@@ -173,19 +173,26 @@ public final class WorldGuardImporter {
     private final Scheduler scheduler;
     private final Executor offTick;
     private final Consumer<String> warn;
+    private final PlayerLookup players;
     private final AtomicBoolean running = new AtomicBoolean();
 
     /**
      * @param dataFolder this plugin's data folder; WorldGuard's files are read from its sibling folder
      */
     public WorldGuardImporter(
-            Path dataFolder, GuardService service, GuardBackups backups, Scheduler scheduler, Consumer<String> warn) {
+            Path dataFolder,
+            GuardService service,
+            GuardBackups backups,
+            Scheduler scheduler,
+            Consumer<String> warn,
+            PlayerLookup players) {
         this.dataFolder = Objects.requireNonNull(dataFolder, "dataFolder");
         this.service = Objects.requireNonNull(service, "service");
         this.backups = Objects.requireNonNull(backups, "backups");
         this.scheduler = Objects.requireNonNull(scheduler, "scheduler");
         this.offTick = scheduler::async;
         this.warn = Objects.requireNonNull(warn, "warn");
+        this.players = Objects.requireNonNull(players, "players");
     }
 
     /** A block position as WorldGuard wrote it. */
@@ -339,23 +346,25 @@ public final class WorldGuardImporter {
             return CompletableFuture.completedFuture(Map.of());
         }
         CompletableFuture<Map<String, UUID>> resolved = new CompletableFuture<>();
-        scheduler.onGlobal(
-                () -> {
-                    try {
-                        Map<String, UUID> found = new HashMap<>();
-                        for (String name : wanted) {
-                            OfflinePlayer player = Bukkit.getOfflinePlayerIfCached(name);
-                            if (player != null) {
-                                found.put(name, player.getUniqueId());
-                            }
-                        }
-                        resolved.complete(found);
-                    } catch (Throwable failure) {
-                        // The import waits on this answer; a throw has to end it rather than leave it running.
-                        resolved.completeExceptionally(failure);
+        // Off the tick, so the lookup may read the name store to settle a name WorldGuard wrote in another case. The
+        // server's own cache matches any case and would hand an offline-mode server's other spelling the region.
+        offTick.execute(() -> {
+            try {
+                Map<String, UUID> found = new HashMap<>();
+                for (String name : wanted) {
+                    NameMatch match = players.matchByName(name);
+                    match.player().ifPresent(player -> found.put(name, player.uuid()));
+                    if (match instanceof NameMatch.Ambiguous ambiguous) {
+                        warn.accept("WorldGuard name " + name + " is left out: it could be any of "
+                                + ambiguous.spellings());
                     }
-                },
-                () -> resolved.completeExceptionally(new IllegalStateException("the server is stopping")));
+                }
+                resolved.complete(found);
+            } catch (Throwable failure) {
+                // The import waits on this answer; a throw has to end it rather than leave it running.
+                resolved.completeExceptionally(failure);
+            }
+        });
         return resolved;
     }
 

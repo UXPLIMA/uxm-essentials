@@ -22,6 +22,11 @@ A server of the network that has no business in the shared database (a creative 
 server to the shared database is `storage.copy-from-file = true` with the new type, for one restart; the log says
 how many rows were copied, and tables that already hold rows are left alone.
 
+A proxy in offline mode (a cracked network) makes `Steve` and `steve` two players, but a backend reads the proxy's
+mode from Paper's proxy settings, which default to online. With `lookup.name-case = "auto"` (the default) the first
+offline-mode login corrects that and logs `event=name_case_detected`; set `lookup.name-case = "sensitive"` in
+`config.conf` on every backend to have it right from the first login.
+
 Every `network` key is read on start. A change needs a restart.
 
 ## The server name

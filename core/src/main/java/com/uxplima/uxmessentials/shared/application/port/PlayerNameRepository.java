@@ -16,10 +16,10 @@ public interface PlayerNameRepository {
     List<PlayerName> loadRecent(int limit);
 
     /**
-     * Every account whose name is {@code name} in any case, each with the name it last joined under. Two accounts
-     * share a name in different cases on an offline-mode server.
+     * The accounts whose name is {@code name} in any case, each with the name it last joined under, most recently seen
+     * first and at most {@code limit} of them. Two accounts share a name in different cases on an offline-mode server.
      */
-    List<PlayerName> underName(String name);
+    List<PlayerName> underName(String name, int limit);
 
     /** Insert or update the row for this account. */
     void upsert(PlayerName record);

@@ -174,7 +174,10 @@ public final class CrossServerRequests implements RemoteRequests {
                 .filter(where -> !where.server().equals(network.localServer()))
                 .filter(where -> presence.isLive(where.server()));
         if (found.isEmpty() || !enabled()) {
-            notifier.send(requester, TeleportError.TARGET_OFFLINE.messageKey(), Map.of("player", targetName));
+            notifier.send(
+                    requester,
+                    presence.matchByName(targetName)
+                            .miss(TeleportError.TARGET_OFFLINE.messageKey(), Map.of("player", targetName)));
             return;
         }
         PlayerRef target = found.get().player();
