@@ -280,7 +280,9 @@ the player, or everyone on that address, wherever they are; a mute is read on th
 messages and blocked commands through the bus (without a bus carrier, within a minute: every server reads its players'
 mutes again once a minute, and again after `/uxmess import`). `/kick` and
 `/freeze` on a player connected to another server are refused with that server's name, since this server cannot
-reach them. A freeze is announced over the bus and held on every server, so a frozen player who switches server stays
+reach them. Without LuckPerms, whether a player on another server holds `uxmessentials.bypass.punishment`
+is asked of that server over the bus; with no answer within three seconds the sanction is refused.
+A freeze is announced over the bus and held on every server, so a frozen player who switches server stays
 frozen, and `/unfreeze` on any server lifts it everywhere. Over Velocity a server that was empty when the freeze was
 announced never heard it, so the proxy plugin keeps a frozen player off other servers and sends one who logs out
 frozen back to the server that froze them. Redis reaches every server, empty or not. A server that restarts, or

@@ -3,7 +3,6 @@ package com.uxplima.uxmessentials.shared.adapter.outbound.permission;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.UUID;
-import java.util.concurrent.CompletableFuture;
 
 import net.luckperms.api.LuckPerms;
 import net.luckperms.api.LuckPermsProvider;
@@ -25,12 +24,12 @@ final class LuckPermsNodeStore implements NodeStore {
     }
 
     @Override
-    public CompletableFuture<Optional<Boolean>> load(UUID player, String node) {
+    public Load prepare(UUID player, String node) {
         Objects.requireNonNull(player, "player");
         Objects.requireNonNull(node, "node");
-        return luckPerms.getUserManager().loadUser(player).thenApply(user -> {
+        return () -> luckPerms.getUserManager().loadUser(player).thenApply(user -> {
             Tristate set = user.getCachedData().getPermissionData().checkPermission(node);
-            return set == Tristate.UNDEFINED ? Optional.empty() : Optional.of(set.asBoolean());
+            return set == Tristate.UNDEFINED ? Optional.<Boolean>empty() : Optional.of(set.asBoolean());
         });
     }
 }

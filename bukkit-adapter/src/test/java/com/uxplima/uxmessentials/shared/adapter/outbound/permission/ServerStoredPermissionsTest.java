@@ -10,13 +10,19 @@ import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 
 import com.uxplima.uxmessentials.moderation.application.ModerationGuard;
+import com.uxplima.uxmessentials.shared.adapter.outbound.bus.BusPublisher;
 import com.uxplima.uxmessentials.shared.application.port.Logger;
 import com.uxplima.uxmessentials.shared.application.port.NetworkPresence;
+import com.uxplima.uxmessentials.shared.application.port.Permissions;
+import com.uxplima.uxmessentials.shared.application.port.PlayerLookup;
 import com.uxplima.uxmessentials.shared.application.port.Scheduler;
 import com.uxplima.uxmessentials.shared.application.port.StoredPermissions.Answer;
 import com.uxplima.uxmessentials.shared.domain.OnlinePlayer;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmessentials.shared.domain.Position;
+import com.uxplima.uxmessentials.shared.domain.WorldRef;
+import com.uxplima.uxmessentials.shared.network.NetworkMessage;
+import com.uxplima.uxmessentials.shared.network.PermissionQueryFrame;
 import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -26,9 +32,10 @@ import org.mockbukkit.mockbukkit.ServerMock;
 import org.mockbukkit.mockbukkit.entity.PlayerMock;
 
 /**
- * A player who is not here is read the way this server would apply the node if they joined: what LuckPerms stored
- * wins, loaded off the tick, and an unset node falls back to the default against the operator list. Without a store
- * that can answer, a player on another backend or a server with another permission plugin gets no answer at all.
+ * A player who is not here is read the way the server they would play on applies the node. What LuckPerms stored wins,
+ * loaded off the tick, and an unset node falls back to the default against the operator list. Without LuckPerms a
+ * player on another backend is asked about over the bus, an offline one through the Vault permission provider, and
+ * with neither the operator list answers. Nothing here is ever a guess.
  */
 class ServerStoredPermissionsTest {
 
@@ -40,6 +47,7 @@ class ServerStoredPermissionsTest {
     private final Lane lane = new Lane();
     private final Presence presence = new Presence();
     private final List<String> warnings = new ArrayList<>();
+    private final List<NetworkMessage> sent = new ArrayList<>();
 
     @BeforeEach
     void start() {
@@ -62,9 +70,9 @@ class ServerStoredPermissionsTest {
     }
 
     @Test
-    void whatTheStoreSetsIsLoadedOnTheAsyncLaneAndWins() {
+    void whatLuckPermsSetsIsLoadedOnTheAsyncLaneAndWins() {
         CompletableFuture<Answer> answer =
-                reader(store(Optional.of(false)), false).read(olaf, NODE);
+                withLuckPerms(store(Optional.of(false))).read(olaf, NODE);
 
         assertThat(answer).isNotDone();
         lane.runAll();
@@ -73,9 +81,9 @@ class ServerStoredPermissionsTest {
     }
 
     @Test
-    void aNodeTheStoreLeavesUnsetFallsBackToItsDefaultForAnOperator() {
+    void aNodeLuckPermsLeavesUnsetFallsBackToItsDefaultForAnOperator() {
         CompletableFuture<Answer> answer =
-                reader(store(Optional.empty()), false).read(olaf, NODE);
+                withLuckPerms(store(Optional.empty())).read(olaf, NODE);
 
         lane.runAll();
 
@@ -84,9 +92,9 @@ class ServerStoredPermissionsTest {
 
     @Test
     void aStoreThatFailsGivesNoAnswerAndIsLogged() {
-        CompletableFuture<Answer> answer = reader(
-                        (player, node) -> CompletableFuture.failedFuture(new IllegalStateException("db down")), false)
-                .read(olaf, NODE);
+        NodeStore failing =
+                (player, node) -> () -> CompletableFuture.failedFuture(new IllegalStateException("db down"));
+        CompletableFuture<Answer> answer = withLuckPerms(failing).read(olaf, NODE);
 
         lane.runAll();
 
@@ -95,42 +103,126 @@ class ServerStoredPermissionsTest {
     }
 
     @Test
-    void withoutAStoreAnOfflinePlayerIsReadFromTheOperatorList() {
-        ServerStoredPermissions reader = reader(null, false);
+    void withLuckPermsAPlayerOnAnotherBackendIsReadFromItsStorage() {
+        presence.at = Optional.of(new OnlinePlayer(olaf, "lobby"));
+        CompletableFuture<Answer> answer =
+                withLuckPerms(store(Optional.of(true))).read(olaf, NODE);
+
+        lane.runAll();
+
+        assertThat(answer).isCompletedWithValue(Answer.HELD);
+        assertThat(sent).isEmpty();
+    }
+
+    @Test
+    void withNoPermissionPluginAnOfflinePlayerIsReadFromTheOperatorList() {
+        ServerStoredPermissions reader = reader(null, null, Optional.of(bus()));
 
         assertThat(reader.read(olaf, NODE)).isCompletedWithValue(Answer.HELD);
         assertThat(reader.read(bert, NODE)).isCompletedWithValue(Answer.NOT_HELD);
     }
 
     @Test
-    void withoutAStoreAPlayerOnAnotherBackendHasNoSource() {
-        presence.at = Optional.of(new OnlinePlayer(olaf, "lobby"));
-
-        assertThat(reader(null, false).read(olaf, NODE)).isCompletedWithValue(Answer.NO_SOURCE);
-    }
-
-    @Test
-    void withoutAStoreAnotherPermissionPluginsGrantsCannotBeReadSoThereIsNoSource() {
-        assertThat(reader(null, true).read(olaf, NODE)).isCompletedWithValue(Answer.NO_SOURCE);
-    }
-
-    @Test
-    void withAStoreAPlayerOnAnotherBackendIsReadFromIt() {
-        presence.at = Optional.of(new OnlinePlayer(olaf, "lobby"));
+    void anOfflinePlayerIsAskedAboutThroughTheVaultProviderOffTheTick() {
         CompletableFuture<Answer> answer =
-                reader(store(Optional.of(true)), false).read(olaf, NODE);
+                reader(null, store(Optional.of(true)), Optional.empty()).read(bert, NODE);
 
+        assertThat(answer).isNotDone();
         lane.runAll();
 
         assertThat(answer).isCompletedWithValue(Answer.HELD);
     }
 
-    private ServerStoredPermissions reader(@Nullable NodeStore store, boolean otherPlugin) {
-        return new ServerStoredPermissions(server, lane, presence, new Warnings(warnings), store, () -> otherPlugin);
+    @Test
+    void aVaultProviderThatThrowsGivesNoAnswer() {
+        NodeStore throwing = (player, node) -> () -> {
+            throw new IllegalStateException("the provider cannot read offline players");
+        };
+        CompletableFuture<Answer> answer =
+                reader(null, throwing, Optional.empty()).read(bert, NODE);
+
+        lane.runAll();
+
+        assertThat(answer).isCompletedWithValue(Answer.NO_ANSWER);
+    }
+
+    @Test
+    void withoutLuckPermsAPlayerOnAnotherBackendIsAskedAboutOverTheBus() {
+        presence.at = Optional.of(new OnlinePlayer(olaf, "lobby"));
+
+        CompletableFuture<Answer> answer =
+                reader(null, store(Optional.of(false)), Optional.of(bus())).read(olaf, NODE);
+
+        assertThat(answer).isNotDone();
+        assertThat(sent).singleElement().isInstanceOfSatisfying(PermissionQueryFrame.class, frame -> {
+            assertThat(frame.toServer()).isEqualTo("lobby");
+            assertThat(frame.player()).isEqualTo(olaf.uuid());
+            assertThat(frame.step()).isEqualTo(PermissionQueryFrame.ASK);
+        });
+    }
+
+    @Test
+    void withoutLuckPermsOrABusAPlayerOnAnotherBackendHasNoSource() {
+        presence.at = Optional.of(new OnlinePlayer(olaf, "lobby"));
+
+        assertThat(reader(null, store(Optional.of(false)), Optional.empty()).read(olaf, NODE))
+                .isCompletedWithValue(Answer.NO_SOURCE);
+    }
+
+    private ServerStoredPermissions withLuckPerms(NodeStore luckPerms) {
+        return reader(luckPerms, null, Optional.of(bus()));
+    }
+
+    private ServerStoredPermissions reader(
+            @Nullable NodeStore luckPerms, @Nullable NodeStore vault, Optional<BusPermissionReads> bus) {
+        return new ServerStoredPermissions(server, lane, presence, new Warnings(warnings), luckPerms, () -> vault, bus);
+    }
+
+    private BusPermissionReads bus() {
+        BusPublisher publisher = new BusPublisher() {
+            @Override
+            public void publish(NetworkMessage message) {
+                sent.add(message);
+            }
+
+            @Override
+            public String serverId() {
+                return "survival";
+            }
+        };
+        Permissions none = new Permissions() {
+            @Override
+            public boolean has(PlayerRef who, String node) {
+                throw new AssertionError("nobody is read live here");
+            }
+
+            @Override
+            public QuotaResult resolveQuota(
+                    PlayerRef who, QuotaFamily family, @Nullable WorldRef world, long configDefault) {
+                throw new AssertionError("nobody is read live here");
+            }
+        };
+        PlayerLookup nobody = new PlayerLookup() {
+            @Override
+            public Optional<PlayerRef> findOnlineByName(String name) {
+                return Optional.empty();
+            }
+
+            @Override
+            public Optional<PlayerRef> findByUuid(UUID uuid) {
+                return Optional.empty();
+            }
+
+            @Override
+            public boolean isOnline(UUID uuid) {
+                return false;
+            }
+        };
+        return new BusPermissionReads(publisher, none, nobody, lane, new Warnings(warnings));
     }
 
     private static NodeStore store(Optional<Boolean> set) {
-        return (player, node) -> CompletableFuture.completedFuture(set);
+        return (player, node) -> () -> CompletableFuture.completedFuture(set);
     }
 
     /** The async lane, run when the test says. Nothing else is asked of it. */
@@ -166,7 +258,7 @@ class ServerStoredPermissionsTest {
 
         @Override
         public void asyncAfter(Duration delay, Runnable task) {
-            throw new AssertionError("only the async lane is used");
+            // A bus question's time limit; these tests read the question, not its expiry.
         }
     }
 

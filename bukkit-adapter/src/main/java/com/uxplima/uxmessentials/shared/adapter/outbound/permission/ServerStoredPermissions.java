@@ -4,7 +4,7 @@ import java.util.Objects;
 import java.util.Optional;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
-import java.util.function.BooleanSupplier;
+import java.util.function.Supplier;
 
 import org.bukkit.Server;
 import org.bukkit.permissions.Permission;
@@ -15,23 +15,30 @@ import com.uxplima.uxmessentials.shared.application.port.Logger;
 import com.uxplima.uxmessentials.shared.application.port.NetworkPresence;
 import com.uxplima.uxmessentials.shared.application.port.Scheduler;
 import com.uxplima.uxmessentials.shared.application.port.StoredPermissions;
+import com.uxplima.uxmessentials.shared.domain.OnlinePlayer;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import org.jspecify.annotations.NullMarked;
 import org.jspecify.annotations.Nullable;
 
 /**
- * Reads a node for a player who is not online here, the way this server would apply it if they joined.
+ * Reads a node for a player who is not online here, the way the server they would play on applies it.
  *
  * <p>With LuckPerms, the user is loaded from its storage on the async lane, never on the tick, and a node it sets
  * wins. A node it leaves unset falls back to the node's declared default against the player's stored operator status,
  * as it would for a player online here.
  *
- * <p>Without LuckPerms the server's own grants are the declared defaults and the operator list, and those answer for a
- * player who is offline. They do not answer when another permission plugin is registered (its stored grants cannot be
- * read here), nor for a player online on another backend, whose operator list and grants are that backend's: the
- * answer is then {@link Answer#NO_SOURCE}, never a guess.
+ * <p>Without LuckPerms:
  *
- * <p>The default and the operator status are read on the calling server thread before anything leaves it.
+ * <ul>
+ *   <li>a player online on another backend is asked about over the bus, and that backend reads the node live; with no
+ *       bus, or no answer, there is {@link Answer#NO_SOURCE}, never a guess;
+ *   <li>an offline player is asked about through the permission plugin registered with Vault, on the async lane;
+ *   <li>with no permission plugin at all, the server's own grants answer: the declared default against the operator
+ *       list.
+ * </ul>
+ *
+ * <p>The default, the operator status and the provider are read on the calling server thread before anything leaves
+ * it.
  */
 @NullMarked
 public final class ServerStoredPermissions implements StoredPermissions {
@@ -44,31 +51,42 @@ public final class ServerStoredPermissions implements StoredPermissions {
     private final NetworkPresence presence;
     private final Logger log;
 
-    @Nullable private final NodeStore store;
+    @Nullable private final NodeStore luckPerms;
 
-    private final BooleanSupplier otherPermissionPlugin;
+    private final Supplier<@Nullable NodeStore> vault;
+    private final Optional<BusPermissionReads> bus;
 
     ServerStoredPermissions(
             Server server,
             Scheduler scheduler,
             NetworkPresence presence,
             Logger log,
-            @Nullable NodeStore store,
-            BooleanSupplier otherPermissionPlugin) {
+            @Nullable NodeStore luckPerms,
+            Supplier<@Nullable NodeStore> vault,
+            Optional<BusPermissionReads> bus) {
         this.server = Objects.requireNonNull(server, "server");
         this.scheduler = Objects.requireNonNull(scheduler, "scheduler");
         this.presence = Objects.requireNonNull(presence, "presence");
         this.log = Objects.requireNonNull(log, "log");
-        this.store = store;
-        this.otherPermissionPlugin = Objects.requireNonNull(otherPermissionPlugin, "otherPermissionPlugin");
+        this.luckPerms = luckPerms;
+        this.vault = Objects.requireNonNull(vault, "vault");
+        this.bus = Objects.requireNonNull(bus, "bus");
     }
 
-    /** The reader for this server: the LuckPerms storage when LuckPerms is enabled, the server's own grants otherwise. */
-    public static ServerStoredPermissions of(Server server, Scheduler scheduler, NetworkPresence presence, Logger log) {
+    /**
+     * The reader for this server: the LuckPerms storage when LuckPerms is enabled, otherwise the backend a player is on
+     * through {@code bus} (empty off the network), the Vault permission provider, or the server's own grants.
+     */
+    public static ServerStoredPermissions of(
+            Server server,
+            Scheduler scheduler,
+            NetworkPresence presence,
+            Logger log,
+            Optional<BusPermissionReads> bus) {
         // Constructed by a direct new past the guard, so a server without LuckPerms never loads its classes.
         NodeStore luckPerms = LuckPermsAccess.isPresent(server) ? new LuckPermsNodeStore() : null;
         return new ServerStoredPermissions(
-                server, scheduler, presence, log, luckPerms, () -> otherPermissionPlugin(server));
+                server, scheduler, presence, log, luckPerms, () -> vaultProvider(server), bus);
     }
 
     @Override
@@ -76,27 +94,37 @@ public final class ServerStoredPermissions implements StoredPermissions {
         Objects.requireNonNull(who, "who");
         Objects.requireNonNull(node, "node");
         boolean byDefault = byDefault(who.uuid(), node);
-        NodeStore loaded = store;
-        if (loaded == null) {
-            return CompletableFuture.completedFuture(
-                    onAnotherBackend(who.uuid()) || otherPermissionPlugin.getAsBoolean()
-                            ? Answer.NO_SOURCE
-                            : answer(byDefault));
+        if (luckPerms != null) {
+            return load(luckPerms, who, node, byDefault);
         }
+        Optional<String> elsewhere = anotherBackend(who.uuid());
+        if (elsewhere.isPresent()) {
+            return bus.map(reads -> reads.ask(who, node, elsewhere.get()))
+                    .orElseGet(() -> CompletableFuture.completedFuture(Answer.NO_SOURCE));
+        }
+        NodeStore provider = vault.get();
+        if (provider != null) {
+            return load(provider, who, node, byDefault);
+        }
+        return CompletableFuture.completedFuture(answer(byDefault));
+    }
+
+    private CompletableFuture<Answer> load(NodeStore store, PlayerRef who, String node, boolean byDefault) {
         CompletableFuture<Answer> answer = new CompletableFuture<>();
         try {
-            scheduler.async(() -> load(loaded, who, node, byDefault, answer));
+            NodeStore.Load load = store.prepare(who.uuid(), node);
+            scheduler.async(() -> run(load, who, node, byDefault, answer));
         } catch (RuntimeException refused) {
-            // The scheduler refuses work while the plugin stops.
-            answer.complete(Answer.NO_ANSWER);
+            // The store could not start the read, or the scheduler refuses work while the plugin stops.
+            unread(who, node, answer);
         }
         return answer;
     }
 
-    private void load(
-            NodeStore loaded, PlayerRef who, String node, boolean byDefault, CompletableFuture<Answer> answer) {
+    private void run(
+            NodeStore.Load load, PlayerRef who, String node, boolean byDefault, CompletableFuture<Answer> answer) {
         try {
-            var unused = loaded.load(who.uuid(), node).whenComplete((set, failure) -> {
+            var unused = load.run().whenComplete((set, failure) -> {
                 if (failure != null || set == null) {
                     unread(who, node, answer);
                 } else {
@@ -125,29 +153,29 @@ public final class ServerStoredPermissions implements StoredPermissions {
         return server.getOperators().stream().anyMatch(op -> op.getUniqueId().equals(player));
     }
 
-    private boolean onAnotherBackend(UUID player) {
-        return presence.find(player)
-                .filter(online -> !online.server().equals(presence.localServer()))
-                .isPresent();
+    private Optional<String> anotherBackend(UUID player) {
+        return presence.find(player).map(OnlinePlayer::server).filter(name -> !name.equals(presence.localServer()));
     }
 
     /**
-     * Whether a permission plugin is registered with Vault: Vault's own fallback registers under Vault itself, and
-     * only a real permission plugin under another name. Read by name so Vault stays optional.
+     * The permission plugin registered with Vault, or null when there is none: Vault's own fallback registers under
+     * Vault itself, and only a real permission plugin under another name. Looked up by name so Vault stays optional.
      */
-    private static boolean otherPermissionPlugin(Server server) {
+    private static @Nullable NodeStore vaultProvider(Server server) {
         Optional<Class<?>> service = server.getServicesManager().getKnownServices().stream()
                 .filter(known -> known.getName().equals(VAULT_PERMISSION))
                 .findFirst();
         if (service.isEmpty()) {
-            return false;
+            return null;
         }
-        for (RegisteredServiceProvider<?> provider : server.getServicesManager().getRegistrations(service.get())) {
-            if (!provider.getPlugin().getName().equals(VAULT)) {
-                return true;
+        for (RegisteredServiceProvider<?> registration :
+                server.getServicesManager().getRegistrations(service.get())) {
+            if (!registration.getPlugin().getName().equals(VAULT)) {
+                // Past the lookup Vault is known to be loaded, so its types resolve.
+                return new VaultNodeStore(server, registration);
             }
         }
-        return false;
+        return null;
     }
 
     private static Answer answer(boolean held) {

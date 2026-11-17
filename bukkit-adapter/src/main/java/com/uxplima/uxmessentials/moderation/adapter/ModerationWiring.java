@@ -118,6 +118,7 @@ import com.uxplima.uxmessentials.shared.adapter.outbound.bus.ModerationSync;
 import com.uxplima.uxmessentials.shared.adapter.outbound.bus.NetworkConfig;
 import com.uxplima.uxmessentials.shared.adapter.outbound.hop.CrossServerHops;
 import com.uxplima.uxmessentials.shared.adapter.outbound.log.AuditChannel;
+import com.uxplima.uxmessentials.shared.adapter.outbound.permission.BusPermissionReads;
 import com.uxplima.uxmessentials.shared.adapter.outbound.permission.ServerStoredPermissions;
 import com.uxplima.uxmessentials.shared.application.IpAlts;
 import com.uxplima.uxmessentials.shared.application.hop.HopDepartures;
@@ -131,6 +132,7 @@ import com.uxplima.uxmessentials.shared.application.port.MessageSink;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
 import com.uxplima.uxmessentials.shared.application.port.NetworkPresence;
 import com.uxplima.uxmessentials.shared.application.port.Permissions;
+import com.uxplima.uxmessentials.shared.application.port.StoredPermissions;
 import com.uxplima.uxmlib.gui.input.TextInput;
 import com.uxplima.uxmlib.menu.Menus;
 import com.uxplima.uxmlib.menu.binding.MenuBindings;
@@ -237,6 +239,7 @@ public final class ModerationWiring {
         }
         JailNetwork jailNetwork = jailNetwork(
                 plugin, kernel, bus, repository, jailLocations, sanctions, hops, networked, presence, clock);
+        StoredPermissions stored = storedPermissions(plugin, kernel, bus, networked, presence);
         ModerationServices services = assemble(
                 plugin,
                 auditChannel,
@@ -256,6 +259,7 @@ public final class ModerationWiring {
                 ipTokens,
                 presence,
                 seenVisibility,
+                stored,
                 clock);
         // The live kick: on a remote ban frame, re-evaluate the now-authoritative ban here and kick an online
         // target. Self-origin frames are dropped by the bus client before dispatch, so the local /ban (which
@@ -495,6 +499,7 @@ public final class ModerationWiring {
             IpTokens ipTokens,
             NetworkPresence presence,
             SeenVisibility seenVisibility,
+            StoredPermissions stored,
             Clock clock) {
         // One alt lookup for every flow that asks "who else uses this address": the login audit, /banip,
         // /tempbanip and /seenip. It tokenises first, so all four match the same rows /alts groups over.
@@ -649,10 +654,26 @@ public final class ModerationWiring {
                         kernel.scheduler(),
                         notifier,
                         kernel.permissions(),
-                        ServerStoredPermissions.of(plugin.getServer(), kernel.scheduler(), presence, kernel.log()),
+                        stored,
                         kernel.playerLookup(),
                         kernel.log()))
                 .build();
+    }
+
+    /**
+     * The reader for the immunity of a target who is not online here. On a network a target connected to another
+     * backend is asked about over the bus, so this backend also answers the questions other backends send it.
+     */
+    private static StoredPermissions storedPermissions(
+            Plugin plugin, KernelPorts kernel, Bus bus, boolean networked, NetworkPresence presence) {
+        Optional<BusPermissionReads> reads = Optional.empty();
+        if (networked) {
+            BusPermissionReads busReads = new BusPermissionReads(
+                    bus.publisher(), kernel.permissions(), kernel.playerLookup(), kernel.scheduler(), kernel.log());
+            bus.registry().register(busReads);
+            reads = Optional.of(busReads);
+        }
+        return ServerStoredPermissions.of(plugin.getServer(), kernel.scheduler(), presence, kernel.log(), reads);
     }
 
     /**

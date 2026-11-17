@@ -51,7 +51,8 @@ public sealed interface NetworkMessage
                 WorldChanged,
                 FreezeChanged,
                 FreezeReset,
-                AllBalancesChanged {
+                AllBalancesChanged,
+                PermissionQueryFrame {
 
     /** The {@code server-id} of the backend that produced this frame; the loop sentinel keys on it. */
     String originServer();
@@ -97,7 +98,8 @@ public sealed interface NetworkMessage
         WORLD_CHANGED(30),
         FREEZE_CHANGED(31),
         FREEZE_RESET(32),
-        ALL_BALANCES_CHANGED(33);
+        ALL_BALANCES_CHANGED(33),
+        PERMISSION_QUERY(34);
 
         private final byte wireTag;
 
