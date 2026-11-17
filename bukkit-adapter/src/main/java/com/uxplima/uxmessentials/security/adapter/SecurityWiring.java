@@ -153,7 +153,8 @@ public final class SecurityWiring {
                 sessions::isPending,
                 kernel.messages(),
                 feedback,
-                kernel.scheduler());
+                kernel.scheduler(),
+                kernel.log());
         FreezeGameMode freezeGameMode =
                 new FreezeGameMode(plugin, config.joinVerification().spectator());
         // The module's own two teleports (into the holding area and back out) announce themselves here, because the
@@ -269,7 +270,7 @@ public final class SecurityWiring {
                 kernel.messageSink(),
                 clock);
         KeypadRouter router =
-                new KeypadRouter(reauthSessions, enrolmentSessions, controller, reauthController, enrolment);
+                new KeypadRouter(reauthSessions, enrolmentSessions, sessions, controller, reauthController, enrolment);
         // The keypad renders through the menu engine: register its per-button actions (routed to whichever verify flow
         // the player is in), its masked-display / digit-label placeholders and its spec now that the router exists. The
         // close listener is the one behaviour the engine does not model: reopening the window if a still-frozen player

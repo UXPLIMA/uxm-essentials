@@ -16,14 +16,17 @@ import org.jspecify.annotations.NullMarked;
  *
  * <p>The order matters and reflects which state can coexist. Creating a PIN is checked first because a player at the
  * create pad is also join-frozen (the freeze is what holds them there), so testing the freeze first would send their
- * new PIN to be verified against the factor they do not have yet. A re-auth is only ever open when the player is not
- * join-frozen, so the remaining two never overlap.
+ * new PIN to be verified against the factor they do not have yet. The join freeze comes before a re-auth because the
+ * two can overlap: an operator can force a player back into verification while a re-auth prompt is still open, and the
+ * entry then answers the freeze. Sent to the re-auth instead, it would run the command and leave the player frozen
+ * with nothing asking them for anything.
  */
 @NullMarked
 public final class KeypadRouter implements KeypadActions {
 
     private final ReauthSessions reauthSessions;
     private final PinEnrolmentSessions enrolmentSessions;
+    private final VerificationSessions freezes;
     private final KeypadActions joinActions;
     private final KeypadActions reauthActions;
     private final KeypadActions enrolmentActions;
@@ -31,11 +34,13 @@ public final class KeypadRouter implements KeypadActions {
     public KeypadRouter(
             ReauthSessions reauthSessions,
             PinEnrolmentSessions enrolmentSessions,
+            VerificationSessions freezes,
             KeypadActions joinActions,
             KeypadActions reauthActions,
             KeypadActions enrolmentActions) {
         this.reauthSessions = Objects.requireNonNull(reauthSessions, "reauthSessions");
         this.enrolmentSessions = Objects.requireNonNull(enrolmentSessions, "enrolmentSessions");
+        this.freezes = Objects.requireNonNull(freezes, "freezes");
         this.joinActions = Objects.requireNonNull(joinActions, "joinActions");
         this.reauthActions = Objects.requireNonNull(reauthActions, "reauthActions");
         this.enrolmentActions = Objects.requireNonNull(enrolmentActions, "enrolmentActions");
@@ -54,6 +59,9 @@ public final class KeypadRouter implements KeypadActions {
     private KeypadActions actionsFor(PlayerRef viewer) {
         if (enrolmentSessions.isPending(viewer.uuid())) {
             return enrolmentActions;
+        }
+        if (freezes.isPending(viewer.uuid())) {
+            return joinActions;
         }
         return reauthSessions.isPending(viewer.uuid()) ? reauthActions : joinActions;
     }

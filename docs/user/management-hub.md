@@ -57,7 +57,7 @@ These modules have no panel of their own, so the hub has nothing to open for the
 | bossbar, nametags, tablist | What they show is set in their config files; `/bossbars` sends a one-off bar. |
 | commandcontrol, customcommands | Their rules are config files, and `/customcmd` creates and tests custom commands in chat. A custom command can open a custom menu, which the custommenus tile edits. |
 | migration | It runs `/uxmess import` once, from the console or chat. |
-| security | Its PIN keypad is the login check, shown to the player it verifies (a Bedrock player types the PIN into a prompt instead); it is not a panel to open on purpose. `/pin` and `/2fa` manage your own factors. |
+| security | Its PIN keypad is the login check, shown to the player it verifies (a Bedrock player types the PIN into a prompt instead, and that prompt shows the digits as they are typed, because neither a Bedrock form nor the anvil, sign or chat fallback can hide them); it is not a panel to open on purpose. `/pin` and `/2fa` manage your own factors. |
 | servertweaks | Its tweaks are config switches. |
 | skin | It is driven by `/skin`. |
 | vanish | Your vanish switch is on the presence tile. |

@@ -47,6 +47,8 @@ class BedrockPinScenarioTest {
     /** The small capitals the catalog writes, in alphabet order, so a letter's index is its distance from 'a'. */
     private static final String SMALL_CAPITALS = "ᴀʙᴄᴅᴇꜰɢʜɪᴊᴋʟᴍ" + "ɴᴏᴘǫʀꜱᴛᴜᴠᴡxʏᴢ";
 
+    private static final String BACKOFF = "event=security_pin_prompt_backoff";
+
     private RunningPlugin running;
 
     @BeforeAll
@@ -74,7 +76,7 @@ class BedrockPinScenarioTest {
         assertThat(said(player)).anyMatch(line -> line.contains("verified. welcome back."));
         running.run(player, "pin");
         assertThat(said(player)).anyMatch(line -> line.contains("a pin is set on your account."));
-        assertThat(running.problems()).isEmpty();
+        assertThat(otherProblems()).isEmpty();
     }
 
     @Test
@@ -88,7 +90,7 @@ class BedrockPinScenarioTest {
         assertThat(said(player)).anyMatch(line -> line.contains(VERIFY_PROMPT));
         running.chat(player, PIN);
         assertThat(said(player)).anyMatch(line -> line.contains("verified. welcome back."));
-        assertThat(running.problems()).isEmpty();
+        assertThat(otherProblems()).isEmpty();
     }
 
     @Test
@@ -124,7 +126,7 @@ class BedrockPinScenarioTest {
         assertThat(said(player)).anyMatch(line -> line.contains("pin set."));
         running.run(player, "pin");
         assertThat(said(player)).anyMatch(line -> line.contains("a pin is set on your account."));
-        assertThat(running.problems()).isEmpty();
+        assertThat(otherProblems()).isEmpty();
     }
 
     @Test
@@ -142,7 +144,43 @@ class BedrockPinScenarioTest {
         assertThat(said(player)).anyMatch(line -> line.contains(VERIFY_PROMPT));
         running.chat(player, PIN);
         assertThat(player.getGameMode()).isEqualTo(GameMode.CREATIVE);
-        assertThat(running.problems()).isEmpty();
+        assertThat(otherProblems()).isEmpty();
+    }
+
+    @Test
+    void aPromptDismissedTheMomentItOpensIsAskedAgainLessAndLessOften() {
+        ScenarioPlayer player = bedrockPlayerWithPin("Basil");
+        running.console("security force Basil");
+        RunningPlugin.said(player);
+
+        running.chat(player, "cancel");
+        assertThat(awaitPrompt(player, VERIFY_PROMPT)).isTrue();
+        running.chat(player, "cancel");
+        assertThat(awaitPrompt(player, VERIFY_PROMPT)).isTrue();
+        running.chat(player, "cancel");
+
+        assertThat(said(player)).noneMatch(line -> line.contains(VERIFY_PROMPT));
+        assertThat(awaitPrompt(player, VERIFY_PROMPT)).isTrue();
+        running.chat(player, PIN);
+        assertThat(said(player)).anyMatch(line -> line.contains("verified. welcome back."));
+        assertThat(running.problems()).anyMatch(line -> line.contains(BACKOFF));
+        assertThat(otherProblems()).isEmpty();
+    }
+
+    @Test
+    void aStillOpenReauthPromptAnsweredAfterAForcedReverifyLiftsTheFreeze() {
+        ScenarioPlayer player = bedrockPlayerWithPin("Rory");
+        player.addAttachment(running.plugin, "uxmessentials.gamemode.use", true);
+        player.addAttachment(running.plugin, "uxmessentials.bypass.security", false);
+        typeCommand(player, "/gamemode creative");
+        said(player);
+
+        running.console("security force Rory");
+        running.chat(player, PIN);
+
+        assertThat(said(player)).anyMatch(line -> line.contains("verified. welcome back."));
+        running.run(player, "pin");
+        assertThat(said(player)).anyMatch(line -> line.contains("a pin is set on your account."));
     }
 
     @Test
@@ -171,6 +209,27 @@ class BedrockPinScenarioTest {
         return RunningPlugin.said(player).stream()
                 .map(BedrockPinScenarioTest::fold)
                 .toList();
+    }
+
+    /**
+     * What the plugin warned about, less the one warning a prompt dismissed again and again rightly raises: the plugin
+     * runs once for the whole class, so that warning stays in the log for every test after the one that causes it.
+     */
+    private List<String> otherProblems() {
+        return running.problems().stream()
+                .filter(line -> !line.contains(BACKOFF))
+                .toList();
+    }
+
+    /** Lets the server run until the player is asked {@code prompt}, for at most ten game seconds. */
+    private boolean awaitPrompt(ScenarioPlayer player, String prompt) {
+        for (int second = 0; second < 10; second++) {
+            if (said(player).stream().anyMatch(line -> line.contains(prompt))) {
+                return true;
+            }
+            running.settle();
+        }
+        return false;
     }
 
     private static String fold(String line) {

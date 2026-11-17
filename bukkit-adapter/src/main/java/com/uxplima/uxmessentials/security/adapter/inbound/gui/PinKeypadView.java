@@ -1,12 +1,14 @@
 package com.uxplima.uxmessentials.security.adapter.inbound.gui;
 
 import java.nio.file.Path;
+import java.time.Duration;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.function.Predicate;
 import java.util.regex.Pattern;
@@ -82,12 +84,25 @@ public final class PinKeypadView {
 
     private static final Pattern WHITESPACE = Pattern.compile("\\s+");
 
+    /** A typed prompt gone sooner than this was most likely never on the player's screen at all. */
+    private static final Duration QUICK_CLOSE = Duration.ofSeconds(1);
+
+    /** The wait before asking again after the first quick close; it doubles with each one in a row. */
+    private static final Duration FIRST_BACKOFF = Duration.ofMillis(500);
+
+    /** The longest wait between two asks. The freeze's entry timeout still ends the whole thing. */
+    private static final Duration MAX_BACKOFF = Duration.ofSeconds(4);
+
+    /** How many quick closes in a row are a prompt that cannot be shown rather than a player in a hurry. */
+    private static final int STREAK_WORTH_LOGGING = 3;
+
     private final Menus menus;
     private final PinEntryPrompt typed;
     private final Predicate<UUID> frozen;
     private final Messages messages;
     private final VerificationFeedback feedback;
     private final Scheduler scheduler;
+    private final Logger log;
 
     /** viewer UUID -> their open keypad's viewer + totp flag; the tracking that lets closeAll close and reopen rebuild. */
     private final Map<UUID, Tracked> open = new ConcurrentHashMap<>();
@@ -116,6 +131,15 @@ public final class PinKeypadView {
 
     private final AtomicLong promptTokens = new AtomicLong();
 
+    /** viewer UUID -> when their open typed prompt was asked for, from {@link System#nanoTime}. */
+    private final Map<UUID, Long> askedAt = new ConcurrentHashMap<>();
+
+    /** viewer UUID -> how many of their typed prompts in a row closed within {@link #QUICK_CLOSE}. */
+    private final Map<UUID, Integer> quickCloses = new ConcurrentHashMap<>();
+
+    /** Whether the backoff has been logged yet; once is enough to point an operator at the input mode. */
+    private final AtomicBoolean backoffLogged = new AtomicBoolean();
+
     /** Where a typed entry goes; set by {@link #register}, because the router is built after this view. */
     private volatile @Nullable KeypadActions actions;
 
@@ -129,13 +153,15 @@ public final class PinKeypadView {
             Predicate<UUID> frozen,
             Messages messages,
             VerificationFeedback feedback,
-            Scheduler scheduler) {
+            Scheduler scheduler,
+            Logger log) {
         this.menus = Objects.requireNonNull(menus, "menus");
         this.typed = Objects.requireNonNull(typed, "typed");
         this.frozen = Objects.requireNonNull(frozen, "frozen");
         this.messages = Objects.requireNonNull(messages, "messages");
         this.feedback = Objects.requireNonNull(feedback, "feedback");
         this.scheduler = Objects.requireNonNull(scheduler, "scheduler");
+        this.log = Objects.requireNonNull(log, "log");
     }
 
     /** Register the keypad's per-button actions, its masked-display / digit-label placeholders, and the spec itself. */
@@ -256,6 +282,8 @@ public final class PinKeypadView {
         suppressReopen.clear();
         inFlight.clear();
         typing.clear();
+        askedAt.clear();
+        quickCloses.clear();
     }
 
     /** Flag the viewer's next keypad close as a deliberate handoff (to the TOTP prompt), so it is not reopened. */
@@ -325,6 +353,8 @@ public final class PinKeypadView {
         open.remove(viewer);
         inFlight.remove(viewer);
         typing.remove(viewer);
+        askedAt.remove(viewer);
+        quickCloses.remove(viewer);
     }
 
     private void show(PlayerRef viewer, boolean totpEnabled) {
@@ -351,6 +381,7 @@ public final class PinKeypadView {
         if (typing.putIfAbsent(id, token) != null) {
             return;
         }
+        askedAt.put(id, System.nanoTime());
         PinEntryPrompt.Step step = !tracked.creating()
                 ? PinEntryPrompt.Step.VERIFY
                 : tracked.confirming() ? PinEntryPrompt.Step.CONFIRM : PinEntryPrompt.Step.CREATE;
@@ -367,15 +398,52 @@ public final class PinKeypadView {
         if (!typing.remove(viewer.uuid(), token) || target == null) {
             return;
         }
+        askedAt.remove(viewer.uuid());
+        quickCloses.remove(viewer.uuid());
         // An authenticator app shows its code in two groups and a phone keyboard may add a space; neither a PIN nor a
         // code has whitespace in it, and the keypad could never have entered any.
         target.submit(player, viewer, WHITESPACE.matcher(entered).replaceAll(""));
     }
 
+    /**
+     * A typed prompt went away without an answer. Normally that is the player dismissing it and is settled like a closed
+     * window. A prompt gone within {@link #QUICK_CLOSE} of being asked for, while the player is still held, may be one
+     * the client could not show at all, and asking again at once would ask again every tick; so each such close in a
+     * row waits twice as long before the next ask, up to {@link #MAX_BACKOFF}. The freeze's entry timeout still bounds
+     * the whole wait, so a player who truly cannot answer is still let go when it runs out.
+     */
     private void typedClosed(UUID viewer, long token) {
-        if (typing.remove(viewer, token)) {
-            closed(viewer);
+        if (!typing.remove(viewer, token)) {
+            return;
         }
+        Long asked = askedAt.remove(viewer);
+        boolean quick = asked != null && System.nanoTime() - asked < QUICK_CLOSE.toNanos();
+        Tracked tracked = open.get(viewer);
+        if (!quick || tracked == null || suppressReopen.contains(viewer) || !frozen.test(viewer)) {
+            quickCloses.remove(viewer);
+            closed(viewer);
+            return;
+        }
+        int streak = quickCloses.merge(viewer, 1, Integer::sum);
+        Duration delay = backoff(streak);
+        if (streak >= STREAK_WORTH_LOGGING && backoffLogged.compareAndSet(false, true)) {
+            log.warn(
+                    "event=security_pin_prompt_backoff player={} closes_in_a_row={} delay_ms={} hint=check the input"
+                            + " mode of security.verify-pin and security.create-pin in text-input.conf",
+                    tracked.viewer().name(),
+                    streak,
+                    delay.toMillis());
+        }
+        scheduler.laterEntity(tracked.viewer(), delay, () -> {
+            if (frozen.test(viewer)) {
+                reopen(viewer);
+            }
+        });
+    }
+
+    private static Duration backoff(int streak) {
+        Duration delay = FIRST_BACKOFF.multipliedBy(1L << Math.min(streak - 1, 8));
+        return delay.compareTo(MAX_BACKOFF) > 0 ? MAX_BACKOFF : delay;
     }
 
     private void markOpening(UUID viewer) {
