@@ -103,3 +103,23 @@ VALUES ('11111111-1111-4111-8111-111111111111', NULL, 'language', 'CONSOLE', 'Co
 INSERT INTO litebans_warnings (uuid, ip, reason, banned_by_uuid, banned_by_name, time, until, silent, ipban, ipban_wildcard, active, warned)
 VALUES ('11111111-1111-4111-8111-111111111111', NULL, 'language again', 'CONSOLE', 'Console',
         1700000300000, 1700086700000, FALSE, FALSE, FALSE, TRUE, FALSE);
+
+-- Every login LiteBans saw: the account and the name it used. A rename leaves the older name behind it.
+CREATE TABLE litebans_history (
+    id BIGINT AUTO_INCREMENT PRIMARY KEY,
+    date TIMESTAMP NOT NULL,
+    name VARCHAR(16),
+    uuid VARCHAR(36),
+    ip VARCHAR(45)
+);
+
+INSERT INTO litebans_history (date, name, uuid, ip)
+    VALUES ('2023-01-01 00:00:00', 'OldGriefer', '11111111-1111-4111-8111-111111111111', '10.0.0.1');
+INSERT INTO litebans_history (date, name, uuid, ip)
+    VALUES ('2024-01-01 00:00:00', 'Griefer', '11111111-1111-4111-8111-111111111111', '10.0.0.1');
+INSERT INTO litebans_history (date, name, uuid, ip)
+    VALUES ('2024-01-01 00:00:00', '.Spammer', '22222222-2222-4222-8222-222222222222', '10.0.0.2');
+INSERT INTO litebans_history (date, name, uuid, ip)
+    VALUES ('2024-01-01 00:00:00', 'not a name', '66666666-6666-4666-8666-666666666666', '10.0.0.6');
+INSERT INTO litebans_history (date, name, uuid, ip)
+    VALUES ('2024-01-01 00:00:00', 'Ghost', '#offline#', '10.0.0.7');

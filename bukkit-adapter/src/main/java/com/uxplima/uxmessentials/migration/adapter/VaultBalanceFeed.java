@@ -1,7 +1,6 @@
 package com.uxplima.uxmessentials.migration.adapter;
 
 import java.math.BigDecimal;
-import java.util.Arrays;
 import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
@@ -19,8 +18,8 @@ import net.milkbowl.vault.economy.Economy;
 import org.jspecify.annotations.NullMarked;
 
 /**
- * Reads live balances out of the registered Vault {@link Economy} provider for the importer. Every offline
- * player Vault knows an account for, with a positive balance, becomes a balance-only {@link ImportedUser}
+ * Reads live balances out of the registered Vault {@link Economy} provider for the importer. Every account this
+ * server or the shared name list knows (see {@link FeedAccounts}) that Vault holds an account for, with a positive balance, becomes a balance-only {@link ImportedUser}
  * the writer seeds a wallet with under {@code defaultCurrency}.
  *
  * <p>This is the platform-side {@link BalanceFeed} the {@code vault} live source reads through, so the
@@ -39,10 +38,12 @@ final class VaultBalanceFeed implements BalanceFeed {
 
     private final Plugin plugin;
     private final Currency defaultCurrency;
+    private final FeedAccounts accounts;
 
-    VaultBalanceFeed(Plugin plugin, Currency defaultCurrency) {
+    VaultBalanceFeed(Plugin plugin, Currency defaultCurrency, FeedAccounts accounts) {
         this.plugin = Objects.requireNonNull(plugin, "plugin");
         this.defaultCurrency = Objects.requireNonNull(defaultCurrency, "defaultCurrency");
+        this.accounts = Objects.requireNonNull(accounts, "accounts");
     }
 
     @Override
@@ -57,13 +58,12 @@ final class VaultBalanceFeed implements BalanceFeed {
             return Stream.empty();
         }
         Economy eco = economy.get();
-        return Arrays.stream(plugin.getServer().getOfflinePlayers())
-                .map(op -> toUser(op, eco))
-                .flatMap(Optional::stream);
+        return accounts.all().map(account -> toUser(account, eco)).flatMap(Optional::stream);
     }
 
     /** Maps one offline player to a balance-only user, or empty when it has no positive Vault balance. */
-    private Optional<ImportedUser> toUser(OfflinePlayer op, Economy eco) {
+    private Optional<ImportedUser> toUser(FeedAccounts.Account account, Economy eco) {
+        OfflinePlayer op = account.player();
         if (!eco.hasAccount(op)) {
             return Optional.empty();
         }
@@ -72,7 +72,7 @@ final class VaultBalanceFeed implements BalanceFeed {
             return Optional.empty();
         }
         BigDecimal figure = defaultCurrency.normalize(BigDecimal.valueOf(balance));
-        PlayerRef owner = new PlayerRef(op.getUniqueId(), name(op));
+        PlayerRef owner = new PlayerRef(op.getUniqueId(), account.name());
         return Optional.of(new ImportedUser(owner, List.of(), Optional.of(figure), List.of()));
     }
 
@@ -88,10 +88,5 @@ final class VaultBalanceFeed implements BalanceFeed {
             return Optional.empty();
         }
         return Optional.of(eco);
-    }
-
-    private static String name(OfflinePlayer op) {
-        String name = op.getName();
-        return name != null ? name : op.getUniqueId().toString();
     }
 }

@@ -54,6 +54,7 @@ public final class AuditChannelMigrationAudit implements MigrationAudit {
     public void record(SourceId source, ImportRecord rec, RecordResult result) {
         RecordOutcome outcome = result.outcome();
         switch (rec) {
+            case ImportRecord.AccountRecord account -> recordAccount(source, account, outcome);
             case ImportRecord.UserRecord user -> recordUser(source, user, result);
             case ImportRecord.WarpRecord warp -> recordWarp(source, warp, result);
             case ImportRecord.PlayerWarpRecord warp -> recordPlayerWarp(source, warp, result);
@@ -65,6 +66,17 @@ public final class AuditChannelMigrationAudit implements MigrationAudit {
             case ImportRecord.HologramRecord hologram -> recordHologram(source, hologram, outcome);
             case ImportRecord.WorldRecord world -> recordWorld(source, world, outcome);
         }
+    }
+
+    // skipped means the name index already held the account, from a join on a server sharing this database.
+    private void recordAccount(SourceId source, ImportRecord.AccountRecord rec, RecordOutcome outcome) {
+        audit.info(
+                "event=migration_import_account source={} uuid={} name={} conflict={} ok={}",
+                source,
+                rec.account().uuid(),
+                rec.account().name(),
+                outcome.token(),
+                outcome.ok());
     }
 
     private void recordWorld(SourceId source, ImportRecord.WorldRecord rec, RecordOutcome outcome) {
@@ -220,10 +232,11 @@ public final class AuditChannelMigrationAudit implements MigrationAudit {
     @Override
     public void finish(String actor, ImportSummary summary, Duration elapsed) {
         audit.info(
-                "event=migration_import_finish actor={} source={} dry_run={} users={} warps={} kits={} jails={} mutes={} bans={} ip_bans={} warns={} skipped={} partial={} failed={} duration_ms={}",
+                "event=migration_import_finish actor={} source={} dry_run={} accounts={} users={} warps={} kits={} jails={} mutes={} bans={} ip_bans={} warns={} skipped={} partial={} failed={} duration_ms={}",
                 actor,
                 summary.source(),
                 summary.dryRun(),
+                summary.accounts(),
                 summary.users(),
                 summary.warps(),
                 summary.kits(),
