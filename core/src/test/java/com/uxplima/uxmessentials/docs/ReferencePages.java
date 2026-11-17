@@ -129,7 +129,7 @@ final class ReferencePages {
                                 + " [permissions-gameplay.md](permissions-gameplay.md), and the item and world tools"
                                 + " are in [permissions-items.md](permissions-items.md)."
                                 + EXPORT
-                                + " Every exemption starts with `uxmessentials.bypass.`; [upgrading.md](upgrading.md)"
+                                + " Every exemption starts with `uxmessentials.bypass.`; [upgrading-renames.md](upgrading-renames.md)"
                                 + " maps the earlier names. The node of the optional REST add-on is listed under"
                                 + " shared, because the add-on is a separate jar.",
                         PERMISSIONS_SERVER),
@@ -249,7 +249,7 @@ final class ReferencePages {
         out.append(elsewhere);
         out.append(" The leaderboard keys are in [reference.md](reference.md#boards). The earlier"
                 + " `%uxmessentials_<key>%` form still answers in this release and logs a warning the first time it is"
-                + " read; [upgrading.md](upgrading.md) says what to change. `/uxmess placeholders export` writes the"
+                + " read; [upgrading-renames.md](upgrading-renames.md) says what to change. `/uxmess placeholders export` writes the"
                 + " same catalogue from the running build to a file in the plugin folder.\n\n");
         out.append("| Key | Module | Value | Example | Scope |\n");
         out.append("|---|---|---|---|---|\n");

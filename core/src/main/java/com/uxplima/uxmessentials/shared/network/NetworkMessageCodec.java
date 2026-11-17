@@ -315,6 +315,7 @@ public final class NetworkMessageCodec {
                 out.writeBoolean(connected.switched());
             }
             case PlayerSkinChanged skin -> writeUuid(out, skin.player());
+            case RankActionsKept kept -> writeUuid(out, kept.player());
         }
     }
 
@@ -420,6 +421,7 @@ public final class NetworkMessageCodec {
                 new ProxyConnectionFrame(
                         origin, readUuid(in), readUuid(in), readUuid(in), in.readUTF(), in.readBoolean());
             case PLAYER_SKIN_CHANGED -> new PlayerSkinChanged(origin, readUuid(in));
+            case RANK_ACTIONS_KEPT -> new RankActionsKept(origin, readUuid(in));
         };
     }
 

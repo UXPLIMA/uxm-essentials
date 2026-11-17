@@ -22,9 +22,9 @@ import com.uxplima.uxmessentials.npc.domain.NpcName;
 import com.uxplima.uxmessentials.shared.adapter.outbound.BukkitRefs;
 import com.uxplima.uxmessentials.shared.adapter.outbound.action.ClickActionRunner;
 import com.uxplima.uxmessentials.shared.adapter.outbound.action.ClickCommandRunner;
+import com.uxplima.uxmessentials.shared.adapter.outbound.action.ResolvedNameFill;
 import com.uxplima.uxmessentials.shared.application.port.Logger;
 import com.uxplima.uxmessentials.shared.application.port.Scheduler;
-import com.uxplima.uxmlib.condition.action.NameFill;
 import org.jspecify.annotations.NullMarked;
 
 /**
@@ -173,7 +173,7 @@ public final class NpcInteractionListener implements Listener {
     }
 
     private void run(Player player, String rawCommand) {
-        Optional<String> filled = NameFill.into(rawCommand, player.getName());
+        Optional<String> filled = ResolvedNameFill.into(rawCommand, player.getName());
         if (filled.isEmpty()) {
             log.warn("event=npc_command_skipped player={} reason=not_an_account_name", player.getUniqueId());
             return;
