@@ -316,6 +316,7 @@ public final class NetworkMessageCodec {
             }
             case PlayerSkinChanged skin -> writeUuid(out, skin.player());
             case RankActionsKept kept -> writeUuid(out, kept.player());
+            case InventoryRestoreKept kept -> writeUuid(out, kept.player());
         }
     }
 
@@ -422,6 +423,7 @@ public final class NetworkMessageCodec {
                         origin, readUuid(in), readUuid(in), readUuid(in), in.readUTF(), in.readBoolean());
             case PLAYER_SKIN_CHANGED -> new PlayerSkinChanged(origin, readUuid(in));
             case RANK_ACTIONS_KEPT -> new RankActionsKept(origin, readUuid(in));
+            case INVENTORY_RESTORE_KEPT -> new InventoryRestoreKept(origin, readUuid(in));
         };
     }
 

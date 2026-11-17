@@ -124,6 +124,14 @@ player's next join, where it used to lose them. See [trade.md](trade.md#items-ke
 The update adds the `rank_pending_actions` table; nothing needs editing. Rank actions now take `{uuid}`: hand a
 permission plugin `{uuid}` rather than `{player}`, as `ranks.conf` shows.
 
+## Inventory restores wait for a player who is not here
+
+The update adds the `inv_pending_restores` table; nothing needs editing. A restore staff choose in `/invrestore` for
+a player who is offline, or on another server, is now kept and put on the player as they next join, or at once by
+the server they are on, with the same safety snapshot first. It used to answer that the player was not online.
+Upgrade every server that shares the database in the same window: an older server neither applies a kept restore nor
+announces one.
+
 ## Velocity bus frames need a shared secret
 
 A network on `network.transport = "velocity"` or `"both"` now signs every frame it sends through the proxy, so a

@@ -1738,7 +1738,7 @@ public final class PluginModule {
         } else if (module.id().equals(ModuleId.of("villagers"))) {
             wireVillagers(plugin, ctx, resources, links, guiRegistry, menus, menuBindings);
         } else if (module.id().equals(ModuleId.of("invrollback"))) {
-            wireInvrollback(plugin, ctx, persistence, resources, links, guiRegistry, menus, menuBindings);
+            wireInvrollback(plugin, ctx, persistence, resources, links, bus, guiRegistry, menus, menuBindings);
         } else if (module.id().equals(ModuleId.of("guard"))) {
             wireGuard(plugin, ctx, persistence, resources, links, bus, guiRegistry, menus, menuBindings);
         } else if (module.id().equals(ModuleId.of("servertweaks"))) {
@@ -1868,6 +1868,7 @@ public final class PluginModule {
             Persistence persistence,
             CloseableResources resources,
             ContextLinks links,
+            Bus bus,
             ManagementGuiRegistry guiRegistry,
             Menus menus,
             MenuBindings menuBindings) {
@@ -1882,7 +1883,12 @@ public final class PluginModule {
         // state is the repeating retention sweep, cancelled through the Wired stop hook so a disable/reload strands no
         // scheduled work; a disabled module wires none of this.
         InvrollbackWiring.Wired wired = InvrollbackWiring.wire(
-                ctx, persistence, menus, menuBindings, plugin.getDataFolder().toPath());
+                ctx,
+                persistence,
+                bus,
+                menus,
+                menuBindings,
+                plugin.getDataFolder().toPath());
         wired.listeners().forEach(resources::addListener);
         wired.commands().forEach(resources::addCommand);
         resources.onClose(wired.stop());
