@@ -119,6 +119,11 @@ shared database; nothing needs editing. A same-server trade that cannot hand a p
 mid-trade, or because the server stopped with the trade open, now keeps them there and gives them back on that
 player's next join, where it used to lose them. See [trade.md](trade.md#items-kept-for-the-next-join).
 
+## Rank actions wait for a player who is not here
+
+The update adds the `rank_pending_actions` table; nothing needs editing. Rank actions now take `{uuid}`: hand a
+permission plugin `{uuid}` rather than `{player}`, as `ranks.conf` shows.
+
 ## Velocity bus frames need a shared secret
 
 A network on `network.transport = "velocity"` or `"both"` now signs every frame it sends through the proxy, so a

@@ -36,7 +36,7 @@ The periods are `alltime`, `monthly`, `weekly` and `daily`. `playtime`, `trades`
 |---|---|
 | `top_<board>_<period>_<n>_name` | The name at place n, or the word for nobody. |
 | `top_<board>_<period>_<n>_value` | The value at place n as the board shows it (a time as `1d 2h 3m`, a balance with its symbol, a count), or the word for none. |
-| `top_<board>_<period>_<n>_head` | The player at place n for a `<head:...>` tag: their name, or their uuid when an account cannot have that name; the `leaderboard.empty-head` for a place nobody holds. |
+| `top_<board>_<period>_<n>_head` | The player at place n for a `<head:...>` tag: their name, or their uuid when an account cannot have that name. An offline-mode or Bedrock account, which Mojang would draw as a stranger who owns the name, and a place nobody holds read the `leaderboard.empty-head`. |
 | `rank_<board>_<period>` | The reader's own place, or the word for none. |
 | `value_<board>_<period>` | The reader's own value. |
 | `resets_<period>` | The time until a period starts again, in the reader's words (`4d 1h`, `1h 30m`, `12m`), or the word for none for `alltime`. |

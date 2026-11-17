@@ -4,9 +4,7 @@ import java.util.Map;
 import java.util.Optional;
 
 import org.bukkit.Material;
-import org.bukkit.OfflinePlayer;
 import org.bukkit.entity.Player;
-import org.bukkit.inventory.ItemStack;
 
 import io.papermc.paper.command.brigadier.CommandSourceStack;
 import io.papermc.paper.command.brigadier.Commands;
@@ -20,7 +18,10 @@ import com.uxplima.uxmessentials.itemworld.domain.ItemworldMessageKey;
 import com.uxplima.uxmessentials.itemworld.domain.SubFeatureGroup;
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandRegistration;
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandSuggestions;
+import com.uxplima.uxmessentials.shared.adapter.outbound.skin.HeadTextures;
 import com.uxplima.uxmessentials.shared.application.permission.ItemworldPermissions;
+import com.uxplima.uxmessentials.shared.domain.PlayerRef;
+import com.uxplima.uxmessentials.shared.domain.SkinTexture;
 import com.uxplima.uxmlib.command.Gate;
 import com.uxplima.uxmlib.item.ItemBuilder;
 import com.uxplima.uxmlib.item.SkullData;
@@ -28,8 +29,9 @@ import org.jspecify.annotations.NullMarked;
 
 /**
  * {@code /skull [player]}: get a player-head skull. The named player's head, or the sender's own when no name
- * is given. The owning profile is resolved by name off the region thread; the skull is added to the player's
- * inventory on their region thread and reported through {@link ItemworldMessageKey#SKULL_GIVEN}.
+ * is given. The head wears the skin its owner wears here (see {@link HeadTextures}), resolved off the region thread;
+ * the skull is added to the player's inventory on their region thread and reported through
+ * {@link ItemworldMessageKey#SKULL_GIVEN}.
  */
 @NullMarked
 public final class SkullCommand extends ItemworldCommandSupport implements CommandRegistration {
@@ -69,20 +71,47 @@ public final class SkullCommand extends ItemworldCommandSupport implements Comma
     }
 
     private void give(CommandContext<CommandSourceStack> ctx, Player player, String owner) {
-        // getOfflinePlayer(String) is a blocking call on an online-mode server: an uncached name costs a Mojang
-        // round-trip, and running that where the command lands would stall the tick for the length of it. So the
-        // lookup goes to the async pool and only the resolved UUID comes back. (On an offline-mode server the same
-        // call derives the UUID from the name locally, so this costs nothing there.)
+        // The name is resolved through the plugin's own index, so an offline-mode or Bedrock account is found under
+        // the name it joined with. The stored skin and Mojang are a database read and a web call: both on the async
+        // lane. An owner online here is read off their own profile, on their own thread.
         services.kernel().scheduler().async(() -> {
-            OfflinePlayer profile = player.getServer().getOfflinePlayer(owner); // allow-blocking: on the async pool
-            java.util.UUID id = profile.getUniqueId();
-            services.kernel().scheduler().onEntity(ref(player), () -> {
-                ItemStack head = ItemBuilder.of(Material.PLAYER_HEAD)
-                        .skull(SkullData.ofUuid(id))
-                        .build();
-                player.getInventory().addItem(head);
-                reply(ctx, ItemworldMessageKey.SKULL_GIVEN, Map.of("player", owner));
-            });
+            Optional<PlayerRef> known = services.kernel().playerLookup().findByName(owner);
+            if (known.isEmpty()) {
+                hand(ctx, player, owner, services.heads().unknown(owner));
+                return;
+            }
+            PlayerRef account = known.get();
+            if (services.kernel().playerLookup().isOnline(account.uuid())) {
+                services.kernel().scheduler().onEntity(account, () -> handWorn(ctx, player, account));
+                return;
+            }
+            hand(ctx, player, account.name(), services.heads().of(account));
+        });
+    }
+
+    /** On the owner's own thread: the skin on their live profile, or the stored one if they left meanwhile. */
+    private void handWorn(CommandContext<CommandSourceStack> ctx, Player player, PlayerRef account) {
+        Player online = player.getServer().getPlayer(account.uuid());
+        if (online == null) {
+            services.kernel()
+                    .scheduler()
+                    .async(() ->
+                            hand(ctx, player, account.name(), services.heads().of(account)));
+            return;
+        }
+        hand(ctx, player, account.name(), HeadTextures.worn(online.getPlayerProfile()));
+    }
+
+    /** Put the head on the player's own thread: drawn from {@code texture}, or the plain head when there is none. */
+    private void hand(
+            CommandContext<CommandSourceStack> ctx, Player player, String owner, Optional<SkinTexture> texture) {
+        services.kernel().scheduler().onEntity(ref(player), () -> {
+            ItemBuilder head = ItemBuilder.of(Material.PLAYER_HEAD);
+            if (texture.isPresent()) {
+                head = head.skull(SkullData.ofTexture(texture.get().value()));
+            }
+            player.getInventory().addItem(head.build());
+            reply(ctx, ItemworldMessageKey.SKULL_GIVEN, Map.of("player", owner));
         });
     }
 }

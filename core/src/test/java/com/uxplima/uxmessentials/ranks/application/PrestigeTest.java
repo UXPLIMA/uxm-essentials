@@ -49,6 +49,7 @@ class PrestigeTest {
     private final CachedPlayerRankRepository cache = new CachedPlayerRankRepository(rows, scheduler, log);
     private final Requirements requirements = new Requirements(scheduler);
     private final Actions actions = new Actions();
+    private final InMemoryPendingRankActions pending = new InMemoryPendingRankActions();
     private final Purse purse = new Purse();
     private final Owed owed = new Owed();
     private final RecordingEvents events = new RecordingEvents();
@@ -57,7 +58,7 @@ class PrestigeTest {
             cache,
             LADDER,
             requirements,
-            actions,
+            new RankActions(actions, pending, scheduler, log),
             Optional.of(purse),
             Optional.of(owed),
             SETTINGS,
@@ -204,7 +205,7 @@ class PrestigeTest {
     }
 
     @Test
-    void aPlayerWhoLeavesWhileSavingKeepsTheLevelWithoutActions() {
+    void aPlayerWhoLeavesWhileSavingKeepsTheLevelAndItsActionsForTheirNextJoin() {
         purse.balance = 100;
         onTopRank(ALEX);
 
@@ -214,6 +215,7 @@ class PrestigeTest {
 
         assertThat(result.join().status()).isEqualTo(Status.PRESTIGED);
         assertThat(actions.ran).isEmpty();
+        assertThat(pending.keptFor(ALEX.uuid())).containsExactly("message prestiged");
         assertThat(events.published()).hasSize(1);
     }
 
@@ -323,8 +325,9 @@ class PrestigeTest {
         final List<String> ran = new ArrayList<>();
 
         @Override
-        public void run(PlayerRef who, List<String> actionLines) {
+        public boolean run(PlayerRef who, List<String> actionLines) {
             ran.addAll(actionLines);
+            return true;
         }
     }
 

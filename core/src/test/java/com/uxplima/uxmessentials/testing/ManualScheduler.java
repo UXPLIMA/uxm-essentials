@@ -74,6 +74,11 @@ public final class ManualScheduler implements Scheduler {
         gone.add(who.uuid());
     }
 
+    /** Treat {@code who} as back: their entity hops run again. */
+    public void arrive(PlayerRef who) {
+        gone.remove(who.uuid());
+    }
+
     @Override
     public void onGlobal(Runnable task) {
         task.run();

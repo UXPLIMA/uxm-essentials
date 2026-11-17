@@ -11,10 +11,10 @@ import com.uxplima.uxmessentials.kits.application.port.KitActionRunner;
 import com.uxplima.uxmessentials.kits.domain.KitAction;
 import com.uxplima.uxmessentials.kits.domain.KitActionType;
 import com.uxplima.uxmessentials.kits.domain.KitDefinition;
+import com.uxplima.uxmessentials.shared.adapter.outbound.action.ResolvedNameFill;
 import com.uxplima.uxmessentials.shared.application.port.Logger;
 import com.uxplima.uxmessentials.shared.application.port.Scheduler;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
-import com.uxplima.uxmlib.condition.action.NameFill;
 import org.jspecify.annotations.NullMarked;
 
 /**
@@ -144,7 +144,7 @@ public final class BukkitKitActionRunner implements KitActionRunner {
      * line names the player and the name is not one an account could have, which is a line that must not run.
      */
     private static Optional<String> filled(String raw, PlayerRef who, KitDefinition kit) {
-        return NameFill.into(raw, who.name())
+        return ResolvedNameFill.into(raw, who.name())
                 .map(line -> line.replace("%kit%", kit.id().value())
                         .replace("{kit}", kit.id().value()));
     }

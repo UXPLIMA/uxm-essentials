@@ -15,6 +15,8 @@ import org.bukkit.event.player.PlayerQuitEvent;
 
 import com.destroystokyo.paper.event.player.PlayerConnectionCloseEvent;
 import com.uxplima.uxmessentials.ranks.application.CachedPlayerRankRepository;
+import com.uxplima.uxmessentials.ranks.application.RankActions;
+import com.uxplima.uxmessentials.shared.adapter.outbound.BukkitRefs;
 import com.uxplima.uxmessentials.shared.application.port.PlayerLookup;
 import org.jspecify.annotations.NullMarked;
 
@@ -24,6 +26,8 @@ import org.jspecify.annotations.NullMarked;
  * without a slow database ever holding a login. The join loads again on the async lane only when the pre-login read
  * did not land. A connection that passed the pre-login but closes without joining (a configuration-phase drop, a
  * refused resource pack, a timeout, a refused login) gets no quit event, so the connection close forgets it too.
+ *
+ * <p>A join also runs the rank actions kept for the player while they were not here, on whichever server they join.
  */
 @NullMarked
 public final class RankCacheListener implements Listener {
@@ -32,17 +36,23 @@ public final class RankCacheListener implements Listener {
     private static final Duration PRELOGIN_WAIT = Duration.ofMillis(1500);
 
     private final CachedPlayerRankRepository cache;
+    private final RankActions actions;
     private final PlayerLookup players;
 
-    public RankCacheListener(CachedPlayerRankRepository cache, PlayerLookup players) {
+    public RankCacheListener(CachedPlayerRankRepository cache, RankActions actions, PlayerLookup players) {
         this.cache = Objects.requireNonNull(cache, "cache");
+        this.actions = Objects.requireNonNull(actions, "actions");
         this.players = Objects.requireNonNull(players, "players");
     }
 
-    /** Load every player already online, for a module enabled or reloaded while they play. */
+    /**
+     * Load every player already online, for a module enabled or reloaded while they play, and run what was kept for
+     * them while the module was off.
+     */
     public void loadOnline(Collection<? extends Player> players) {
         for (Player player : players) {
             cache.join(player.getUniqueId());
+            actions.joined(BukkitRefs.toRef(player));
         }
     }
 
@@ -58,6 +68,12 @@ public final class RankCacheListener implements Listener {
     @EventHandler(priority = EventPriority.LOWEST)
     public void onJoin(PlayerJoinEvent event) {
         cache.join(event.getPlayer().getUniqueId());
+    }
+
+    // MONITOR so the kept actions run once every other plugin, a permission plugin above all, has the player loaded.
+    @EventHandler(priority = EventPriority.MONITOR)
+    public void onJoined(PlayerJoinEvent event) {
+        actions.joined(BukkitRefs.toRef(event.getPlayer()));
     }
 
     @EventHandler(priority = EventPriority.MONITOR)
