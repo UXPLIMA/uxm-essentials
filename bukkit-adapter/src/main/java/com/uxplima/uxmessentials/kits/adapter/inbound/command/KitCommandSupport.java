@@ -10,7 +10,6 @@ import org.bukkit.entity.Player;
 
 import io.papermc.paper.command.brigadier.CommandSourceStack;
 import io.papermc.paper.command.brigadier.Commands;
-import io.papermc.paper.command.brigadier.argument.ArgumentTypes;
 import io.papermc.paper.command.brigadier.argument.resolvers.selector.PlayerSelectorArgumentResolver;
 
 import com.mojang.brigadier.builder.RequiredArgumentBuilder;
@@ -21,6 +20,7 @@ import com.uxplima.uxmessentials.kits.adapter.outbound.KitItemCodec;
 import com.uxplima.uxmessentials.kits.domain.KitItem;
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandFeedback;
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandSuggestions;
+import com.uxplima.uxmessentials.shared.adapter.inbound.command.PlayerArgument;
 import com.uxplima.uxmessentials.shared.adapter.outbound.BukkitRefs;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
@@ -78,17 +78,16 @@ abstract class KitCommandSupport {
 
     /**
      * Resolve the {@code player} selector argument to the first matched online player, reporting unknown-player
-     * to {@code sender} when nothing matches. The argument is an
-     * {@link io.papermc.paper.command.brigadier.argument.ArgumentTypes#player()} selector, so a name,
+     * to {@code sender} when nothing matches. The argument is a {@link PlayerArgument#player()}, so a name,
      * {@code @p}, {@code @s}, or {@code @r} all resolve here, and a match is always an online player (the PDC
-     * a kit stamp or give touches must be loaded).
+     * a kit stamp or give touches must be loaded). A player on another server is named as being there.
      */
     final Optional<PlayerRef> resolveSelectorTarget(CommandContext<CommandSourceStack> ctx, CommandSender sender) {
         try {
             PlayerSelectorArgumentResolver resolver = ctx.getArgument("player", PlayerSelectorArgumentResolver.class);
             List<Player> resolved = resolver.resolve(ctx.getSource());
             if (resolved.isEmpty()) {
-                unknownPlayer(sender, typedTarget(ctx));
+                feedback.send(sender, PlayerArgument.miss(ctx, "player", UNKNOWN_PLAYER));
                 return Optional.empty();
             }
             return Optional.of(ref(resolved.get(0)));
@@ -101,7 +100,7 @@ abstract class KitCommandSupport {
     /** A {@code player} selector argument, accepting a name or {@code @p}/{@code @s}/{@code @r}. */
     static RequiredArgumentBuilder<CommandSourceStack, PlayerSelectorArgumentResolver> playerSelectorArgument(
             String argName) {
-        return Commands.argument(argName, ArgumentTypes.player()).suggests(CommandSuggestions.singlePlayerTarget());
+        return Commands.argument(argName, PlayerArgument.player()).suggests(CommandSuggestions.singlePlayerTarget());
     }
 
     /** A {@link PlayerRef} for the live player. */

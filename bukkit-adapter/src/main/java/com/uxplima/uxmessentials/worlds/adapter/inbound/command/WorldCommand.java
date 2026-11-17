@@ -16,7 +16,6 @@ import org.bukkit.entity.Player;
 
 import io.papermc.paper.command.brigadier.CommandSourceStack;
 import io.papermc.paper.command.brigadier.Commands;
-import io.papermc.paper.command.brigadier.argument.ArgumentTypes;
 import io.papermc.paper.command.brigadier.argument.resolvers.selector.PlayerSelectorArgumentResolver;
 
 import com.mojang.brigadier.Command;
@@ -30,12 +29,14 @@ import com.mojang.brigadier.exceptions.CommandSyntaxException;
 import com.mojang.brigadier.tree.LiteralCommandNode;
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandRegistration;
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandSuggestions;
+import com.uxplima.uxmessentials.shared.adapter.inbound.command.PlayerArgument;
 import com.uxplima.uxmessentials.shared.application.permission.DestinationPermissions;
 import com.uxplima.uxmessentials.shared.application.permission.PlayerstatePermissions;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmessentials.shared.domain.Position;
 import com.uxplima.uxmessentials.shared.domain.WorldRef;
+import com.uxplima.uxmessentials.shared.domain.message.SharedMessageKey;
 import com.uxplima.uxmessentials.worlds.adapter.WorldsServices;
 import com.uxplima.uxmessentials.worlds.application.ListWorlds;
 import com.uxplima.uxmessentials.worlds.domain.BackupId;
@@ -150,7 +151,7 @@ public final class WorldCommand extends WorldCommandSupport implements CommandRe
                         .requires(p(TP))
                         .then(destinationArg()
                                 .executes(this::runTpSelf)
-                                .then(Commands.argument("player", ArgumentTypes.player())
+                                .then(Commands.argument("player", PlayerArgument.player())
                                         .suggests(CommandSuggestions.singlePlayerTarget())
                                         .requires(p(TP_OTHERS))
                                         .executes(this::runTpOther))))
@@ -680,6 +681,7 @@ public final class WorldCommand extends WorldCommandSupport implements CommandRe
         CommandSender sender = Sender.audience(ctx.getSource());
         Optional<Player> target = resolveTarget(ctx);
         if (target.isEmpty()) {
+            feedback.send(sender, PlayerArgument.miss(ctx, "player", SharedMessageKey.COMMAND_UNKNOWN_PLAYER));
             return 0;
         }
         Destination destination = parseDestination(sender, ctx.getArgument("name", String.class));
@@ -829,10 +831,14 @@ public final class WorldCommand extends WorldCommandSupport implements CommandRe
     }
 
     /** Resolve the {@code player} selector to a single target, or empty (no online match) for the actor. */
-    private Optional<Player> resolveTarget(CommandContext<CommandSourceStack> ctx) throws CommandSyntaxException {
-        PlayerSelectorArgumentResolver resolver = ctx.getArgument("player", PlayerSelectorArgumentResolver.class);
-        List<Player> resolved = resolver.resolve(ctx.getSource());
-        return resolved.isEmpty() ? Optional.empty() : Optional.of(resolved.get(0));
+    private Optional<Player> resolveTarget(CommandContext<CommandSourceStack> ctx) {
+        try {
+            PlayerSelectorArgumentResolver resolver = ctx.getArgument("player", PlayerSelectorArgumentResolver.class);
+            List<Player> resolved = resolver.resolve(ctx.getSource());
+            return resolved.isEmpty() ? Optional.empty() : Optional.of(resolved.get(0));
+        } catch (CommandSyntaxException unmatched) {
+            return Optional.empty();
+        }
     }
 
     private int mutate(CommandContext<CommandSourceStack> ctx, Mutation mutation) {

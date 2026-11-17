@@ -179,6 +179,7 @@ import com.uxplima.uxmessentials.shared.adapter.inbound.command.GateBinding;
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.GuiRootBinding;
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.LocaleBinding;
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.LocalizedCommandVisibilityListener;
+import com.uxplima.uxmessentials.shared.adapter.inbound.command.PlayerArgument;
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.UsageBinding;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.EntityListLayout;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.GuiLayouts;
@@ -581,6 +582,9 @@ public final class PluginModule {
                 kernel.scheduler(),
                 kernel.log());
         resources.onClose(networkPresence::stop);
+        // A typed player argument is matched through the lookup's name rules and, for a player not here, the roster.
+        PlayerArgument.bind(kernel.playerLookup(), networkPresence.presence());
+        resources.onClose(PlayerArgument::unbind);
         resources.addListener(new NetworkPresenceListener(networkPresence.track()));
         for (Player online : plugin.getServer().getOnlinePlayers()) {
             networkPresence

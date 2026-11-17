@@ -1,6 +1,5 @@
 package com.uxplima.uxmessentials.teleport.adapter.inbound.command;
 
-import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
 
@@ -8,8 +7,6 @@ import org.bukkit.entity.Player;
 
 import io.papermc.paper.command.brigadier.CommandSourceStack;
 import io.papermc.paper.command.brigadier.Commands;
-import io.papermc.paper.command.brigadier.argument.ArgumentTypes;
-import io.papermc.paper.command.brigadier.argument.resolvers.selector.PlayerSelectorArgumentResolver;
 
 import com.mojang.brigadier.Command;
 import com.mojang.brigadier.context.CommandContext;
@@ -17,9 +14,11 @@ import com.mojang.brigadier.exceptions.CommandSyntaxException;
 import com.mojang.brigadier.tree.LiteralCommandNode;
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandRegistration;
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandSuggestions;
+import com.uxplima.uxmessentials.shared.adapter.inbound.command.PlayerArgument;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmessentials.shared.domain.Result;
+import com.uxplima.uxmessentials.shared.domain.message.SharedMessageKey;
 import com.uxplima.uxmessentials.teleport.adapter.TeleportRefs;
 import com.uxplima.uxmessentials.teleport.adapter.TeleportServices;
 import com.uxplima.uxmessentials.teleport.domain.RequestDirection;
@@ -60,7 +59,7 @@ public final class TpaRequestCommand extends TeleportCommandSupport implements C
     public LiteralCommandNode<CommandSourceStack> build() {
         return Commands.literal(literal)
                 .requires(Gate.permission(permission))
-                .then(Commands.argument("player", ArgumentTypes.player())
+                .then(Commands.argument("player", PlayerArgument.player())
                         .suggests(CommandSuggestions.singlePlayerTarget())
                         .executes(this::run))
                 .build();
@@ -86,8 +85,10 @@ public final class TpaRequestCommand extends TeleportCommandSupport implements C
                 return Command.SINGLE_SUCCESS;
             }
         }
-        resolved = resolveTarget(ctx);
+        resolved = resolveHere(ctx, "player");
         if (resolved.isEmpty()) {
+            services.notifier()
+                    .send(ref(sender), PlayerArgument.miss(ctx, "player", SharedMessageKey.COMMAND_UNKNOWN_PLAYER));
             return 0;
         }
         Player targetPlayer = resolved.get();
@@ -109,11 +110,5 @@ public final class TpaRequestCommand extends TeleportCommandSupport implements C
         services.scheduler()
                 .onEntity(
                         target, () -> services.acceptTeleport().accept(target, TeleportRefs.positionOf(targetPlayer)));
-    }
-
-    private Optional<Player> resolveTarget(CommandContext<CommandSourceStack> ctx) throws CommandSyntaxException {
-        PlayerSelectorArgumentResolver resolver = ctx.getArgument("player", PlayerSelectorArgumentResolver.class);
-        List<Player> resolved = resolver.resolve(ctx.getSource());
-        return resolved.isEmpty() ? Optional.empty() : Optional.of(resolved.get(0));
     }
 }

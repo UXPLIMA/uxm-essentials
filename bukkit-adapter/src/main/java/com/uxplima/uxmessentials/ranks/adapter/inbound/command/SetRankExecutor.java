@@ -10,7 +10,6 @@ import org.bukkit.entity.Player;
 
 import io.papermc.paper.command.brigadier.CommandSourceStack;
 import io.papermc.paper.command.brigadier.Commands;
-import io.papermc.paper.command.brigadier.argument.ArgumentTypes;
 import io.papermc.paper.command.brigadier.argument.resolvers.selector.PlayerSelectorArgumentResolver;
 
 import com.mojang.brigadier.Command;
@@ -24,6 +23,7 @@ import com.uxplima.uxmessentials.ranks.domain.RankLadder;
 import com.uxplima.uxmessentials.ranks.domain.RanksMessageKey;
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandFeedback;
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandSuggestions;
+import com.uxplima.uxmessentials.shared.adapter.inbound.command.PlayerArgument;
 import com.uxplima.uxmessentials.shared.adapter.outbound.BukkitRefs;
 import com.uxplima.uxmessentials.shared.application.port.Logger;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
@@ -65,7 +65,7 @@ final class SetRankExecutor {
 
     /** A fresh {@code <player> <rank>} argument subtree, wired with target/rank suggestions and the set executor. */
     ArgumentBuilder<CommandSourceStack, ?> arguments() {
-        return Commands.argument("player", ArgumentTypes.player())
+        return Commands.argument("player", PlayerArgument.player())
                 .suggests(CommandSuggestions.singlePlayerTarget())
                 .then(Commands.argument("rank", Args.token())
                         .suggests(CommandSuggestions.fromStrings(this::rankIds))
@@ -122,12 +122,12 @@ final class SetRankExecutor {
             PlayerSelectorArgumentResolver resolver = ctx.getArgument("player", PlayerSelectorArgumentResolver.class);
             List<Player> resolved = resolver.resolve(ctx.getSource());
             if (resolved.isEmpty()) {
-                feedback.send(sender, SharedMessageKey.COMMAND_UNKNOWN_PLAYER);
+                feedback.send(sender, PlayerArgument.miss(ctx, "player", SharedMessageKey.COMMAND_UNKNOWN_PLAYER));
                 return Optional.empty();
             }
             return Optional.of(BukkitRefs.toRef(resolved.get(0)));
         } catch (CommandSyntaxException unmatched) {
-            feedback.send(sender, SharedMessageKey.COMMAND_UNKNOWN_PLAYER);
+            feedback.send(sender, PlayerArgument.miss(ctx, "player", SharedMessageKey.COMMAND_UNKNOWN_PLAYER));
             return Optional.empty();
         }
     }

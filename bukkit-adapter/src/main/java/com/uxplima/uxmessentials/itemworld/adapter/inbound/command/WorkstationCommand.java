@@ -8,7 +8,6 @@ import org.bukkit.entity.Player;
 
 import io.papermc.paper.command.brigadier.CommandSourceStack;
 import io.papermc.paper.command.brigadier.Commands;
-import io.papermc.paper.command.brigadier.argument.ArgumentTypes;
 import io.papermc.paper.command.brigadier.argument.resolvers.selector.PlayerSelectorArgumentResolver;
 
 import com.mojang.brigadier.Command;
@@ -20,7 +19,9 @@ import com.uxplima.uxmessentials.itemworld.domain.ItemworldMessageKey;
 import com.uxplima.uxmessentials.itemworld.domain.SubFeatureGroup;
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandRegistration;
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandSuggestions;
+import com.uxplima.uxmessentials.shared.adapter.inbound.command.PlayerArgument;
 import com.uxplima.uxmessentials.shared.application.permission.ItemworldPermissions;
+import com.uxplima.uxmessentials.shared.domain.message.MessageLine;
 import com.uxplima.uxmessentials.shared.domain.message.SharedMessageKey;
 import com.uxplima.uxmlib.command.Gate;
 import org.jspecify.annotations.NullMarked;
@@ -61,7 +62,7 @@ public final class WorkstationCommand extends ItemworldCommandSupport implements
         return Commands.literal(literal())
                 .requires(Gate.permission(station.permission()))
                 .executes(this::run)
-                .then(Commands.argument("player", ArgumentTypes.player())
+                .then(Commands.argument("player", PlayerArgument.player())
                         .suggests(CommandSuggestions.singlePlayerTarget())
                         .executes(this::run))
                 .build();
@@ -110,7 +111,8 @@ public final class WorkstationCommand extends ItemworldCommandSupport implements
         }
         Optional<Player> target = resolveTarget(ctx, selector);
         if (target.isEmpty()) {
-            reply(ctx, SharedMessageKey.COMMAND_UNKNOWN_PLAYER, Map.of("player", typedTarget(ctx)));
+            MessageLine miss = PlayerArgument.miss(ctx, "player", SharedMessageKey.COMMAND_UNKNOWN_PLAYER);
+            reply(ctx, miss.key(), miss.args());
             return;
         }
         Player other = target.get();
@@ -142,14 +144,5 @@ public final class WorkstationCommand extends ItemworldCommandSupport implements
             // rejection by the caller, never as a raw Brigadier parse error.
             return Optional.empty();
         }
-    }
-
-    /** The raw text the sender typed for the {@code player} argument, for the unknown-player rejection. */
-    private static String typedTarget(CommandContext<CommandSourceStack> ctx) {
-        return ctx.getNodes().stream()
-                .filter(node -> "player".equals(node.getNode().getName()))
-                .findFirst()
-                .map(node -> node.getRange().get(ctx.getInput()))
-                .orElse("");
     }
 }

@@ -14,7 +14,6 @@ import org.bukkit.entity.Player;
 
 import io.papermc.paper.command.brigadier.CommandSourceStack;
 import io.papermc.paper.command.brigadier.Commands;
-import io.papermc.paper.command.brigadier.argument.ArgumentTypes;
 import io.papermc.paper.command.brigadier.argument.resolvers.selector.PlayerSelectorArgumentResolver;
 
 import com.mojang.brigadier.Command;
@@ -32,6 +31,7 @@ import com.uxplima.uxmessentials.customcommands.domain.CustomCommandsMessageKey;
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandFeedback;
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandRegistration;
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandSuggestions;
+import com.uxplima.uxmessentials.shared.adapter.inbound.command.PlayerArgument;
 import com.uxplima.uxmessentials.shared.application.permission.ContentPermissions;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
 import com.uxplima.uxmessentials.shared.application.port.Scheduler;
@@ -105,7 +105,7 @@ public final class CustomCommandCommand implements CommandRegistration {
                 .then(Commands.literal("run")
                         .then(idArgument()
                                 .executes(this::runForSelf)
-                                .then(Commands.argument("player", ArgumentTypes.player())
+                                .then(Commands.argument("player", PlayerArgument.player())
                                         .executes(this::runForOther))))
                 .build();
     }
@@ -263,7 +263,7 @@ public final class CustomCommandCommand implements CommandRegistration {
         PlayerSelectorArgumentResolver resolver = ctx.getArgument("player", PlayerSelectorArgumentResolver.class);
         List<Player> resolved = resolver.resolve(ctx.getSource());
         if (resolved.isEmpty()) {
-            feedback.send(sender, SharedMessageKey.COMMAND_UNKNOWN_PLAYER, Map.of("player", typedTarget(ctx)));
+            feedback.send(sender, PlayerArgument.miss(ctx, "player", SharedMessageKey.COMMAND_UNKNOWN_PLAYER));
             return 0;
         }
         Player target = resolved.get(0);
@@ -330,14 +330,5 @@ public final class CustomCommandCommand implements CommandRegistration {
     private int notFound(CommandSender sender, String id) {
         feedback.send(sender, CustomCommandsMessageKey.CUSTOMCOMMAND_NOT_FOUND, Map.of("id", id));
         return 0;
-    }
-
-    /** The target exactly as the sender typed it, for the line that says nobody matched it. */
-    private static String typedTarget(CommandContext<CommandSourceStack> ctx) {
-        return ctx.getNodes().stream()
-                .filter(node -> "player".equals(node.getNode().getName()))
-                .findFirst()
-                .map(node -> node.getRange().get(ctx.getInput()))
-                .orElse("");
     }
 }

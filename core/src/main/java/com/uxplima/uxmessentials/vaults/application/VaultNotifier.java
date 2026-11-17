@@ -141,6 +141,11 @@ public final class VaultNotifier {
         send(actor, miss.key(), miss.args());
     }
 
+    /** Tell {@code actor} a line an adapter already chose, such as why a typed player argument named nobody. */
+    public void tell(PlayerRef actor, MessageLine line) {
+        send(actor, line.key(), line.args());
+    }
+
     /** Tell {@code sender} the command is player-only (a console actor cannot open a GUI). */
     public void playersOnly(PlayerRef sender) {
         send(sender, VaultsMessageKey.VAULT_PLAYERS_ONLY, Map.of());

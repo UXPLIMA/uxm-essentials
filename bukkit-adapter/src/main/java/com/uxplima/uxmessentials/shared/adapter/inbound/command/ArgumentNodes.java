@@ -14,7 +14,6 @@ import org.bukkit.entity.Player;
 
 import io.papermc.paper.command.brigadier.CommandSourceStack;
 import io.papermc.paper.command.brigadier.Commands;
-import io.papermc.paper.command.brigadier.argument.ArgumentTypes;
 import io.papermc.paper.command.brigadier.argument.resolvers.selector.PlayerSelectorArgumentResolver;
 
 import com.mojang.brigadier.Command;
@@ -131,22 +130,23 @@ public final class ArgumentNodes {
                         : DoubleArgumentType.doubleArg(
                                 arg.min().orElse(-Double.MAX_VALUE), arg.max().orElse(Double.MAX_VALUE));
             case BOOL -> BoolArgumentType.bool();
-            case ONLINE_PLAYER -> ArgumentTypes.player();
+            case ONLINE_PLAYER -> PlayerArgument.player();
             case STRING, PLAYER, MATERIAL, WORLD -> Args.token();
         };
     }
 
     /**
      * The suggestion provider for a word-typed argument, or empty when the argument type supplies its own
-     * completion. {@code ONLINE_PLAYER} autocompletes online players through {@link ArgumentTypes#player()}, so it
-     * needs no extra provider; the offline {@code PLAYER} kind stays a plain word but still surfaces online names.
+     * completion. {@code ONLINE_PLAYER} suggests the single-player selectors and the online players; the offline
+     * {@code PLAYER} kind stays a plain word but still surfaces online names.
      */
     private static Optional<SuggestionProvider<CommandSourceStack>> suggestionsFor(ArgType type) {
         return switch (type) {
             case PLAYER -> Optional.of(CommandSuggestions.onlinePlayers());
             case MATERIAL -> Optional.of(materialSuggestions());
             case WORLD -> Optional.of(worldSuggestions());
-            case STRING, INT, DOUBLE, BOOL, ONLINE_PLAYER -> Optional.empty();
+            case ONLINE_PLAYER -> Optional.of(CommandSuggestions.singlePlayerTarget());
+            case STRING, INT, DOUBLE, BOOL -> Optional.empty();
         };
     }
 
@@ -191,11 +191,19 @@ public final class ArgumentNodes {
         };
     }
 
-    /** Resolve an online-player argument to the target's name, empty when the selector matched nobody. */
+    /**
+     * Resolve an online-player argument to the target's name: the player here it names, else the typed name of a
+     * player online on another server, else empty.
+     */
     private static String resolvePlayerName(CommandContext<CommandSourceStack> ctx, String name)
             throws CommandSyntaxException {
         PlayerSelectorArgumentResolver resolver = ctx.getArgument(name, PlayerSelectorArgumentResolver.class);
         List<Player> resolved = resolver.resolve(ctx.getSource());
-        return resolved.isEmpty() ? "" : resolved.get(0).getName();
+        if (!resolved.isEmpty()) {
+            return resolved.get(0).getName();
+        }
+        return PlayerArgument.elsewhere(ctx, name)
+                .map(found -> found.player().name())
+                .orElse("");
     }
 }
