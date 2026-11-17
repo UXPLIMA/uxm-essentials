@@ -44,7 +44,11 @@ class IndexedPlayerLookupTest {
 
     private final OnlinePlayerIndex online = new OnlinePlayerIndex();
     private final ServerProfiles server = new ServerProfiles();
-    private final CachingPlayerNameIndex names = new CachingPlayerNameIndex(new NoScheduler(), new QuietLog());
+    /** This backend's monotonic clock, in milliseconds, for the windows the index keeps. */
+    private long millis;
+
+    private final QuietLog log = new QuietLog();
+    private final CachingPlayerNameIndex names = new CachingPlayerNameIndex(new NoScheduler(), log, () -> millis);
     /** Whether the lookup is asked from a tick thread, where it may not read the name store. */
     private boolean onTick;
 
@@ -396,6 +400,81 @@ class IndexedPlayerLookupTest {
     }
 
     @Test
+    void aRenameStoredByABackendWhoseClockRunsBehindStillTakesTheOldNameAwayInEitherMode() {
+        StoredNames store = new StoredNames();
+        CachingPlayerNameIndex index = new CachingPlayerNameIndex(new InlineScheduler(), log, () -> millis);
+        index.backWith(store, 10);
+        PlayerLookup insensitive =
+                new IndexedPlayerLookup(server, index, online, () -> NameCase.INSENSITIVE, () -> onTick);
+        PlayerLookup sensitive = new IndexedPlayerLookup(server, index, online, () -> NameCase.SENSITIVE, () -> onTick);
+        PlayerRef bob = new PlayerRef(UUID.randomUUID(), "Bob");
+        // Bob joined here and the row was written by this backend's clock.
+        index.record(bob.uuid(), bob.name());
+        // Bob renamed and joined another backend whose clock runs a long way behind this one.
+        store.upsert(new PlayerName(bob.uuid(), "Robert", 100L));
+
+        assertThat(insensitive.matchByName("bob")).isEqualTo(NameMatch.unknown());
+        assertThat(sensitive.matchByName("Bob")).isEqualTo(NameMatch.unknown());
+        assertThat(insensitive.matchByName("robert")).isEqualTo(NameMatch.found(new PlayerRef(bob.uuid(), "Robert")));
+    }
+
+    @Test
+    void aNameLearnedFromAnotherBackendStandsOnlyUntilItsRowHadTimeToBeWritten() {
+        PlayerRef bob = new PlayerRef(UUID.randomUUID(), "Bob");
+        StoredNames store = new StoredNames();
+        // What the store still says of the account, stamped by a backend whose clock runs far behind this one.
+        store.upsert(new PlayerName(bob.uuid(), "Robert", 100L));
+        names.backWith(store, 10);
+
+        names.learn(bob.uuid(), bob.name());
+        assertThat(onlineMode.matchByName("bob")).isEqualTo(NameMatch.found(bob));
+        assertThat(lookup.matchByName("Bob")).isEqualTo(NameMatch.found(bob));
+
+        millis += 31_000L;
+        assertThat(onlineMode.matchByName("bob")).isEqualTo(NameMatch.unknown());
+        assertThat(lookup.matchByName("Robert")).isEqualTo(NameMatch.found(new PlayerRef(bob.uuid(), "Robert")));
+    }
+
+    @Test
+    void whileTheStoreCannotBeReadTheMemoryAnswersAndThatIsLoggedOnce() {
+        StoredNames store = new StoredNames();
+        store.upsert(new PlayerName(ALEX.uuid(), ALEX.name(), 100L));
+        names.backWith(store, 10);
+        store.unreachable = true;
+
+        assertThat(onlineMode.matchByName("alex")).isEqualTo(NameMatch.found(ALEX));
+        assertThat(lookup.matchByName("Alex")).isEqualTo(NameMatch.found(ALEX));
+        assertThat(lookup.findByUuid(ALEX.uuid())).contains(ALEX);
+        assertThat(lookup.findByUuid(UUID.randomUUID())).isEmpty();
+
+        assertThat(log.warnings).isEqualTo(1);
+        millis += 61_000L;
+        onlineMode.matchByName("alex");
+        assertThat(log.warnings).isEqualTo(2);
+    }
+
+    @Test
+    void aNameConfirmedAMomentAgoIsReadAgainOnlyAfterAFewSecondsOrANewJoin() {
+        StoredNames store = new StoredNames();
+        store.upsert(new PlayerName(ALEX.uuid(), ALEX.name(), 100L));
+        names.backWith(store, 10);
+        onlineMode.matchByName("alex");
+        int reads = store.reads;
+
+        assertThat(onlineMode.matchByName("ALEX")).isEqualTo(NameMatch.found(ALEX));
+        assertThat(store.reads).isEqualTo(reads);
+
+        millis += 5_000L;
+        onlineMode.matchByName("alex");
+        assertThat(store.reads).isGreaterThan(reads);
+
+        reads = store.reads;
+        names.record(STEVE.uuid(), STEVE.name());
+        onlineMode.matchByName("alex");
+        assertThat(store.reads).isGreaterThan(reads);
+    }
+
+    @Test
     void offlineModeTheServerCacheAnswersOnlyForTheSpellingTyped() {
         server.profiles.put(STEVE.uuid(), STEVE);
 
@@ -475,6 +554,15 @@ class IndexedPlayerLookupTest {
         final List<PlayerName> rows = new ArrayList<>();
         /** How many times a typed name or an account was read from the store. */
         int reads;
+        /** Whether the database is down, so every read fails. */
+        boolean unreachable;
+
+        private void read() {
+            if (unreachable) {
+                throw new IllegalStateException("the database is down");
+            }
+            reads++;
+        }
 
         @Override
         public List<PlayerName> loadRecent(int limit) {
@@ -483,7 +571,7 @@ class IndexedPlayerLookupTest {
 
         @Override
         public List<PlayerName> underName(String name, int limit) {
-            reads++;
+            read();
             return newestFirst()
                     .filter(row -> row.name().equalsIgnoreCase(name.strip()))
                     .limit(limit)
@@ -505,7 +593,7 @@ class IndexedPlayerLookupTest {
 
         @Override
         public java.util.Optional<PlayerName> byUuid(java.util.UUID uuid) {
-            reads++;
+            read();
             return rows.stream().filter(row -> row.uuid().equals(uuid)).reduce((first, second) -> second);
         }
 
@@ -547,13 +635,47 @@ class IndexedPlayerLookupTest {
         public void asyncAfter(Duration delay, Runnable task) {}
     }
 
+    /** A store write that runs at once, as the async lane would a moment later. */
+    private static final class InlineScheduler implements Scheduler {
+
+        @Override
+        public void onGlobal(Runnable task) {
+            task.run();
+        }
+
+        @Override
+        public void onRegion(Position position, Runnable task) {
+            task.run();
+        }
+
+        @Override
+        public void onEntity(PlayerRef player, Runnable task) {
+            task.run();
+        }
+
+        @Override
+        public void async(Runnable task) {
+            task.run();
+        }
+
+        @Override
+        public void asyncAfter(Duration delay, Runnable task) {
+            task.run();
+        }
+    }
+
+    /** Counts the warnings, which an unreachable store must not flood. */
     private static final class QuietLog implements Logger {
+
+        int warnings;
 
         @Override
         public void info(String message, Object... args) {}
 
         @Override
-        public void warn(String message, Object... args) {}
+        public void warn(String message, Object... args) {
+            warnings++;
+        }
 
         @Override
         public void error(String message, Throwable cause) {}

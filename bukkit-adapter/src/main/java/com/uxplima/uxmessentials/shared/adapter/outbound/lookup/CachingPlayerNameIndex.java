@@ -16,8 +16,10 @@ import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.CopyOnWriteArrayList;
+import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.BiConsumer;
+import java.util.function.LongSupplier;
 
 import com.uxplima.uxmessentials.shared.application.port.Logger;
 import com.uxplima.uxmessentials.shared.application.port.PlayerNameIndex;
@@ -62,6 +64,23 @@ public final class CachingPlayerNameIndex implements PlayerNameIndex {
      */
     private static final int STORED_HOLDERS = 32;
 
+    /**
+     * How long a name learned from another backend stands against the store. The backend the player joined writes the
+     * row on its async lane right after the join, so for this long the store may not show it yet; after that the
+     * store has the word. The frames carry a roster stamp (session and sequence), which orders one backend's
+     * announcements but says nothing next to the last-seen times other backends wrote, and the clocks of two machines
+     * are never compared, so this backend's own monotonic clock times the window.
+     */
+    private static final long LEARNED_STANDS_MILLIS = 30_000L;
+    /** How long a name confirmed against the store answers again without another read: a placeholder refreshes often. */
+    private static final long CONFIRMED_FOR_MILLIS = 5_000L;
+    /** The most names a confirmation is kept for; past it every one is let go at once. */
+    private static final int CONFIRMED_NAMES = 1_024;
+    /** How often an unreachable store is logged while it stays so. */
+    private static final long WARN_EVERY_MILLIS = 60_000L;
+
+    private static final long NEVER = Long.MIN_VALUE;
+
     private final Object lock = new Object();
     private final LinkedHashMap<UUID, PlayerName> byAccount = new LinkedHashMap<>();
     private final Map<String, Set<UUID>> byLowerName = new HashMap<>();
@@ -80,13 +99,34 @@ public final class CachingPlayerNameIndex implements PlayerNameIndex {
     /** Told each name a join here wrote to the store, once it is written. */
     private final List<BiConsumer<UUID, String>> stored = new CopyOnWriteArrayList<>();
 
+    /** The accounts whose join here is still being written to the store, with how many writes are in flight. */
+    private final ConcurrentHashMap<UUID, Integer> unwritten = new ConcurrentHashMap<>();
+    /** When, on {@link #clock}, each account was last learned from another backend. */
+    private final ConcurrentHashMap<UUID, Long> learnedAt = new ConcurrentHashMap<>();
+    /** The holders the store confirmed under each lower-cased name, and when. */
+    private final ConcurrentHashMap<String, Confirmed> confirmed = new ConcurrentHashMap<>();
+    /** Counts the names recorded and learned, so a confirmation read across one is not kept. */
+    private final AtomicLong heard = new AtomicLong();
+
+    private final AtomicLong lastWarned = new AtomicLong(NEVER);
+
     private final Scheduler scheduler;
     private final Logger log;
+    private final LongSupplier clock;
 
     public CachingPlayerNameIndex(Scheduler scheduler, Logger log) {
+        this(scheduler, log, () -> System.nanoTime() / 1_000_000L);
+    }
+
+    /** @param clock a monotonic clock in milliseconds, for the windows this index keeps; never a wall clock */
+    public CachingPlayerNameIndex(Scheduler scheduler, Logger log, LongSupplier clock) {
         this.scheduler = Objects.requireNonNull(scheduler, "scheduler");
         this.log = Objects.requireNonNull(log, "log");
+        this.clock = Objects.requireNonNull(clock, "clock");
     }
+
+    /** The holders the store confirmed under one name, at {@code at} on the index's clock. */
+    private record Confirmed(List<PlayerRef> holders, long at) {}
 
     /**
      * Attach the durable store and warm the map with its {@code warmLimit} most recently seen rows. Reads the
@@ -153,47 +193,113 @@ public final class CachingPlayerNameIndex implements PlayerNameIndex {
      * {@inheritDoc}
      *
      * <p>The store is the word on who holds a name: every backend writes it, while the memory hears only of the joins
-     * here and of those the network announces. A remembered holder is kept only where the memory is newer than the
-     * store, as for a join whose row is still being written or a name learned from another backend; a holder the
-     * store has seen since under another name is let go from under this one, and a newer holder than any remembered
-     * is remembered, so the tick answers the same from then on. Most recently seen first.
+     * here and of those the network announces. A remembered holder stands against it only while its word is not in the
+     * store yet: a join here whose row is still being written, or a name learned from another backend a moment ago.
+     * Otherwise a holder the store lists under another name is let go from under this one, whatever the clocks of the
+     * backends say. Those still being written come first, then the store's holders, most recently seen first. When the
+     * memory held somebody under the name, the store's first holder is remembered, so the tick answers the same from
+     * then on.
+     *
+     * <p>An answer is kept for a few seconds, so a name read again and again, as a placeholder does, reads the store
+     * once. While the store cannot be read, the memory answers, and that is logged now and then.
      */
     @Override
     public List<PlayerRef> storedUnder(String name) {
         Objects.requireNonNull(name, "name");
         PlayerNameRepository store = repository.get();
-        if (store == null) {
+        String key = key(name.strip());
+        if (store == null || key.isEmpty()) {
             return byName(name);
         }
-        Map<UUID, PlayerName> holders = new LinkedHashMap<>();
+        long now = clock.getAsLong();
+        Confirmed known = confirmed.get(key);
+        if (known != null && now - known.at() < CONFIRMED_FOR_MILLIS) {
+            return known.holders();
+        }
+        long heardBefore = heard.get();
+        List<PlayerName> found;
+        try {
+            found = confirm(store, name, now);
+        } catch (RuntimeException unreachable) {
+            storeUnreachable(unreachable);
+            return byName(name);
+        }
+        List<PlayerRef> holders = found.stream().map(PlayerName::ref).toList();
+        if (heard.get() == heardBefore) {
+            if (confirmed.size() >= CONFIRMED_NAMES) {
+                confirmed.clear();
+            }
+            confirmed.put(key, new Confirmed(holders, now));
+        }
+        return holders;
+    }
+
+    /** The holders of {@code name}, the memory confirmed against the store as {@link #storedUnder} says. */
+    private List<PlayerName> confirm(PlayerNameRepository store, String name, long now) {
+        Map<UUID, PlayerName> fromStore = new LinkedHashMap<>();
         for (PlayerName row : store.underName(name, STORED_HOLDERS)) {
-            holders.putIfAbsent(row.uuid(), row);
+            fromStore.putIfAbsent(row.uuid(), row);
         }
         List<PlayerName> remembered = heldUnder(name);
+        List<PlayerName> standing = new ArrayList<>();
+        List<PlayerName> unstored = new ArrayList<>();
         for (PlayerName held : remembered) {
-            PlayerName stored = holders.get(held.uuid());
-            if (stored == null) {
-                // Not under this name in the store: renamed since on another backend, or its row is not written yet.
+            if (stands(held.uuid(), now)) {
+                fromStore.remove(held.uuid());
+                standing.add(held);
+            } else if (!fromStore.containsKey(held.uuid())) {
+                // Not under this name in the store: renamed since on another backend, or never written at all.
                 Optional<PlayerName> current = store.byUuid(held.uuid());
-                if (current.isPresent() && current.get().lastSeen() >= held.lastSeen()) {
-                    rememberIfNewer(current.get());
-                    continue;
+                if (current.isPresent()) {
+                    rememberStored(current.get());
+                } else {
+                    unstored.add(held);
                 }
-                holders.put(held.uuid(), held);
-            } else if (held.lastSeen() > stored.lastSeen()) {
-                holders.put(held.uuid(), held);
             }
         }
-        List<PlayerName> found = new ArrayList<>(holders.values());
-        found.sort(Comparator.comparingLong(PlayerName::lastSeen).reversed());
-        // A newer holder than any the memory has under the name took it: held from now on, so the tick names them.
-        // A name the memory holds nobody under stays out of the window, which keeps the accounts seen here lately.
-        long newestRemembered =
-                remembered.stream().mapToLong(PlayerName::lastSeen).max().orElse(Long.MAX_VALUE);
-        if (!found.isEmpty() && found.getFirst().lastSeen() > newestRemembered) {
-            rememberIfNewer(found.getFirst());
+        // Rows from one memory, so their times come from one clock.
+        standing.sort(Comparator.comparingLong(PlayerName::lastSeen).reversed());
+        List<PlayerName> found = new ArrayList<>(standing);
+        found.addAll(fromStore.values());
+        found.addAll(unstored);
+        // Somebody else took a name the memory held: held from now on, so the tick names them. A name the memory holds
+        // nobody under stays out of the window, which keeps the accounts seen here lately.
+        if (!remembered.isEmpty()
+                && !found.isEmpty()
+                && !stands(found.getFirst().uuid(), now)) {
+            rememberStored(found.getFirst());
         }
-        return found.stream().map(PlayerName::ref).toList();
+        return found;
+    }
+
+    /** Whether the memory's word on {@code account} is not in the store yet, so it stands against the store. */
+    private boolean stands(UUID account, long now) {
+        if (unwritten.containsKey(account)) {
+            return true;
+        }
+        Long learned = learnedAt.get(account);
+        if (learned == null) {
+            return false;
+        }
+        if (now - learned < LEARNED_STANDS_MILLIS) {
+            return true;
+        }
+        learnedAt.remove(account, learned);
+        return false;
+    }
+
+    /** Log that the store could not be read, once a minute at most while it stays so. */
+    private void storeUnreachable(RuntimeException failure) {
+        long now = clock.getAsLong();
+        long last = lastWarned.get();
+        if (last != NEVER && now - last < WARN_EVERY_MILLIS) {
+            return;
+        }
+        if (lastWarned.compareAndSet(last, now)) {
+            log.warn(
+                    "event=name_store_unreachable reason={}; names are answered from memory until it is back",
+                    String.valueOf(failure.getMessage()));
+        }
     }
 
     /** The rows the memory holds under {@code name}, in any case. */
@@ -227,7 +333,13 @@ public final class CachingPlayerNameIndex implements PlayerNameIndex {
         if (held.isPresent() || store == null) {
             return held;
         }
-        Optional<PlayerName> stored = store.byUuid(uuid);
+        Optional<PlayerName> stored;
+        try {
+            stored = store.byUuid(uuid);
+        } catch (RuntimeException unreachable) {
+            storeUnreachable(unreachable);
+            return held;
+        }
         // Read once, held from now on: a list shown again, on the tick too, names the account from memory.
         stored.ifPresent(this::rememberIfAbsent);
         return stored.map(PlayerName::ref);
@@ -267,13 +379,23 @@ public final class CachingPlayerNameIndex implements PlayerNameIndex {
         }
         PlayerName row = new PlayerName(uuid, trimmed, System.currentTimeMillis());
         remember(row);
+        nameHeard();
         PlayerNameRepository store = repository.get();
         if (store == null) {
             return;
         }
+        // Until the row is written, this join stands against whatever the store still says of the account.
+        unwritten.merge(uuid, 1, Integer::sum);
         scheduler.async(() -> {
-            store.upsert(row);
-            noteIfShared(store, uuid, trimmed);
+            try {
+                store.upsert(row);
+                noteIfShared(store, uuid, trimmed);
+            } catch (RuntimeException unreachable) {
+                storeUnreachable(unreachable);
+                return;
+            } finally {
+                unwritten.computeIfPresent(uuid, (account, writes) -> writes > 1 ? writes - 1 : null);
+            }
             for (BiConsumer<UUID, String> listener : stored) {
                 try {
                     listener.accept(uuid, trimmed);
@@ -296,6 +418,12 @@ public final class CachingPlayerNameIndex implements PlayerNameIndex {
             return;
         }
         remember(new PlayerName(uuid, trimmed, System.currentTimeMillis()));
+        long now = clock.getAsLong();
+        if (learnedAt.size() > CONFIRMED_NAMES) {
+            learnedAt.values().removeIf(at -> now - at >= LEARNED_STANDS_MILLIS);
+        }
+        learnedAt.put(uuid, now);
+        nameHeard();
         PlayerNameRepository store = repository.get();
         if (store != null) {
             // The backend the player joined writes the row, but another holder of the name may be known only there.
@@ -354,14 +482,23 @@ public final class CachingPlayerNameIndex implements PlayerNameIndex {
         }
     }
 
+    /** A name was recorded or learned: what the store confirmed before may be out of date. */
+    private void nameHeard() {
+        heard.incrementAndGet();
+        confirmed.clear();
+    }
+
     /**
-     * Hold a row read from the store unless the memory already has a word on the account at least as new, so a read
-     * never undoes a join or a learned name that landed while it ran.
+     * Hold a row the store has the word on, unless the memory already holds the account under that name, or a join or
+     * a learned name landed while the store was read: the newer word stands then.
      */
-    private void rememberIfNewer(PlayerName row) {
+    private void rememberStored(PlayerName row) {
         synchronized (lock) {
             PlayerName held = byAccount.get(row.uuid());
-            if (held != null && held.lastSeen() >= row.lastSeen()) {
+            if (held != null && held.name().equals(row.name())) {
+                return;
+            }
+            if (stands(row.uuid(), clock.getAsLong())) {
                 return;
             }
             remember(row);
