@@ -13,9 +13,9 @@ import org.jspecify.annotations.NullMarked;
  * Each reads against a sane default so an operator who declares nothing still gets working behaviour.
  *
  * <p>A non-positive reply-TTL or retention is honoured by the domain as "never expires", so an operator can
- * switch either bound off by setting it to zero. The {@code offline-to-mail} flag governs the {@code /msg}
- * offline fallback: with it on, a message to a genuinely-offline player is stored as durable mail instead of
- * rejecting; with it off the not-online rejection stands.
+ * switch either bound off by setting it to zero. The {@code offline-to-mail} flag governs the {@code /msg} and
+ * {@code /reply} offline fallback: with it on, a message to a genuinely-offline player is stored as durable mail
+ * instead of rejecting; with it off the not-online rejection stands.
  */
 @NullMarked
 public final class MessagingSettings {

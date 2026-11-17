@@ -22,12 +22,13 @@ import com.mojang.brigadier.context.CommandContext;
 import com.mojang.brigadier.exceptions.CommandSyntaxException;
 import com.mojang.brigadier.suggestion.SuggestionProvider;
 import com.mojang.brigadier.tree.LiteralCommandNode;
+import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandFeedback;
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandRegistration;
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandSuggestions;
+import com.uxplima.uxmessentials.shared.adapter.inbound.command.OffTickNames;
 import com.uxplima.uxmessentials.shared.adapter.outbound.BukkitRefs;
 import com.uxplima.uxmessentials.shared.application.permission.DestinationPermissions;
 import com.uxplima.uxmessentials.shared.application.port.Scheduler;
-import com.uxplima.uxmessentials.shared.domain.NameMatch;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmessentials.shared.domain.Result;
 import com.uxplima.uxmessentials.vaults.adapter.VaultServices;
@@ -79,11 +80,16 @@ public final class VaultCommand implements CommandRegistration {
     private final VaultServices services;
     private final VaultNotifier notifier;
     private final Scheduler scheduler;
+    private final OffTickNames names;
 
     public VaultCommand(VaultServices services) {
         this.services = Objects.requireNonNull(services, "services");
         this.notifier = services.notifier();
         this.scheduler = services.kernel().scheduler();
+        this.names = new OffTickNames(
+                services.kernel().playerLookup(),
+                scheduler,
+                new CommandFeedback(services.kernel().messages()));
     }
 
     @Override
@@ -250,14 +256,13 @@ public final class VaultCommand implements CommandRegistration {
         }
         PlayerRef actor = BukkitRefs.toRef(staff);
         String typed = StringArgumentType.getString(ctx, "player");
-        NameMatch match = services.kernel().playerLookup().matchByName(typed);
-        Optional<PlayerRef> owner = match.player();
-        if (owner.isEmpty()) {
-            notifier.unknownTarget(actor, typed, match);
-            return Command.SINGLE_SUCCESS;
-        }
-        // A DB write, run it off the tick thread; the use case audits the override and notifies the actor.
-        scheduler.async(() -> services.deleteVault().deleteOther(actor, owner.get(), index));
+        // The name and the DB write are both settled off the tick thread; the use case audits the override and
+        // notifies the actor.
+        names.resolve(
+                staff,
+                typed,
+                match -> notifier.unknownTarget(actor, typed, match),
+                owner -> services.deleteVault().deleteOther(actor, owner, index));
         return Command.SINGLE_SUCCESS;
     }
 

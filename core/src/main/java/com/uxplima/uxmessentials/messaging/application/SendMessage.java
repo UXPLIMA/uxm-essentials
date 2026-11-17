@@ -150,6 +150,24 @@ public final class SendMessage {
         return Result.ok();
     }
 
+    /** Whether a message that cannot be delivered live is left as mail (the offline-to-mail policy). */
+    boolean leavesMail() {
+        return offlineToMail;
+    }
+
+    /**
+     * The offline path of a {@code /reply} whose partner cannot take it live: offline on every backend, hidden from
+     * the sender, or with reply routing off. All of these read the same to the sender, so none tells them the partner
+     * is there: with offline-to-mail on the reply is left as mail, as a message to an offline player is, and with it
+     * off there is no one to reply to. Writes storage, so off the tick.
+     */
+    Result<Unit, MessagingError> replyOffline(PlayerRef sender, PlayerRef partner, MessageBody body) {
+        if (!offlineToMail) {
+            return reject(sender, MessagingError.NO_REPLY_TARGET);
+        }
+        return offline(sender, partner, body);
+    }
+
     /**
      * The shared delivery engine for {@code /msg} and {@code /reply}: gate, then deliver. The target is
      * assumed resolved (online and not hidden) by the caller's lookup; the remaining gates are mute, self,

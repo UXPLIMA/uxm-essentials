@@ -21,17 +21,19 @@ import org.jspecify.annotations.NullMarked;
  * Decides what a player wears when they join, and hands the answer to whoever is dressing them: the pre-login
  * listener as they connect, or {@code /skin clear} once they are already in the world.
  *
- * <p>Four steps, stopping at the first that resolves:
+ * <p>Three steps, stopping at the first that resolves:
  *
  * <ol>
  *   <li>the skin stored for that uuid, which is their own choice and needs no network call at all;
- *   <li>the real skin of the paid account with that name, which is what makes a cracked server look right
- *       without anybody typing a command;
- *   <li>their Bedrock skin, when Floodgate knows them, written back to the store so the next join is a plain
- *       database read;
+ *   <li>for a Bedrock player, their Bedrock skin, written back to the store so the next join is a plain database
+ *       read, or when it cannot be read the premium skin of the Java account they linked; for anybody else, the real skin of the paid account with that name, which is what makes a cracked
+ *       server look right without anybody typing a command;
  *   <li>an entry from the configured default pool, the same one every time so a player has a face rather than a
  *       new one each join.
  * </ol>
+ *
+ * <p>A Bedrock player's name is a gamertag, perhaps behind a prefix such as {@code BE_}, so it is never sent to
+ * Mojang: the paid account it might match belongs to somebody else, and the call would only spend the login timeout.
  *
  * <p>Every step is fail-soft: a lookup that times out, refuses or throws is logged and falls through to the next,
  * and an empty answer simply leaves the player in the skin the client already had. A skin is never the reason a
@@ -57,36 +59,61 @@ public final class DressLogin {
 
     /** What {@code player}, logging in as {@code username}, should be dressed in, or empty to leave them alone. */
     public Optional<Dressed> resolve(UUID player, String username) {
+        return resolve(player, username, true);
+    }
+
+    /**
+     * What {@code player}, known as {@code username}, wears, for somebody copying their skin. The same order as a
+     * join, except that a stored Bedrock skin is taken as it is and a Bedrock skin read here is not stored: copying
+     * a skin changes nothing for its owner.
+     */
+    public Optional<Dressed> worn(UUID player, String username) {
+        return resolve(player, username, false);
+    }
+
+    private Optional<Dressed> resolve(UUID player, String username, boolean joining) {
         Objects.requireNonNull(player, "player");
         Objects.requireNonNull(username, "username");
-        Optional<Dressed> stored = failSoft("stored skin", username, () -> storedSkin(player));
+        Optional<PlayerSkin> row = failSoft("stored skin", username, () -> repository.find(player));
+        Optional<Dressed> stored = row.filter(skin -> !(joining && refreshedOnJoin(skin)))
+                .map(skin -> new Dressed(skin.texture(), skin.model(), skin.source()));
         if (stored.isPresent()) {
             return stored;
         }
-        Optional<Dressed> premium = failSoft("premium skin", username, () -> premiumSkin(username));
-        if (premium.isPresent()) {
-            return premium;
+        boolean bedrockPlayer =
+                row.map(skin -> skin.source() instanceof SkinSource.Bedrock).orElse(false) || isBedrock(player);
+        Optional<Dressed> own = bedrockPlayer
+                ? failSoft("bedrock skin", username, () -> bedrockSkin(player, username, joining))
+                        .or(() -> failSoft("linked java skin", username, () -> linkedSkin(player)))
+                : failSoft("premium skin", username, () -> premiumSkin(username));
+        if (own.isPresent()) {
+            return own;
         }
-        Optional<Dressed> bedrockSkin = failSoft("bedrock skin", username, () -> bedrockSkin(player, username));
-        if (bedrockSkin.isPresent()) {
-            return bedrockSkin;
+        // A Bedrock skin that could not be read again keeps the face the player already had.
+        Optional<Dressed> kept = row.map(skin -> new Dressed(skin.texture(), skin.model(), skin.source()));
+        if (kept.isPresent()) {
+            return kept;
         }
         return failSoft("default pool", username, () -> poolSkin(player));
     }
 
     /**
-     * The player's own choice, which is the whole answer whenever it is there. A stored Bedrock skin is the one
-     * exception: with {@code bedrock.refresh-on-join} on it is re-read, so a player who changed their skin on the
-     * Bedrock side sees the change here rather than wearing the face they had the day they first joined.
+     * Whether a stored skin is read again at join rather than worn as it is: a Bedrock skin with
+     * {@code bedrock.refresh-on-join} on, so a player who changed their skin on the Bedrock side sees the change here
+     * rather than wearing the face they had the day they first joined.
      */
-    private Optional<Dressed> storedSkin(UUID player) {
-        Optional<PlayerSkin> stored = repository.find(player);
-        if (stored.isPresent()
-                && config.bedrockRefreshOnJoin()
-                && stored.get().source() instanceof SkinSource.Bedrock) {
-            return Optional.empty();
+    private boolean refreshedOnJoin(PlayerSkin skin) {
+        return config.bedrockRefreshOnJoin() && skin.source() instanceof SkinSource.Bedrock;
+    }
+
+    /** Whether the player connected from Bedrock; a failed answer counts as Java, as it did before the check. */
+    private boolean isBedrock(UUID player) {
+        try {
+            return bedrock.isBedrock(player);
+        } catch (RuntimeException failure) {
+            log.warn("skin: could not tell whether {} is a Bedrock player ({})", player, failure.toString());
+            return false;
         }
-        return stored.map(skin -> new Dressed(skin.texture(), skin.model(), skin.source()));
     }
 
     /** The skin the paid account of that name really wears. */
@@ -98,15 +125,22 @@ public final class DressLogin {
                 .map(texture -> new Dressed(texture, SkinModel.CLASSIC, new SkinSource.ByName(username)));
     }
 
-    /** The skin Floodgate and Geyser know this player by, stored so the next join needs no lookup. */
-    private Optional<Dressed> bedrockSkin(UUID player, String username) {
+    /** The premium skin of the Java account a Bedrock player linked, for when their Bedrock skin cannot be read. */
+    private Optional<Dressed> linkedSkin(UUID player) {
+        return bedrock.linkedJava(player).flatMap(java -> premiumSkin(java.name()));
+    }
+
+    /** The skin Floodgate and Geyser know this player by, stored at join so the next one needs no lookup. */
+    private Optional<Dressed> bedrockSkin(UUID player, String username, boolean store) {
         if (!config.bedrockSource() || !bedrock.available()) {
             return Optional.empty();
         }
         return bedrock.byPlayer(player).map(texture -> {
             SkinSource source = new SkinSource.Bedrock(player.toString());
-            repository.save(
-                    new PlayerSkin(new PlayerRef(player, username), source, texture, SkinModel.CLASSIC, Instant.EPOCH));
+            if (store) {
+                repository.save(new PlayerSkin(
+                        new PlayerRef(player, username), source, texture, SkinModel.CLASSIC, Instant.EPOCH));
+            }
             return new Dressed(texture, SkinModel.CLASSIC, source);
         });
     }
@@ -120,7 +154,7 @@ public final class DressLogin {
     }
 
     /** Run one step, turning any failure into "this step resolved nothing" so the next one still gets its turn. */
-    private Optional<Dressed> failSoft(String step, String username, Supplier<Optional<Dressed>> step0) {
+    private <T> Optional<T> failSoft(String step, String username, Supplier<Optional<T>> step0) {
         try {
             return step0.get();
         } catch (RuntimeException failure) {

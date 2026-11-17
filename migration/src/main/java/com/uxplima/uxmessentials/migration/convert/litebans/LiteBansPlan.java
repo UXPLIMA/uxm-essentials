@@ -2,8 +2,11 @@ package com.uxplima.uxmessentials.migration.convert.litebans;
 
 import java.sql.SQLException;
 import java.util.List;
+import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.UUID;
+import java.util.function.Function;
 import java.util.function.Supplier;
 import java.util.stream.Stream;
 
@@ -12,17 +15,20 @@ import com.uxplima.uxmessentials.migration.ImportRecord;
 import com.uxplima.uxmessentials.migration.convert.jdbc.JdbcConnection;
 import com.uxplima.uxmessentials.migration.convert.jdbc.JdbcSource;
 import com.uxplima.uxmessentials.migration.convert.jdbc.RowMapper;
+import com.uxplima.uxmessentials.migration.convert.litebans.map.LiteBansAccounts;
 import com.uxplima.uxmessentials.migration.convert.litebans.map.LiteBansBanMapper;
 import com.uxplima.uxmessentials.migration.convert.litebans.map.LiteBansMuteMapper;
 import com.uxplima.uxmessentials.migration.convert.litebans.map.LiteBansWarnMapper;
 import com.uxplima.uxmessentials.migration.convert.litebans.parse.LiteBansRow;
 import com.uxplima.uxmessentials.migration.convert.litebans.parse.LiteBansRowReaders;
 import com.uxplima.uxmessentials.migration.convert.litebans.parse.LiteBansTables;
+import com.uxplima.uxmessentials.migration.convert.map.ImportedAccount;
 import com.uxplima.uxmessentials.shared.application.port.Logger;
 import org.jspecify.annotations.NullMarked;
 
 /**
- * The LiteBans source's {@link ImportPlan}. It composes three sub-streams (bans, mutes, warnings) into one
+ * The LiteBans source's {@link ImportPlan}. It composes the accounts of the login history and three sub-streams
+ * (bans, mutes, warnings) into one
  * {@link ImportRecord} stream, each table read and mapped on demand as the importer's bounded executor drains
  * it. Each table is queried through {@link JdbcSource}, which opens and closes its own
  * read-only connection per query, so no handle is held across records.
@@ -38,29 +44,33 @@ final class LiteBansPlan implements ImportPlan {
 
     private final JdbcConnection connection;
     private final LiteBansTables tables;
-    private final LiteBansBanMapper banMapper;
-    private final LiteBansMuteMapper muteMapper;
-    private final LiteBansWarnMapper warnMapper;
     private final Logger log;
 
     LiteBansPlan(JdbcConnection connection, LiteBansTables tables, Logger log) {
         this.connection = Objects.requireNonNull(connection, "connection");
         this.tables = Objects.requireNonNull(tables, "tables");
         this.log = Objects.requireNonNull(log, "log");
-        this.banMapper = new LiteBansBanMapper();
-        this.muteMapper = new LiteBansMuteMapper();
-        this.warnMapper = new LiteBansWarnMapper();
     }
 
     @Override
     public Stream<ImportRecord> records() {
+        // The login history names every account, the punished ones included, so it is read first: its accounts lead
+        // the stream and its names go on the targets of the punishments after them.
+        Map<UUID, ImportedAccount> accounts =
+                LiteBansAccounts.latest(rows(tables.selectHistory(), LiteBansRowReaders.history()));
+        Function<UUID, Optional<String>> names =
+                uuid -> Optional.ofNullable(accounts.get(uuid)).map(ImportedAccount::name);
+        LiteBansBanMapper banMapper = new LiteBansBanMapper(names);
+        LiteBansMuteMapper muteMapper = new LiteBansMuteMapper(names);
+        LiteBansWarnMapper warnMapper = new LiteBansWarnMapper(names);
+        Stream<ImportRecord> known = accounts.values().stream().map(ImportRecord.AccountRecord::new);
         Stream<ImportRecord> bans =
                 table(() -> rows(tables.selectBans(), LiteBansRowReaders.punishment()), banMapper::map);
         Stream<ImportRecord> mutes =
                 table(() -> rows(tables.selectMutes(), LiteBansRowReaders.punishment()), muteMapper::map);
         Stream<ImportRecord> warns =
                 table(() -> rows(tables.selectWarnings(), LiteBansRowReaders.warning()), warnMapper::map);
-        return Stream.concat(bans, Stream.concat(mutes, warns));
+        return Stream.concat(known, Stream.concat(bans, Stream.concat(mutes, warns)));
     }
 
     /** Defer a table's query into the stream so it runs only when this segment is drained, keeping memory flat. */
@@ -83,7 +93,7 @@ final class LiteBansPlan implements ImportPlan {
         }
     }
 
-    private List<LiteBansRow> rows(String sql, RowMapper<LiteBansRow> reader) {
+    private <T> List<T> rows(String sql, RowMapper<T> reader) {
         try {
             return JdbcSource.query(connection, sql, reader);
         } catch (SQLException unreadable) {

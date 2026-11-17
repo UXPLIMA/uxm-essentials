@@ -1,7 +1,10 @@
 package com.uxplima.uxmessentials.migration.convert.litebans.map;
 
 import java.time.Instant;
+import java.util.Objects;
 import java.util.Optional;
+import java.util.UUID;
+import java.util.function.Function;
 
 import com.uxplima.uxmessentials.migration.ImportRecord;
 import com.uxplima.uxmessentials.migration.convert.litebans.parse.LiteBansRow;
@@ -26,6 +29,13 @@ import org.jspecify.annotations.NullMarked;
 @NullMarked
 public final class LiteBansBanMapper {
 
+    private final Function<UUID, Optional<String>> names;
+
+    /** @param names the name LiteBans last saw each account under, empty for an account it never saw log in */
+    public LiteBansBanMapper(Function<UUID, Optional<String>> names) {
+        this.names = Objects.requireNonNull(names, "names");
+    }
+
     /** Map a bans-table row to a ban record, or empty when the row is skipped (wildcard / sentinel target). */
     public Optional<ImportRecord> map(LiteBansRow row) {
         if (row.ipban()) {
@@ -35,7 +45,7 @@ public final class LiteBansBanMapper {
     }
 
     private Optional<ImportRecord> uuidBan(LiteBansRow row) {
-        Optional<PlayerRef> target = LiteBansActors.target(row);
+        Optional<PlayerRef> target = LiteBansActors.target(row, names);
         if (target.isEmpty()) {
             return Optional.empty();
         }
@@ -58,7 +68,7 @@ public final class LiteBansBanMapper {
                 row.ip().orElseThrow(),
                 until,
                 row.reason(),
-                LiteBansActors.target(row).map(PlayerRef::uuid),
+                LiteBansActors.target(row, names).map(PlayerRef::uuid),
                 issuer,
                 issuedAt);
         return Optional.of(new ImportRecord.IpBanRecord(ban));

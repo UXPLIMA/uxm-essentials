@@ -2,6 +2,7 @@ package com.uxplima.uxmessentials.migration.convert.litebans.map;
 
 import java.util.Optional;
 import java.util.UUID;
+import java.util.function.Function;
 
 import com.uxplima.uxmessentials.migration.convert.litebans.parse.LiteBansRow;
 import com.uxplima.uxmessentials.moderation.domain.Issuer;
@@ -27,10 +28,12 @@ final class LiteBansActors {
      * ({@code #offline#}/{@code #undefined#}) or simply unparseable. Such a row names no real account, so
      * the importer skips it rather than inventing a target.
      */
-    static Optional<PlayerRef> target(LiteBansRow row) {
-        // LiteBans stores no display name on a punishment row, so the target carries the source name; identity
-        // is the UUID alone (PlayerRef equality), so the placeholder name never affects a write.
-        return parseUuid(row.uuid()).map(uuid -> new PlayerRef(uuid, SOURCE_NAME));
+    static Optional<PlayerRef> target(LiteBansRow row, Function<UUID, Optional<String>> names) {
+        // A punishment row stores no name, so the target is named from LiteBans' login history; an account the
+        // history never saw carries the source name. Identity is the UUID alone (PlayerRef equality), so the name
+        // never affects a write.
+        return parseUuid(row.uuid())
+                .map(uuid -> new PlayerRef(uuid, names.apply(uuid).orElse(SOURCE_NAME)));
     }
 
     /**
@@ -48,7 +51,7 @@ final class LiteBansActors {
     }
 
     /** Parse a UUID, rejecting the LiteBans target sentinels and any malformed value. */
-    private static Optional<UUID> parseUuid(String raw) {
+    static Optional<UUID> parseUuid(String raw) {
         String value = raw.strip();
         if (value.isEmpty() || value.startsWith("#")) {
             return Optional.empty();
