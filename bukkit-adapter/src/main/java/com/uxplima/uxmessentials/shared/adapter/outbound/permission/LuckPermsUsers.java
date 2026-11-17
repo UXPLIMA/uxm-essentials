@@ -9,6 +9,8 @@ import net.luckperms.api.LuckPerms;
 import net.luckperms.api.LuckPermsProvider;
 import net.luckperms.api.model.PermissionHolder;
 import net.luckperms.api.model.group.Group;
+import net.luckperms.api.node.Node;
+import net.luckperms.api.node.types.InheritanceNode;
 import net.luckperms.api.query.QueryOptions;
 import net.luckperms.api.util.Tristate;
 import org.jspecify.annotations.NullMarked;
@@ -38,6 +40,19 @@ final class LuckPermsUsers implements LuckPermsNodeStore.Users {
                 .getUserManager()
                 .loadUser(Objects.requireNonNull(player, "player"))
                 .thenApply(user -> grants(user, node));
+    }
+
+    @Override
+    public CompletableFuture<Boolean> holdsOwnNodes(UUID player) {
+        return luckPerms
+                .getUserManager()
+                .loadUser(Objects.requireNonNull(player, "player"))
+                .thenApply(user -> user.getNodes().stream().anyMatch(held -> !joinedIntoDefault(held)));
+    }
+
+    /** The membership of the {@code default} group LuckPerms adds to every user it loads. */
+    private static boolean joinedIntoDefault(Node held) {
+        return held instanceof InheritanceNode parent && parent.getGroupName().equals("default");
     }
 
     @Override

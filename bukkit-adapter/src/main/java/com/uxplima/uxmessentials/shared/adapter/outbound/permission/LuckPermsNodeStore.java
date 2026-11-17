@@ -18,9 +18,10 @@ import org.jspecify.annotations.NullMarked;
  * counts, wherever the read is made. A sanction reaches the player on every server and in every world, so a grant
  * that exempts them anywhere exempts them from it.
  *
- * <p>LuckPerms makes up an empty user for an account its storage has never seen, so such a user is not loaded. An
- * account its storage has no name for joins into the {@code default} group, and nothing else LuckPerms holds can grant
- * it a node: it is read for what that group grants. A player who played only where another LuckPerms storage holds
+ * <p>LuckPerms makes up an empty user for an account its storage has never seen, so the made-up user's answer is not
+ * taken as it stands. An account its storage has no name for is either one an admin gave nodes by uuid before it ever
+ * joined, read for those nodes like any stored user, or one with no nodes of its own, which joins into the
+ * {@code default} group and is read for what that group grants. A player who played only where another LuckPerms storage holds
  * their grants reads the same way here, which is why the backends' own record of the exemption is read beside this
  * store.
  */
@@ -42,15 +43,24 @@ final class LuckPermsNodeStore implements NodeStore {
         Objects.requireNonNull(player, "player");
         Objects.requireNonNull(node, "node");
         return () -> users.knownName(player)
-                .thenCompose(name -> name.isEmpty() ? users.grantsNewcomers(node) : users.grants(player, node))
+                .thenCompose(name -> name.isPresent()
+                        ? users.grants(player, node)
+                        : users.holdsOwnNodes(player)
+                                .thenCompose(own -> own ? users.grants(player, node) : users.grantsNewcomers(node)))
                 .thenApply(held -> held ? Answer.HELD : Answer.NOT_HELD);
     }
 
-    /** The two reads this store makes of the LuckPerms storage, both off the tick. */
+    /** The reads this store makes of the LuckPerms storage, all off the tick. */
     interface Users {
 
         /** The name the storage holds for {@code player}, empty when it has never seen them. */
         CompletableFuture<Optional<String>> knownName(UUID player);
+
+        /**
+         * Whether the storage holds nodes for {@code player} beyond the {@code default} group membership LuckPerms
+         * gives everyone: an admin granted them something by uuid, whether or not they ever joined.
+         */
+        CompletableFuture<Boolean> holdsOwnNodes(UUID player);
 
         /** Whether the stored {@code player} holds {@code node} in any context. */
         CompletableFuture<Boolean> grants(UUID player, String node);
