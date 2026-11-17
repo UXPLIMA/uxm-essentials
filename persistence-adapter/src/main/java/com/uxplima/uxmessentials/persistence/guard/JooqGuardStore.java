@@ -11,6 +11,7 @@ import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
+import java.util.UUID;
 
 import com.uxplima.uxmessentials.guard.application.port.GuardStore;
 import com.uxplima.uxmessentials.guard.application.port.GuardStoreException;
@@ -18,6 +19,7 @@ import com.uxplima.uxmessentials.guard.domain.HistoryEntry;
 import com.uxplima.uxmessentials.guard.domain.Region;
 import com.uxplima.uxmessentials.guard.domain.RegionId;
 import com.uxplima.uxmessentials.guard.domain.RegionKey;
+import com.uxplima.uxmessentials.persistence.runtime.ColumnFit;
 import com.uxplima.uxmessentials.persistence.runtime.JooqRepository;
 import com.uxplima.uxmessentials.shared.domain.ServerScope;
 import org.jooq.Condition;
@@ -203,7 +205,10 @@ public final class JooqGuardStore extends JooqRepository implements GuardStore {
             for (Denial d : denials) {
                 dsl.insertInto(GUARD_DENIALS)
                         .set(GUARD_DENIALS.HAPPENED_AT, d.at().toEpochMilli())
-                        .set(GUARD_DENIALS.PLAYER, clip(d.player(), 16))
+                        .set(GUARD_DENIALS.PLAYER, ColumnFit.name(GUARD_DENIALS.PLAYER, d.player()))
+                        .set(
+                                GUARD_DENIALS.PLAYER_UUID,
+                                d.playerId().map(UUID::toString).orElse(null))
                         .set(GUARD_DENIALS.WORLD, clip(d.world(), 128))
                         .set(GUARD_DENIALS.X, d.x())
                         .set(GUARD_DENIALS.Y, d.y())
@@ -217,11 +222,11 @@ public final class JooqGuardStore extends JooqRepository implements GuardStore {
     }
 
     @Override
-    public List<Denial> denials(@Nullable String player, @Nullable String region, int offset, int limit) {
+    public List<Denial> denials(@Nullable DenialPlayer player, @Nullable String region, int offset, int limit) {
         return read(dsl -> {
             Condition where = DSL.noCondition();
             if (player != null) {
-                where = where.and(GUARD_DENIALS.PLAYER.equalIgnoreCase(player));
+                where = where.and(whose(player));
             }
             if (region != null) {
                 where = where.and(GUARD_DENIALS.REGION.eq(region));
@@ -234,6 +239,8 @@ public final class JooqGuardStore extends JooqRepository implements GuardStore {
                     .fetch()
                     .map(r -> new Denial(
                             Instant.ofEpochMilli(r.get(GUARD_DENIALS.HAPPENED_AT)),
+                            Optional.ofNullable(r.get(GUARD_DENIALS.PLAYER_UUID))
+                                    .map(UUID::fromString),
                             r.get(GUARD_DENIALS.PLAYER),
                             r.get(GUARD_DENIALS.WORLD),
                             r.get(GUARD_DENIALS.X),
@@ -242,6 +249,21 @@ public final class JooqGuardStore extends JooqRepository implements GuardStore {
                             r.get(GUARD_DENIALS.REGION),
                             r.get(GUARD_DENIALS.ACTION_ID)));
         });
+    }
+
+    /**
+     * The denials of {@code player}: by the account where a row has one, by the name for a row logged before accounts
+     * were kept. A name that named no single account reads every row under it.
+     */
+    private static Condition whose(DenialPlayer player) {
+        Condition byName = GUARD_DENIALS.PLAYER.equalIgnoreCase(player.name());
+        if (player.account().isEmpty()) {
+            return byName;
+        }
+        return GUARD_DENIALS
+                .PLAYER_UUID
+                .eq(player.account().get().toString())
+                .or(GUARD_DENIALS.PLAYER_UUID.isNull().and(byName));
     }
 
     @Override

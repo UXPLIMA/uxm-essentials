@@ -1,11 +1,14 @@
 package com.uxplima.uxmessentials.persistence.playerwarps;
 
+import static com.uxplima.uxmessentials.persistence.jooq.tables.PlayerWarps.PLAYER_WARPS;
+
 import java.time.Instant;
 import java.util.Optional;
 import java.util.UUID;
 import java.util.function.Function;
 
 import com.uxplima.uxmessentials.persistence.jooq.tables.records.PlayerWarpsRecord;
+import com.uxplima.uxmessentials.persistence.runtime.ColumnFit;
 import com.uxplima.uxmessentials.playerwarps.domain.DisplayName;
 import com.uxplima.uxmessentials.playerwarps.domain.IconSpec;
 import com.uxplima.uxmessentials.playerwarps.domain.PlayerWarp;
@@ -107,8 +110,8 @@ final class PlayerWarpRows {
 
     /** The name to keep on the row, or null when only the owner's uuid is known (see the class note). */
     private static @Nullable String storedOwnerName(PlayerWarp warp) {
-        String name = warp.ownerName();
-        return name.equals(warp.owner().uuid().toString()) ? null : name;
+        String name = ColumnFit.name(PLAYER_WARPS.OWNER_NAME, warp.ownerName());
+        return name.isBlank() ? null : name;
     }
 
     private static void applyPresentation(PlayerWarpsRecord record, PlayerWarp warp) {

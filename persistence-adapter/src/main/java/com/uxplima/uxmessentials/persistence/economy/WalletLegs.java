@@ -6,6 +6,7 @@ import static com.uxplima.uxmessentials.persistence.jooq.tables.WalletBalances.W
 import java.math.BigDecimal;
 
 import com.uxplima.uxmessentials.economy.domain.Money;
+import com.uxplima.uxmessentials.persistence.runtime.ColumnFit;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import org.jooq.DSLContext;
 import org.jspecify.annotations.NullMarked;
@@ -68,7 +69,6 @@ final class WalletLegs {
     }
 
     private static String ownerName(PlayerRef owner) {
-        String name = owner.name();
-        return name.length() <= 16 ? name : name.substring(0, 16);
+        return ColumnFit.name(ECONOMY_OWNERS.NAME, owner.name());
     }
 }

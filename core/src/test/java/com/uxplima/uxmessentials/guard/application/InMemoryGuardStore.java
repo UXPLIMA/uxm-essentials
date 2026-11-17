@@ -88,7 +88,8 @@ final class InMemoryGuardStore implements GuardStore {
     }
 
     @Override
-    public synchronized List<Denial> denials(@Nullable String player, @Nullable String region, int offset, int limit) {
+    public synchronized List<Denial> denials(
+            @Nullable DenialPlayer player, @Nullable String region, int offset, int limit) {
         return denials.stream().skip(offset).limit(limit).toList();
     }
 

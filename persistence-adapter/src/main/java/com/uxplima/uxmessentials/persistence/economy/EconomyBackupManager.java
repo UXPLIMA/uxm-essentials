@@ -27,6 +27,7 @@ import com.uxplima.uxmessentials.economy.application.port.WalletRepository;
 import com.uxplima.uxmessentials.economy.domain.Currency;
 import com.uxplima.uxmessentials.economy.domain.CurrencyId;
 import com.uxplima.uxmessentials.economy.domain.CurrencyRegistry;
+import com.uxplima.uxmessentials.persistence.runtime.ColumnFit;
 import com.uxplima.uxmessentials.persistence.runtime.JooqRepository;
 import com.uxplima.uxmessentials.persistence.runtime.PersistenceException;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
@@ -202,7 +203,6 @@ public final class EconomyBackupManager extends JooqRepository {
     }
 
     private static String ownerName(PlayerRef owner) {
-        String name = owner.name();
-        return name.length() <= 16 ? name : name.substring(0, 16);
+        return ColumnFit.name(ECONOMY_OWNERS.NAME, owner.name());
     }
 }

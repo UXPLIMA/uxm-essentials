@@ -1,6 +1,7 @@
 package com.uxplima.uxmessentials.persistence.moderation;
 
 import static com.uxplima.uxmessentials.persistence.jooq.tables.ModerationMutes.MODERATION_MUTES;
+import static com.uxplima.uxmessentials.persistence.jooq.tables.ModerationSeen.MODERATION_SEEN;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import java.time.Duration;
@@ -63,6 +64,42 @@ class JooqModerationRepositoryTest {
 
         assertThat(second.loadMutes(List.of(SAM, ALEX)))
                 .isEqualTo(Map.of(SAM.uuid(), permanent, ALEX.uuid(), MuteState.none()));
+    }
+
+    @Test
+    void aFloodgatePlayerWithALongNameIsSeenAndBannedByAStaffMemberWithOne() {
+        PlayerRef bedrock =
+                new PlayerRef(UUID.fromString("00000000-0000-0000-0009-01f2a3b4c5d6"), ".Twenty_Char_Gamer_1");
+        PlayerRef staff =
+                new PlayerRef(UUID.fromString("00000000-0000-0000-0009-01f2a3b4c5d7"), ".Bedrock_Moderator_2");
+        first.recordSeen(bedrock, Optional.of(ADDRESS), NOW);
+        TempbanState.Active day = (TempbanState.Active)
+                TempbanState.active(NOW.plus(Duration.ofDays(1)), Issuer.of(staff), Optional.of("grief"), NOW);
+
+        first.saveTempban(bedrock, day);
+
+        assertThat(second.seen(bedrock))
+                .hasValueSatisfying(seen -> assertThat(seen.player().name()).isEqualTo(".Twenty_Char_Gamer_1"));
+        assertThat(second.loadTempban(bedrock)).isEqualTo(day);
+    }
+
+    @Test
+    void anAccountNobodyHasANameForIsNotStoredUnderItsUuidAndKeepsTheNameAJoinRecorded() {
+        UUID id = UUID.fromString("00000000-0000-0000-0000-0000000000a9");
+        PlayerRef nameless = new PlayerRef(id, id.toString());
+
+        first.ensureUserExists(nameless, NOW);
+        assertThat(dsl.select(MODERATION_SEEN.NAME)
+                        .from(MODERATION_SEEN)
+                        .where(MODERATION_SEEN.UUID.eq(id.toString()))
+                        .fetchOne(MODERATION_SEEN.NAME))
+                .isEmpty();
+
+        first.recordSeen(new PlayerRef(id, "Robin"), Optional.empty(), NOW);
+        first.recordSeen(nameless, Optional.empty(), NOW.plusSeconds(60));
+
+        assertThat(second.seen(nameless))
+                .hasValueSatisfying(seen -> assertThat(seen.player().name()).isEqualTo("Robin"));
     }
 
     @Test
