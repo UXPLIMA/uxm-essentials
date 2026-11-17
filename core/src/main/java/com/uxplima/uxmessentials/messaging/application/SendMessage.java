@@ -4,12 +4,14 @@ import java.time.Clock;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.UUID;
 
 import com.uxplima.uxmessentials.messaging.application.port.AfkStatus;
 import com.uxplima.uxmessentials.messaging.application.port.ConversationStore;
 import com.uxplima.uxmessentials.messaging.application.port.IgnoreStore;
 import com.uxplima.uxmessentials.messaging.application.port.MessageDelivery;
 import com.uxplima.uxmessentials.messaging.application.port.MessageToggleStore;
+import com.uxplima.uxmessentials.messaging.application.port.MessagingNetwork;
 import com.uxplima.uxmessentials.messaging.application.port.MutePolicy;
 import com.uxplima.uxmessentials.messaging.application.port.SocialSpyStore;
 import com.uxplima.uxmessentials.messaging.domain.IgnoreChannel;
@@ -36,7 +38,9 @@ import com.uxplima.uxmessentials.shared.domain.Unit;
  *
  * <p>On delivery it echoes to the sender, delivers to the recipient, fans out to active socialspy staff,
  * records the reply target on <em>both</em> sides (either may {@code /reply}), and publishes
- * {@code PrivateMessageSent}. The reply path ({@link Reply}) shares this engine through {@link #deliver}.
+ * {@code PrivateMessageSent}. The reply path ({@link Reply}) shares this engine through {@link #deliver}. The spies on
+ * the other backends of the network are shown it too: the message goes out to them as an answer nobody waits for,
+ * the same one a message across backends sends, so each backend shows it to the spies on it.
  *
  * <p>Two presence-aware courtesies wrap that core flow. <strong>AFK notice:</strong> after a real delivery to
  * an AFK target the sender is also told the target is away (the {@link AfkStatus} soft-couple), so they know
@@ -66,6 +70,7 @@ public final class SendMessage {
     private final ConversationStore conversations;
     private final MessageToggleStore toggles;
     private final SocialSpyStore socialSpy;
+    private final MessagingNetwork network;
     private final MutePolicy mute;
     private final AfkStatus afk;
     private final SendMail mail;
@@ -80,6 +85,7 @@ public final class SendMessage {
             ConversationStore conversations,
             MessageToggleStore toggles,
             SocialSpyStore socialSpy,
+            MessagingNetwork network,
             MutePolicy mute,
             AfkStatus afk,
             SendMail mail,
@@ -92,6 +98,7 @@ public final class SendMessage {
         this.conversations = Objects.requireNonNull(conversations, "conversations");
         this.toggles = Objects.requireNonNull(toggles, "toggles");
         this.socialSpy = Objects.requireNonNull(socialSpy, "socialSpy");
+        this.network = Objects.requireNonNull(network, "network");
         this.mute = Objects.requireNonNull(mute, "mute");
         this.afk = Objects.requireNonNull(afk, "afk");
         this.mail = Objects.requireNonNull(mail, "mail");
@@ -197,6 +204,7 @@ public final class SendMessage {
         delivery.deliverMessage(sender, target, body);
         notifyIfAfk(sender, target);
         fanOutSpies(sender, target, body);
+        showElsewhere(sender, target, body, RemoteOutcome.DELIVERED);
         rememberBothSides(sender, target);
         events.publish(new PrivateMessageSent(sender, target, body, clock.instant()));
     }
@@ -224,6 +232,11 @@ public final class SendMessage {
                 delivery.deliverSpy(observer, sender, target, body);
             }
         }
+    }
+
+    private void showElsewhere(PlayerRef sender, PlayerRef target, MessageBody body, RemoteOutcome outcome) {
+        // No backend waits for this id, so every other backend only shows it to its spies.
+        network.answer(new RemoteAnswer(UUID.randomUUID(), outcome, sender, target, body, Optional.empty()));
     }
 
     private void rememberBothSides(PlayerRef sender, PlayerRef target) {
@@ -311,6 +324,7 @@ public final class SendMessage {
         // observable. Spies still see the attempt; the reply target is still captured for the sender.
         delivery.echoSent(sender, target, body);
         fanOutSpies(sender, target, body);
+        showElsewhere(sender, target, body, RemoteOutcome.IGNORED);
         conversations.remember(sender, LastConversation.with(target, clock.instant()));
         return Result.ok();
     }

@@ -310,6 +310,36 @@ class CrossServerMessagingTest {
     }
 
     @Test
+    void socialSpiesOnOtherBackendsSeeAMessageBetweenTwoPlayersOfOneBackendOnce() {
+        network.deliverTwice = true;
+        lobby.leave(BOB);
+        survival.join(BOB);
+        survival.spy(HELPER);
+        lobby.spy(MOD);
+        creative.spy(ADMIN);
+
+        survival.msgHere(ALEX, BOB, "hi");
+
+        assertThat(survival.lines())
+                .containsExactly("Alex: sent to Bob: hi", "Bob: received from Alex: hi", "Helper: spy Alex -> Bob: hi");
+        assertThat(lobby.lines()).containsExactly("Mod: spy Alex -> Bob: hi");
+        assertThat(creative.lines()).containsExactly("Admin: spy Alex -> Bob: hi");
+    }
+
+    @Test
+    void socialSpiesOnOtherBackendsSeeAnIgnoredMessageBetweenTwoPlayersOfOneBackend() {
+        lobby.leave(BOB);
+        survival.join(BOB);
+        lobby.spy(MOD);
+        network.ignores.put(BOB.uuid(), IgnoreList.empty(BOB).ignore(ALEX, IgnoreScope.ALL));
+
+        survival.msgHere(ALEX, BOB, "ignored");
+
+        assertThat(survival.lines()).containsExactly("Alex: sent to Bob: ignored");
+        assertThat(lobby.lines()).containsExactly("Mod: spy Alex -> Bob: ignored");
+    }
+
+    @Test
     void socialSpiesSeeAnIgnoredMessageButNotARefusedOne() {
         lobby.spy(MOD);
         creative.spy(ADMIN);
@@ -608,6 +638,7 @@ class CrossServerMessagingTest {
                     new Conversations(),
                     new Switch(toggledOff),
                     new Spies(),
+                    bus,
                     network::mute,
                     (AfkStatus) who -> Optional.ofNullable(away.get(who.uuid())),
                     sendMail,
@@ -658,6 +689,11 @@ class CrossServerMessagingTest {
         void msg(PlayerRef sender, String target, String text) {
             OnlinePlayer elsewhere = relay.elsewhere(target).orElseThrow();
             relay.send(sender, elsewhere, body(text));
+        }
+
+        /** {@code /msg} to a player on this same backend. */
+        void msgHere(PlayerRef sender, PlayerRef target, String text) {
+            sendMessage.send(sender, target, body(text));
         }
 
         /** {@code /msg} to a player who is on no backend at all. */
@@ -1013,6 +1049,11 @@ class CrossServerMessagingTest {
         @Override
         public boolean toggle(PlayerRef who) {
             throw new UnsupportedOperationException();
+        }
+
+        @Override
+        public boolean ready(PlayerRef who) {
+            return true;
         }
     }
 }

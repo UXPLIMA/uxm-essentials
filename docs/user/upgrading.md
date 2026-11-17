@@ -3,6 +3,13 @@
 What an operator edits when a release renames something an operator's own files or permission grants depend on, or
 needs a setting it did not need before.
 
+## Messaging switches follow the player
+
+`/msgtoggle`, `/rtoggle`, `/broadcasttoggle`, `/socialspy` and the `/reply` partner are kept in three new tables
+(`player_switches`, `messaging_spy_targets`, `messaging_reply_partners`) and follow the player to every server. Social
+spy stays on across a relog, and shows nothing without its node. A server still on an older release keeps its own
+copy and does not see the shared one, so upgrade every server of the network in the same window.
+
 ## Offline mode: names match as spelled
 
 On an offline-mode server, or a network whose proxy runs in offline mode, `Steve` and `steve` are now two players: a
@@ -41,13 +48,12 @@ in its own default. See [network.md](network.md).
 
 ## /eco giveall and resetall reach every player
 
-`/eco giveall` and `/eco resetall` used to change only the players online on the server that ran them. They now
-change every player who has joined a server of the database, offline and on other servers too, and with
-`--all-accounts` also the accounts other plugins opened, for every kind of currency: the ledger, item currencies
-(delivered when each player is next online) and economies another plugin keeps (paid one player at a time through
-it). The update adds two tables, `economy_sweeps`, where the progress of each run is kept, and
-`economy_item_deliveries`, the item deliveries waiting for their players. See
-[economy.md](economy.md#changing-every-balance).
+`/eco giveall` and `/eco resetall` used to change only the players online on the server that ran them. They now change
+every player who has joined a server of the database, offline and on other servers too, and with `--all-accounts` also
+the accounts other plugins opened, for every kind of currency: the ledger, item currencies (delivered when each player
+is next online) and economies another plugin keeps (paid one player at a time through it). The update adds two tables,
+`economy_sweeps`, where the progress of each run is kept, and `economy_item_deliveries`, the item deliveries waiting for
+their players. See [economy.md](economy.md#changing-every-balance).
 
 - **Scheduled commands.** A console script or scheduler that runs `eco giveall 100` as a reward for the players
   online would now pay every player who ever joined, each time it runs. Add `--online` to keep the old meaning:
@@ -181,9 +187,8 @@ commands and the menu `cooldown:` labels ([permission pages](permissions-gamepla
   its node is also the kit cooldown node `uxmessentials.kit.cooldown.60`, so its holders got a 60 second cap on every
   kit. The entry stays in the kit file; rename the group to a word and move the grant.
 
-Kits, a teleport command with its own `cooldowns.<command>` value and a warp with its own cooldown are not affected:
-one node covers all of them, so there it still only lowers each value ([teleport](teleport.md#cooldowns),
-[kits](kits.md)).
+Kits, a teleport command with its own `cooldowns.<command>` value and a warp with its own cooldown are not affected: one
+node covers all of them, so there it still only lowers each value ([teleport](teleport.md#cooldowns), [kits](kits.md)).
 
 An example with LuckPerms: the `default` group holds `uxmessentials.tp.cooldown.10` and `default-cooldown` was lowered
 to 5. Before the upgrade everyone waited 5 seconds; after it every rank that inherits `default` waits 10.
