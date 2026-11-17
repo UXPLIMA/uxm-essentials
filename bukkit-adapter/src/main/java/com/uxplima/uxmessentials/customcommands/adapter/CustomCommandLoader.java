@@ -228,7 +228,8 @@ public final class CustomCommandLoader {
                     child.node("optional").getBoolean(false),
                     ArgumentKind.isRestToken(type),
                     bound(child.node("min")),
-                    bound(child.node("max"))));
+                    bound(child.node("max")),
+                    textInCommands(id, name, child.node("in-commands"), warnings)));
         }
         return arguments;
     }
@@ -313,6 +314,24 @@ public final class CustomCommandLoader {
             return 0;
         }
         return declared;
+    }
+
+    /**
+     * Whether an argument may go into a command line as text: {@code in-commands = "text"}. The default, and anything
+     * other than {@code text}, is a single word, so a mistyped value never widens what a player can put into a command.
+     */
+    private boolean textInCommands(CustomCommandId id, String argument, ConfigurationNode node, List<String> warnings) {
+        String value = node.getString("word").strip().toLowerCase(Locale.ROOT);
+        if (value.equals("text")) {
+            return true;
+        }
+        if (!value.equals("word")) {
+            warn(
+                    warnings,
+                    id.value(),
+                    "argument '" + argument + "' has in-commands '" + value + "', reading it as word");
+        }
+        return false;
     }
 
     /** An optional numeric bound on an argument, absent when the file declares none. */

@@ -3,6 +3,23 @@
 What an operator edits when a release renames something an operator's own files or permission grants depend on, or
 needs a setting it did not need before.
 
+## Custom command arguments in command lines
+
+A value a player types for a custom command now goes into a command line only when it fits what the argument allows
+there; a run that does not fit is refused with a message and runs nothing. In a `console`, `console-random`,
+`command-as-op` or `command-op` action every value, `%args%` included, must be one word: no spaces, no `@` selector,
+none of `{ } [ ] " ' \`, and no `%`. In a `command`, `command-random` or `commandevent` action, which the player runs
+as themselves, a `rest` argument and `%args%` may also hold spaces, so an `alias` keeps working. A command whose
+console line takes several words, such as `console:ban %arg_target% %arg_reason%`, needs `in-commands = "text"` on
+that argument:
+
+```hocon
+arguments = [
+  { name = "target", type = player }
+  { name = "reason", type = rest, in-commands = "text" }
+]
+```
+
 ## Text players write is shown as written
 
 A tag in text a player wrote is now shown as the words, never as styling or a click: a display name, a renamed weapon

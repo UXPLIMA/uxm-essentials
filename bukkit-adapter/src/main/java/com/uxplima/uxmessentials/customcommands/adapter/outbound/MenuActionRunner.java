@@ -14,6 +14,8 @@ import org.bukkit.Bukkit;
 import com.uxplima.uxmessentials.customcommands.application.port.ActionRunner;
 import com.uxplima.uxmessentials.customcommands.domain.ActionChain;
 import com.uxplima.uxmessentials.customcommands.domain.ActionStep;
+import com.uxplima.uxmessentials.customcommands.domain.ChainArguments;
+import com.uxplima.uxmessentials.customcommands.domain.CommandLineArguments;
 import com.uxplima.uxmessentials.shared.adapter.outbound.LivePlayers;
 import com.uxplima.uxmessentials.shared.adapter.outbound.style.StyledText;
 import com.uxplima.uxmessentials.shared.application.port.Logger;
@@ -96,7 +98,7 @@ public final class MenuActionRunner implements ActionRunner {
     }
 
     @Override
-    public void run(PlayerRef actor, ActionChain chain, Map<String, String> arguments) {
+    public void run(PlayerRef actor, ActionChain chain, ChainArguments arguments) {
         Objects.requireNonNull(actor, "actor");
         Objects.requireNonNull(chain, "chain");
         Objects.requireNonNull(arguments, "arguments");
@@ -106,10 +108,11 @@ public final class MenuActionRunner implements ActionRunner {
             return;
         }
         for (ActionStep step : chain.steps()) {
-            String token = expand(step.token(), arguments);
+            Map<String, String> source = sourceFor(head(step.token()), arguments);
+            String token = expand(step.token(), source);
             // The engine fills %argument_<name>% and %<name>% in the step from the values it is handed, so it is
             // handed them made ready for this step exactly as expand made its own.
-            Map<String, String> values = forStep(head(step.token()), arguments);
+            Map<String, String> values = forStep(head(step.token()), source);
             if (!permitted(token, allowed)) {
                 // A chain that names a privileged action the operator turned off skips that step and says which
                 // head it lost, rather than quietly granting the privilege or dropping the whole chain.
@@ -137,10 +140,9 @@ public final class MenuActionRunner implements ActionRunner {
      * anything else is named in the log and skipped, because a console run of a chain written for players should
      * read as a partial run rather than as a failure or as a success that did nothing.
      */
-    private void runAsSystem(
-            PlayerRef actor, ActionChain chain, Map<String, String> arguments, PrivilegedActions allowed) {
+    private void runAsSystem(PlayerRef actor, ActionChain chain, ChainArguments arguments, PrivilegedActions allowed) {
         for (ActionStep step : chain.steps()) {
-            String token = expand(step.token(), arguments);
+            String token = expand(step.token(), sourceFor(head(step.token()), arguments));
             String head = head(token);
             if (!permitted(token, allowed)) {
                 log.warn(
@@ -196,7 +198,8 @@ public final class MenuActionRunner implements ActionRunner {
      *
      * <p>One pass: an argument that itself holds {@code %args%} or another argument's token is put in as typed. An
      * argument going into text players read is put in as text ({@link #STYLED_TEXT_HEADS}, {@link #JSON_HEAD}); one
-     * going into a command is put in as typed, since a command takes its words exactly.
+     * going into a command is put in as typed, since a command takes its words exactly, and comes from the values
+     * {@link #sourceFor} allows there.
      */
     private static String expand(String token, Map<String, String> arguments) {
         if (token.indexOf('%') < 0) {
@@ -213,6 +216,14 @@ public final class MenuActionRunner implements ActionRunner {
         }
         matcher.appendTail(out);
         return out.toString();
+    }
+
+    /**
+     * The values a step with this {@code head} may use. A command line gets only those that passed the command's
+     * argument rules, so neither expand nor the engine can put any other typed value into a line the console runs.
+     */
+    private static Map<String, String> sourceFor(String head, ChainArguments arguments) {
+        return CommandLineArguments.lineOf(head).map(arguments::forLine).orElseGet(arguments::typed);
     }
 
     /** Every value of {@code arguments} as it goes into an action with this {@code head}. */

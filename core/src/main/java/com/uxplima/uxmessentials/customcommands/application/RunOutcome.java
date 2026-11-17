@@ -7,7 +7,7 @@ import java.util.Objects;
  * What running a custom command did, one case per gate the run can stop at plus the accepted one. The use case
  * returns exactly one of these, and the feedback port turns it into the line the actor reads.
  *
- * <p>{@link #gate()} names the gate in a short stable token ({@code console}, {@code permission}, {@code depth},
+ * <p>{@link #gate()} names the gate in a short stable token ({@code console}, {@code permission}, {@code argument}, {@code depth},
  * {@code requirements}, {@code cooldown}, {@code warmup}, {@code cost}, {@code currency}). {@code /customcmd test} renders it into
  * its report, so the token is part of the operator surface and does not change with the wording of a message.
  */
@@ -37,6 +37,22 @@ public sealed interface RunOutcome {
         @Override
         public String gate() {
             return "permission";
+        }
+    }
+
+    /**
+     * A value the actor typed for {@code argument} would go into a command line although it is not what that argument
+     * allows there, so nothing ran.
+     */
+    record ArgumentRefused(String argument) implements RunOutcome {
+
+        public ArgumentRefused {
+            Objects.requireNonNull(argument, "argument");
+        }
+
+        @Override
+        public String gate() {
+            return "argument";
         }
     }
 

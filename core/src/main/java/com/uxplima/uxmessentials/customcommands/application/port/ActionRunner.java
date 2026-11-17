@@ -1,8 +1,7 @@
 package com.uxplima.uxmessentials.customcommands.application.port;
 
-import java.util.Map;
-
 import com.uxplima.uxmessentials.customcommands.domain.ActionChain;
+import com.uxplima.uxmessentials.customcommands.domain.ChainArguments;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 
 /**
@@ -15,6 +14,10 @@ import com.uxplima.uxmessentials.shared.domain.PlayerRef;
  */
 public interface ActionRunner {
 
-    /** Run every step of {@code chain} for {@code actor}, resolving argument tokens from {@code arguments}. */
-    void run(PlayerRef actor, ActionChain chain, Map<String, String> arguments);
+    /**
+     * Run every step of {@code chain} for {@code actor}, resolving argument tokens from {@code arguments}: a step that
+     * runs a command line from {@link ChainArguments#forLine} only, every other step from
+     * {@link ChainArguments#typed()}.
+     */
+    void run(PlayerRef actor, ActionChain chain, ChainArguments arguments);
 }

@@ -15,6 +15,7 @@ import com.uxplima.uxmessentials.customcommands.application.port.ActionRunner;
 import com.uxplima.uxmessentials.customcommands.application.port.CommandFee;
 import com.uxplima.uxmessentials.customcommands.application.port.RunFeedback;
 import com.uxplima.uxmessentials.customcommands.domain.ActionChain;
+import com.uxplima.uxmessentials.customcommands.domain.ChainArguments;
 import com.uxplima.uxmessentials.customcommands.domain.ChainDepth;
 import com.uxplima.uxmessentials.customcommands.domain.CommandLiteral;
 import com.uxplima.uxmessentials.customcommands.domain.CustomCommand;
@@ -174,8 +175,8 @@ class RunCustomCommandWarmupTest {
     private final class ChainRunner implements ActionRunner {
 
         @Override
-        public void run(PlayerRef actor, ActionChain chain, Map<String, String> arguments) {
-            if (!arguments.containsKey("chain")) {
+        public void run(PlayerRef actor, ActionChain chain, ChainArguments arguments) {
+            if (!arguments.typed().containsKey("chain")) {
                 return;
             }
             RunCustomCommand runner = Objects.requireNonNull(self.get(), "runner");
