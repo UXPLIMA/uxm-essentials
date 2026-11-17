@@ -58,4 +58,14 @@ public final class CachedSkinRepository implements SkinRepository {
         delegate.delete(player);
         cache.invalidate(player);
     }
+
+    /** Forget the cached row of {@code player}, so the next read goes to the delegate: another server changed it. */
+    public void invalidate(UUID player) {
+        cache.invalidate(Objects.requireNonNull(player, "player"));
+    }
+
+    /** Forget every cached row, for a server that may have missed changes made elsewhere. */
+    public void invalidateAll() {
+        cache.invalidateAll();
+    }
 }

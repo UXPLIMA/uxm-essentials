@@ -206,6 +206,7 @@ shared: each backend reads its own `config.conf` and module files, so keep them 
 | Trade | Escrow | Two players on different servers trade | `trade` `cross-server` |
 | Vote | Party counter | A party pays players on every server | `voteparty.network-rewards` in `vote`, default on |
 | Playtime | Daily rows | Time on every server adds up | none |
+| Skin | Each player's chosen skin | A change is worn at once on the server the player is on | none |
 
 ### Cross-server moves
 
