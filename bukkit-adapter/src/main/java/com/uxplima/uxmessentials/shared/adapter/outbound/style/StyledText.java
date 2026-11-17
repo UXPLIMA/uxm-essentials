@@ -11,6 +11,7 @@ import net.kyori.adventure.text.format.Style;
 import net.kyori.adventure.text.minimessage.tag.resolver.TagResolver;
 
 import com.uxplima.uxmessentials.shared.adapter.outbound.papi.PlaceholderShield;
+import com.uxplima.uxmessentials.shared.domain.message.TypedText;
 import com.uxplima.uxmlib.gui.style.MenuTitles;
 import com.uxplima.uxmlib.text.Text;
 import com.uxplima.uxmlib.text.style.StyleTokens;
@@ -122,15 +123,6 @@ public final class StyledText {
      * written after it ran.
      */
     public static String escape(String text) {
-        Objects.requireNonNull(text, "text");
-        StringBuilder escaped = new StringBuilder(text.length() + 8);
-        for (int i = 0; i < text.length(); i++) {
-            char character = text.charAt(i);
-            if (character == '<' || character == '\\') {
-                escaped.append('\\');
-            }
-            escaped.append(character);
-        }
-        return escaped.toString();
+        return TypedText.asWords(text);
     }
 }

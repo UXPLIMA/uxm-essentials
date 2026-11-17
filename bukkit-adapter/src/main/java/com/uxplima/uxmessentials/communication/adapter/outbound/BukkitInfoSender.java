@@ -6,6 +6,7 @@ import java.util.Objects;
 import com.uxplima.uxmessentials.communication.domain.InfoPage;
 import com.uxplima.uxmessentials.communication.domain.PlaceholderBindings;
 import com.uxplima.uxmessentials.shared.adapter.outbound.hud.HudText;
+import com.uxplima.uxmessentials.shared.adapter.outbound.style.StyledText;
 import com.uxplima.uxmessentials.shared.application.port.MessageSink;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import org.jspecify.annotations.NullMarked;
@@ -38,7 +39,8 @@ public final class BukkitInfoSender {
     public void send(PlayerRef viewer, List<String> lines) {
         Objects.requireNonNull(viewer, "viewer");
         Objects.requireNonNull(lines, "lines");
-        PlaceholderBindings bindings = PlaceholderBindings.empty().with("player", viewer.name());
+        // The line is parsed with the name in it, so the name is bound as text, never as markup.
+        PlaceholderBindings bindings = PlaceholderBindings.empty().with("player", StyledText.escape(viewer.name()));
         for (String line : lines) {
             // An @key line reads in this reader's language; its {player} is filled like a line written out.
             sink.deliver(viewer, bindings.apply(HudText.lineFor(viewer.uuid(), line)));

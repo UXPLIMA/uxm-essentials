@@ -3,6 +3,15 @@
 What an operator edits when a release renames something an operator's own files or permission grants depend on, or
 needs a setting it did not need before.
 
+## Text players write is shown as written
+
+A tag in text a player wrote is now shown as the words, never as styling or a click: a display name, a renamed weapon
+or the vanilla death line in a join, quit or death message, the `/me` action, the `/afk` reason, and an argument a
+custom command puts into a `broadcast`, `message`, `title`, `action-bar` or `toast` action. In a `broadcast-json`
+action the argument stays inside its JSON string, and in a `broadcast-legacy` action a typed `&` colour code shows as
+text. A custom command that let players style their text that way loses the styling; an argument going into a command
+is unchanged. The `/afk` reason is kept as the player typed it, so the API and placeholders read it as written.
+
 ## Placeholders typed by players stay as typed
 
 With PlaceholderAPI installed, a `%placeholder%` inside a value (a private message, mail, help request, staff chat
