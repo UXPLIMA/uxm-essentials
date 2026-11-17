@@ -3,6 +3,7 @@ package com.uxplima.uxmessentials.persistence.vote;
 import java.util.Objects;
 
 import com.uxplima.uxmessentials.persistence.runtime.Persistence;
+import com.uxplima.uxmessentials.vote.application.port.ParkedVotes;
 import com.uxplima.uxmessentials.vote.application.port.VoteRepository;
 import org.jspecify.annotations.NullMarked;
 
@@ -34,5 +35,11 @@ public final class VoteRepositories {
     public static CachedVoteRepository cachedConcrete(Persistence persistence) {
         Objects.requireNonNull(persistence, "persistence");
         return new CachedVoteRepository(new JooqVoteRepository(persistence.dsl()));
+    }
+
+    /** The votes parked for names no account answers to yet, over the shared persistence DSL. */
+    public static ParkedVotes parked(Persistence persistence) {
+        Objects.requireNonNull(persistence, "persistence");
+        return new JooqParkedVotes(persistence.dsl());
     }
 }

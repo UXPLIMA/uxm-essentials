@@ -149,6 +149,16 @@ player's next join, where it used to lose them. See [trade.md](trade.md#items-ke
 The update adds the `rank_pending_actions` table; nothing needs editing. Rank actions now take `{uuid}`: hand a
 permission plugin `{uuid}` rather than `{player}`, as `ranks.conf` shows.
 
+## Votes for an unknown name wait for that player
+
+The update adds the `vote_parked` table; nothing needs editing. A vote whose name no account answers to used to be
+credited to an id made up from the name, which on a Bedrock bridge, or on an online-mode server for a name Mojang
+gives someone else, was the wrong player, so the rewards were never paid. Such a vote now waits under the name and
+is credited, with the time it came, when a player with that name first joins any server of the database; votes
+nobody claims within 30 days are forgotten. A Bedrock voter who types their gamertag without the bridge's prefix is
+found under the prefixed name. On an offline-mode server, a name that only differs in case from several accounts
+waits for that exact spelling.
+
 ## Inventory restores wait for a player who is not here
 
 The update adds the `inv_pending_restores` table; nothing needs editing. A restore staff choose in `/invrestore` for
