@@ -270,8 +270,8 @@ used on whichever server holds the player, when that server has its world. Detai
 Every backend knows which server each online player is on, from what the others announce with their heartbeats. With the
 network on, `/msg` and `/reply` reach a player on another server; that server applies the recipient's own message
 toggle, reply setting, ignore list and vanish. A spy holding `uxmessentials.msg.socialspy` sees every private message
-once, on any server; message switches and the `/reply` partner follow the player. `/helpop` and staff chat reach the
-staff of every server with the sender's server in the line. `/seen` reports a player elsewhere as online. Tab
+once, on any server; message switches, the `/reply` partner and the `/nick` follow the player. `/helpop` and staff chat
+reach the staff of every server with the sender's server in the line. `/seen` reports a player elsewhere as online. Tab
 completion, `/list`, `/staff`, `/stafflist` (a click teleports with teleport's `cross-server` on), `staff_online`,
 pickers, `/realname`, `/whois` and `/mail sendall` take in every server's players.
 
