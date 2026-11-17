@@ -15,7 +15,9 @@ import org.bukkit.plugin.messaging.PluginMessageListener;
 import com.uxplima.uxmessentials.shared.application.port.Logger;
 import com.uxplima.uxmessentials.shared.application.port.Scheduler;
 import com.uxplima.uxmessentials.shared.network.BusChannel;
+import com.uxplima.uxmessentials.shared.network.BusSecret;
 import com.uxplima.uxmessentials.shared.network.BusTransport;
+import com.uxplima.uxmessentials.shared.network.FrameSeal;
 import org.jspecify.annotations.NullMarked;
 import org.jspecify.annotations.Nullable;
 

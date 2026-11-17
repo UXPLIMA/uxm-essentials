@@ -4,6 +4,7 @@ import java.nio.file.Path;
 import java.time.Clock;
 import java.util.List;
 import java.util.Objects;
+import java.util.function.BooleanSupplier;
 
 import org.bukkit.event.Listener;
 import org.bukkit.plugin.Plugin;
@@ -33,6 +34,7 @@ import com.uxplima.uxmessentials.security.application.PendingTotpEnrollments;
 import com.uxplima.uxmessentials.security.application.RemovePin;
 import com.uxplima.uxmessentials.security.application.ResetFactors;
 import com.uxplima.uxmessentials.security.application.SecurityConfig;
+import com.uxplima.uxmessentials.security.application.SessionCarry;
 import com.uxplima.uxmessentials.security.application.SetPin;
 import com.uxplima.uxmessentials.security.application.VerifyTwoFactor;
 import com.uxplima.uxmessentials.security.application.port.LockoutBan;
@@ -42,10 +44,12 @@ import com.uxplima.uxmessentials.security.domain.SecretGenerator;
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandRegistration;
 import com.uxplima.uxmessentials.shared.adapter.inbound.ip.IpHistoryRecorder;
 import com.uxplima.uxmessentials.shared.adapter.outbound.action.ServerConnector;
+import com.uxplima.uxmessentials.shared.adapter.outbound.bus.Bus;
 import com.uxplima.uxmessentials.shared.application.module.KernelPorts;
 import com.uxplima.uxmessentials.shared.application.module.ModuleContext;
 import com.uxplima.uxmessentials.shared.application.port.IpHistoryStore;
 import com.uxplima.uxmessentials.shared.application.port.IpTokens;
+import com.uxplima.uxmessentials.shared.application.port.NetworkPresence;
 import com.uxplima.uxmlib.gui.input.TextInput;
 import com.uxplima.uxmlib.menu.Menus;
 import com.uxplima.uxmlib.menu.binding.MenuBindings;
@@ -76,7 +80,8 @@ public final class SecurityWiring {
             ServerConnector proxy,
             IpHistoryStore ipHistory,
             IpTokens ipTokens,
-            IpHistoryRecorder recorder) {
+            IpHistoryRecorder recorder,
+            Network network) {
         Objects.requireNonNull(plugin, "plugin");
         Objects.requireNonNull(ctx, "ctx");
         Objects.requireNonNull(persistence, "persistence");
@@ -88,6 +93,7 @@ public final class SecurityWiring {
         Objects.requireNonNull(ipHistory, "ipHistory");
         Objects.requireNonNull(ipTokens, "ipTokens");
         Objects.requireNonNull(recorder, "recorder");
+        Objects.requireNonNull(network, "network");
         KernelPorts kernel = ctx.kernel();
         SecurityConfig config = SecurityConfig.from(ctx.config(), kernel.log());
         SecurityConfig.TwoFactorSettings twoFactor = config.twoFactor();
@@ -96,8 +102,10 @@ public final class SecurityWiring {
         PendingTotpEnrollments pending = new PendingTotpEnrollments();
         // The durable, account-scoped brute-force limiter is shared by every verification surface: the join freeze,
         // the op re-auth keypad, /2fa disable, /pin change and /pin remove. A failed proof on any of them counts
-        // toward, and a lockout blocks, all of them. Built from the join-verification lockout policy and duration.
+        // toward, and a lockout blocks, all of them, on every backend of the database. Built from the
+        // join-verification lockout policy and duration.
         AttemptLimiter limiter = new AttemptLimiter(
+                TrustStores.attempts(persistence),
                 config.joinVerification().lockoutPolicy(),
                 config.joinVerification().lockout());
         BeginTotpEnrollment begin = new BeginTotpEnrollment(new SecretGenerator(), pending, twoFactor.issuer());
@@ -172,6 +180,22 @@ public final class SecurityWiring {
                 kernel.scheduler(),
                 kernel.messages(),
                 kernel.messageSink());
+        // A proof carries across a switch only on a network; off it every join is a login and proves the factor.
+        SessionCarry carry = new SessionCarry(
+                TrustStores.sessions(persistence),
+                network.enabled() ? config.joinVerification().switchGrace() : java.time.Duration.ZERO);
+        ProxyArrivals arrivals = new ProxyArrivals(kernel.scheduler(), network.proxyAnswering());
+        network.bus().registry().register(arrivals);
+        String serverId = network.bus().publisher().serverId();
+        // Nobody is on a backend that just started, so a session it held when it stopped is released now.
+        java.time.Instant started = clock.instant();
+        kernel.scheduler().async(() -> {
+            try {
+                carry.started(serverId, started);
+            } catch (RuntimeException failure) {
+                kernel.log().error("event=security_session_release_failed server=" + serverId, failure);
+            }
+        });
         VerificationController controller = new VerificationController(
                 repository,
                 verify,
@@ -191,6 +215,10 @@ public final class SecurityWiring {
                 proxy,
                 ipTokens,
                 kernel.events(),
+                carry,
+                arrivals,
+                serverId,
+                network.presence()::isLive,
                 kernel.scheduler(),
                 kernel.messages(),
                 kernel.messageSink(),
@@ -200,8 +228,9 @@ public final class SecurityWiring {
         // their next join re-verifies even from a trusted device), paired with the immediate online freeze driven
         // through the controller above. Reset is the recovery door: the one path that clears a factor without proving
         // it, for a player who has lost their authenticator or forgotten their PIN.
-        ForceReverification forceReverification = new ForceReverification(repository, trustStore);
-        ResetFactors resetFactors = new ResetFactors(repository, trustStore);
+        ForceReverification forceReverification =
+                new ForceReverification(repository, trustStore, TrustStores.sessions(persistence));
+        ResetFactors resetFactors = new ResetFactors(repository, trustStore, TrustStores.sessions(persistence));
 
         List<CommandRegistration> commands = List.of(
                 new TwoFactorCommand(
@@ -305,6 +334,23 @@ public final class SecurityWiring {
     }
 
     /**
+     * The network this backend is on, as far as the security module needs it.
+     *
+     * @param enabled whether this backend is on a network ({@code network.enabled})
+     * @param bus the cross-server bus, where the proxy plugin's word about each arrival comes in
+     * @param presence which backend each player is on, and which backends run
+     * @param proxyAnswering whether the uxmEssentials proxy plugin answers on the bus now
+     */
+    public record Network(boolean enabled, Bus bus, NetworkPresence presence, BooleanSupplier proxyAnswering) {
+
+        public Network {
+            Objects.requireNonNull(bus, "bus");
+            Objects.requireNonNull(presence, "presence");
+            Objects.requireNonNull(proxyAnswering, "proxyAnswering");
+        }
+    }
+
+    /**
      * Everything the security module contributes once wired: the {@code /2fa}, {@code /pin} and {@code /security}
      * command registrations and the join-verification listeners to publish, plus the transient registries cleared on stop (the pending
      * un-confirmed enrolments, the freeze/lockout sessions) and the keypad view whose open windows close on stop, so
@@ -314,7 +360,7 @@ public final class SecurityWiring {
      * @param listeners the join/freeze/keypad/op-protection Bukkit listeners to register
      * @param pending the pending un-confirmed TOTP enrolments, cleared on module stop
      * @param sessions the freeze registry, cleared on module stop
-     * @param limiter the shared durable brute-force limiter, cleared on module stop
+     * @param limiter the shared durable brute-force limiter, whose memory of lockouts is dropped on module stop
      * @param keypad the keypad view whose open windows close on module stop
      * @param reauthSessions the in-flight op-command re-auth prompts, cleared on module stop
      * @param enrolmentSessions the in-flight create-a-PIN entries, cleared on module stop
@@ -366,7 +412,7 @@ public final class SecurityWiring {
             pending.clearAll();
             keypad.closeAll();
             sessions.clearAll();
-            limiter.clearAll();
+            limiter.forgetKnown();
             reauthSessions.clearAll();
             enrolmentSessions.clearAll();
             reauthState.clearAll();

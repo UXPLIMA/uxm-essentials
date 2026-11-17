@@ -13,7 +13,7 @@ import org.jspecify.annotations.NullMarked;
  * is transient in-memory state owned solely by the security adapter. The freeze listeners read {@link #isPending(UUID)}
  * to decide whether to cancel a frozen player's action. The durable, account-scoped failure counter and lockout window
  * live separately in the shared {@link com.uxplima.uxmessentials.security.application.AttemptLimiter}, so that a relog
- * clears the freeze but never the accumulated attempt budget.
+ * or a move to another backend clears the freeze but never the accumulated attempt budget.
  *
  * <p>Each freeze also carries a token, a number that only ever goes up. It exists for the delayed work a freeze starts
  * (the entry time limit), which fires long after the freeze that scheduled it and must be able to tell "this player is

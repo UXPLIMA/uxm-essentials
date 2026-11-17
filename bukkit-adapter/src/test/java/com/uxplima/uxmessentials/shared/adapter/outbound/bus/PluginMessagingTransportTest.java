@@ -20,6 +20,8 @@ import com.uxplima.uxmessentials.shared.domain.Position;
 import com.uxplima.uxmessentials.shared.network.BalanceChanged;
 import com.uxplima.uxmessentials.shared.network.BanChanged;
 import com.uxplima.uxmessentials.shared.network.BusChannel;
+import com.uxplima.uxmessentials.shared.network.BusSecret;
+import com.uxplima.uxmessentials.shared.network.FrameSeal;
 import com.uxplima.uxmessentials.shared.network.HomeChanged;
 import com.uxplima.uxmessentials.shared.network.NetworkMessage;
 import com.uxplima.uxmessentials.shared.network.NetworkMessageCodec;

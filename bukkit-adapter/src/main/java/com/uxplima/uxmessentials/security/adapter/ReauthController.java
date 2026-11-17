@@ -143,21 +143,36 @@ public final class ReauthController implements KeypadActions {
         }
         scheduler.async(() -> {
             VerifyResult result = verify.verify(viewer.uuid(), candidate, clock.instant());
-            scheduler.onEntity(viewer, () -> applyResult(player, viewer, result, reopenOnFailure));
+            // The shared limiter is a database record, so it is counted here, off the tick, before the answer goes
+            // back to the player's thread.
+            AttemptLimiter.Outcome outcome = counted(viewer, result);
+            scheduler.onEntity(viewer, () -> applyResult(player, viewer, result, outcome, reopenOnFailure));
         });
     }
 
-    private void applyResult(Player player, PlayerRef viewer, VerifyResult result, boolean reopenOnFailure) {
+    private AttemptLimiter.Outcome counted(PlayerRef viewer, VerifyResult result) {
+        if (result == VerifyResult.INVALID) {
+            return limiter.recordFailure(viewer.uuid(), clock.instant());
+        }
+        limiter.recordSuccess(viewer.uuid());
+        return new AttemptLimiter.Outcome(false, 0);
+    }
+
+    private void applyResult(
+            Player player,
+            PlayerRef viewer,
+            VerifyResult result,
+            AttemptLimiter.Outcome outcome,
+            boolean reopenOnFailure) {
         switch (result) {
             case SUCCESS, NOT_ENROLLED -> succeed(viewer);
-            case INVALID -> fail(player, viewer, reopenOnFailure);
+            case INVALID -> fail(player, viewer, outcome, reopenOnFailure);
         }
     }
 
     private void succeed(PlayerRef viewer) {
         String commandLine = sessions.pendingCommand(viewer.uuid());
         sessions.clear(viewer.uuid());
-        limiter.recordSuccess(viewer.uuid());
         reauthState.stamp(viewer.uuid(), clock.instant());
         keypad.closeFor(viewer);
         notify(viewer, SecurityMessageKey.SECURITY_REAUTH_SUCCESS);
@@ -166,8 +181,7 @@ public final class ReauthController implements KeypadActions {
         }
     }
 
-    private void fail(Player player, PlayerRef viewer, boolean reopenOnFailure) {
-        AttemptLimiter.Outcome outcome = limiter.recordFailure(viewer.uuid(), clock.instant());
+    private void fail(Player player, PlayerRef viewer, AttemptLimiter.Outcome outcome, boolean reopenOnFailure) {
         if (outcome.lockedOut()) {
             // Too many wrong proofs on the shared budget, abandon the prompt and lock the account out of every
             // surface.

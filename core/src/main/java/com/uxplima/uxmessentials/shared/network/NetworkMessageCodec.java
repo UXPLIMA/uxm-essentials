@@ -299,6 +299,13 @@ public final class NetworkMessageCodec {
             }
             case FreezeReset reset -> out.writeLong(reset.clearedAtMillis());
             case AllBalancesChanged swept -> out.writeUTF(swept.currencyId());
+            case ProxyConnectionFrame connected -> {
+                writeUuid(out, connected.frameId());
+                writeUuid(out, connected.player());
+                writeUuid(out, connected.connection());
+                out.writeUTF(connected.server());
+                out.writeBoolean(connected.switched());
+            }
         }
     }
 
@@ -397,6 +404,9 @@ public final class NetworkMessageCodec {
                 new FreezeChanged(origin, readUuid(in), readUuid(in), in.readUTF(), in.readBoolean(), in.readLong());
             case FREEZE_RESET -> new FreezeReset(origin, in.readLong());
             case ALL_BALANCES_CHANGED -> new AllBalancesChanged(origin, in.readUTF());
+            case PROXY_CONNECTION ->
+                new ProxyConnectionFrame(
+                        origin, readUuid(in), readUuid(in), readUuid(in), in.readUTF(), in.readBoolean());
         };
     }
 

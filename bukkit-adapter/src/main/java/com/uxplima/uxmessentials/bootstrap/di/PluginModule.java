@@ -926,6 +926,7 @@ public final class PluginModule {
                 () -> bus.peers()
                         .map(peers -> peers.liveServerIds(System.currentTimeMillis()))
                         .orElse(java.util.Set.of()),
+                bus.health(),
                 hooks,
                 guiRegistry,
                 menus,
@@ -1275,6 +1276,7 @@ public final class PluginModule {
             Logger log,
             Bus bus,
             java.util.function.Supplier<java.util.Set<String>> livePeers,
+            com.uxplima.uxmessentials.shared.adapter.outbound.bus.BusHealth busHealth,
             Integrations hooks,
             ManagementGuiRegistry guiRegistry,
             Menus menus,
@@ -1299,6 +1301,10 @@ public final class PluginModule {
         links.dailyRewards = networkClaims.map(claims -> ClaimLedgers.dailyRewards(persistence));
         links.claimLedger = ClaimLedgers.claims(persistence);
         links.livePeers = livePeers;
+        links.proxyAnswering = () -> busHealth
+                .proxy()
+                .map(link -> link.answeredWithin(System.currentTimeMillis(), busHealth.answerWindow()))
+                .orElse(false);
         links.networked = NetworkConfig.from(config).enabled();
         // Install uxmLib's single menu listener once, before any GUI-using module (vaults, itemworld) wires,
         // and tear it down on disable so a reload re-installs cleanly (the static install state is reset).
@@ -1726,6 +1732,7 @@ public final class PluginModule {
                     persistence,
                     resources,
                     links,
+                    bus,
                     textInput,
                     menus,
                     menuBindings,
@@ -1955,6 +1962,7 @@ public final class PluginModule {
             Persistence persistence,
             CloseableResources resources,
             ContextLinks links,
+            Bus bus,
             TextInput textInput,
             Menus menus,
             MenuBindings menuBindings,
@@ -1969,7 +1977,7 @@ public final class PluginModule {
         // disable or reload leaves no residual secret and no locked player.
         // The lockout escalation goes through moderation's own tempban when that module is enabled, so it lands in
         // the same ban table, history and staff broadcast as every other ban; with moderation off it binds to NONE
-        // and the lockout stays the in-memory cooldown.
+        // and the lockout stays the module's own record.
         LockoutBan lockoutBan = links.securityLockoutBan == null
                 ? LockoutBan.NONE
                 : new ModerationLockoutBan(
@@ -1993,7 +2001,8 @@ public final class PluginModule {
                 proxy,
                 ipCapture.store(),
                 ipCapture.tokens(),
-                ipCapture.recorder());
+                ipCapture.recorder(),
+                new SecurityWiring.Network(links.networked, bus, links.presence, links.proxyAnswering));
         wired.commands().forEach(resources::addCommand);
         wired.listeners().forEach(resources::addListener);
         resources.worldPhase().run("security holding area", wired.holdingArea()::warmUp);
@@ -3940,6 +3949,8 @@ public final class PluginModule {
     private static final class ContextLinks {
         // The peer backends live by their heartbeats; a cross-server trade invite waits for each to answer.
         private java.util.function.Supplier<java.util.Set<String>> livePeers = java.util.Set::of;
+        // Whether the uxmEssentials proxy plugin answers on the bus now, which is when it can confirm a switch.
+        private java.util.function.BooleanSupplier proxyAnswering = () -> false;
         // Whether this backend is part of a network (network.enabled), which is when a jail can be on another one.
         private boolean networked;
         // The shared target picker, built and registered at enable before any module wires; moderation and the
