@@ -245,6 +245,7 @@ import com.uxplima.uxmessentials.shared.adapter.outbound.hud.HudText;
 import com.uxplima.uxmessentials.shared.adapter.outbound.log.AuditChannel;
 import com.uxplima.uxmessentials.shared.adapter.outbound.log.SystemLoggerBridge;
 import com.uxplima.uxmessentials.shared.adapter.outbound.lookup.CachingPlayerNameIndex;
+import com.uxplima.uxmessentials.shared.adapter.outbound.lookup.ServerNameCase;
 import com.uxplima.uxmessentials.shared.adapter.outbound.message.LocaleResolver;
 import com.uxplima.uxmessentials.shared.adapter.outbound.meta.PlayerMeta;
 import com.uxplima.uxmessentials.shared.adapter.outbound.papi.BukkitPlayerFacts;
@@ -2023,6 +2024,7 @@ public final class PluginModule {
                 ctx.kernel().messages(),
                 ctx.kernel().messageSink(),
                 ctx.kernel().log(),
+                ServerNameCase.of(plugin.getServer()),
                 SecurityConfig.AllowedOperators.from(ctx.config()).list());
         resources.addListener(new OperatorLockListener(operators));
         AutoCloseable sweep = operators.startSweep();

@@ -21,6 +21,7 @@ import com.uxplima.uxmessentials.shared.application.port.Logger;
 import com.uxplima.uxmessentials.shared.application.port.MessageSink;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
 import com.uxplima.uxmessentials.shared.application.port.Scheduler;
+import com.uxplima.uxmessentials.shared.domain.NameCase;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import org.jspecify.annotations.NullMarked;
 import org.jspecify.annotations.Nullable;
@@ -31,6 +32,9 @@ import org.jspecify.annotations.Nullable;
  * listed is refused, from a player or from the console. Reading the command text cannot catch every route to operator
  * ({@code /execute ... run op}, an alias, a plugin calling {@code setOp}), so the online operators are also checked one
  * tick after any command runs and every few seconds besides. The list is swapped whole on reload.
+ *
+ * <p>On an offline-mode server a listed name matches only as spelled ({@link OperatorList}), and the server's user
+ * cache, which matches any case, may vouch for a uuid only when the name it holds is the one typed.
  */
 @NullMarked
 public final class OperatorLock {
@@ -46,15 +50,23 @@ public final class OperatorLock {
     private final Messages messages;
     private final MessageSink sink;
     private final Logger log;
+    private final NameCase names;
     private volatile OperatorList list;
 
     public OperatorLock(
-            Server server, Scheduler scheduler, Messages messages, MessageSink sink, Logger log, OperatorList list) {
+            Server server,
+            Scheduler scheduler,
+            Messages messages,
+            MessageSink sink,
+            Logger log,
+            NameCase names,
+            OperatorList list) {
         this.server = Objects.requireNonNull(server, "server");
         this.scheduler = Objects.requireNonNull(scheduler, "scheduler");
         this.messages = Objects.requireNonNull(messages, "messages");
         this.sink = Objects.requireNonNull(sink, "sink");
         this.log = Objects.requireNonNull(log, "log");
+        this.names = Objects.requireNonNull(names, "names");
         this.list = Objects.requireNonNull(list, "list");
     }
 
@@ -69,7 +81,7 @@ public final class OperatorLock {
      */
     public boolean enforce(Player player) {
         OperatorList current = list;
-        if (!current.enabled() || !player.isOp() || current.permits(player.getUniqueId(), player.getName())) {
+        if (!current.enabled() || !player.isOp() || current.permits(player.getUniqueId(), player.getName(), names)) {
             return false;
         }
         player.setOp(false);
@@ -129,7 +141,11 @@ public final class OperatorLock {
     private boolean permitted(OperatorList current, String name) {
         OfflinePlayer known = server.getOfflinePlayerIfCached(name);
         @Nullable UUID id = known == null ? null : known.getUniqueId();
-        return current.permits(id, name);
+        if (names == NameCase.SENSITIVE && known != null && !name.equals(known.getName())) {
+            // The cache matched another spelling, which is another account here.
+            id = null;
+        }
+        return current.permits(id, name, names);
     }
 
     /** The player an {@code /op} or {@code /namespace:op} command names, or empty for any other command. */
