@@ -24,7 +24,8 @@ import com.uxplima.uxmlib.command.Gate;
 import org.jspecify.annotations.NullMarked;
 
 /**
- * {@code /pay <player> <amount> [currency]}: transfer funds to another player. The gates (self-pay,
+ * {@code /pay <player> <amount> [currency]}: transfer funds to another player, online here, on another server or
+ * offline. The name is resolved through the player lookup off the tick, with its case rules. The gates (self-pay,
  * {@code min-pay}, the target's {@code /paytoggle}, the per-currency confirm-threshold) and the atomic move
  * are the {@link com.uxplima.uxmessentials.economy.application.Pay} use case's job; this handler resolves the
  * target name and the currency at the boundary, parses the amount to the currency's precision, and runs the
@@ -84,7 +85,7 @@ public final class PayCommand extends EconomyCommandSupport implements CommandRe
     }
 
     private void resolveAndPay(Player sender, PlayerRef from, String targetName, Money amount) {
-        NameMatch match = services.players().matchOnlineByName(targetName);
+        NameMatch match = services.players().matchByName(targetName);
         Optional<PlayerRef> target = match.player();
         if (target.isEmpty()) {
             rejectUnknownTarget(from, targetName, match);

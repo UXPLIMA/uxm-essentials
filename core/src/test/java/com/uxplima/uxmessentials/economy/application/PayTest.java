@@ -59,7 +59,7 @@ class PayTest {
                 return payOff.add(who) || !payOff.remove(who);
             }
         };
-        return new Pay(bank, preferences, staged, notifier, taxation, CLOCK);
+        return new Pay(bank, preferences, staged, notifier, notifier::send, taxation, CLOCK);
     }
 
     private Pay pay() {

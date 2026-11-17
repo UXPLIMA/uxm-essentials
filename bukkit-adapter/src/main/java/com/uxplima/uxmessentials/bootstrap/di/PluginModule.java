@@ -135,6 +135,7 @@ import com.uxplima.uxmessentials.persistence.ip.LegacyIpHistoryBackfill;
 import com.uxplima.uxmessentials.persistence.ledger.ClaimLedgers;
 import com.uxplima.uxmessentials.persistence.lookup.PlayerNameRepositories;
 import com.uxplima.uxmessentials.persistence.menu.PlayerDataRepositories;
+import com.uxplima.uxmessentials.persistence.notice.PlayerNoticeStores;
 import com.uxplima.uxmessentials.persistence.playerstate.PlaytimeRepositories;
 import com.uxplima.uxmessentials.persistence.runtime.Persistence;
 import com.uxplima.uxmessentials.persistence.security.SecurityKeyFile;
@@ -215,6 +216,7 @@ import com.uxplima.uxmessentials.shared.adapter.inbound.lookup.NameCaseEvidenceL
 import com.uxplima.uxmessentials.shared.adapter.inbound.lookup.OnlinePlayerIndexListener;
 import com.uxplima.uxmessentials.shared.adapter.inbound.lookup.PlayerNameRecordingListener;
 import com.uxplima.uxmessentials.shared.adapter.inbound.networkpresence.NetworkPresenceListener;
+import com.uxplima.uxmessentials.shared.adapter.inbound.notice.KeptNoticeJoinListener;
 import com.uxplima.uxmessentials.shared.adapter.inbound.playerdata.PlayerDataLifecycleListener;
 import com.uxplima.uxmessentials.shared.adapter.inbound.window.FormReportingScreen;
 import com.uxplima.uxmessentials.shared.adapter.outbound.EngineLog;
@@ -232,6 +234,7 @@ import com.uxplima.uxmessentials.shared.adapter.outbound.bus.Bus;
 import com.uxplima.uxmessentials.shared.adapter.outbound.bus.BusWiring;
 import com.uxplima.uxmessentials.shared.adapter.outbound.bus.NetworkConfig;
 import com.uxplima.uxmessentials.shared.adapter.outbound.bus.NetworkPresenceWiring;
+import com.uxplima.uxmessentials.shared.adapter.outbound.bus.NoticeSync;
 import com.uxplima.uxmessentials.shared.adapter.outbound.bus.SharedCacheRefresh;
 import com.uxplima.uxmessentials.shared.adapter.outbound.chat.UxmChatStepBack;
 import com.uxplima.uxmessentials.shared.adapter.outbound.claim.LibraryClaims;
@@ -291,6 +294,8 @@ import com.uxplima.uxmessentials.shared.application.command.CommandDefinition;
 import com.uxplima.uxmessentials.shared.application.command.CommandId;
 import com.uxplima.uxmessentials.shared.application.command.EffectiveCommand;
 import com.uxplima.uxmessentials.shared.application.health.HealthCheck;
+import com.uxplima.uxmessentials.shared.application.message.DeferredPlayerNotices;
+import com.uxplima.uxmessentials.shared.application.message.Notifier;
 import com.uxplima.uxmessentials.shared.application.module.FeatureModule;
 import com.uxplima.uxmessentials.shared.application.module.KernelPorts;
 import com.uxplima.uxmessentials.shared.application.module.LoadCondition;
@@ -1303,6 +1308,17 @@ public final class PluginModule {
         links.dailyRewards = networkClaims.map(claims -> ClaimLedgers.dailyRewards(persistence));
         links.claimLedger = ClaimLedgers.claims(persistence);
         links.kitResets = ClaimLedgers.kitResets(persistence);
+        // A line for a player who is not online here, such as being paid, is kept in the shared database and shown
+        // when they are next online: at once on the server they are on, which the keep announces, or as they join.
+        DeferredPlayerNotices notices = new DeferredPlayerNotices(
+                NoticeSync.pending(
+                        PlayerNoticeStores.pending(persistence, kernel.log()), bus.publisher(), kernel.log()),
+                kernel.playerLookup(),
+                new Notifier(kernel.messages(), kernel.messageSink()),
+                Clock.systemUTC());
+        bus.registry().register(NoticeSync.listener(notices::deliver, kernel.playerLookup(), kernel.scheduler()));
+        resources.addListener(new KeptNoticeJoinListener(notices, kernel.scheduler()));
+        links.playerNotices = notices;
         links.livePeers = livePeers;
         links.proxyAnswering = () -> busHealth
                 .proxy()
@@ -2652,7 +2668,8 @@ public final class PluginModule {
                 menus,
                 menuBindings,
                 plugin.getDataFolder().toPath(),
-                links.dailyRewards);
+                links.dailyRewards,
+                Objects.requireNonNull(links.playerNotices, "playerNotices"));
         // Fill the deferred reference the menu-currency façade was handed at menu-wiring time (above): from here on
         // a give-money click resolves against the same backend and currency registries a warp fee spends through.
         menuCurrencyBackends.set(new EconomyBackends(wired.backends(), wired.currencies()));
@@ -4056,6 +4073,9 @@ public final class PluginModule {
         // The kit resets a single server keeps for a player who was offline, applied as they next join.
         private com.uxplima.uxmessentials.kits.application.port.@org.jspecify.annotations.Nullable PendingKitResets
                 kitResets;
+        // Lines kept for players who were not online when they were meant for them.
+        private com.uxplima.uxmessentials.shared.application.port.@org.jspecify.annotations.Nullable PlayerNotices
+                playerNotices;
         private @org.jspecify.annotations.Nullable HomeEconomy homeEconomy;
         private com.uxplima.uxmessentials.vaults.application.port.@org.jspecify.annotations.Nullable VaultEconomy
                 vaultEconomy;
