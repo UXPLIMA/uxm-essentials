@@ -128,7 +128,9 @@ public final class PlaceholderApiSupport {
             return source;
         }
         OfflinePlayer player = Bukkit.getOfflinePlayer(viewer);
-        return fill.apply(player, source);
+        // A value's % is kept out of PlaceholderAPI's sight for the call, so it can neither open nor close a
+        // placeholder.
+        return PlaceholderShield.around(text -> fill.apply(player, text)).apply(source);
     }
 
     /**
@@ -144,12 +146,15 @@ public final class PlaceholderApiSupport {
             return UnaryOperator.identity();
         }
         return source -> {
-            if (!hasRelational(source)) {
+            if (!hasRelational(PlaceholderShield.hide(source))) {
                 return source;
             }
             Player one = Bukkit.getPlayer(viewer);
             Player two = Bukkit.getPlayer(target);
-            return one == null || two == null ? source : PlaceholderAPI.setRelationalPlaceholders(one, two, source);
+            return one == null || two == null
+                    ? source
+                    : PlaceholderShield.around(text -> PlaceholderAPI.setRelationalPlaceholders(one, two, text))
+                            .apply(source);
         };
     }
 
@@ -170,14 +175,20 @@ public final class PlaceholderApiSupport {
         if (!isPresent()) {
             return UnaryOperator.identity();
         }
-        return source -> hasPlaceholder(source) ? PlaceholderAPI.setPlaceholders((OfflinePlayer) null, source) : source;
+        UnaryOperator<String> fill =
+                PlaceholderShield.around(text -> PlaceholderAPI.setPlaceholders((OfflinePlayer) null, text));
+        return source -> hasPlaceholder(source) ? fill.apply(source) : source;
     }
 
-    /** Whether {@code source} embeds a PlaceholderAPI token ({@code %...%}) the bridge would expand. */
+    /**
+     * Whether {@code source} embeds a PlaceholderAPI token ({@code %...%}) the bridge would expand. A value's marked
+     * {@code %} (see {@link PlaceholderShield}) does not count.
+     */
     public static boolean hasPlaceholder(String source) {
         Objects.requireNonNull(source, "source");
-        int open = source.indexOf('%');
-        return open >= 0 && source.indexOf('%', open + 1) > open;
+        String unmarked = PlaceholderShield.hide(source);
+        int open = unmarked.indexOf('%');
+        return open >= 0 && unmarked.indexOf('%', open + 1) > open;
     }
 
     /**

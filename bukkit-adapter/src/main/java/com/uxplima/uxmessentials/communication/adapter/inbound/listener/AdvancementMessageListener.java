@@ -28,6 +28,8 @@ import com.uxplima.uxmessentials.shared.adapter.outbound.BukkitRefs;
 import com.uxplima.uxmessentials.shared.adapter.outbound.BukkitRegistryKeys;
 import com.uxplima.uxmessentials.shared.adapter.outbound.hud.ChannelBroadcaster;
 import com.uxplima.uxmessentials.shared.adapter.outbound.hud.HudText;
+import com.uxplima.uxmessentials.shared.adapter.outbound.papi.PlaceholderShield;
+import com.uxplima.uxmessentials.shared.adapter.outbound.style.StyledText;
 import com.uxplima.uxmessentials.shared.application.port.Scheduler;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import org.jspecify.annotations.NullMarked;
@@ -198,7 +200,8 @@ public final class AdvancementMessageListener implements Listener {
      * title and description as {@code words} flattened them.
      */
     static String substitute(String template, String player, String key, Words words) {
-        return template.replace("{player}", player)
+        // The earner's name is read as markup and then for every reader's placeholders, as a name on the scoreboard is.
+        return template.replace("{player}", PlaceholderShield.shield(StyledText.escape(player)))
                 .replace("{advancement}", key)
                 .replace("{title}", words.title())
                 .replace("{description}", words.description());

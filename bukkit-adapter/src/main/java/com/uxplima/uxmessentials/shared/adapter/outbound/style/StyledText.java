@@ -1,10 +1,14 @@
 package com.uxplima.uxmessentials.shared.adapter.outbound.style;
 
+import java.util.List;
 import java.util.Objects;
 
 import net.kyori.adventure.text.Component;
+import net.kyori.adventure.text.event.ClickEvent;
+import net.kyori.adventure.text.format.Style;
 import net.kyori.adventure.text.minimessage.tag.resolver.TagResolver;
 
+import com.uxplima.uxmessentials.shared.adapter.outbound.papi.PlaceholderShield;
 import com.uxplima.uxmlib.gui.style.MenuTitles;
 import com.uxplima.uxmlib.text.Text;
 import com.uxplima.uxmlib.text.style.StyleTokens;
@@ -34,7 +38,48 @@ public final class StyledText {
         TagResolver[] all = new TagResolver[extra.length + 1];
         all[0] = StyleTags.resolver();
         System.arraycopy(extra, 0, all, 1, extra.length);
-        return Text.mini(StyleTokens.expand(source, StyleTags.theme(), false), all);
+        Component drawn = Text.mini(StyleTokens.expand(source, StyleTags.theme(), false), all);
+        return PlaceholderShield.marked(source) ? exactActions(drawn) : drawn;
+    }
+
+    /**
+     * {@code drawn} with the placeholder marks taken off what its clicks and insertions carry. A value is marked where it
+     * goes into a line (see {@link PlaceholderShield}); on screen the mark has no width, but a command, an address or the
+     * text a click copies has to stay byte for byte what was written.
+     */
+    private static Component exactActions(Component drawn) {
+        Style style = drawn.style();
+        ClickEvent<?> click = style.clickEvent();
+        if (click != null && click.payload() instanceof ClickEvent.Payload.Text text) {
+            style = style.clickEvent(exact(click, PlaceholderShield.unshield(text.value())));
+        }
+        String insertion = style.insertion();
+        if (insertion != null) {
+            style = style.insertion(PlaceholderShield.unshield(insertion));
+        }
+        List<Component> children =
+                drawn.children().stream().map(StyledText::exactActions).toList();
+        return drawn.style(style).children(children);
+    }
+
+    private static ClickEvent<?> exact(ClickEvent<?> click, String value) {
+        ClickEvent.Action<?> action = click.action();
+        if (action.equals(ClickEvent.Action.OPEN_URL)) {
+            return ClickEvent.openUrl(value);
+        }
+        if (action.equals(ClickEvent.Action.OPEN_FILE)) {
+            return ClickEvent.openFile(value);
+        }
+        if (action.equals(ClickEvent.Action.RUN_COMMAND)) {
+            return ClickEvent.runCommand(value);
+        }
+        if (action.equals(ClickEvent.Action.SUGGEST_COMMAND)) {
+            return ClickEvent.suggestCommand(value);
+        }
+        if (action.equals(ClickEvent.Action.COPY_TO_CLIPBOARD)) {
+            return ClickEvent.copyToClipboard(value);
+        }
+        return click;
     }
 
     /**

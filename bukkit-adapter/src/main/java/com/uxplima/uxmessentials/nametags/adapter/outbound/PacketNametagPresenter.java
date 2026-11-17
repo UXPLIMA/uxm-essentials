@@ -29,7 +29,9 @@ import com.uxplima.uxmessentials.shared.adapter.outbound.hud.AnimationRegistry;
 import com.uxplima.uxmessentials.shared.adapter.outbound.hud.HudText;
 import com.uxplima.uxmessentials.shared.adapter.outbound.hud.ReaderText;
 import com.uxplima.uxmessentials.shared.adapter.outbound.papi.PlaceholderApiSupport;
+import com.uxplima.uxmessentials.shared.adapter.outbound.papi.PlaceholderShield;
 import com.uxplima.uxmessentials.shared.adapter.outbound.permission.CatalogPermissionCheck;
+import com.uxplima.uxmessentials.shared.adapter.outbound.style.StyledText;
 import com.uxplima.uxmessentials.shared.adapter.outbound.team.PlayerTeamCoordinator;
 import com.uxplima.uxmessentials.shared.display.ConditionContext;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
@@ -333,8 +335,10 @@ public final class PacketNametagPresenter {
         long frame = animations.tick();
         List<Component> rendered = new ArrayList<>(format.lines().size());
         for (String line : format.lines()) {
-            String withName =
-                    readerText.forReader(wearer.getUniqueId(), line, reader).replace("{player}", wearer.getName());
+            // The name is read as markup and handed to PlaceholderAPI next, as the scoreboard and tablist names are.
+            String withName = readerText
+                    .forReader(wearer.getUniqueId(), line, reader)
+                    .replace("{player}", PlaceholderShield.shield(StyledText.escape(wearer.getName())));
             rendered.add(HudText.render(wearer.getUniqueId(), animations.resolve(withName, frame)));
         }
         return rendered;

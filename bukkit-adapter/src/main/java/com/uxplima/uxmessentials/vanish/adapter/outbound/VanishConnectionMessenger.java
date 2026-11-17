@@ -101,11 +101,7 @@ public final class VanishConnectionMessenger {
                 String template = canSee ? staffTemplate : publicTemplate;
                 if (!template.isBlank()) {
                     recipients.add(new Recipient(
-                            online,
-                            viewer,
-                            new Pending(
-                                    HudText.lineFor(viewer.uuid(), template),
-                                    messages.resolve(viewer, PREFIX, Map.of()))));
+                            online, viewer, new Pending(HudText.lineFor(viewer.uuid(), template), prefix(viewer))));
                 }
             }
             if (recipients.isEmpty()) {
@@ -122,6 +118,14 @@ public final class VanishConnectionMessenger {
                     },
                     () -> deliver(recipients, who, Component.text(who.name()), UnaryOperator.identity()));
         });
+    }
+
+    /**
+     * The chat prefix as {@code viewer} reads it, its placeholders filled for them, the same as the prefix of every line
+     * the message sink draws.
+     */
+    private String prefix(PlayerRef viewer) {
+        return PlaceholderApiSupport.messageBridge(viewer.uuid()).apply(messages.resolve(viewer, PREFIX, Map.of()));
     }
 
     private void deliver(List<Recipient> recipients, PlayerRef who, Component display, UnaryOperator<String> subject) {

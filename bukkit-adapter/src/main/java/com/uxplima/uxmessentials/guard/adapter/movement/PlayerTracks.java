@@ -37,11 +37,11 @@ import com.uxplima.uxmessentials.guard.domain.engine.RegionSet;
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.ClickActionValueCheck;
 import com.uxplima.uxmessentials.shared.adapter.outbound.action.ClickActionRunner;
 import com.uxplima.uxmessentials.shared.adapter.outbound.papi.PlaceholderApiSupport;
+import com.uxplima.uxmessentials.shared.adapter.outbound.papi.PlaceholderShield;
 import com.uxplima.uxmessentials.shared.adapter.outbound.style.StyledText;
 import com.uxplima.uxmessentials.shared.application.permission.ContentPermissions;
 import com.uxplima.uxmessentials.shared.domain.action.ClickAction;
 import com.uxplima.uxmessentials.shared.domain.action.ClickTrigger;
-import me.clip.placeholderapi.PlaceholderAPI;
 import org.jspecify.annotations.Nullable;
 
 /**
@@ -500,10 +500,8 @@ public final class PlayerTracks {
 
     /** A region message with {@code {player}} filled in, and PlaceholderAPI's placeholders when it is installed. */
     private static String expand(Player player, String text) {
-        String named = text.replace("{player}", player.getName());
-        return PlaceholderApiSupport.isPresent() && named.indexOf('%') >= 0
-                ? PlaceholderAPI.setPlaceholders(player, named)
-                : named;
+        String named = text.replace("{player}", PlaceholderShield.shield(player.getName()));
+        return PlaceholderApiSupport.messageBridge(player.getUniqueId()).apply(named);
     }
 
     private @Nullable Location pushBack(Track track, Location from, @Nullable RegionSet set, boolean teleport) {
