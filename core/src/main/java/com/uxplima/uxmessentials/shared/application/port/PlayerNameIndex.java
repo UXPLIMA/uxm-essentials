@@ -26,9 +26,10 @@ public interface PlayerNameIndex {
     List<PlayerRef> byName(String name);
 
     /**
-     * Like {@link #byName}, but complete: the memory holds only the most recently seen names, so this also reads the
-     * durable store when there is one. It reads storage, so it is called off the tick. The default answers from
-     * memory, for an index that has no store.
+     * Like {@link #byName}, but complete and current: the memory holds only the most recently seen names and hears
+     * only of some joins, so this reads the durable store when there is one, and a remembered holder the store has
+     * seen under another name since is not answered. It reads storage, so it is called off the tick. The default
+     * answers from memory, for an index that has no store.
      */
     default List<PlayerRef> storedUnder(String name) {
         return byName(name);

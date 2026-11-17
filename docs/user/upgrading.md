@@ -3,6 +3,24 @@
 What an operator edits when a release renames something an operator's own files or permission grants depend on, or
 needs a setting it did not need before.
 
+## Placeholders typed by players stay as typed
+
+With PlaceholderAPI installed, a `%placeholder%` inside a value (a private message, mail, help request, staff chat
+line, nickname, item or sign name, or a line relayed from another server) is no longer filled in for the reader; it
+shows as typed. Placeholders you write into a message file, the `<prefix>`, an `@key` line's own arguments and a
+`/broadcast` line are still filled, and the `<prefix>` now fills its placeholders too.
+
+## Nicks are kept in the database
+
+A `/nick` is kept in the new `player_nicks` table, so it survives a relog and follows the player to every server; it
+was lost before. A nick that is another account's name in any case, or another player's nick, is refused; a player may
+wear their own name, a Bedrock player's dotted one too. One nick has one holder across the database, so two servers
+cannot hand it out at once, and a nick that copied a name before its account first joined is cleared when it joins.
+A nick saved in a server's player data by an earlier version is taken over at the player's next join to that server,
+under the same rules, when the database holds none; one that is taken is dropped. `/realname` also answers for a nick
+whose player is offline or on another server. A server still on an older release does not show the shared nick, so
+upgrade every server of the network in the same window.
+
 ## Lists name the players of every server
 
 On a network, tab completion, `/list`, `/staff`, `/stafflist`, `staff_online`, the player pickers, `/realname`,
@@ -168,6 +186,13 @@ a player who is offline, or on another server, is now kept and put on the player
 the server they are on, with the same safety snapshot first. It used to answer that the player was not online.
 Upgrade every server that shares the database in the same window: an older server neither applies a kept restore nor
 announces one.
+
+## /pay reaches players who are not online
+
+The update adds the `player_notices` table; nothing needs editing. `/pay` now pays a player who is offline or on
+another server, where it used to answer that the player was unknown. The receiver's own `/paytoggle`, the minimum
+and the confirm threshold apply as before. The line telling them they were paid waits in that table until they are
+next online.
 
 ## Velocity bus frames need a shared secret
 

@@ -37,9 +37,11 @@ import org.jspecify.annotations.NullMarked;
  * <p>Before MiniMessage parses, the source runs through a per-viewer pre-parse transform, the {@code
  * preParse} factory. The default factory yields the identity transform; the PlaceholderAPI integration
  * supplies one that expands {@code %papi%} placeholders against the viewer, so operator-authored catalog
- * content (announcer lines, join messages) may embed third-party placeholders. The transform runs on the
- * caller's thread before the entity hop, and degrades to the identity when PlaceholderAPI is absent, so it
- * never touches the domain and is a no-op without the soft-depend.
+ * content (announcer lines, join messages) and the {@code <prefix>} may embed third-party placeholders. The transform
+ * runs on the caller's thread before the entity hop, and degrades to the identity when PlaceholderAPI is absent, so it
+ * never touches the domain and is a no-op without the soft-depend. A line reaches here already filled with its values;
+ * those were shielded as they went in ({@code PlaceholderShield}), so a placeholder a player typed into one reads as
+ * written rather than being filled for the viewer.
  *
  * <p>A line that opens with {@code <center>} is drawn in the middle of the chat. See {@link ChatCentre}.
  */
@@ -68,23 +70,44 @@ public final class BukkitMessageSink implements MessageSink {
     public void deliver(PlayerRef viewer, String renderedText) {
         Objects.requireNonNull(viewer, "viewer");
         Objects.requireNonNull(renderedText, "renderedText");
-        String expanded = preParse.apply(viewer.uuid()).apply(renderedText);
-        TagResolver prefix = Placeholder.parsed("prefix", prefixTemplate);
-        Optional<String> centred = ChatCentre.afterMarker(expanded);
-        Component component = centred.isPresent()
-                ? CenteredTextPadder.centred(StyledText.render(centred.get(), prefix))
-                : StyledText.render(expanded, prefix);
+        Component component = component(viewer, renderedText);
         if (viewer.isSystem()) {
             scheduler.onGlobal(() -> Bukkit.getConsoleSender().sendMessage(component));
             return;
         }
-        scheduler.onEntity(viewer, () -> sendTo(viewer, component));
+        scheduler.onEntity(viewer, () -> sendTo(viewer, component, () -> {}));
     }
 
-    private void sendTo(PlayerRef viewer, Component component) {
+    @Override
+    public void deliver(PlayerRef viewer, String renderedText, Runnable unreached) {
+        Objects.requireNonNull(unreached, "unreached");
+        if (viewer.isSystem()) {
+            deliver(viewer, renderedText);
+            return;
+        }
+        Objects.requireNonNull(renderedText, "renderedText");
+        Component component = component(viewer, renderedText);
+        // A player still logging in has no entity yet and one quitting loses it; either way the line did not land.
+        scheduler.onEntity(viewer, () -> sendTo(viewer, component, unreached), unreached);
+    }
+
+    private Component component(PlayerRef viewer, String renderedText) {
+        UnaryOperator<String> placeholders = preParse.apply(viewer.uuid());
+        String expanded = placeholders.apply(renderedText);
+        // The prefix is the operator's words too, and is read for the same viewer as the line it opens.
+        TagResolver prefix = Placeholder.parsed("prefix", placeholders.apply(prefixTemplate));
+        Optional<String> centred = ChatCentre.afterMarker(expanded);
+        return centred.isPresent()
+                ? CenteredTextPadder.centred(StyledText.render(centred.get(), prefix))
+                : StyledText.render(expanded, prefix);
+    }
+
+    private void sendTo(PlayerRef viewer, Component component, Runnable unreached) {
         Player player = Bukkit.getPlayer(viewer.uuid());
         if (player != null) {
             player.sendMessage(component);
+        } else {
+            unreached.run();
         }
     }
 }

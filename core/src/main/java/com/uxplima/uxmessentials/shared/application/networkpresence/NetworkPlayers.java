@@ -6,8 +6,10 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.function.Supplier;
 
 import com.uxplima.uxmessentials.shared.application.port.NetworkPresence;
+import com.uxplima.uxmessentials.shared.domain.NameCase;
 import com.uxplima.uxmessentials.shared.domain.OnlinePlayer;
 import com.uxplima.uxmessentials.shared.domain.PresenceTraits;
 
@@ -29,9 +31,12 @@ public final class NetworkPlayers {
             Comparator.comparing(online -> online.player().name().toLowerCase(Locale.ROOT));
 
     private final NetworkPresence presence;
+    private final Supplier<NameCase> names;
 
-    public NetworkPlayers(NetworkPresence presence) {
+    /** @param names how names are told apart, asked on every lookup since it can change while the server runs */
+    public NetworkPlayers(NetworkPresence presence, Supplier<NameCase> names) {
         this.presence = Objects.requireNonNull(presence, "presence");
+        this.names = Objects.requireNonNull(names, "names");
     }
 
     /** The players on other backends a viewer at {@code seeLevel} sees, one per account, ordered by name. */
@@ -68,12 +73,50 @@ public final class NetworkPlayers {
         return count;
     }
 
-    /** The player on another backend with this name that a viewer at {@code seeLevel} sees, if any. */
+    /**
+     * The player on another backend with this name that a viewer at {@code seeLevel} sees, if any. The name spelled
+     * exactly wins over any other case. Where names differ by case only between accounts ({@link NameCase#SENSITIVE})
+     * only the exact spelling answers, since another spelling is another player. Otherwise a name has one owner in any
+     * case: a player here under it holds it, so nobody elsewhere answers, and a lone player elsewhere under the name in
+     * another case does, while several are no answer.
+     */
     public Optional<OnlinePlayer> findElsewhere(String name, int seeLevel) {
         Objects.requireNonNull(name, "name");
-        return presence.findByName(name)
-                .filter(online -> !online.server().equals(presence.localServer()))
-                .filter(online -> traits(online).visibleTo(seeLevel));
+        String wanted = name.strip();
+        if (wanted.isEmpty()) {
+            return Optional.empty();
+        }
+        boolean sensitive = names.get() == NameCase.SENSITIVE;
+        if (!sensitive
+                && presence.findByName(wanted)
+                        .filter(online -> online.server().equals(presence.localServer()))
+                        .isPresent()) {
+            return Optional.empty();
+        }
+        List<OnlinePlayer> remote = remote();
+        for (OnlinePlayer online : remote) {
+            if (online.player().name().equals(wanted)) {
+                return seen(online, seeLevel);
+            }
+        }
+        if (sensitive) {
+            return Optional.empty();
+        }
+        OnlinePlayer caseless = null;
+        for (OnlinePlayer online : remote) {
+            if (online.player().name().equalsIgnoreCase(wanted)) {
+                if (caseless != null
+                        && !caseless.player().uuid().equals(online.player().uuid())) {
+                    return Optional.empty();
+                }
+                caseless = online;
+            }
+        }
+        return caseless == null ? Optional.empty() : seen(caseless, seeLevel);
+    }
+
+    private Optional<OnlinePlayer> seen(OnlinePlayer online, int seeLevel) {
+        return traits(online).visibleTo(seeLevel) ? Optional.of(online) : Optional.empty();
     }
 
     private List<OnlinePlayer> remote() {

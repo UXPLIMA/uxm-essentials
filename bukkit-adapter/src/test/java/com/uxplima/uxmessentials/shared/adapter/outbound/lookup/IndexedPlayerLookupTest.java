@@ -44,7 +44,11 @@ class IndexedPlayerLookupTest {
 
     private final OnlinePlayerIndex online = new OnlinePlayerIndex();
     private final ServerProfiles server = new ServerProfiles();
-    private final CachingPlayerNameIndex names = new CachingPlayerNameIndex(new NoScheduler(), new QuietLog());
+    /** This backend's monotonic clock, in milliseconds, for the windows the index keeps. */
+    private long millis;
+
+    private final QuietLog log = new QuietLog();
+    private final CachingPlayerNameIndex names = new CachingPlayerNameIndex(new NoScheduler(), log, () -> millis);
     /** Whether the lookup is asked from a tick thread, where it may not read the name store. */
     private boolean onTick;
 
@@ -300,6 +304,210 @@ class IndexedPlayerLookupTest {
     }
 
     @Test
+    void onlineModeANameThatChangedHandsOnAnotherBackendResolvesToItsNewHolderOffTheTick() {
+        PlayerRef oldHolder = new PlayerRef(UUID.randomUUID(), "Bob");
+        PlayerRef newHolder = new PlayerRef(UUID.randomUUID(), "bob");
+        StoredNames store = new StoredNames();
+        store.upsert(new PlayerName(oldHolder.uuid(), oldHolder.name(), 100L));
+        names.backWith(store, 10);
+        // The new holder joined only on another backend, which this one has no word from: the store has it.
+        store.upsert(new PlayerName(newHolder.uuid(), newHolder.name(), 200L));
+
+        onTick = true;
+        int readsBefore = store.reads;
+        assertThat(onlineMode.matchByName("Bob")).isEqualTo(NameMatch.found(oldHolder));
+        assertThat(store.reads).as("the tick answers from memory alone").isEqualTo(readsBefore);
+
+        onTick = false;
+        assertThat(onlineMode.matchByName("Bob")).isEqualTo(NameMatch.found(newHolder));
+        // What the store said is remembered, so the tick answers the same from then on.
+        onTick = true;
+        assertThat(onlineMode.matchByName("BOB")).isEqualTo(NameMatch.found(newHolder));
+    }
+
+    @Test
+    void onlineModeAHolderTheStoreHasSeenUnderAnotherNameSinceIsLetGo() {
+        PlayerRef bob = new PlayerRef(UUID.randomUUID(), "Bob");
+        StoredNames store = new StoredNames();
+        store.upsert(new PlayerName(bob.uuid(), bob.name(), 100L));
+        names.backWith(store, 10);
+        // Bob renamed and joined another backend under the new name.
+        store.upsert(new PlayerName(bob.uuid(), "Robert", 300L));
+
+        assertThat(onlineMode.matchByName("bob")).isEqualTo(NameMatch.unknown());
+        assertThat(names.byName("bob")).isEmpty();
+        assertThat(names.byName("robert")).containsExactly(new PlayerRef(bob.uuid(), "Robert"));
+    }
+
+    @Test
+    void onlineModeAJoinHereNewerThanTheStoreWinsWhileItsRowIsBeingWritten() {
+        PlayerRef earlier = new PlayerRef(UUID.randomUUID(), "Bob");
+        StoredNames store = new StoredNames();
+        store.upsert(new PlayerName(earlier.uuid(), earlier.name(), 100L));
+        names.backWith(store, 10);
+        PlayerRef joined = new PlayerRef(UUID.randomUUID(), "bob");
+
+        // The join is remembered at once; its row is written later, off the tick.
+        names.record(joined.uuid(), joined.name());
+
+        assertThat(onlineMode.matchByName("Bob")).isEqualTo(NameMatch.found(joined));
+    }
+
+    @Test
+    void offlineModeARenamedBedrockAccountIsNotAnsweredForItsOldGamertagOffTheTick() {
+        PlayerRef taker = new PlayerRef(UUID.fromString("00000000-0000-0000-0009-0000000000aa"), BEDROCK.name());
+        StoredNames store = new StoredNames();
+        store.upsert(new PlayerName(BEDROCK.uuid(), BEDROCK.name(), 100L));
+        names.backWith(store, 10);
+        // The gamertag changed hands: its first holder renamed, another account took it, both on another backend.
+        store.upsert(new PlayerName(BEDROCK.uuid(), ".Renamed", 300L));
+        store.upsert(new PlayerName(taker.uuid(), taker.name(), 250L));
+
+        onTick = true;
+        int readsBefore = store.reads;
+        assertThat(lookup.matchByName(BEDROCK.name())).isEqualTo(NameMatch.found(BEDROCK));
+        assertThat(store.reads).isEqualTo(readsBefore);
+
+        onTick = false;
+        assertThat(lookup.matchByName(BEDROCK.name())).isEqualTo(NameMatch.found(taker));
+        onTick = true;
+        assertThat(lookup.matchByName(BEDROCK.name())).isEqualTo(NameMatch.found(taker));
+    }
+
+    @Test
+    void offlineModeAnExactSpellingTheStoreConfirmsStillWinsOverAVariant() {
+        StoredNames store = new StoredNames();
+        store.upsert(new PlayerName(STEVE.uuid(), STEVE.name(), 100L));
+        store.upsert(new PlayerName(LOWER_STEVE.uuid(), LOWER_STEVE.name(), 200L));
+        names.backWith(store, 10);
+
+        assertThat(lookup.matchByName("Steve")).isEqualTo(NameMatch.found(STEVE));
+        assertThat(lookup.matchByName("steve")).isEqualTo(NameMatch.found(LOWER_STEVE));
+        assertThat(lookup.matchByName("STEVE")).isInstanceOf(NameMatch.Ambiguous.class);
+    }
+
+    @Test
+    void theMemoryAloneAnswersForANameItHoldsWhenTheStoreIsNotRead() {
+        StoredNames store = new StoredNames();
+        store.upsert(new PlayerName(ALEX.uuid(), ALEX.name(), 100L));
+        names.backWith(store, 10);
+        int readsBefore = store.reads;
+
+        assertThat(onlineMode.matchByNameFromMemory("alex")).isEqualTo(NameMatch.found(ALEX));
+        assertThat(lookup.matchByNameFromMemory("Alex")).isEqualTo(NameMatch.found(ALEX));
+
+        assertThat(store.reads).isEqualTo(readsBefore);
+    }
+
+    @Test
+    void aRenameStoredByABackendWhoseClockRunsBehindStillTakesTheOldNameAwayInEitherMode() {
+        StoredNames store = new StoredNames();
+        CachingPlayerNameIndex index = new CachingPlayerNameIndex(new InlineScheduler(), log, () -> millis);
+        index.backWith(store, 10);
+        PlayerLookup insensitive =
+                new IndexedPlayerLookup(server, index, online, () -> NameCase.INSENSITIVE, () -> onTick);
+        PlayerLookup sensitive = new IndexedPlayerLookup(server, index, online, () -> NameCase.SENSITIVE, () -> onTick);
+        PlayerRef bob = new PlayerRef(UUID.randomUUID(), "Bob");
+        // Bob joined here and the row was written by this backend's clock.
+        index.record(bob.uuid(), bob.name());
+        // Bob renamed and joined another backend whose clock runs a long way behind this one.
+        store.upsert(new PlayerName(bob.uuid(), "Robert", 100L));
+
+        assertThat(insensitive.matchByName("bob")).isEqualTo(NameMatch.unknown());
+        assertThat(sensitive.matchByName("Bob")).isEqualTo(NameMatch.unknown());
+        assertThat(insensitive.matchByName("robert")).isEqualTo(NameMatch.found(new PlayerRef(bob.uuid(), "Robert")));
+    }
+
+    @Test
+    void aNameLearnedFromAnotherBackendStandsOnlyUntilItsRowHadTimeToBeWritten() {
+        PlayerRef bob = new PlayerRef(UUID.randomUUID(), "Bob");
+        StoredNames store = new StoredNames();
+        // What the store still says of the account, stamped by a backend whose clock runs far behind this one.
+        store.upsert(new PlayerName(bob.uuid(), "Robert", 100L));
+        names.backWith(store, 10);
+
+        names.learn(bob.uuid(), bob.name());
+        assertThat(onlineMode.matchByName("bob")).isEqualTo(NameMatch.found(bob));
+        assertThat(lookup.matchByName("Bob")).isEqualTo(NameMatch.found(bob));
+
+        millis += 31_000L;
+        assertThat(onlineMode.matchByName("bob")).isEqualTo(NameMatch.unknown());
+        assertThat(lookup.matchByName("Robert")).isEqualTo(NameMatch.found(new PlayerRef(bob.uuid(), "Robert")));
+    }
+
+    @Test
+    void whileTheStoreCannotBeReadTheMemoryAnswersAndThatIsLoggedOnce() {
+        StoredNames store = new StoredNames();
+        store.upsert(new PlayerName(ALEX.uuid(), ALEX.name(), 100L));
+        names.backWith(store, 10);
+        store.unreachable = true;
+
+        assertThat(onlineMode.matchByName("alex")).isEqualTo(NameMatch.found(ALEX));
+        assertThat(lookup.matchByName("Alex")).isEqualTo(NameMatch.found(ALEX));
+        assertThat(lookup.findByUuid(ALEX.uuid())).contains(ALEX);
+        assertThat(lookup.findByUuid(UUID.randomUUID())).isEmpty();
+
+        assertThat(log.warnings).isEqualTo(1);
+        millis += 61_000L;
+        onlineMode.matchByName("alex");
+        assertThat(log.warnings).isEqualTo(2);
+    }
+
+    @Test
+    void aNameConfirmedAMomentAgoIsReadAgainOnlyAfterAFewSecondsOrANewJoin() {
+        StoredNames store = new StoredNames();
+        store.upsert(new PlayerName(ALEX.uuid(), ALEX.name(), 100L));
+        names.backWith(store, 10);
+        onlineMode.matchByName("alex");
+        int reads = store.reads;
+
+        assertThat(onlineMode.matchByName("ALEX")).isEqualTo(NameMatch.found(ALEX));
+        assertThat(store.reads).isEqualTo(reads);
+
+        millis += 5_000L;
+        onlineMode.matchByName("alex");
+        assertThat(store.reads).isGreaterThan(reads);
+
+        reads = store.reads;
+        names.record(STEVE.uuid(), STEVE.name());
+        onlineMode.matchByName("alex");
+        assertThat(store.reads).isGreaterThan(reads);
+    }
+
+    @Test
+    void aConfirmationReadWhileANameWasHeardIsNotServedAfterwards() {
+        PlayerRef bob = new PlayerRef(UUID.randomUUID(), "Bob");
+        StoredNames store = new StoredNames();
+        store.upsert(new PlayerName(ALEX.uuid(), ALEX.name(), 100L));
+        names.backWith(store, 10);
+        // While the store is read for "alex", another backend announces Bob: the answer read may be out of date.
+        store.duringNextRead = () -> names.learn(bob.uuid(), bob.name());
+        onlineMode.matchByName("alex");
+        int reads = store.reads;
+
+        onlineMode.matchByName("alex");
+
+        assertThat(store.reads).isGreaterThan(reads);
+    }
+
+    @Test
+    void aJoinHereWhileTheStoreIsReadIsNotUndoneByWhatTheReadFound() {
+        PlayerRef first = new PlayerRef(UUID.randomUUID(), "Bob");
+        PlayerRef renamed = new PlayerRef(UUID.randomUUID(), "Rob");
+        StoredNames store = new StoredNames();
+        store.upsert(new PlayerName(first.uuid(), first.name(), 100L));
+        // What the store still says of the second account, which is about to join here under a new name.
+        store.upsert(new PlayerName(renamed.uuid(), "bob", 200L));
+        names.backWith(store, 10);
+        store.duringNextRead = () -> names.record(renamed.uuid(), renamed.name());
+
+        onlineMode.matchByName("Bob");
+
+        assertThat(names.byUuid(renamed.uuid())).contains(renamed);
+        assertThat(names.byName("bob")).doesNotContain(new PlayerRef(renamed.uuid(), "bob"));
+    }
+
+    @Test
     void offlineModeTheServerCacheAnswersOnlyForTheSpellingTyped() {
         server.profiles.put(STEVE.uuid(), STEVE);
 
@@ -377,6 +585,19 @@ class IndexedPlayerLookupTest {
     private static final class StoredNames implements PlayerNameRepository {
 
         final List<PlayerName> rows = new ArrayList<>();
+        /** How many times a typed name or an account was read from the store. */
+        int reads;
+        /** Whether the database is down, so every read fails. */
+        boolean unreachable;
+        /** Run once in the middle of the next read of a name, as another thread would act while it waits on the store. */
+        @org.jspecify.annotations.Nullable Runnable duringNextRead;
+
+        private void read() {
+            if (unreachable) {
+                throw new IllegalStateException("the database is down");
+            }
+            reads++;
+        }
 
         @Override
         public List<PlayerName> loadRecent(int limit) {
@@ -385,10 +606,17 @@ class IndexedPlayerLookupTest {
 
         @Override
         public List<PlayerName> underName(String name, int limit) {
-            return newestFirst()
+            read();
+            List<PlayerName> found = newestFirst()
                     .filter(row -> row.name().equalsIgnoreCase(name.strip()))
                     .limit(limit)
                     .toList();
+            Runnable meanwhile = duringNextRead;
+            duringNextRead = null;
+            if (meanwhile != null) {
+                meanwhile.run();
+            }
+            return found;
         }
 
         @Override
@@ -406,11 +634,14 @@ class IndexedPlayerLookupTest {
 
         @Override
         public java.util.Optional<PlayerName> byUuid(java.util.UUID uuid) {
+            read();
             return rows.stream().filter(row -> row.uuid().equals(uuid)).reduce((first, second) -> second);
         }
 
         @Override
         public void upsert(PlayerName record) {
+            // One row per account, as the table keeps it.
+            rows.removeIf(row -> row.uuid().equals(record.uuid()));
             rows.add(record);
         }
 
@@ -445,13 +676,47 @@ class IndexedPlayerLookupTest {
         public void asyncAfter(Duration delay, Runnable task) {}
     }
 
+    /** A store write that runs at once, as the async lane would a moment later. */
+    private static final class InlineScheduler implements Scheduler {
+
+        @Override
+        public void onGlobal(Runnable task) {
+            task.run();
+        }
+
+        @Override
+        public void onRegion(Position position, Runnable task) {
+            task.run();
+        }
+
+        @Override
+        public void onEntity(PlayerRef player, Runnable task) {
+            task.run();
+        }
+
+        @Override
+        public void async(Runnable task) {
+            task.run();
+        }
+
+        @Override
+        public void asyncAfter(Duration delay, Runnable task) {
+            task.run();
+        }
+    }
+
+    /** Counts the warnings, which an unreachable store must not flood. */
     private static final class QuietLog implements Logger {
+
+        int warnings;
 
         @Override
         public void info(String message, Object... args) {}
 
         @Override
-        public void warn(String message, Object... args) {}
+        public void warn(String message, Object... args) {
+            warnings++;
+        }
 
         @Override
         public void error(String message, Throwable cause) {}

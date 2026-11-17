@@ -9,6 +9,7 @@ import org.bukkit.entity.Player;
 
 import net.kyori.adventure.text.serializer.plain.PlainTextComponentSerializer;
 
+import com.uxplima.uxmessentials.shared.adapter.outbound.papi.PlaceholderShield;
 import com.uxplima.uxmessentials.shared.adapter.outbound.style.StyledText;
 import org.jspecify.annotations.NullMarked;
 
@@ -48,9 +49,10 @@ public final class BuiltinTokens {
         }
         String out = source;
         // A name is text in a line that is read as markup next, so a bracket in one is escaped: a server told to check
-        // names less, or a nickname, would otherwise open a tag.
-        out = replace(out, "{player}", () -> StyledText.escape(player.getName()));
-        out = replace(out, "{displayname}", () -> StyledText.escape(displayName(player)));
+        // names less, or a nickname, would otherwise open a tag. The line goes to PlaceholderAPI after this pass, so a
+        // placeholder typed into a nickname is shielded too.
+        out = replace(out, "{player}", () -> PlaceholderShield.shield(StyledText.escape(player.getName())));
+        out = replace(out, "{displayname}", () -> PlaceholderShield.shield(StyledText.escape(displayName(player))));
         // The {online} token reads only the roster size, never a player's mutable entity state. This pass runs in
         // the scoreboard/tablist renderers, which already hold the live viewer on its own region thread, and on the
         // PlaceholderAPI bridge thread for the metric tokens. Neither is the global thread, but a global marshal is

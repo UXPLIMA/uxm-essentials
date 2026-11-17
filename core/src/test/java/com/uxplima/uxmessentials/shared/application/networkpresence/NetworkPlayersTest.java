@@ -33,12 +33,82 @@ class NetworkPlayersTest {
             new PlayerRef(UUID.fromString("00000000-0000-0000-0009-01f2a3b4c5d6"), ".BedrockGamer123");
 
     private final MutableClock clock = new MutableClock(Instant.parse("2026-11-17T12:00:00Z"));
-    private final NetworkRoster roster =
-            new NetworkRoster("survival-1", clock, Duration.ofSeconds(90), () -> NameCase.INSENSITIVE);
+    private NameCase nameCase = NameCase.INSENSITIVE;
+    private final NetworkRoster roster = new NetworkRoster("survival-1", clock, Duration.ofSeconds(90), () -> nameCase);
     private final List<String> announced = new ArrayList<>();
     private final TrackNetworkPresence track = new TrackNetworkPresence(roster, new Recording(), new NoNames(), clock);
-    private final NetworkPlayers players = new NetworkPlayers(roster);
+    private final NetworkPlayers players = new NetworkPlayers(roster, () -> nameCase);
     private long sequence;
+
+    @Test
+    void offlineModeTheNameSpelledExactlyIsFoundElsewhereAndAnotherSpellingIsNot() {
+        nameCase = NameCase.SENSITIVE;
+        PlayerRef lowerBob = offline("bob");
+        PlayerRef bob = offline("Bob");
+        remote("lobby-1", lowerBob, PresenceTraits.PLAIN);
+        remote("lobby-2", bob, PresenceTraits.PLAIN);
+
+        assertThat(players.findElsewhere("Bob", 0)).map(OnlinePlayer::player).contains(bob);
+        assertThat(players.findElsewhere("bob", 0)).map(OnlinePlayer::player).contains(lowerBob);
+        assertThat(players.findElsewhere("BOB", 0)).isEmpty();
+    }
+
+    @Test
+    void offlineModeALoneVariantInAnotherCaseIsNotTakenForTheNameTyped() {
+        nameCase = NameCase.SENSITIVE;
+        remote("lobby-1", offline("bob"), PresenceTraits.PLAIN);
+
+        assertThat(players.findElsewhere("Bob", 0)).isEmpty();
+    }
+
+    @Test
+    void onlineModeTheExactSpellingElsewhereWinsOverAVariantElsewhere() {
+        PlayerRef lowerBob = offline("bob");
+        PlayerRef bob = offline("Bob");
+        remote("lobby-1", lowerBob, PresenceTraits.PLAIN);
+        remote("lobby-2", bob, PresenceTraits.PLAIN);
+
+        assertThat(players.findElsewhere("Bob", 0)).map(OnlinePlayer::player).contains(bob);
+        assertThat(players.findElsewhere("bob", 0)).map(OnlinePlayer::player).contains(lowerBob);
+    }
+
+    @Test
+    void onlineModeAPlayerHereHoldsTheirNameSoNobodyElsewhereAnswersForIt() {
+        track.joined(offline("bob"));
+        remote("lobby-1", offline("Bob"), PresenceTraits.PLAIN);
+
+        assertThat(players.findElsewhere("Bob", 0)).isEmpty();
+    }
+
+    @Test
+    void offlineModeAVariantHereDoesNotHideTheExactSpellingElsewhere() {
+        nameCase = NameCase.SENSITIVE;
+        PlayerRef bob = offline("Bob");
+        track.joined(offline("bob"));
+        remote("lobby-1", bob, PresenceTraits.PLAIN);
+
+        assertThat(players.findElsewhere("Bob", 0)).map(OnlinePlayer::player).contains(bob);
+    }
+
+    @Test
+    void onlineModeALoneVariantElsewhereIsFoundAndSeveralAreNot() {
+        PlayerRef bob = offline("Bob");
+        remote("lobby-1", bob, PresenceTraits.PLAIN);
+        assertThat(players.findElsewhere("BOB", 0)).map(OnlinePlayer::player).contains(bob);
+
+        remote("lobby-2", offline("bob"), PresenceTraits.PLAIN);
+
+        assertThat(players.findElsewhere("BOB", 0)).isEmpty();
+    }
+
+    @Test
+    void anExactSpellingHiddenFromTheViewerIsNotAnsweredWithAVariant() {
+        nameCase = NameCase.SENSITIVE;
+        remote("lobby-1", offline("Bob"), new PresenceTraits(3, false));
+        remote("lobby-1", offline("bob"), PresenceTraits.PLAIN);
+
+        assertThat(players.findElsewhere("Bob", 0)).isEmpty();
+    }
 
     @Test
     void playersOnOtherBackendsAreListedButNotThoseHere() {
@@ -179,5 +249,10 @@ class NetworkPlayersTest {
 
         @Override
         public void record(UUID uuid, String name) {}
+    }
+
+    /** An offline-mode account: its uuid derived from the name, so each spelling is its own account. */
+    private static PlayerRef offline(String name) {
+        return new PlayerRef(UUID.nameUUIDFromBytes(("OfflinePlayer:" + name).getBytes(StandardCharsets.UTF_8)), name);
     }
 }

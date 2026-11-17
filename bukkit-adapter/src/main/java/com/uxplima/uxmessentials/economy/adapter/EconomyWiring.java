@@ -88,6 +88,7 @@ import com.uxplima.uxmessentials.shared.application.module.KernelPorts;
 import com.uxplima.uxmessentials.shared.application.module.ModuleContext;
 import com.uxplima.uxmessentials.shared.application.port.ClickActionEconomy;
 import com.uxplima.uxmessentials.shared.application.port.Logger;
+import com.uxplima.uxmessentials.shared.application.port.PlayerNotices;
 import com.uxplima.uxmessentials.vaults.adapter.outbound.ProviderVaultEconomy;
 import com.uxplima.uxmessentials.vaults.application.port.VaultEconomy;
 import com.uxplima.uxmessentials.warps.application.port.WarpEconomy;
@@ -139,8 +140,10 @@ public final class EconomyWiring {
             Menus menus,
             MenuBindings menuBindings,
             Path dataFolder,
-            Optional<com.uxplima.uxmessentials.economy.application.port.DailyRewardLedger> dailyRewards) {
+            Optional<com.uxplima.uxmessentials.economy.application.port.DailyRewardLedger> dailyRewards,
+            PlayerNotices notices) {
         Objects.requireNonNull(plugin, "plugin");
+        Objects.requireNonNull(notices, "notices");
         Objects.requireNonNull(ctx, "ctx");
         Objects.requireNonNull(auditChannel, "auditChannel");
         Objects.requireNonNull(persistence, "persistence");
@@ -275,7 +278,8 @@ public final class EconomyWiring {
                 dataFolder,
                 // On a network the stamp is taken in the shared database, so a backend switch pays nothing twice.
                 dailyRewards.map(stamps -> new com.uxplima.uxmessentials.economy.application.ClaimDailyReward(
-                        stamps, clock, settings.dailyRewardCooldown())));
+                        stamps, clock, settings.dailyRewardCooldown())),
+                notices);
     }
 
     /**
@@ -459,7 +463,8 @@ public final class EconomyWiring {
             Menus menus,
             MenuBindings menuBindings,
             Path dataFolder,
-            Optional<com.uxplima.uxmessentials.economy.application.ClaimDailyReward> networkDailyReward) {
+            Optional<com.uxplima.uxmessentials.economy.application.ClaimDailyReward> networkDailyReward,
+            PlayerNotices notices) {
         KernelPorts kernel = ctx.kernel();
         BaltopExemption exemption = new PermissionBaltopExemption(kernel.permissions(), settings.baltopExemptNode());
         BaltopSnapshots snapshots = new BaltopSnapshots(
@@ -493,7 +498,8 @@ public final class EconomyWiring {
                 currencyPicker,
                 menus,
                 menuBindings,
-                dataFolder);
+                dataFolder,
+                notices);
         // The bare-/eco admin GUI (item 19): a hub over picker → per-player Give/Take/Set/Reset and a server-wide
         // bulk screen, reusing the shared input seam for amount entry. Built only when a seam is supplied (the
         // module is wired with GUIs available); GuiRootBinding then opens it on bare /eco when the catalog gui flag
@@ -711,7 +717,8 @@ public final class EconomyWiring {
             com.uxplima.uxmessentials.economy.adapter.inbound.gui.CurrencyPickerMenu currencyPicker,
             Menus menus,
             MenuBindings menuBindings,
-            Path dataFolder) {
+            Path dataFolder,
+            PlayerNotices notices) {
         // The bank, loan, and exchange dashboards all capture a typed amount through the shared input seam, so a
         // non-null TextInput is required to build them; bootstrap always supplies it.
         com.uxplima.uxmlib.gui.input.TextInput input = Objects.requireNonNull(textInput, "textInput");
@@ -760,7 +767,7 @@ public final class EconomyWiring {
                 settings.taxPolicy(),
                 new ProviderTaxSink(resolved, settings.taxSinkAccount(), kernel.log()),
                 new PermissionTaxExemption(kernel.permissions(), settings.taxBypassNode()));
-        Pay pay = new Pay(resolved, preferences, pending, notifier, taxation, clock);
+        Pay pay = new Pay(resolved, preferences, pending, notifier, notices, taxation, clock);
 
         boolean nativeLedger = walletLedgerIsAuthoritative(resolved, currencies, kernel);
         ExchangeService exchangeService = new ExchangeService(repository, settings.exchangeRegistry(), nativeLedger);

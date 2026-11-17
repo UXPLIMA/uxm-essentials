@@ -145,10 +145,10 @@ changes, trade signals and vote parties), and a second cache reload is harmless.
 
 This holds only once every backend runs the same version. During a rolling upgrade, a backend on an older version,
 or a vote party sent by one, can still pay a vote party twice. A backend remembers the ids it acted on in memory
-only, so a copy that arrives very late, after that backend restarted, can act again. Vote parties are the exception:
-a party sent over both carriers carries the time it fired, and a backend that is itself on both carriers drops one
-that fired more than 60 seconds before it started, so the late proxy copy of a party it already paid does not pay
-again. The 60 seconds cover a Redis copy sent while the backend was still starting and a sender whose clock runs a
+only, so a copy that arrives very late, after that backend restarted, can act again. Votes and vote parties are the
+exception: one sent over both carriers carries the time it was sent, and a backend that is itself on both carriers
+drops one sent more than 60 seconds before it started, so the late proxy copy of a party or a vote it already acted
+on is not paid or announced again. The 60 seconds cover a Redis copy sent while the backend was still starting and a sender whose clock runs a
 little ahead; a backend that restarts within 60 seconds of a party can still pay its late proxy copy again. A party
 sent on the proxy alone, or received by a backend on the proxy alone, is never dropped this way.
 
@@ -270,8 +270,8 @@ used on whichever server holds the player, when that server has its world. Detai
 Every backend knows which server each online player is on, from what the others announce with their heartbeats. With the
 network on, `/msg` and `/reply` reach a player on another server; that server applies the recipient's own message
 toggle, reply setting, ignore list and vanish. A spy holding `uxmessentials.msg.socialspy` sees every private message
-once, on any server; message switches and the `/reply` partner follow the player. `/helpop` and staff chat reach the
-staff of every server with the sender's server in the line. `/seen` reports a player elsewhere as online. Tab
+once, on any server; message switches, the `/reply` partner and the `/nick` follow the player. `/helpop` and staff chat
+reach the staff of every server with the sender's server in the line. `/seen` reports a player elsewhere as online. Tab
 completion, `/list`, `/staff`, `/stafflist` (a click teleports with teleport's `cross-server` on), `staff_online`,
 pickers, `/realname`, `/whois` and `/mail sendall` take in every server's players.
 

@@ -38,8 +38,8 @@ import org.jspecify.annotations.NullMarked;
  * it back to the account name, and {@code /nick <player> <name>} sets another player's (gated by
  * {@code uxmessentials.nick.others}). The validation, the stamp, and the confirmation are the
  * {@code SetNick}/{@code ClearNick} use cases' job; this handler only maps the arguments and resolves a named
- * target against the online set. The display-name application hops to the target's region thread inside the
- * {@code NickStore}, so the command stays a thin argument mapper.
+ * target, online here, on another server or offline, through the player lookup off the tick. The nick is kept in the
+ * database and shown on whichever server the player is on, so the command stays a thin argument mapper.
  *
  * <p>The first {@code name} argument is overloaded: alone it is the sender's own nick (or a clear keyword), and
  * in the two-argument form it names the target player. Its completion reflects that. It offers the sender's own
@@ -119,17 +119,25 @@ public final class NickCommand extends PresenceCommandSupport implements Command
         PlayerRef actor = ref(sender);
         String targetName = StringArgumentType.getString(ctx, "name");
         String nick = StringArgumentType.getString(ctx, "value");
-        NameMatch match = players.matchOnlineByName(targetName);
-        Optional<PlayerRef> target = match.player();
-        if (target.isEmpty()) {
-            feedback.send(sender, match.miss(PresenceMessageKey.NICK_TARGET_UNKNOWN, Map.of("player", targetName)));
-            return Command.SINGLE_SUCCESS;
-        }
-        if (nick.equalsIgnoreCase(OFF)) {
-            services.clearNick().clear(target.get());
-            return Command.SINGLE_SUCCESS;
-        }
-        services.setNick().set(actor, target.get(), nick);
+        // The target may be offline or on another server: the name is settled off the tick, where the shared name
+        // store may be read.
+        scheduler.async(() -> {
+            NameMatch match = players.matchByName(targetName);
+            Optional<PlayerRef> target = match.player();
+            if (target.isEmpty()) {
+                replyOnSenderThread(
+                        sender,
+                        () -> feedback.send(
+                                sender,
+                                match.miss(PresenceMessageKey.NICK_TARGET_UNKNOWN, Map.of("player", targetName))));
+                return;
+            }
+            if (nick.equalsIgnoreCase(OFF)) {
+                services.clearNick().clear(actor, target.get());
+                return;
+            }
+            services.setNick().set(actor, target.get(), nick);
+        });
         return Command.SINGLE_SUCCESS;
     }
 

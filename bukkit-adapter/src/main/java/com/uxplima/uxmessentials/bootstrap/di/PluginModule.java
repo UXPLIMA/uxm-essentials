@@ -136,6 +136,7 @@ import com.uxplima.uxmessentials.persistence.ip.LegacyIpHistoryBackfill;
 import com.uxplima.uxmessentials.persistence.ledger.ClaimLedgers;
 import com.uxplima.uxmessentials.persistence.lookup.PlayerNameRepositories;
 import com.uxplima.uxmessentials.persistence.menu.PlayerDataRepositories;
+import com.uxplima.uxmessentials.persistence.notice.PlayerNoticeStores;
 import com.uxplima.uxmessentials.persistence.playerstate.PlaytimeRepositories;
 import com.uxplima.uxmessentials.persistence.runtime.Persistence;
 import com.uxplima.uxmessentials.persistence.security.SecurityKeyFile;
@@ -216,6 +217,7 @@ import com.uxplima.uxmessentials.shared.adapter.inbound.lookup.NameCaseEvidenceL
 import com.uxplima.uxmessentials.shared.adapter.inbound.lookup.OnlinePlayerIndexListener;
 import com.uxplima.uxmessentials.shared.adapter.inbound.lookup.PlayerNameRecordingListener;
 import com.uxplima.uxmessentials.shared.adapter.inbound.networkpresence.NetworkPresenceListener;
+import com.uxplima.uxmessentials.shared.adapter.inbound.notice.KeptNoticeJoinListener;
 import com.uxplima.uxmessentials.shared.adapter.inbound.playerdata.PlayerDataLifecycleListener;
 import com.uxplima.uxmessentials.shared.adapter.inbound.window.FormReportingScreen;
 import com.uxplima.uxmessentials.shared.adapter.outbound.EngineLog;
@@ -233,6 +235,7 @@ import com.uxplima.uxmessentials.shared.adapter.outbound.bus.Bus;
 import com.uxplima.uxmessentials.shared.adapter.outbound.bus.BusWiring;
 import com.uxplima.uxmessentials.shared.adapter.outbound.bus.NetworkConfig;
 import com.uxplima.uxmessentials.shared.adapter.outbound.bus.NetworkPresenceWiring;
+import com.uxplima.uxmessentials.shared.adapter.outbound.bus.NoticeSync;
 import com.uxplima.uxmessentials.shared.adapter.outbound.bus.SharedCacheRefresh;
 import com.uxplima.uxmessentials.shared.adapter.outbound.chat.UxmChatStepBack;
 import com.uxplima.uxmessentials.shared.adapter.outbound.claim.LibraryClaims;
@@ -252,6 +255,8 @@ import com.uxplima.uxmessentials.shared.adapter.outbound.lookup.CachingPlayerNam
 import com.uxplima.uxmessentials.shared.adapter.outbound.lookup.ServerKnownPlayers;
 import com.uxplima.uxmessentials.shared.adapter.outbound.message.LocaleResolver;
 import com.uxplima.uxmessentials.shared.adapter.outbound.meta.PlayerMeta;
+import com.uxplima.uxmessentials.shared.adapter.outbound.notice.KeptNoticeSettings;
+import com.uxplima.uxmessentials.shared.adapter.outbound.notice.KeptNoticeSweep;
 import com.uxplima.uxmessentials.shared.adapter.outbound.papi.BukkitPlayerFacts;
 import com.uxplima.uxmessentials.shared.adapter.outbound.papi.BukkitServerMetrics;
 import com.uxplima.uxmessentials.shared.adapter.outbound.papi.GateModerationPlaceholders;
@@ -292,6 +297,8 @@ import com.uxplima.uxmessentials.shared.application.command.CommandDefinition;
 import com.uxplima.uxmessentials.shared.application.command.CommandId;
 import com.uxplima.uxmessentials.shared.application.command.EffectiveCommand;
 import com.uxplima.uxmessentials.shared.application.health.HealthCheck;
+import com.uxplima.uxmessentials.shared.application.message.DeferredPlayerNotices;
+import com.uxplima.uxmessentials.shared.application.message.Notifier;
 import com.uxplima.uxmessentials.shared.application.module.FeatureModule;
 import com.uxplima.uxmessentials.shared.application.module.KernelPorts;
 import com.uxplima.uxmessentials.shared.application.module.LoadCondition;
@@ -311,6 +318,7 @@ import com.uxplima.uxmessentials.shared.application.port.ConfigStore;
 import com.uxplima.uxmessentials.shared.application.port.IpHistoryStore;
 import com.uxplima.uxmessentials.shared.application.port.IpTokens;
 import com.uxplima.uxmessentials.shared.application.port.NetworkPresence;
+import com.uxplima.uxmessentials.shared.application.port.PendingPlayerNotices;
 import com.uxplima.uxmessentials.shared.application.port.PlayerNameRepository;
 import com.uxplima.uxmessentials.shared.application.reload.ReloadTask;
 import com.uxplima.uxmessentials.shared.application.teleport.PaidTeleports;
@@ -933,7 +941,8 @@ public final class PluginModule {
                 wiredKernel.resolver()::resolve,
                 networkPresence.presence(),
                 networkPresence.track(),
-                wiredKernel.networkClaims());
+                wiredKernel.networkClaims(),
+                wiredKernel.nameIndex());
         bus.start();
         networkPresence.start();
         // Every module has registered its resync by now. The proxy cannot relay a frame to an empty backend, so the
@@ -1290,7 +1299,8 @@ public final class PluginModule {
             Function<com.uxplima.uxmessentials.shared.domain.PlayerRef, Locale> languages,
             NetworkPresence presence,
             com.uxplima.uxmessentials.shared.application.networkpresence.TrackNetworkPresence presenceTrack,
-            Optional<com.uxplima.uxmessentials.shared.application.ledger.NetworkClaims> networkClaims) {
+            Optional<com.uxplima.uxmessentials.shared.application.ledger.NetworkClaims> networkClaims,
+            CachingPlayerNameIndex nameIndex) {
         // teleport is wired before homes/warps (registry order is dependency-first), so its engine is
         // captured and handed to the contexts that delegate teleport execution to it.
         // The cross-server hop every teleport kind shares, built before any of them wires so each registers its
@@ -1306,7 +1316,35 @@ public final class PluginModule {
         links.dailyRewards = networkClaims.map(claims -> ClaimLedgers.dailyRewards(persistence));
         links.claimLedger = ClaimLedgers.claims(persistence);
         links.kitResets = ClaimLedgers.kitResets(persistence);
+        // A line for a player who is not online here, such as being paid, is kept in the shared database and shown
+        // when they are next online: at once on the server they are on, which the keep announces, or as they join.
+        // A player away for long, or sent a flood of lines, holds only so many and only for so long.
+        KeptNoticeSettings noticeSettings = KeptNoticeSettings.from(config, kernel.log());
+        PendingPlayerNotices keptNotices =
+                PlayerNoticeStores.pending(persistence, kernel.log(), noticeSettings.keptPerPlayer());
+        DeferredPlayerNotices notices = new DeferredPlayerNotices(
+                NoticeSync.pending(keptNotices, bus.publisher(), kernel.log()),
+                kernel.playerLookup(),
+                new Notifier(kernel.messages(), kernel.messageSink()),
+                kernel.scheduler(),
+                kernel.log(),
+                Clock.systemUTC(),
+                noticeSettings.shownAtOnce());
+        AutoCloseable noticeSweep = new KeptNoticeSweep(
+                        keptNotices, noticeSettings.keepFor(), kernel.scheduler(), Clock.systemUTC(), kernel.log())
+                .start();
+        resources.onClose(() -> {
+            try {
+                noticeSweep.close();
+            } catch (Exception closeFailure) {
+                kernel.log().warn("event=notice_sweep_close_failed detail={}", closeFailure.toString());
+            }
+        });
+        bus.registry().register(NoticeSync.listener(notices::deliver, kernel.playerLookup(), kernel.scheduler()));
+        resources.addListener(new KeptNoticeJoinListener(notices, kernel.scheduler()));
+        links.playerNotices = notices;
         links.livePeers = livePeers;
+        links.nameIndex = nameIndex;
         links.proxyAnswering = () -> busHealth
                 .proxy()
                 .map(link -> link.answeredWithin(System.currentTimeMillis(), busHealth.answerWindow()))
@@ -1315,7 +1353,8 @@ public final class PluginModule {
         // Who is online on the other backends, as far as a viewer may see them, for every list, picker and suggestion
         // that names the players online. The see level is a permission read, the same with the vanish module off.
         links.visibleNetwork = com.uxplima.uxmessentials.shared.adapter.outbound.lookup.VisibleNetwork.of(
-                new com.uxplima.uxmessentials.shared.application.networkpresence.NetworkPlayers(presence),
+                new com.uxplima.uxmessentials.shared.application.networkpresence.NetworkPlayers(
+                        presence, kernel.playerLookup()::nameCase),
                 new com.uxplima.uxmessentials.vanish.adapter.outbound.BukkitVanishLevelResolver()::seeLevel);
         com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandSuggestions.network(links.visibleNetwork);
         resources.onClose(() -> com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandSuggestions.network(
@@ -1676,7 +1715,7 @@ public final class PluginModule {
         } else if (module.id().equals(ModuleId.of("vanish"))) {
             wireVanish(plugin, ctx, persistence, resources, links, bus);
         } else if (module.id().equals(ModuleId.of("presence"))) {
-            wirePresence(plugin, ctx, resources, links, guiLayouts, guiRegistry, menus);
+            wirePresence(plugin, ctx, persistence, resources, links, bus, guiLayouts, guiRegistry, menus);
         } else if (module.id().equals(ModuleId.of("moderation"))) {
             wireModeration(
                     plugin,
@@ -2679,7 +2718,8 @@ public final class PluginModule {
                 menus,
                 menuBindings,
                 plugin.getDataFolder().toPath(),
-                links.dailyRewards);
+                links.dailyRewards,
+                Objects.requireNonNull(links.playerNotices, "playerNotices"));
         // Fill the deferred reference the menu-currency façade was handed at menu-wiring time (above): from here on
         // a give-money click resolves against the same backend and currency registries a warp fee spends through.
         menuCurrencyBackends.set(new EconomyBackends(wired.backends(), wired.currencies()));
@@ -3451,17 +3491,19 @@ public final class PluginModule {
     private static void wirePresence(
             JavaPlugin plugin,
             ModuleContext ctx,
+            Persistence persistence,
             CloseableResources resources,
             ContextLinks links,
+            Bus bus,
             GuiLayouts guiLayouts,
             ManagementGuiRegistry guiRegistry,
             Menus menus) {
-        // presence persists nothing: the per-player PlayerPresence map is transient in-memory state. Vanish lives
-        // in its own context (wired earlier), so presence receives that authority's isVanished lookup, overlaid onto
-        // its store so the %..._vanished% placeholder and the sleep exclusion reflect the one vanish state, and a
-        // vanish-toggle handle for the settings panel; both degrade to no-ops when the vanish module is off. The
-        // AFK soft-couple: presence rebinds messaging's MutableAfkStatus (captured during the earlier messaging
-        // wiring) to a PresenceAfkStatus over this store so /msg adds the AFK courtesy notice.
+        // presence persists only the players' nicks; the per-player PlayerPresence map is transient in-memory state.
+        // Vanish lives in its own context (wired earlier), so presence receives that authority's isVanished lookup,
+        // overlaid onto its store so the %..._vanished% placeholder and the sleep exclusion reflect the one vanish
+        // state, and a vanish-toggle handle for the settings panel; both degrade to no-ops when the vanish module is
+        // off. The AFK soft-couple: presence rebinds messaging's MutableAfkStatus (captured during the earlier
+        // messaging wiring) to a PresenceAfkStatus over this store so /msg adds the AFK courtesy notice.
         com.uxplima.uxmessentials.vanish.application.port.VanishStore vanishStore = links.vanishStore;
         java.util.function.Predicate<java.util.UUID> vanishLookup =
                 vanishStore == null ? uuid -> false : vanishStore::isVanished;
@@ -3469,11 +3511,25 @@ public final class PluginModule {
         java.util.function.Consumer<com.uxplima.uxmessentials.shared.domain.PlayerRef> vanishToggleHandle =
                 vanishToggle == null ? who -> {} : vanishToggle::toggle;
         PresenceWiring.Wired wired = PresenceWiring.wire(
-                plugin, ctx, vanishLookup, vanishToggleHandle, guiLayouts, guiRegistry, menus, links.visibleNetwork);
+                plugin,
+                ctx,
+                vanishLookup,
+                vanishToggleHandle,
+                guiLayouts,
+                guiRegistry,
+                menus,
+                persistence,
+                bus,
+                links.visibleNetwork);
         wired.commands().forEach(resources::addCommand);
         wired.listeners().forEach(resources::addListener);
         wired.startBackgroundWork();
         resources.onClose(wired::stop);
+        // A name joining here takes back a nick another player copied from it while it was free.
+        CachingPlayerNameIndex nameIndex = links.nameIndex;
+        if (nameIndex != null) {
+            resources.onClose(nameIndex.afterStored(wired.nicks()::nameJoined));
+        }
         links.placeholders.presence(new StorePresencePlaceholders(wired.store(), wired.clock()));
         links.queries.register(UxmPresenceQuery.class, new PresenceQueries(wired.store()));
         links.actions.register(
@@ -4094,6 +4150,8 @@ public final class PluginModule {
         private java.util.function.BooleanSupplier proxyAnswering = () -> false;
         // Whether this backend is part of a network (network.enabled), which is when a jail can be on another one.
         private boolean networked;
+        // The name index behind the lookup port, told when a joining player's name is stored.
+        private @Nullable CachingPlayerNameIndex nameIndex;
         // The players of the other backends a viewer may see; none until the network view is built at wiring start.
         private com.uxplima.uxmessentials.shared.adapter.outbound.lookup.VisibleNetwork visibleNetwork =
                 com.uxplima.uxmessentials.shared.adapter.outbound.lookup.VisibleNetwork.NONE;
@@ -4135,6 +4193,9 @@ public final class PluginModule {
         // The kit resets a single server keeps for a player who was offline, applied as they next join.
         private com.uxplima.uxmessentials.kits.application.port.@org.jspecify.annotations.Nullable PendingKitResets
                 kitResets;
+        // Lines kept for players who were not online when they were meant for them.
+        private com.uxplima.uxmessentials.shared.application.port.@org.jspecify.annotations.Nullable PlayerNotices
+                playerNotices;
         private @org.jspecify.annotations.Nullable HomeEconomy homeEconomy;
         private com.uxplima.uxmessentials.vaults.application.port.@org.jspecify.annotations.Nullable VaultEconomy
                 vaultEconomy;
