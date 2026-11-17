@@ -32,6 +32,7 @@ import com.uxplima.uxmessentials.shared.application.networkpresence.TrackNetwork
 import com.uxplima.uxmessentials.shared.application.port.NetworkPresenceBroadcast;
 import com.uxplima.uxmessentials.shared.application.port.PlayerLookup;
 import com.uxplima.uxmessentials.shared.application.port.PlayerNameIndex;
+import com.uxplima.uxmessentials.shared.domain.NameCase;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmessentials.shared.domain.message.MessageKey;
 import com.uxplima.uxmessentials.testing.FakePermissions;
@@ -64,7 +65,8 @@ class LiveTargetsTest {
     };
 
     private final RecordingNotifier notifier = new RecordingNotifier();
-    private final NetworkRoster presence = new NetworkRoster("survival-1", CLOCK, Duration.ofSeconds(90));
+    private final NetworkRoster presence =
+            new NetworkRoster("survival-1", CLOCK, Duration.ofSeconds(90), () -> NameCase.INSENSITIVE);
     private final FakeSanctions sanctions = new FakeSanctions();
     private final KeptHistory history = new KeptHistory();
     private final List<MessageKey> broadcasts = new ArrayList<>();

@@ -32,6 +32,7 @@ import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandRegistrat
 import com.uxplima.uxmessentials.shared.adapter.outbound.BukkitRefs;
 import com.uxplima.uxmessentials.shared.application.permission.ContentPermissions;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
+import com.uxplima.uxmessentials.shared.application.port.PlayerLookup;
 import com.uxplima.uxmessentials.shared.application.port.Scheduler;
 import com.uxplima.uxmessentials.shared.domain.Position;
 import com.uxplima.uxmlib.command.Args;
@@ -113,9 +114,10 @@ public final class NpcCommand extends NpcCommandSupport implements CommandRegist
             NpcSkinByName skinByName,
             Messages messages,
             NpcListMenu listView,
-            Scheduler scheduler) {
+            Scheduler scheduler,
+            PlayerLookup players) {
         super(services, npcNames, messages);
-        this.skinCommands = new NpcSkinCommands(services, npcNames, skinByName, messages);
+        this.skinCommands = new NpcSkinCommands(services, npcNames, skinByName, messages, players);
         this.appearanceCommands = new NpcAppearanceCommands(services, npcNames, messages);
         this.dataCommands = new NpcDataCommands(services, npcNames, messages);
         this.actionCommands = new NpcActionCommands(services, npcNames, messages);

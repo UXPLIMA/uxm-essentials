@@ -10,6 +10,7 @@ import org.bukkit.plugin.ServicesManager;
 import com.uxplima.uxmessentials.economy.application.port.EconomyProvider;
 import com.uxplima.uxmessentials.economy.domain.Currency;
 import com.uxplima.uxmessentials.shared.application.port.Logger;
+import com.uxplima.uxmessentials.shared.application.port.PlayerLookup;
 import net.milkbowl.vault.economy.Economy;
 import org.jspecify.annotations.NullMarked;
 
@@ -32,7 +33,12 @@ public final class VaultEconomyPublisher {
 
     /** Publish the native wallet as the server's Vault economy, unless a real economy already serves it. */
     public static void publish(
-            Plugin plugin, EconomyProvider provider, Currency currency, ServicePriority priority, Logger log) {
+            Plugin plugin,
+            EconomyProvider provider,
+            Currency currency,
+            ServicePriority priority,
+            PlayerLookup players,
+            Logger log) {
         Objects.requireNonNull(plugin, "plugin");
         Objects.requireNonNull(provider, "provider");
         Objects.requireNonNull(currency, "currency");
@@ -45,7 +51,10 @@ public final class VaultEconomyPublisher {
             return;
         }
         services.register(
-                Economy.class, new NativeVaultEconomy(provider, currency, plugin.getServer(), log), plugin, priority);
+                Economy.class,
+                new NativeVaultEconomy(provider, currency, plugin.getServer(), players, log),
+                plugin,
+                priority);
         log.info(
                 "event=vault_economy_registered currency={} priority={}",
                 currency.id().value(),

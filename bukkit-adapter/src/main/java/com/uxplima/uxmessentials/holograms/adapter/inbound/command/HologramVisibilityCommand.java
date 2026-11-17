@@ -6,7 +6,6 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.function.Supplier;
 
-import org.bukkit.Bukkit;
 import org.bukkit.command.CommandSender;
 import org.bukkit.entity.Player;
 
@@ -22,7 +21,10 @@ import com.uxplima.uxmessentials.holograms.domain.HologramName;
 import com.uxplima.uxmessentials.holograms.domain.HologramsMessageKey;
 import com.uxplima.uxmessentials.holograms.domain.Visibility;
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandSuggestions;
+import com.uxplima.uxmessentials.shared.adapter.outbound.lookup.OnlineByName;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
+import com.uxplima.uxmessentials.shared.application.port.PlayerLookup;
+import com.uxplima.uxmessentials.shared.domain.NameMatch;
 import com.uxplima.uxmlib.command.Args;
 import com.uxplima.uxmlib.command.Sender;
 import org.jspecify.annotations.NullMarked;
@@ -49,9 +51,15 @@ final class HologramVisibilityCommand extends HologramCommandSupport {
 
     private static final List<String> MODES = List.of("ALL", "PERMISSION", "MANUAL");
 
+    private final PlayerLookup players;
+
     HologramVisibilityCommand(
-            HologramServices services, Messages messages, Supplier<? extends Collection<String>> hologramNames) {
+            HologramServices services,
+            Messages messages,
+            Supplier<? extends Collection<String>> hologramNames,
+            PlayerLookup players) {
         super(services, messages, hologramNames);
+        this.players = java.util.Objects.requireNonNull(players, "players");
     }
 
     /** The visibility subcommand nodes the {@code /hologram} literal attaches. */
@@ -178,9 +186,11 @@ final class HologramVisibilityCommand extends HologramCommandSupport {
     /** Resolve the {@code player} argument to an online player, or send the not-found reply and return null. */
     private @org.jspecify.annotations.Nullable Player onlineTarget(
             CommandContext<CommandSourceStack> ctx, CommandSender sender) {
-        Player target = Bukkit.getPlayerExact(ctx.getArgument("player", String.class));
+        String name = ctx.getArgument("player", String.class);
+        NameMatch match = players.matchOnlineByName(name);
+        Player target = OnlineByName.player(match);
         if (target == null) {
-            feedback.send(sender, HologramsMessageKey.HOLOGRAM_PLAYER_NOT_FOUND, Map.of());
+            feedback.send(sender, match.miss(HologramsMessageKey.HOLOGRAM_PLAYER_NOT_FOUND, Map.of()));
         }
         return target;
     }

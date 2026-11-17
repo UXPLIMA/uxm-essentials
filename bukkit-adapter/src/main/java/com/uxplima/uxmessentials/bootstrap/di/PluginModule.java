@@ -210,6 +210,7 @@ import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.vocab.Requireme
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.vocab.SoundActions;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.vocab.StringConditions;
 import com.uxplima.uxmessentials.shared.adapter.inbound.ip.IpHistoryRecorder;
+import com.uxplima.uxmessentials.shared.adapter.inbound.lookup.NameCaseEvidenceListener;
 import com.uxplima.uxmessentials.shared.adapter.inbound.lookup.OnlinePlayerIndexListener;
 import com.uxplima.uxmessentials.shared.adapter.inbound.lookup.PlayerNameRecordingListener;
 import com.uxplima.uxmessentials.shared.adapter.inbound.networkpresence.NetworkPresenceListener;
@@ -554,7 +555,9 @@ public final class PluginModule {
         // Who is connected, for the lookup port's online answers. The players already online are seeded here, on
         // the enable thread, so a plugin reload does not forget them.
         resources.addListener(new OnlinePlayerIndexListener(wiredKernel.online()));
+        resources.addListener(new NameCaseEvidenceListener(wiredKernel.nameCase()));
         for (Player online : plugin.getServer().getOnlinePlayers()) {
+            wiredKernel.nameCase().observe(online.getUniqueId(), online.getName());
             wiredKernel
                     .online()
                     .joined(com.uxplima.uxmessentials.shared.adapter.outbound.BukkitRefs.toRef(online), online);
@@ -571,7 +574,12 @@ public final class PluginModule {
         // does not forget them; their join frames are dropped by the stopped transport, and the first roster
         // announcement after the bus starts carries them instead.
         NetworkPresenceWiring.Wired networkPresence = NetworkPresenceWiring.wire(
-                bus.bus(), NetworkConfig.from(config), nameIndex, kernel.scheduler(), kernel.log());
+                bus.bus(),
+                NetworkConfig.from(config),
+                nameIndex,
+                wiredKernel.nameCase(),
+                kernel.scheduler(),
+                kernel.log());
         resources.onClose(networkPresence::stop);
         resources.addListener(new NetworkPresenceListener(networkPresence.track()));
         for (Player online : plugin.getServer().getOnlinePlayers()) {
@@ -811,7 +819,7 @@ public final class PluginModule {
         // MenuVocabulary signature untouched. The toast action pops through uxmLib's advancement-toast service,
         // which routes its cleanup through the library's Folia-aware scheduler.
         Toasts menuToasts = new Toasts(plugin, new PaperScheduler(plugin));
-        MessagingActions.register(menuBindings, menuToasts, kernel.log());
+        MessagingActions.register(menuBindings, menuToasts, kernel.playerLookup(), kernel.log());
         // The player/command slice (chat-as-player, command-as-op, commandevent, command/console-random) registers
         // alongside the generic actions; like the messaging slice it has its own entry point so the MenuVocabulary
         // signature stays untouched. It reuses the same stateless click-command runner npc/holograms build, so the
@@ -1337,6 +1345,17 @@ public final class PluginModule {
         // here, on enable, before any menu can be clicked. The listener was constructed earlier (it installs before
         // the modules wire), so this late-init is what closes the ordering gap between the two.
         menuTextInputRef.set(textInput);
+        // The security prompts carry a PIN or a code, so they get their own door onto the same seam: one that refuses
+        // the chat mode, because a chat line can reach chat loggers before any capture sees it.
+        links.securityEntryInput = new com.uxplima.uxmessentials.security.adapter.SecureEntryInput(
+                textInput,
+                input.settings(),
+                anvil,
+                new GuiText(kernel.messages()),
+                resolvedBedrock == null ? BedrockDetector.NONE : resolvedBedrock,
+                resolvedScreen == null ? BedrockScreen.NONE : resolvedScreen,
+                kernel.scheduler(),
+                kernel.log());
         // The one shared target picker. It is infrastructure rather than a module's own screen (moderation's
         // sanction flows and the /eco admin GUI both open it), so it is built and registered with the engine here,
         // once, and handed to those modules through the links bag. Two instances would each try to claim the same
@@ -1727,7 +1746,6 @@ public final class PluginModule {
                     persistence,
                     resources,
                     links,
-                    textInput,
                     menus,
                     menuBindings,
                     Objects.requireNonNull(ipCapture, "ipCapture"));
@@ -1956,7 +1974,6 @@ public final class PluginModule {
             Persistence persistence,
             CloseableResources resources,
             ContextLinks links,
-            TextInput textInput,
             Menus menus,
             MenuBindings menuBindings,
             IpCapture ipCapture) {
@@ -1987,7 +2004,7 @@ public final class PluginModule {
                 plugin,
                 ctx,
                 persistence,
-                textInput,
+                Objects.requireNonNull(links.securityEntryInput, "securityEntryInput"),
                 menus,
                 menuBindings,
                 lockoutBan,
@@ -4035,6 +4052,8 @@ public final class PluginModule {
                 staffTeleport;
         private com.uxplima.uxmessentials.moderation.application.@org.jspecify.annotations.Nullable TempBan
                 securityLockoutBan;
+        private com.uxplima.uxmessentials.security.adapter.@org.jspecify.annotations.Nullable SecureEntryInput
+                securityEntryInput;
         // The PlaceholderAPI read seams, filled by each enabled context that contributes placeholders.
         private final PlaceholderContexts.Builder placeholders = PlaceholderContexts.builder();
         // The leaderboards every module that ranks something defines as it wires, built once they all have.

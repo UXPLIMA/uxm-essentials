@@ -10,7 +10,6 @@ import java.util.UUID;
 import java.util.function.BiFunction;
 import java.util.function.Supplier;
 
-import org.bukkit.Bukkit;
 import org.bukkit.command.CommandSender;
 import org.bukkit.entity.Player;
 
@@ -33,9 +32,12 @@ import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandFeedback;
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandRegistration;
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandSuggestions;
 import com.uxplima.uxmessentials.shared.adapter.outbound.BukkitRefs;
+import com.uxplima.uxmessentials.shared.adapter.outbound.lookup.OnlineByName;
 import com.uxplima.uxmessentials.shared.application.permission.ContentPermissions;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
+import com.uxplima.uxmessentials.shared.application.port.PlayerLookup;
 import com.uxplima.uxmessentials.shared.application.port.Scheduler;
+import com.uxplima.uxmessentials.shared.domain.NameMatch;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmessentials.shared.domain.message.SharedMessageKey;
 import com.uxplima.uxmlib.command.Args;
@@ -74,6 +76,7 @@ public final class BossBarCommand implements CommandRegistration {
     private final Supplier<Instant> clock;
     private final Scheduler scheduler;
     private final CommandFeedback feedback;
+    private final PlayerLookup players;
 
     /**
      * @param redrawEverybody draws every player's bars now, after an announcement
@@ -88,7 +91,8 @@ public final class BossBarCommand implements CommandRegistration {
             BiFunction<UUID, Duration, String> remaining,
             Supplier<Instant> clock,
             Scheduler scheduler,
-            Messages messages) {
+            Messages messages,
+            PlayerLookup players) {
         this.toggle = Objects.requireNonNull(toggle, "toggle");
         this.renderer = Objects.requireNonNull(renderer, "renderer");
         this.announcements = Objects.requireNonNull(announcements, "announcements");
@@ -98,6 +102,7 @@ public final class BossBarCommand implements CommandRegistration {
         this.clock = Objects.requireNonNull(clock, "clock");
         this.scheduler = Objects.requireNonNull(scheduler, "scheduler");
         this.feedback = new CommandFeedback(Objects.requireNonNull(messages, "messages"));
+        this.players = Objects.requireNonNull(players, "players");
     }
 
     @Override
@@ -205,9 +210,10 @@ public final class BossBarCommand implements CommandRegistration {
     }
 
     private @Nullable Player online(CommandSender sender, String name) {
-        @Nullable Player player = Bukkit.getPlayerExact(name);
+        NameMatch match = players.matchOnlineByName(name);
+        @Nullable Player player = OnlineByName.player(match);
         if (player == null) {
-            feedback.send(sender, SharedMessageKey.COMMAND_UNKNOWN_PLAYER, Map.of(PLAYER, name));
+            feedback.send(sender, match.miss(SharedMessageKey.COMMAND_UNKNOWN_PLAYER, Map.of(PLAYER, name)));
         }
         return player;
     }

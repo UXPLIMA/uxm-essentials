@@ -81,9 +81,11 @@ final class ScenarioServer extends ServerMock {
 
     @Override
     public InventoryMock createInventory(@Nullable InventoryHolder owner, InventoryType type, Component title) {
-        return type == InventoryType.CHEST
-                ? chest(owner, type.getDefaultSize())
-                : super.createInventory(owner, type, title);
+        return switch (type) {
+            case CHEST -> chest(owner, type.getDefaultSize());
+            case ANVIL -> new ScenarioAnvil(owner);
+            default -> super.createInventory(owner, type, title);
+        };
     }
 
     private static InventoryMock chest(@Nullable InventoryHolder owner, int size) {

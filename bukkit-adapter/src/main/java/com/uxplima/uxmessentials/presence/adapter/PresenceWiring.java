@@ -131,8 +131,8 @@ public final class PresenceWiring {
                 com.uxplima.uxmessentials.shared.adapter.inbound.gui.EntityListLayout.paginatedDefault(
                         org.bukkit.Material.PLAYER_HEAD));
         OnlinePlayerListView listView = new OnlinePlayerListView(menus, guiText, kernel.scheduler(), listLayout);
-        List<CommandRegistration> commands =
-                new ArrayList<>(PresenceCommands.all(services, kernel.messages(), kernel.scheduler(), listView));
+        List<CommandRegistration> commands = new ArrayList<>(
+                PresenceCommands.all(services, kernel.messages(), kernel.scheduler(), listView, kernel.playerLookup()));
         commands.add(new PresenceSettingsCommand(services, kernel.messages(), kernel.scheduler(), settingsView));
         List<Listener> listeners = listeners(kernel, settings, services, store, notifier);
         return new Wired(commands, listeners, sweep, store, services, running, clock);

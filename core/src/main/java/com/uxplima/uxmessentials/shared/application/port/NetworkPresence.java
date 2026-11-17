@@ -4,6 +4,7 @@ import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 
+import com.uxplima.uxmessentials.shared.domain.NameMatch;
 import com.uxplima.uxmessentials.shared.domain.OnlinePlayer;
 
 /**
@@ -33,9 +34,18 @@ public interface NetworkPresence {
     /**
      * Where the online player with this exact name is, ignoring case. A player on this backend wins over one with
      * the same name elsewhere, and an exact-case match wins over a match that differs in case. When only case
-     * variants are online and they are several accounts (offline mode), none is a match.
+     * variants are online and they are several accounts, none is a match; with offline-mode logins only the spelling
+     * typed is a match at all.
      */
     Optional<OnlinePlayer> findByName(String name);
+
+    /**
+     * Like {@link #findByName}, but says when the name could mean several accounts online, so the sender is told the
+     * spellings rather than that nobody is online. The default knows no case variants.
+     */
+    default NameMatch matchByName(String name) {
+        return NameMatch.of(findByName(name).map(OnlinePlayer::player));
+    }
 
     /** The players online on {@code server}, ordered by name. */
     List<OnlinePlayer> onServer(String server);

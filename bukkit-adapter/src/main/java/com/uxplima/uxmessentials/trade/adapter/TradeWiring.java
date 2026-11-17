@@ -183,8 +183,8 @@ public final class TradeWiring {
                     dataFolder,
                     new CrossInviteSeams(sessions, cooldown, livePeers));
         }
-        TradeCommand command =
-                new TradeCommand(requests, cooldown, config, sessions, view::open, kernel.messages(), crossView);
+        TradeCommand command = new TradeCommand(
+                requests, cooldown, config, sessions, view::open, kernel.messages(), crossView, kernel.playerLookup());
         return new Wired(List.of(command), List.copyOf(listeners), config, sessions, view, crossView, command::request);
     }
 
@@ -223,6 +223,7 @@ public final class TradeWiring {
                 tradeBus,
                 new CrossTradeWindow(kernel.messages(), menus, dataFolder, kernel.log()),
                 seams.sessions(),
+                kernel.playerLookup(),
                 presence -> new CrossServerInvites(
                         tradeBus,
                         presence,

@@ -52,6 +52,12 @@ import org.jspecify.annotations.Nullable;
 @NullMarked
 public final class CachingPlayerNameIndex implements PlayerNameIndex {
 
+    /**
+     * The most accounts read from the store under one name. Case variants of one name are a handful at most; the
+     * bound keeps a pathological name from turning a lookup into a table scan.
+     */
+    private static final int STORED_HOLDERS = 32;
+
     private final Object lock = new Object();
     private final LinkedHashMap<UUID, PlayerName> byAccount = new LinkedHashMap<>();
     private final Map<String, Set<UUID>> byLowerName = new HashMap<>();
@@ -104,6 +110,25 @@ public final class CachingPlayerNameIndex implements PlayerNameIndex {
         Collections.reverse(found);
         found.sort(Comparator.comparingLong(PlayerName::lastSeen).reversed());
         return found.stream().map(PlayerName::ref).toList();
+    }
+
+    @Override
+    public List<PlayerRef> storedUnder(String name) {
+        Objects.requireNonNull(name, "name");
+        PlayerNameRepository store = repository.get();
+        List<PlayerRef> remembered = byName(name);
+        if (store == null) {
+            return remembered;
+        }
+        // Memory first: a name learned from another backend is not written here, and the store has every other.
+        Map<UUID, PlayerRef> holders = new LinkedHashMap<>();
+        for (PlayerRef held : remembered) {
+            holders.put(held.uuid(), held);
+        }
+        for (PlayerName row : store.underName(name, STORED_HOLDERS)) {
+            holders.putIfAbsent(row.uuid(), row.ref());
+        }
+        return List.copyOf(holders.values());
     }
 
     @Override

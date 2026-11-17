@@ -30,6 +30,7 @@ import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandRegistrat
 import com.uxplima.uxmessentials.shared.adapter.outbound.BukkitRefs;
 import com.uxplima.uxmessentials.shared.application.permission.ContentPermissions;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
+import com.uxplima.uxmessentials.shared.application.port.PlayerLookup;
 import com.uxplima.uxmessentials.shared.application.port.Scheduler;
 import com.uxplima.uxmessentials.shared.domain.Position;
 import com.uxplima.uxmlib.command.Args;
@@ -116,6 +117,7 @@ public final class HologramCommand extends HologramCommandSupport implements Com
     private final Supplier<? extends Collection<String>> npcNames;
     private final HologramListMenu listMenu;
     private final Scheduler scheduler;
+    private final PlayerLookup players;
 
     public HologramCommand(
             HologramServices services,
@@ -123,12 +125,14 @@ public final class HologramCommand extends HologramCommandSupport implements Com
             Supplier<? extends Collection<String>> hologramNames,
             Supplier<? extends Collection<String>> npcNames,
             HologramListMenu listMenu,
-            Scheduler scheduler) {
+            Scheduler scheduler,
+            PlayerLookup players) {
         super(services, messages, hologramNames);
         this.hologramNames = hologramNames;
         this.npcNames = Objects.requireNonNull(npcNames, "npcNames");
         this.listMenu = Objects.requireNonNull(listMenu, "listMenu");
         this.scheduler = Objects.requireNonNull(scheduler, "scheduler");
+        this.players = Objects.requireNonNull(players, "players");
     }
 
     @Override
@@ -149,8 +153,8 @@ public final class HologramCommand extends HologramCommandSupport implements Com
                 moveToNode(),
                 moveAtNode()));
         verbs.addAll(new HologramAppearanceCommand(services, messages, hologramNames).nodes());
-        verbs.addAll(new HologramVisibilityCommand(services, messages, hologramNames).nodes());
-        verbs.addAll(new HologramModelCommand(services, messages, hologramNames).nodes());
+        verbs.addAll(new HologramVisibilityCommand(services, messages, hologramNames, players).nodes());
+        verbs.addAll(new HologramModelCommand(services, messages, hologramNames, players).nodes());
         verbs.addAll(new HologramConvenienceCommand(services, messages, hologramNames).nodes());
         verbs.addAll(new HologramNpcCommand(services, messages, hologramNames, npcNames).nodes());
         verbs.addAll(new HologramPageCommand(services, messages, hologramNames).nodes());

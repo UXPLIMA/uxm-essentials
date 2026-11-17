@@ -3,16 +3,20 @@ package com.uxplima.uxmessentials.shared.adapter.outbound.lookup;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import java.time.Duration;
+import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
 
 import com.uxplima.uxmessentials.shared.application.port.Logger;
 import com.uxplima.uxmessentials.shared.application.port.PlayerLookup;
+import com.uxplima.uxmessentials.shared.application.port.PlayerNameRepository;
 import com.uxplima.uxmessentials.shared.application.port.Scheduler;
 import com.uxplima.uxmessentials.shared.domain.NameCase;
 import com.uxplima.uxmessentials.shared.domain.NameMatch;
+import com.uxplima.uxmessentials.shared.domain.PlayerName;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmessentials.shared.domain.Position;
 import com.uxplima.uxmessentials.shared.domain.message.MessageLine;
@@ -38,8 +42,13 @@ class IndexedPlayerLookupTest {
     private final OnlinePlayerIndex online = new OnlinePlayerIndex();
     private final ServerProfiles server = new ServerProfiles();
     private final CachingPlayerNameIndex names = new CachingPlayerNameIndex(new NoScheduler(), new QuietLog());
-    private final PlayerLookup lookup = new IndexedPlayerLookup(server, names, online, NameCase.SENSITIVE);
-    private final PlayerLookup onlineMode = new IndexedPlayerLookup(server, names, online, NameCase.INSENSITIVE);
+    /** Whether the lookup is asked from a tick thread, where it may not read the name store. */
+    private boolean onTick;
+
+    private final PlayerLookup lookup =
+            new IndexedPlayerLookup(server, names, online, () -> NameCase.SENSITIVE, () -> onTick);
+    private final PlayerLookup onlineMode =
+            new IndexedPlayerLookup(server, names, online, () -> NameCase.INSENSITIVE, () -> onTick);
 
     @Test
     void aPlayerIsOnlineFromJoinUntilQuit() {
@@ -171,6 +180,41 @@ class IndexedPlayerLookupTest {
     }
 
     @Test
+    void offlineModeOnTheTickALoneAccountInAnotherCaseIsNotTakenOnTrust() {
+        names.record(STEVE.uuid(), STEVE.name());
+        onTick = true;
+
+        // The memory is a window; only the store could say no other account is spelled STEVE.
+        assertThat(lookup.matchByName("STEVE")).isEqualTo(NameMatch.unknown());
+        assertThat(lookup.matchByName("Steve")).isEqualTo(NameMatch.found(STEVE));
+        assertThat(lookup.matchByNameFromMemory("STEVE")).isEqualTo(NameMatch.unknown());
+    }
+
+    @Test
+    void offlineModeTheStoreFindsAnAccountSpelledAsTypedThatTheMemoryLetGo() {
+        StoredNames store = new StoredNames();
+        store.rows.add(new PlayerName(STEVE.uuid(), STEVE.name(), 100L));
+        store.rows.add(new PlayerName(LOWER_STEVE.uuid(), LOWER_STEVE.name(), 200L));
+        // A window of one: only the more recently seen steve is held in memory.
+        names.backWith(store, 1);
+
+        assertThat(lookup.findByName("Steve").map(PlayerRef::uuid)).contains(STEVE.uuid());
+        assertThat(lookup.matchByName("STEVE")).isInstanceOf(NameMatch.Ambiguous.class);
+
+        onTick = true;
+        assertThat(lookup.matchByName("Steve")).isEqualTo(NameMatch.unknown());
+    }
+
+    @Test
+    void offlineModeTheServerCacheAnswersOnlyForTheSpellingTyped() {
+        server.profiles.put(STEVE.uuid(), STEVE);
+
+        assertThat(lookup.matchByName("steve")).isEqualTo(NameMatch.unknown());
+        assertThat(lookup.matchByName("Steve")).isEqualTo(NameMatch.found(STEVE));
+        assertThat(onlineMode.matchByName("steve")).isEqualTo(NameMatch.found(STEVE));
+    }
+
+    @Test
     void onlineModeCaseIsIgnoredAndTheAccountLastSeenUnderTheNameWins() {
         // An online-mode account that held the name before a rename, and the one that holds it now.
         names.record(LOWER_STEVE.uuid(), LOWER_STEVE.name());
@@ -232,6 +276,41 @@ class IndexedPlayerLookupTest {
         public Optional<PlayerRef> byUuid(UUID uuid) {
             asked++;
             return Optional.ofNullable(profiles.get(uuid));
+        }
+    }
+
+    /** The durable name store: every account ever seen, newest first. */
+    private static final class StoredNames implements PlayerNameRepository {
+
+        final List<PlayerName> rows = new ArrayList<>();
+
+        @Override
+        public List<PlayerName> loadRecent(int limit) {
+            return newestFirst().limit(Math.max(0, limit)).toList();
+        }
+
+        @Override
+        public List<PlayerName> underName(String name, int limit) {
+            return newestFirst()
+                    .filter(row -> row.name().equalsIgnoreCase(name.strip()))
+                    .limit(limit)
+                    .toList();
+        }
+
+        @Override
+        public void upsert(PlayerName record) {
+            rows.add(record);
+        }
+
+        @Override
+        public int count() {
+            return rows.size();
+        }
+
+        private java.util.stream.Stream<PlayerName> newestFirst() {
+            return rows.stream()
+                    .sorted(java.util.Comparator.comparingLong(PlayerName::lastSeen)
+                            .reversed());
         }
     }
 

@@ -33,12 +33,10 @@ public final class PlayerLookupTargetResolver implements TargetResolver {
 
     private final NetworkPresence presence;
     private final PlayerLookup lookup;
-    private final NameCase names;
 
-    public PlayerLookupTargetResolver(NetworkPresence presence, PlayerLookup lookup, NameCase names) {
+    public PlayerLookupTargetResolver(NetworkPresence presence, PlayerLookup lookup) {
         this.presence = Objects.requireNonNull(presence, "presence");
         this.lookup = Objects.requireNonNull(lookup, "lookup");
-        this.names = Objects.requireNonNull(names, "names");
     }
 
     @Override
@@ -46,7 +44,7 @@ public final class PlayerLookupTargetResolver implements TargetResolver {
         Objects.requireNonNull(name, "name");
         String typed = name.strip();
         Optional<OnlinePlayer> online = presence.findByName(typed);
-        if (names == NameCase.SENSITIVE) {
+        if (lookup.nameCase() == NameCase.SENSITIVE) {
             online = online.filter(found -> found.player().name().equals(typed));
         }
         return online.isPresent() ? NameMatch.found(online.get().player()) : lookup.matchByName(typed);

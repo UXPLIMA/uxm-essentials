@@ -19,7 +19,14 @@ class PlayerLookupTargetResolverTest {
     private static final PlayerRef ONLINE_ELSEWHERE = new PlayerRef(UUID.randomUUID(), "Steve");
     private static final PlayerRef CACHED_OWNER = new PlayerRef(UUID.randomUUID(), "steve");
 
+    private NameCase nameCase = NameCase.INSENSITIVE;
+
     private final PlayerLookup offlineCache = new PlayerLookup() {
+        @Override
+        public NameCase nameCase() {
+            return nameCase;
+        }
+
         @Override
         public Optional<PlayerRef> findOnlineByName(String name) {
             return Optional.empty();
@@ -44,23 +51,23 @@ class PlayerLookupTargetResolverTest {
     @Test
     void aPlayerOnAnotherBackendIsResolvedAheadOfTheOfflineCache() {
         PlayerLookupTargetResolver resolver = new PlayerLookupTargetResolver(
-                presence(List.of(new OnlinePlayer(ONLINE_ELSEWHERE, "lobby-1"))), offlineCache, NameCase.INSENSITIVE);
+                presence(List.of(new OnlinePlayer(ONLINE_ELSEWHERE, "lobby-1"))), offlineCache);
 
         assertThat(resolver.resolve("STEVE").player().map(PlayerRef::uuid)).contains(ONLINE_ELSEWHERE.uuid());
     }
 
     @Test
     void aPlayerOnlineNowhereFallsBackToTheOfflineCache() {
-        PlayerLookupTargetResolver resolver =
-                new PlayerLookupTargetResolver(presence(List.of()), offlineCache, NameCase.INSENSITIVE);
+        PlayerLookupTargetResolver resolver = new PlayerLookupTargetResolver(presence(List.of()), offlineCache);
 
         assertThat(resolver.resolve("steve").player().map(PlayerRef::uuid)).contains(CACHED_OWNER.uuid());
     }
 
     @Test
     void offlineModePresenceSettlesOnlyTheSpellingThatWasTyped() {
+        nameCase = NameCase.SENSITIVE;
         PlayerLookupTargetResolver resolver = new PlayerLookupTargetResolver(
-                presence(List.of(new OnlinePlayer(ONLINE_ELSEWHERE, "lobby-1"))), offlineCache, NameCase.SENSITIVE);
+                presence(List.of(new OnlinePlayer(ONLINE_ELSEWHERE, "lobby-1"))), offlineCache);
 
         assertThat(resolver.resolve("Steve").player().map(PlayerRef::uuid)).contains(ONLINE_ELSEWHERE.uuid());
         // "steve" is another offline-mode account than the "Steve" online elsewhere.

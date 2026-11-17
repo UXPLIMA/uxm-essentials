@@ -228,8 +228,8 @@ public final class GuardWiring {
                         Duration.ofSeconds(5)));
         timers.add(kernel.scheduler().repeatGlobal(service::poll, config.pollInterval(), config.pollInterval()));
 
-        WorldGuardImporter importer =
-                new WorldGuardImporter(plugin.getDataFolder().toPath(), service, backups, kernel.scheduler(), warn);
+        WorldGuardImporter importer = new WorldGuardImporter(
+                plugin.getDataFolder().toPath(), service, backups, kernel.scheduler(), warn, kernel.playerLookup());
         // The command opens the menus and the menus answer through the command, so the menus are reached through a
         // holder filled right after both exist.
         GuardMenus[] menusHolder = new GuardMenus[1];
