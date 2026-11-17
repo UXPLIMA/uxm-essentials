@@ -197,6 +197,18 @@ public final class PlayerArgument
     }
 
     /**
+     * The player online on another server whom {@code name} means, with that server, for a command that reads a name
+     * as a plain word; empty for a name nobody the sender of {@code source} may see holds elsewhere, or before the
+     * network roster is bound.
+     */
+    public static Optional<OnlinePlayer> elsewhere(CommandSourceStack source, String name) {
+        Objects.requireNonNull(source, "source");
+        Objects.requireNonNull(name, "name");
+        Bound current = bound;
+        return current == null ? Optional.empty() : elsewhere(current, source, name);
+    }
+
+    /**
      * The name typed for {@code argument}, unquoted, or empty when it was a selector or the argument is absent. A
      * UUID typed as the argument is a name too: it names the account with that id.
      */

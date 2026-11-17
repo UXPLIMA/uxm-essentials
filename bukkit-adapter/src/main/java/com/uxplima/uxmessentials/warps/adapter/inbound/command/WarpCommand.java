@@ -22,11 +22,15 @@ import com.mojang.brigadier.tree.LiteralCommandNode;
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandRegistration;
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandSuggestions;
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.ListDisplayMode;
+import com.uxplima.uxmessentials.shared.adapter.inbound.command.PlayerArgument;
 import com.uxplima.uxmessentials.shared.adapter.outbound.BukkitRefs;
 import com.uxplima.uxmessentials.shared.application.permission.DestinationPermissions;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
+import com.uxplima.uxmessentials.shared.domain.NameMatch;
+import com.uxplima.uxmessentials.shared.domain.OnlinePlayer;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmessentials.shared.domain.Position;
+import com.uxplima.uxmessentials.shared.domain.message.SharedMessageKey;
 import com.uxplima.uxmessentials.warps.adapter.WarpServices;
 import com.uxplima.uxmessentials.warps.domain.Warp;
 import com.uxplima.uxmessentials.warps.domain.WarpName;
@@ -227,15 +231,42 @@ public final class WarpCommand extends WarpCommandSupport implements CommandRegi
         String arg = ctx.getArgument("arg", String.class);
 
         if (sender.hasPermission(OTHERS_PERMISSION)) {
-            Optional<PlayerRef> target = services.players().findOnlineByName(arg);
+            NameMatch match = services.players().matchOnlineByName(arg);
+            Optional<PlayerRef> target = match.player();
             if (target.isPresent()) {
                 services.useWarp().useFor(ref(sender), target.get(), WarpName.of(warpName));
                 return Command.SINGLE_SUCCESS;
+            }
+            // A player online on another server is warped there, not here: say where, never read the name as a
+            // password. Without a password on the warp the word can only have meant a player.
+            Optional<OnlinePlayer> away = PlayerArgument.elsewhere(ctx.getSource(), arg);
+            if (away.isPresent()) {
+                feedback.send(
+                        sender,
+                        SharedMessageKey.COMMAND_TARGET_ELSEWHERE,
+                        Map.of(
+                                "player",
+                                away.get().player().name(),
+                                "server",
+                                away.get().server()));
+                return 0;
+            }
+            if (!guardedByPassword(warpName)) {
+                feedback.send(sender, match.miss(SharedMessageKey.COMMAND_UNKNOWN_PLAYER, Map.of("player", arg)));
+                return 0;
             }
         }
 
         services.useWarp().use(ref(sender), WarpName.of(warpName), arg);
         return Command.SINGLE_SUCCESS;
+    }
+
+    /** Whether the warp {@code name} asks for a password, so a word after it may be one. */
+    private boolean guardedByPassword(String name) {
+        return services.repository()
+                .find(WarpName.of(name))
+                .flatMap(Warp::password)
+                .isPresent();
     }
 
     /**
