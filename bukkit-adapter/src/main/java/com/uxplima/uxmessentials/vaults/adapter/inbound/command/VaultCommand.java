@@ -63,8 +63,9 @@ import org.jspecify.annotations.Nullable;
  * <p>This handler maps the Bukkit source to the kernel value objects and hands off to the use cases. The GUI
  * open is entity-bound, so it is scheduled on the viewer's region thread through the kernel {@code Scheduler};
  * the delete touches the database, so it runs off the tick thread through {@link Scheduler#async}. The admin
- * inspect override targets an online player (the GUI opens on their entity); the admin delete accepts an
- * offline owner by name, since deleting a vault opens no window.
+ * inspect override and the admin delete both take a selector for a player online here or a name resolved through the
+ * player lookup, so an owner who is offline or on another server is reached too: the window opens for the staff
+ * member, and the owner's items come from the shared database.
  */
 @NullMarked
 public final class VaultCommand implements CommandRegistration {
@@ -75,6 +76,8 @@ public final class VaultCommand implements CommandRegistration {
     private static final String RENAME = DestinationPermissions.VAULT_RENAME;
     private static final String ICON = DestinationPermissions.VAULT_ICON;
     private static final int DEFAULT_INDEX = 1;
+    private static final String TARGET = "target";
+    private static final String NAMED = "player";
 
     private final VaultServices services;
     private final VaultNotifier notifier;
@@ -95,7 +98,7 @@ public final class VaultCommand implements CommandRegistration {
                 .then(Commands.literal("delete")
                         .then(Commands.argument("n", IntegerArgumentType.integer(1))
                                 .executes(ctx -> deleteOwn(ctx, ctx.getArgument("n", Integer.class))))
-                        .then(Commands.argument("player", Args.token())
+                        .then(Commands.argument(NAMED, Args.token())
                                 .requires(Gate.permission(ADMIN_DELETE))
                                 .suggests(onlinePlayerSuggestions())
                                 .then(Commands.argument("idx", IntegerArgumentType.integer(1))
@@ -120,12 +123,17 @@ public final class VaultCommand implements CommandRegistration {
                                                 StringArgumentType.getString(ctx, "material"))))))
                 .then(Commands.argument("n", IntegerArgumentType.integer(1))
                         .executes(ctx -> openOwn(ctx, ctx.getArgument("n", Integer.class))))
-                .then(Commands.argument("player", ArgumentTypes.player())
+                .then(Commands.argument(TARGET, ArgumentTypes.player())
                         .suggests(CommandSuggestions.singlePlayerTarget())
                         .requires(Gate.permission(OTHERS))
-                        .executes(ctx -> openOther(ctx, DEFAULT_INDEX))
+                        .executes(ctx -> openSelected(ctx, DEFAULT_INDEX))
                         .then(Commands.argument("idx", IntegerArgumentType.integer(1))
-                                .executes(ctx -> openOther(ctx, ctx.getArgument("idx", Integer.class)))))
+                                .executes(ctx -> openSelected(ctx, ctx.getArgument("idx", Integer.class)))))
+                .then(CommandSuggestions.playerArgument(NAMED)
+                        .requires(Gate.permission(OTHERS))
+                        .executes(ctx -> openNamed(ctx, DEFAULT_INDEX))
+                        .then(Commands.argument("idx", IntegerArgumentType.integer(1))
+                                .executes(ctx -> openNamed(ctx, ctx.getArgument("idx", Integer.class)))))
                 .build();
     }
 
@@ -212,7 +220,16 @@ public final class VaultCommand implements CommandRegistration {
         });
     }
 
-    private int openOther(CommandContext<CommandSourceStack> ctx, int index) {
+    /**
+     * The selector branch of the staff open. A selector ({@code @p}, {@code @s}) names a player online here and is
+     * resolved the usual way. The vanilla parser also reads a plain name, but answers only for a player online here and
+     * settles case on its own, so a name goes to the lookup.
+     */
+    private int openSelected(CommandContext<CommandSourceStack> ctx, int index) {
+        String typed = typedTarget(ctx, TARGET);
+        if (!typed.startsWith("@")) {
+            return openByName(ctx, typed, index);
+        }
         Player staff = playerOrReject(ctx);
         if (staff == null) {
             return Command.SINGLE_SUCCESS;
@@ -223,13 +240,46 @@ public final class VaultCommand implements CommandRegistration {
             return Command.SINGLE_SUCCESS;
         }
         PlayerRef owner = BukkitRefs.toRef(resolved.get());
-        // The admin open reads the owner's vault contents from the database; run it off the tick thread, then
-        // bridge the window open back to the staff member's region thread (the staff member is the one viewing).
+        scheduler.async(() -> openOther(staff, actor, owner, index));
+        return Command.SINGLE_SUCCESS;
+    }
+
+    /** The name branch of the staff open, for a name the vanilla parser refuses, such as a Bedrock name. */
+    private int openNamed(CommandContext<CommandSourceStack> ctx, int index) {
+        return openByName(ctx, StringArgumentType.getString(ctx, NAMED), index);
+    }
+
+    /**
+     * Resolve the owner by name through the player lookup, so an owner who is offline, on another server, or known
+     * here only in another case is reached too; a name several accounts could mean is refused with the spellings to
+     * choose from. The lookup may read the database, so it runs off the tick.
+     */
+    private int openByName(CommandContext<CommandSourceStack> ctx, String typed, int index) {
+        Player staff = playerOrReject(ctx);
+        if (staff == null) {
+            return Command.SINGLE_SUCCESS;
+        }
+        PlayerRef actor = BukkitRefs.toRef(staff);
         scheduler.async(() -> {
-            Vault vault = services.openAdminVault().open(actor, owner, index);
-            openWindow(staff, actor, owner, vault, VaultOpenFee.free());
+            NameMatch match = services.kernel().playerLookup().matchByName(typed);
+            Optional<PlayerRef> owner = match.player();
+            if (owner.isEmpty()) {
+                notifier.unknownTarget(actor, typed, match);
+                return;
+            }
+            openOther(staff, actor, owner.get(), index);
         });
         return Command.SINGLE_SUCCESS;
+    }
+
+    /**
+     * On the async lane: read the owner's vault from the database and show it to the staff member on their own thread.
+     * The owner's items are in the shared database whether or not the owner is online, and a write from a window the
+     * owner holds on another server is told apart by the row's stamp, so neither window writes over the other.
+     */
+    private void openOther(Player staff, PlayerRef actor, PlayerRef owner, int index) {
+        Vault vault = services.openAdminVault().open(actor, owner, index);
+        openWindow(staff, actor, owner, vault, VaultOpenFee.free());
     }
 
     private int deleteOwn(CommandContext<CommandSourceStack> ctx, int index) {
@@ -249,15 +299,18 @@ public final class VaultCommand implements CommandRegistration {
             return Command.SINGLE_SUCCESS;
         }
         PlayerRef actor = BukkitRefs.toRef(staff);
-        String typed = StringArgumentType.getString(ctx, "player");
-        NameMatch match = services.kernel().playerLookup().matchByName(typed);
-        Optional<PlayerRef> owner = match.player();
-        if (owner.isEmpty()) {
-            notifier.unknownTarget(actor, typed, match);
-            return Command.SINGLE_SUCCESS;
-        }
-        // A DB write, run it off the tick thread; the use case audits the override and notifies the actor.
-        scheduler.async(() -> services.deleteVault().deleteOther(actor, owner.get(), index));
+        String typed = StringArgumentType.getString(ctx, NAMED);
+        // The lookup may read the database and the delete writes it, so both run off the tick thread; the use case
+        // audits the override and notifies the actor.
+        scheduler.async(() -> {
+            NameMatch match = services.kernel().playerLookup().matchByName(typed);
+            Optional<PlayerRef> owner = match.player();
+            if (owner.isEmpty()) {
+                notifier.unknownTarget(actor, typed, match);
+                return;
+            }
+            services.deleteVault().deleteOther(actor, owner.get(), index);
+        });
         return Command.SINGLE_SUCCESS;
     }
 
@@ -331,22 +384,22 @@ public final class VaultCommand implements CommandRegistration {
 
     private Optional<Player> resolveTarget(CommandContext<CommandSourceStack> ctx, PlayerRef actor) {
         try {
-            PlayerSelectorArgumentResolver resolver = ctx.getArgument("player", PlayerSelectorArgumentResolver.class);
+            PlayerSelectorArgumentResolver resolver = ctx.getArgument(TARGET, PlayerSelectorArgumentResolver.class);
             List<Player> matched = resolver.resolve(ctx.getSource());
             if (matched.isEmpty()) {
-                notifier.unknownTarget(actor, typedTarget(ctx));
+                notifier.unknownTarget(actor, typedTarget(ctx, TARGET));
                 return Optional.empty();
             }
             return Optional.of(matched.get(0));
         } catch (CommandSyntaxException unmatched) {
-            notifier.unknownTarget(actor, typedTarget(ctx));
+            notifier.unknownTarget(actor, typedTarget(ctx, TARGET));
             return Optional.empty();
         }
     }
 
-    private static String typedTarget(CommandContext<CommandSourceStack> ctx) {
+    private static String typedTarget(CommandContext<CommandSourceStack> ctx, String argument) {
         return ctx.getNodes().stream()
-                .filter(node -> "player".equals(node.getNode().getName()))
+                .filter(node -> argument.equals(node.getNode().getName()))
                 .findFirst()
                 .map(node -> node.getRange().get(ctx.getInput()))
                 .orElse("");

@@ -45,9 +45,18 @@ public final class OpenAdminVault {
         VaultId id = VaultId.of(owner, index);
         VaultSize size = sizeQuota.resolve(owner);
         Optional<Vault> stored = repository.find(id);
-        Vault vault = stored.map(existing -> existing.openedAt(size))
+        Vault vault = stored.map(existing -> existing.openedAt(atLeast(size, existing.size())))
                 .orElseGet(() -> Vault.allocate(id, size, clock.instant()));
         audit.adminOpened(actor, owner, owner.uuid(), index);
         return vault;
+    }
+
+    /**
+     * The larger of the two sizes. An audit never shows a stored vault shorter than it was saved: the size quota of an
+     * owner who is not online here reads as the config default, and a shorter window would hand the rows past it to
+     * the staff member. An owner whose quota really shrank gets those rows back at their own next open.
+     */
+    private static VaultSize atLeast(VaultSize resolved, VaultSize stored) {
+        return stored.rows() > resolved.rows() ? stored : resolved;
     }
 }

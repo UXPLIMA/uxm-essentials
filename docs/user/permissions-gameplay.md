@@ -280,7 +280,7 @@ Contents: [economy](#economy) · [homes](#homes) · [kits](#kits) · [playerstat
 | `uxmessentials.bypass.blacklist.vault` | Store any item in a vault, ignoring the blacklist-materials list (items are not returned). | op |
 | `uxmessentials.bypass.cost.vault` | Bypass every vault economy fee (create/open); no refund is paid on delete. | false |
 | `uxmessentials.vault.icon` | /vault icon <n> [material]: set or clear the icon of your own vault (held item if omitted). | true |
-| `uxmessentials.vault.others` | /vault <player> [n]: open and audit another player's vault (audit-logged). | op |
+| `uxmessentials.vault.others` | /vault <player> [n]: open and audit another player's vault, offline too (audit-logged). | op |
 | `uxmessentials.vault.rename` | /vault rename <n> [name]: set or clear the display name of your own vault. | true |
 | `uxmessentials.vault.size.<rows>` | How many rows each of your vaults holds; the largest tier held wins. | true |
 | `uxmessentials.vault.use` | /vault to open your default vault (or list them), /vault <n> to open the Nth, and /vault delete <n> to delete your own. | true |
