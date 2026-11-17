@@ -34,6 +34,7 @@ class AxPlayerWarpsImportTest {
 
     private final RecordingLogger log = new RecordingLogger();
     private List<ImportedPlayerWarp> warps = List.of();
+    private List<ImportRecord> records = List.of();
 
     @BeforeEach
     void importTheFixture() {
@@ -42,7 +43,8 @@ class AxPlayerWarpsImportTest {
                 plugins.resolve("AxPlayerWarps").resolve("data.mv.db"));
         AxPlayerWarpsConvert source = new AxPlayerWarpsConvert(
                 new AxPlayerWarpsConfig(Optional.empty(), "", "", Optional.of(plugins)), Fixtures.ONLY_WORLD, log);
-        warps = only(Fixtures.records(source, plugins), ImportRecord.PlayerWarpRecord.class).stream()
+        records = Fixtures.records(source, plugins);
+        warps = only(records, ImportRecord.PlayerWarpRecord.class).stream()
                 .map(ImportRecord.PlayerWarpRecord::warp)
                 .toList();
     }
@@ -58,6 +60,15 @@ class AxPlayerWarpsImportTest {
     void aWarpInAnUnknownWorldOrWithoutItsOwnerIsLeftOutAndTheOwnerlessOneIsReported() {
         assertThat(warps).extracting(ImportedPlayerWarp::name).containsExactlyInAnyOrder("Market", "Secret", "Hideout");
         assertThat(log.warnings()).anySatisfy(line -> assertThat(line).contains("Orphan", "99"));
+    }
+
+    @Test
+    void everyPlayerAxPlayerWarpsKnowsIsRecordedByNameAndOneWithoutAUuidIsLeftOut() {
+        assertThat(only(records, ImportRecord.AccountRecord.class))
+                .extracting(
+                        account -> account.account().uuid(),
+                        account -> account.account().name())
+                .containsExactlyInAnyOrder(tuple(ALICE, "Alice"), tuple(BOB, "Bob"), tuple(CAROL, "Carol"));
     }
 
     @Test

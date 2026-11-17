@@ -22,6 +22,7 @@ public final class LiteBansTables {
     private final String bans;
     private final String mutes;
     private final String warnings;
+    private final String history;
 
     /**
      * Build the table set for {@code tablePrefix}.
@@ -40,6 +41,7 @@ public final class LiteBansTables {
         this.bans = prefix + "bans";
         this.mutes = prefix + "mutes";
         this.warnings = prefix + "warnings";
+        this.history = prefix + "history";
     }
 
     /** The {@code SELECT} over the bans table. The prefix was validated; the table name is not user data. */
@@ -56,6 +58,11 @@ public final class LiteBansTables {
     public String selectWarnings() {
         return "SELECT uuid, ip, reason, banned_by_uuid, banned_by_name, time, until, "
                 + "ipban, ipban_wildcard, active, warned FROM " + warnings;
+    }
+
+    /** The {@code SELECT} over the history table: every login, the account and the name it used. */
+    public String selectHistory() {
+        return "SELECT uuid, name, date FROM " + history;
     }
 
     private static String select(String table) {

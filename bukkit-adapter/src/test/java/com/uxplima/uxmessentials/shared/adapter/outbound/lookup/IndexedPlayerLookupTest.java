@@ -232,6 +232,22 @@ class IndexedPlayerLookupTest {
     }
 
     @Test
+    void onTheTickTheServersPlayerDataIsNeverReadForATypedName() {
+        server.profiles.put(STEVE.uuid(), STEVE);
+        onTick = true;
+
+        assertThat(lookup.matchByName("Steve")).isEqualTo(NameMatch.unknown());
+        assertThat(onlineMode.matchByName("steve")).isEqualTo(NameMatch.unknown());
+        assertThat(server.asked).isZero();
+
+        onTick = false;
+        assertThat(lookup.matchByNameFromMemory("Steve")).isEqualTo(NameMatch.unknown());
+        assertThat(onlineMode.matchByNameFromMemory("steve")).isEqualTo(NameMatch.unknown());
+        assertThat(server.asked).isZero();
+        assertThat(lookup.matchByName("Steve")).isEqualTo(NameMatch.found(STEVE));
+    }
+
+    @Test
     void anAccountSeenOnlyOnAnotherServerIsNamedFromTheStoreOffTheTickAndFromMemoryAfter() {
         StoredNames store = new StoredNames();
         store.rows.add(new PlayerName(BEDROCK.uuid(), BEDROCK.name(), 100L));
@@ -279,7 +295,8 @@ class IndexedPlayerLookupTest {
 
         onTick = true;
         assertThat(onlineMode.matchByName(".bedrockgamer123")).isEqualTo(NameMatch.unknown());
-        assertThat(server.asked).isEqualTo(1);
+        // On the tick neither the store nor the server's player data is read for a typed name.
+        assertThat(server.asked).isZero();
     }
 
     @Test

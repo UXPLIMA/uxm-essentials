@@ -15,12 +15,16 @@ import org.bukkit.inventory.meta.ItemMeta;
 
 import io.papermc.paper.command.brigadier.CommandSourceStack;
 import io.papermc.paper.command.brigadier.Commands;
+import io.papermc.paper.command.brigadier.argument.ArgumentTypes;
+import io.papermc.paper.command.brigadier.argument.resolvers.selector.PlayerSelectorArgumentResolver;
 
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.serializer.plain.PlainTextComponentSerializer;
 
 import com.mojang.brigadier.Command;
 import com.mojang.brigadier.context.CommandContext;
+import com.mojang.brigadier.context.ParsedCommandNode;
+import com.mojang.brigadier.exceptions.CommandSyntaxException;
 import com.mojang.brigadier.tree.LiteralCommandNode;
 import com.uxplima.uxmessentials.kits.adapter.KitServices;
 import com.uxplima.uxmessentials.kits.adapter.inbound.gui.KitManagerMenu;
@@ -30,11 +34,15 @@ import com.uxplima.uxmessentials.kits.domain.KitId;
 import com.uxplima.uxmessentials.kits.domain.KitItem;
 import com.uxplima.uxmessentials.kits.domain.KitsMessageKey;
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandRegistration;
+import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandSuggestions;
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.ListDisplayMode;
 import com.uxplima.uxmessentials.shared.application.permission.ContentPermissions;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
 import com.uxplima.uxmessentials.shared.application.port.Scheduler;
+import com.uxplima.uxmessentials.shared.domain.NameMatch;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
+import com.uxplima.uxmessentials.shared.domain.message.MessageLine;
+import com.uxplima.uxmessentials.shared.domain.message.SharedMessageKey;
 import com.uxplima.uxmlib.command.Args;
 import com.uxplima.uxmlib.command.Gate;
 import com.uxplima.uxmlib.command.Sender;
@@ -61,7 +69,7 @@ import org.jspecify.annotations.NullMarked;
  *   <li>{@code /kit editor [name [save]]} edits a kit's contents (manager GUI with no name, the editable
  *       window with one, the inventory-snapshot {@code save} flow with the trailing literal). Gated by
  *       {@code uxmessentials.kit.edit}.
- *   <li>{@code /kit reset <player> [kit]} clears a player's one-time-claim stamps. Gated by
+ *   <li>{@code /kit reset <player> [kit]} clears a player's one-time-claim stamps, offline players included. Gated by
  *       {@code uxmessentials.kit.reset}.
  * </ul>
  *
@@ -79,6 +87,10 @@ public final class KitCommand extends KitCommandSupport implements CommandRegist
     private static final String PREVIEW_PERMISSION = ContentPermissions.KIT_PREVIEW;
     private static final String EDIT_PERMISSION = ContentPermissions.KIT_EDIT;
     private static final String RESET_PERMISSION = ContentPermissions.KIT_RESET;
+
+    private static final String TARGETS = "targets";
+    private static final String NAMED = "player";
+    private static final String KIT = "kit";
 
     private static final PlainTextComponentSerializer PLAIN = PlainTextComponentSerializer.plainText();
 
@@ -124,9 +136,13 @@ public final class KitCommand extends KitCommandSupport implements CommandRegist
                 .then(Commands.literal("reset")
                         .requires(Gate.permission(RESET_PERMISSION))
                         .executes(ctx -> usage(ctx, "kit reset", "<player> [kit]", "Reset player kit cooldown"))
-                        .then(playerSelectorArgument("player")
-                                .executes(this::resetAll)
-                                .then(kitNameArgument("kit").executes(this::resetOne))))
+                        .then(Commands.argument(TARGETS, ArgumentTypes.players())
+                                .suggests(CommandSuggestions.onlinePlayers())
+                                .executes(ctx -> resetSelected(ctx, Optional.empty()))
+                                .then(kitNameArgument(KIT).executes(ctx -> resetSelected(ctx, kitOf(ctx)))))
+                        .then(CommandSuggestions.playerArgument(NAMED)
+                                .executes(ctx -> resetNamed(ctx, Optional.empty()))
+                                .then(kitNameArgument(KIT).executes(ctx -> resetNamed(ctx, kitOf(ctx))))))
                 .then(kitNameArgument("name")
                         .executes(this::claimSelf)
                         .then(playerSelectorArgument("player")
@@ -304,26 +320,102 @@ public final class KitCommand extends KitCommandSupport implements CommandRegist
         return Command.SINGLE_SUCCESS;
     }
 
-    private int resetAll(CommandContext<CommandSourceStack> ctx) {
+    /**
+     * The selector branch of {@code /kit reset}. A selector ({@code @p}, {@code @a[tag=vip]}) is resolved the usual
+     * way, so a command block keeps working, and names the players online here. The vanilla parser also reads a plain
+     * name, but answers only for a player online here and settles case on its own, so a name goes to the lookup.
+     */
+    private int resetSelected(CommandContext<CommandSourceStack> ctx, Optional<KitId> kit) {
+        String typed = raw(ctx, TARGETS);
+        if (!typed.startsWith("@")) {
+            return resetByName(ctx, typed, kit);
+        }
         CommandSender sender = Sender.audience(ctx.getSource());
-        PlayerRef actor = actorRef(sender);
-        Optional<PlayerRef> target = resolveSelectorTarget(ctx, sender);
-        if (target.isEmpty()) {
+        List<Player> selected;
+        try {
+            selected = ctx.getArgument(TARGETS, PlayerSelectorArgumentResolver.class)
+                    .resolve(ctx.getSource());
+        } catch (CommandSyntaxException unmatched) {
+            selected = List.of();
+        }
+        if (selected.isEmpty()) {
+            unknownPlayer(sender, typed);
             return 0;
         }
-        services.kitReset().resetAll(actor, target.get());
+        PlayerRef actor = actorRef(sender);
+        for (Player player : selected) {
+            reset(actor, ref(player), kit);
+        }
         return Command.SINGLE_SUCCESS;
     }
 
-    private int resetOne(CommandContext<CommandSourceStack> ctx) {
+    /** The name branch of {@code /kit reset}, for a name the vanilla parser refuses, such as a Bedrock name. */
+    private int resetNamed(CommandContext<CommandSourceStack> ctx, Optional<KitId> kit) {
+        return resetByName(ctx, ctx.getArgument(NAMED, String.class), kit);
+    }
+
+    /**
+     * Resolve {@code name} through the player lookup off the tick, so a player who is offline, or known only in
+     * another case, is reached too; a name several accounts could mean is refused with the spellings to choose from.
+     */
+    private int resetByName(CommandContext<CommandSourceStack> ctx, String name, Optional<KitId> kit) {
         CommandSender sender = Sender.audience(ctx.getSource());
         PlayerRef actor = actorRef(sender);
-        Optional<PlayerRef> target = resolveSelectorTarget(ctx, sender);
-        if (target.isEmpty()) {
-            return 0;
-        }
-        services.kitReset().reset(actor, target.get(), KitId.of(ctx.getArgument("kit", String.class)));
+        scheduler.async(() -> {
+            NameMatch match;
+            try {
+                match = services.players().matchByName(name);
+            } catch (RuntimeException failure) {
+                reply(sender, new MessageLine(SharedMessageKey.COMMAND_ERROR, Map.of()));
+                return;
+            }
+            Optional<PlayerRef> target = match.player();
+            if (target.isEmpty()) {
+                reply(sender, match.miss(UNKNOWN_PLAYER, Map.of("player", name)));
+                return;
+            }
+            reset(actor, target.get(), kit);
+        });
         return Command.SINGLE_SUCCESS;
+    }
+
+    /**
+     * Reset {@code target}'s stamps on their own thread when they are online here, where the stamps live; otherwise
+     * on the async lane, where the reset is kept for their next join.
+     */
+    private void reset(PlayerRef actor, PlayerRef target, Optional<KitId> kit) {
+        Runnable run = () -> {
+            if (kit.isPresent()) {
+                services.kitReset().reset(actor, target, kit.get());
+            } else {
+                services.kitReset().resetAll(actor, target);
+            }
+        };
+        scheduler.onEntity(target, run, () -> scheduler.async(run));
+    }
+
+    private static Optional<KitId> kitOf(CommandContext<CommandSourceStack> ctx) {
+        return Optional.of(KitId.of(ctx.getArgument(KIT, String.class)));
+    }
+
+    /** The text the sender typed for argument {@code name}. */
+    private static String raw(CommandContext<CommandSourceStack> ctx, String name) {
+        for (ParsedCommandNode<CommandSourceStack> node : ctx.getNodes()) {
+            if (node.getNode().getName().equals(name)) {
+                return node.getRange().get(ctx.getInput());
+            }
+        }
+        throw new IllegalStateException("no argument " + name + " in " + ctx.getInput());
+    }
+
+    /** Send {@code line} on the thread that owns {@code sender}: the player's own, or the global region. */
+    private void reply(CommandSender sender, MessageLine line) {
+        Runnable send = () -> feedback.send(sender, line);
+        if (sender instanceof Player player) {
+            scheduler.onEntity(ref(player), send);
+        } else {
+            scheduler.onGlobal(send);
+        }
     }
 
     private static PlayerRef actorRef(CommandSender sender) {

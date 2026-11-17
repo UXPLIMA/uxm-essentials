@@ -7,6 +7,7 @@ import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.function.Consumer;
 
 import com.uxplima.uxmessentials.shared.application.message.Notifier;
 import com.uxplima.uxmessentials.shared.application.port.Logger;
@@ -103,8 +104,10 @@ public final class OfflineTeleport {
     /** Send {@code actor} to where the player named {@code name} logged out of this server. */
     public void goTo(PlayerRef actor, String name) {
         Objects.requireNonNull(actor, "actor");
-        offline(actor, name)
-                .ifPresent(target -> scheduler.async(() -> {
+        offline(
+                actor,
+                name,
+                target -> scheduler.async(() -> {
                     Optional<SavedSpot> saved;
                     try {
                         saved = positions.read(target.uuid());
@@ -126,7 +129,7 @@ public final class OfflineTeleport {
     public void bring(PlayerRef actor, String name, Position here) {
         Objects.requireNonNull(actor, "actor");
         Objects.requireNonNull(here, "here");
-        offline(actor, name).ifPresent(target -> {
+        offline(actor, name, target -> {
             PendingRelocation relocation = new PendingRelocation(
                     target.uuid(),
                     server,
@@ -282,12 +285,23 @@ public final class OfflineTeleport {
     }
 
     /**
-     * The named player when this server knows them and they are not online here as far as the actor can see;
-     * otherwise the actor is told why not. A player online here whom the actor may not see is handled as offline.
+     * Run {@code then} on the actor's thread with the named player when this server knows them and they are not online
+     * here as far as the actor can see; otherwise the actor is told why not. The name is settled on the async lane,
+     * since a name the index does not hold in memory is read from the database or the server's player data.
      */
-    private Optional<PlayerRef> offline(PlayerRef actor, String name) {
+    private void offline(PlayerRef actor, String name, Consumer<PlayerRef> then) {
         Objects.requireNonNull(name, "name");
-        NameMatch match = players.matchByName(name);
+        scheduler.async(() -> {
+            NameMatch match = players.matchByName(name);
+            scheduler.onEntity(actor, () -> offline(actor, name, match).ifPresent(then));
+        });
+    }
+
+    /**
+     * The matched player unless they are online here as far as the actor can see. A player online here whom the actor
+     * may not see is handled as offline.
+     */
+    private Optional<PlayerRef> offline(PlayerRef actor, String name, NameMatch match) {
         Optional<PlayerRef> target = match.player();
         if (target.isEmpty()) {
             notifier.send(actor, match.miss(TeleportMessageKey.TPOFFLINE_UNKNOWN, Map.of("player", name)));

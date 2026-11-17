@@ -32,8 +32,9 @@ import com.uxplima.uxmessentials.shared.domain.PlayerRef;
  * sender cannot tell them apart from a player who is gone; the target's backend checks this itself, because the
  * sender's backend knows peers' vanish only while vanish {@code cross-server} is on. A target who left before the
  * message arrived, or a backend that runs private messages through another plugin, answers offline too: the message
- * becomes mail when offline-to-mail is on, and the sender reads the usual offline line when it is off. A backend that
- * never answers leaves the sender with the offline line and no mail, since the target may still have read it.
+ * becomes mail when offline-to-mail is on, and the sender reads the usual offline line when it is off; a reply that
+ * cannot reach its partner, hidden or with reply routing off included, takes the same path. A backend that never
+ * answers leaves the sender with the offline line and no mail, since the target may still have read it.
  *
  * <p>Answers arrive on the bus's dispatch thread. What the sender reads is written on the sender's thread and what
  * spies read on the global thread, because both resolve online players; mail is written on the async lane.
@@ -127,7 +128,7 @@ public final class RelayPrivateMessage {
         // The same feedback a vanished player on this backend produces, so a hidden player elsewhere is never told
         // apart from one who is gone.
         if (reply) {
-            notifier.send(sender, MessagingError.NO_REPLY_TARGET.messageKey());
+            replyOffline(sender, target, body);
         } else {
             sendMessage.send(sender, target, body, false);
         }
@@ -179,8 +180,9 @@ public final class RelayPrivateMessage {
             scheduler.onGlobal(() -> sendMessage.observe(answer));
             return;
         }
-        if (answer.outcome() == RemoteOutcome.OFFLINE) {
-            // A late offline answer changes nothing: the sender already read the offline line when the wait ended.
+        if (answer.outcome() == RemoteOutcome.OFFLINE || answer.outcome() == RemoteOutcome.REPLIES_OFF) {
+            // A late answer changes nothing: the sender already read the offline line when the wait ended. A partner
+            // with reply routing off reads as offline, so a reply never tells the sender they are there.
             if (!late) {
                 concludeOffline(sent);
             }
@@ -195,11 +197,19 @@ public final class RelayPrivateMessage {
 
     private void concludeOffline(RemoteMessage sent) {
         if (sent.reply()) {
-            scheduler.onEntity(
-                    sent.sender(), () -> sendMessage.conclude(sent, RemoteAnswer.to(sent, RemoteOutcome.OFFLINE)));
+            replyOffline(sent.sender(), sent.target(), sent.body());
         } else {
             // Mail is storage work, so it stays on the async lane.
             scheduler.async(() -> sendMessage.offline(sent.sender(), sent.target(), sent.body()));
+        }
+    }
+
+    private void replyOffline(PlayerRef sender, PlayerRef partner, MessageBody body) {
+        if (sendMessage.leavesMail()) {
+            // Mail is storage work, so it stays on the async lane.
+            scheduler.async(() -> sendMessage.replyOffline(sender, partner, body));
+        } else {
+            notifier.send(sender, MessagingError.NO_REPLY_TARGET.messageKey());
         }
     }
 

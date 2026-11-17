@@ -18,6 +18,7 @@ public final class ImportSummary {
 
     private final SourceId source;
     private final ImportMode mode;
+    private final LongAdder accounts = new LongAdder();
     private final LongAdder users = new LongAdder();
     private final LongAdder warps = new LongAdder();
     private final LongAdder playerWarps = new LongAdder();
@@ -52,6 +53,7 @@ public final class ImportSummary {
 
     private void countKind(ImportRecord rec) {
         switch (rec) {
+            case ImportRecord.AccountRecord ignored -> accounts.increment();
             case ImportRecord.UserRecord ignored -> users.increment();
             case ImportRecord.WarpRecord ignored -> warps.increment();
             case ImportRecord.PlayerWarpRecord ignored -> playerWarps.increment();
@@ -82,6 +84,11 @@ public final class ImportSummary {
 
     public boolean dryRun() {
         return mode.isDryRun();
+    }
+
+    /** The accounts the source knew by name, each recorded in the name index or already there. */
+    public long accounts() {
+        return accounts.sum();
     }
 
     public long users() {
@@ -146,7 +153,8 @@ public final class ImportSummary {
      * once here (it is one record) even though it feeds two of the finish line's counters.
      */
     public long total() {
-        return users()
+        return accounts()
+                + users()
                 + warps()
                 + playerWarps()
                 + kits()
@@ -167,7 +175,8 @@ public final class ImportSummary {
 
     /** A one-line, audit-friendly rendering of the totals plus the run duration. */
     public String describe(Duration elapsed) {
-        return "source=" + source + " dry_run=" + dryRun() + " users=" + users() + " warps=" + warps()
+        return "source=" + source + " dry_run=" + dryRun() + " accounts=" + accounts() + " users=" + users() + " warps="
+                + warps()
                 + " player_warps=" + playerWarps() + " kits=" + kits() + " jails=" + jails() + " mutes=" + mutes()
                 + " bans=" + bans() + " ip_bans=" + ipBans() + " warns=" + warns() + " holograms=" + holograms()
                 + " worlds=" + worlds() + " skipped=" + skipped() + " partial=" + partial() + " failed=" + failed()

@@ -32,6 +32,7 @@ import com.uxplima.uxmessentials.holograms.domain.HologramName;
 import com.uxplima.uxmessentials.kits.application.port.KitRepository;
 import com.uxplima.uxmessentials.kits.domain.KitDefinition;
 import com.uxplima.uxmessentials.kits.domain.KitId;
+import com.uxplima.uxmessentials.migration.AccountNames;
 import com.uxplima.uxmessentials.migration.BalancePolicy;
 import com.uxplima.uxmessentials.migration.ConflictPolicy;
 import com.uxplima.uxmessentials.migration.ImportMode;
@@ -42,6 +43,7 @@ import com.uxplima.uxmessentials.migration.RecordOutcome;
 import com.uxplima.uxmessentials.migration.RecordResult;
 import com.uxplima.uxmessentials.migration.RecordWriter;
 import com.uxplima.uxmessentials.migration.UserRecordWriter;
+import com.uxplima.uxmessentials.migration.convert.map.ImportedAccount;
 import com.uxplima.uxmessentials.migration.convert.map.ImportedHologram;
 import com.uxplima.uxmessentials.migration.convert.map.ImportedKit;
 import com.uxplima.uxmessentials.migration.convert.map.ImportedModeration;
@@ -98,6 +100,8 @@ class DryRunImportTest {
     /** A pair of records of each kind the writers dispatch, the first colliding with what the server holds. */
     private static List<ImportRecord> records() {
         return List.of(
+                new ImportRecord.AccountRecord(account(KNOWN)),
+                new ImportRecord.AccountRecord(account(FRESH)),
                 new ImportRecord.WarpRecord(new ImportedWarp(warp("market"))),
                 new ImportRecord.WarpRecord(new ImportedWarp(warp("spawn"))),
                 new ImportRecord.KitRecord(new ImportedKit(kit("starter"))),
@@ -139,6 +143,8 @@ class DryRunImportTest {
 
         assertThat(outcomes)
                 .containsExactly(
+                        RecordOutcome.SKIPPED,
+                        RecordOutcome.WRITTEN,
                         RecordOutcome.SKIPPED,
                         RecordOutcome.WRITTEN,
                         RecordOutcome.SKIPPED,
@@ -214,6 +220,10 @@ class DryRunImportTest {
         return new ImportOptions(Path.of("source"), ImportMode.LIVE, policy, BalancePolicy.SKIP_IF_PRESENT);
     }
 
+    private static ImportedAccount account(PlayerRef player) {
+        return new ImportedAccount(player.uuid(), player.name(), NOW);
+    }
+
     private static Warp warp(String name) {
         return Warp.create(WarpName.of(name), Position.of(WORLD, 1, 64, 1), KNOWN, NOW);
     }
@@ -270,6 +280,7 @@ class DryRunImportTest {
         private final Map<HologramName, Hologram> holograms = new LinkedHashMap<>();
         private final Map<WorldName, ManagedWorld> worlds = new LinkedHashMap<>();
         private final Map<UUID, Set<KitId>> kitClaims = new HashMap<>();
+        private final Map<UUID, String> names = new HashMap<>();
 
         private Server(boolean refuseWrites) {
             this.refuseWrites = refuseWrites;
@@ -287,6 +298,7 @@ class DryRunImportTest {
             server.holograms.put(HologramName.of("welcome"), hologram("welcome"));
             server.worlds.put(WorldName.of("resource"), world("resource"));
             server.kitClaims.put(KNOWN.uuid(), new HashSet<>(Set.of(KitId.of("welcome"))));
+            server.names.put(KNOWN.uuid(), KNOWN.name());
             return server;
         }
 
@@ -299,6 +311,7 @@ class DryRunImportTest {
                     new Holograms(),
                     new Worlds(),
                     UntouchedImportPorts.playerWarpWriter(new UntouchedImportPorts.PlayerWarps()),
+                    new Names(),
                     CLOCK);
         }
 
@@ -311,6 +324,7 @@ class DryRunImportTest {
                     new Holograms(),
                     new Worlds(),
                     UntouchedImportPorts.playerWarpWriter(new UntouchedImportPorts.PlayerWarps()),
+                    new Names(),
                     CLOCK,
                     new QuietLog());
         }
@@ -331,6 +345,24 @@ class DryRunImportTest {
             writes.add(what);
             if (refuseWrites) {
                 throw new AssertionError("a dry run wrote " + what);
+            }
+        }
+
+        private final class Names implements AccountNames {
+
+            @Override
+            public boolean record(ImportedAccount account) {
+                if (names.containsKey(account.uuid())) {
+                    return false;
+                }
+                write("account " + account.uuid());
+                names.put(account.uuid(), account.name());
+                return true;
+            }
+
+            @Override
+            public boolean holds(ImportedAccount account) {
+                return names.containsKey(account.uuid());
             }
         }
 

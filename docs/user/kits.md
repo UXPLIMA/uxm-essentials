@@ -82,7 +82,7 @@ Some limits to know:
 | `/kit create <name>` | `uxmessentials.kit.edit` | operators | Makes a kit from your inventory. |
 | `/kit del <name>` | `uxmessentials.kit.edit` | operators | Deletes a kit. |
 | `/kit editor [name [save]]` | `uxmessentials.kit.edit` | operators | Edits kits in a menu. |
-| `/kit reset <player> [kit]` | `uxmessentials.kit.reset` | operators | Clears a player's claims and cooldowns, for one kit or all. |
+| `/kit reset <player> [kit]` | `uxmessentials.kit.reset` | operators | Clears a player's claims and cooldowns, for one kit or all. A player who is offline gets the reset when they next join. |
 
 `uxmessentials.bypass.cooldown.kit` skips cooldowns and lets a one-time kit be claimed again.
 `uxmessentials.kit.cooldown.<seconds>` caps every kit's wait for its holder: a kit set longer waits the node's

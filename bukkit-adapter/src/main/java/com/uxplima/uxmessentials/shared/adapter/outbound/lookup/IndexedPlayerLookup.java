@@ -32,7 +32,9 @@ import org.jspecify.annotations.NullMarked;
  * case is ambiguous rather than a guess. A name only one account matches, in another case, means that account only
  * when the durable store confirms nobody else holds the name: the memory is a window of recent names, and an older
  * account spelled as typed may sit outside it. The store is read only off the tick; on the tick such a name answers
- * unknown. The server's own cache, the last fallback, matches any case and is held to the exact spelling.
+ * unknown. The server's own cache, the last fallback, matches any case and is held to the exact spelling. It is
+ * asked only off the tick too: whether its account has played here is read from the player's data file, and a tick
+ * thread never waits on the disk for a typed name.
  *
  * <p>Whether a player is connected, and who a connected player is, is answered from the {@link OnlinePlayerIndex}
  * rather than the server, so a caller on the async lane gets an answer without touching the Bukkit API.
@@ -116,11 +118,14 @@ public final class IndexedPlayerLookup implements PlayerLookup {
                 // Memory holds a window of accounts; the store holds every account any backend has seen.
                 known = index.storedUnder(name);
             }
-            return known.isEmpty() ? NameMatch.of(offline.byName(name)) : NameMatch.found(known.getFirst());
+            if (!known.isEmpty()) {
+                return NameMatch.found(known.getFirst());
+            }
+            return mayReadStore ? NameMatch.of(offline.byName(name)) : NameMatch.unknown();
         }
         String typed = name.strip();
         NameMatch match = matchSpelling(typed, connected, mayReadStore);
-        if (!(match instanceof NameMatch.Unknown)) {
+        if (!(match instanceof NameMatch.Unknown) || !mayReadStore) {
             return match;
         }
         // The server's cache matches any case and keeps one profile per lower-cased name: only its exact spelling is

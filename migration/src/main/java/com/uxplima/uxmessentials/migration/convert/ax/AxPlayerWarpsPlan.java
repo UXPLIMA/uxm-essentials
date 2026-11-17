@@ -23,6 +23,7 @@ import com.uxplima.uxmessentials.migration.convert.ax.parse.AxWarpRow;
 import com.uxplima.uxmessentials.migration.convert.jdbc.JdbcConnection;
 import com.uxplima.uxmessentials.migration.convert.jdbc.JdbcSource;
 import com.uxplima.uxmessentials.migration.convert.jdbc.RowMapper;
+import com.uxplima.uxmessentials.migration.convert.map.ImportedAccount;
 import com.uxplima.uxmessentials.migration.convert.map.ImportedPlayerWarp;
 import com.uxplima.uxmessentials.shared.application.port.Logger;
 import org.jspecify.annotations.NullMarked;
@@ -60,7 +61,14 @@ final class AxPlayerWarpsPlan implements ImportPlan {
         Map<Integer, List<ImportedPlayerWarp.Ban>> bans = banMap(players);
         Map<Integer, List<ImportedPlayerWarp.Rating>> ratings = ratingMap(players);
         Map<Integer, AxVisitRow> visits = visitMap();
-        return warpRows().stream().flatMap(row -> mapWarp(row, players, whitelist, favourites, bans, ratings, visits));
+        // Every player AxPlayerWarps knows is an account with a name, warp owner or not, so each is recorded first.
+        Stream<ImportRecord> accounts = players.values().stream()
+                .flatMap(player -> account(player).stream())
+                .map(ImportRecord.AccountRecord::new);
+        return Stream.concat(
+                accounts,
+                warpRows().stream()
+                        .flatMap(row -> mapWarp(row, players, whitelist, favourites, bans, ratings, visits)));
     }
 
     private Stream<ImportRecord> mapWarp(
@@ -145,6 +153,14 @@ final class AxPlayerWarpsPlan implements ImportPlan {
 
     private List<AxWarpRow> warpRows() {
         return rows(AxTables.SELECT_WARPS, AxRowReaders.warp());
+    }
+
+    private static java.util.Optional<ImportedAccount> account(AxPlayer player) {
+        try {
+            return ImportedAccount.of(UUID.fromString(player.uuid()), player.name(), Instant.EPOCH);
+        } catch (IllegalArgumentException malformed) {
+            return java.util.Optional.empty();
+        }
     }
 
     private static java.util.Optional<UUID> resolve(Map<Integer, AxPlayer> players, int playerId) {
