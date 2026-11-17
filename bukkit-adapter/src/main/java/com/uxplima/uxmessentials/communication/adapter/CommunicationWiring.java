@@ -5,6 +5,7 @@ import java.time.Clock;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
+import java.util.Map;
 import java.util.Objects;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.BooleanSupplier;
@@ -30,7 +31,6 @@ import com.uxplima.uxmessentials.communication.adapter.outbound.BukkitInfoSender
 import com.uxplima.uxmessentials.communication.adapter.outbound.ChatMetaSource;
 import com.uxplima.uxmessentials.communication.adapter.outbound.ChatMetaSources;
 import com.uxplima.uxmessentials.communication.adapter.outbound.ChatPlaceholderExpander;
-import com.uxplima.uxmessentials.communication.adapter.outbound.PdcBroadcastOptOutStore;
 import com.uxplima.uxmessentials.communication.adapter.outbound.ThreadLocalRandomSource;
 import com.uxplima.uxmessentials.communication.application.BroadcastOptOut;
 import com.uxplima.uxmessentials.communication.application.InfoRegistry;
@@ -40,6 +40,7 @@ import com.uxplima.uxmessentials.communication.application.ResolveConnectionMess
 import com.uxplima.uxmessentials.communication.application.ResolveDeathMessage;
 import com.uxplima.uxmessentials.communication.application.ResolveJoinMessage;
 import com.uxplima.uxmessentials.communication.application.ResolveQuitMessage;
+import com.uxplima.uxmessentials.communication.application.SharedBroadcastOptOut;
 import com.uxplima.uxmessentials.communication.application.port.AnnouncementStore;
 import com.uxplima.uxmessentials.communication.application.port.AnnouncerSettingsStore;
 import com.uxplima.uxmessentials.communication.application.port.BroadcastOptOutStore;
@@ -48,6 +49,10 @@ import com.uxplima.uxmessentials.communication.domain.AnnouncerConfig;
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandRegistration;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.GuiLayouts;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.GuiText;
+import com.uxplima.uxmessentials.shared.adapter.inbound.settings.HeldSettingsListener;
+import com.uxplima.uxmessentials.shared.adapter.inbound.settings.LegacySwitches;
+import com.uxplima.uxmessentials.shared.adapter.outbound.bus.Bus;
+import com.uxplima.uxmessentials.shared.adapter.outbound.bus.PlayerSettingsSync;
 import com.uxplima.uxmessentials.shared.adapter.outbound.chat.UxmChatStepBack;
 import com.uxplima.uxmessentials.shared.adapter.outbound.hud.ChannelBroadcaster;
 import com.uxplima.uxmessentials.shared.adapter.outbound.hud.HudText;
@@ -56,7 +61,10 @@ import com.uxplima.uxmessentials.shared.adapter.outbound.permission.CatalogPermi
 import com.uxplima.uxmessentials.shared.application.message.Notifier;
 import com.uxplima.uxmessentials.shared.application.module.KernelPorts;
 import com.uxplima.uxmessentials.shared.application.module.ModuleContext;
+import com.uxplima.uxmessentials.shared.application.port.PlayerSwitchStore;
 import com.uxplima.uxmessentials.shared.application.port.Scheduler;
+import com.uxplima.uxmessentials.shared.application.settings.PlayerSwitches;
+import com.uxplima.uxmessentials.shared.application.settings.SettingsSessions;
 import com.uxplima.uxmessentials.shared.display.ConditionContext;
 import com.uxplima.uxmlib.gui.input.TextInput;
 import com.uxplima.uxmlib.menu.Menus;
@@ -76,8 +84,8 @@ import org.jspecify.annotations.NullMarked;
  * gated by its live config, so {@code /uxmess reload communication} can enable it without re-registration. This is
  * the one place the communication context is wired: nothing else news up its classes.
  *
- * <p>The context persists nothing: the per-player opt-out bit is PDC-backed (survives relog), the sequence
- * counters are transient, and the announcer schedule and info pages are config-authored. The operator content is
+ * <p>The per-player opt-out is one of the switches every backend shares through the database, read at login and
+ * announced on the bus when it changes; the sequence counters are transient, and the announcer schedule and info pages are config-authored. The operator content is
  * read once into {@link CommunicationSettings} and rendered through MiniMessage; the plugin's own
  * {@code /broadcasttoggle} confirmation and missing-page error are {@code MessageKey}s through the
  * {@link Notifier}, keeping the parity-checked keys and the unchecked operator content apart.
@@ -95,6 +103,8 @@ public final class CommunicationWiring {
             ModuleContext ctx,
             AnnouncementStore announcementStore,
             AnnouncerSettingsStore announcerSettingsStore,
+            PlayerSwitchStore switchStore,
+            Bus bus,
             Supplier<Theme> theme,
             GuiLayouts guiLayouts,
             TextInput textInput,
@@ -104,6 +114,8 @@ public final class CommunicationWiring {
         Objects.requireNonNull(ctx, "ctx");
         Objects.requireNonNull(announcementStore, "announcementStore");
         Objects.requireNonNull(announcerSettingsStore, "announcerSettingsStore");
+        Objects.requireNonNull(switchStore, "switchStore");
+        Objects.requireNonNull(bus, "bus");
         Objects.requireNonNull(theme, "theme");
         Objects.requireNonNull(guiLayouts, "guiLayouts");
         Objects.requireNonNull(textInput, "textInput");
@@ -114,7 +126,18 @@ public final class CommunicationWiring {
         CommunicationSettings settings = new CommunicationSettings(dir, kernel.log());
         AtomicBoolean running = new AtomicBoolean(true);
 
-        BroadcastOptOutStore optOutStore = new PdcBroadcastOptOutStore(plugin);
+        PlayerSwitches switches = new PlayerSwitches(
+                SharedBroadcastOptOut.NAMES,
+                switchStore,
+                Clock.systemUTC(),
+                kernel.scheduler(),
+                kernel.log(),
+                PlayerSettingsSync.announcer(bus.publisher()));
+        PlayerSettingsSync.register(bus.registry(), switches);
+        BroadcastOptOutStore optOutStore = new SharedBroadcastOptOut(switches);
+        HeldSettingsListener heldSwitches =
+                new HeldSettingsListener(new SettingsSessions(switches, kernel.scheduler()), kernel.playerLookup());
+        heldSwitches.adoptOnline(plugin.getServer().getOnlinePlayers());
         RandomSource random = new ThreadLocalRandomSource();
         BukkitInfoSender infoSender = new BukkitInfoSender(kernel.messageSink());
         Notifier notifier = new Notifier(kernel.messages(), kernel.messageSink());
@@ -199,7 +222,7 @@ public final class CommunicationWiring {
         ChatMetaSource chatMeta = ChatMetaSources.create(plugin.getServer());
         // PlaceholderAPI-backed %token% expansion for the chat format when installed, identity otherwise (probed once).
         ChatPlaceholderExpander chatPlaceholders = ChatPlaceholderExpander.create();
-        List<Listener> listeners = listeners(
+        List<Listener> listeners = new ArrayList<>(listeners(
                 services,
                 registry,
                 infoSender,
@@ -211,7 +234,12 @@ public final class CommunicationWiring {
                 kernel.scheduler(),
                 chatMeta,
                 chatPlaceholders,
-                chat);
+                chat));
+        listeners.add(heldSwitches);
+        // An earlier version kept the opt-out in the player's data on each server; it moves to the shared switch as
+        // each player next joins.
+        listeners.add(
+                new LegacySwitches(plugin, switches, Map.of("broadcast-opt-out", SharedBroadcastOptOut.BROADCASTS)));
         // The same re-read /announce reload performs, exposed so /uxmess reload communication applies the module's
         // file edits through one path rather than a second copy that could drift from it.
         Runnable reload = () -> {

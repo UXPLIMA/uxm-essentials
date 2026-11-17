@@ -157,6 +157,7 @@ public final class NetworkMessageCodec {
             case HologramChanged hologram -> out.writeUTF(hologram.name());
             case NpcChanged npc -> out.writeUTF(npc.name());
             case IgnoreChanged ignore -> writeUuid(out, ignore.owner());
+            case PlayerSettingsChanged settings -> writeUuid(out, settings.player());
             case ServerPing ping -> {
                 out.writeLong(ping.epochMillis());
                 // Written last: a peer on the older layout stops reading after the timestamp and never sees it.
@@ -314,6 +315,7 @@ public final class NetworkMessageCodec {
                 out.writeBoolean(connected.switched());
             }
             case PlayerSkinChanged skin -> writeUuid(out, skin.player());
+            case RankActionsKept kept -> writeUuid(out, kept.player());
         }
     }
 
@@ -330,6 +332,7 @@ public final class NetworkMessageCodec {
             case HOLOGRAM_CHANGED -> new HologramChanged(origin, in.readUTF());
             case NPC_CHANGED -> new NpcChanged(origin, in.readUTF());
             case IGNORE_CHANGED -> new IgnoreChanged(origin, readUuid(in));
+            case PLAYER_SETTINGS_CHANGED -> new PlayerSettingsChanged(origin, readUuid(in));
             case SERVER_PING -> new ServerPing(origin, in.readLong(), readOptionalLong(in, ServerPing.NO_NONCE));
             case VOTE_PARTY_FIRED -> readParty(in, origin);
             case VOTE_COUNTER_CHANGED -> new VoteCounterChanged(origin);
@@ -418,6 +421,7 @@ public final class NetworkMessageCodec {
                 new ProxyConnectionFrame(
                         origin, readUuid(in), readUuid(in), readUuid(in), in.readUTF(), in.readBoolean());
             case PLAYER_SKIN_CHANGED -> new PlayerSkinChanged(origin, readUuid(in));
+            case RANK_ACTIONS_KEPT -> new RankActionsKept(origin, readUuid(in));
         };
     }
 

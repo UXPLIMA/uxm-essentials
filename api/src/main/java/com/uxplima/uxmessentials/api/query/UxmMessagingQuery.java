@@ -33,10 +33,14 @@ public interface UxmMessagingQuery {
 
     /**
      * Whether this player is taking private messages, which is the {@code /msgtoggle} switch. Mail reaches them
-     * either way: the switch gates the live channel only.
+     * either way: the switch gates the live channel only. False for a player who is not online on this server, whose
+     * switch this server does not hold.
      */
     boolean acceptsMessages(UUID playerId);
 
-    /** Whether this player has social spy on, so they are shown other players' private messages. */
+    /**
+     * Whether this player has social spy on, so they are shown other players' private messages. False for a player who
+     * is not online on this server.
+     */
     boolean isSocialSpying(UUID playerId);
 }

@@ -59,7 +59,11 @@ public interface PlayerLookup {
         return matchByName(name);
     }
 
-    /** The player with this UUID, online or resolvable from the profile cache. */
+    /**
+     * The player with this UUID under the name they last joined with on any server of the database, or from this
+     * server's profile cache. On a tick thread the stored names are answered from memory only, so an account no
+     * server has seen lately may need a read off the tick to be named.
+     */
     Optional<PlayerRef> findByUuid(UUID uuid);
 
     /** True when the player with this UUID is currently connected. */

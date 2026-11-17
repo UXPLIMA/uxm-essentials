@@ -8,8 +8,8 @@ import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 /**
  * Outbound port for the staff {@code /socialspy} toggle, which staff are currently observing other
  * players' private messages (audit-relevant). When a private message is delivered, every spying staff
- * member who is not a party to the conversation receives a spy line. The flag is per-holder session/PDC
- * state, dropped on relog by default; the store also enumerates the observers of a given conversation so
+ * member who is not a party to the conversation receives a spy line. The flags are kept in the database every
+ * backend shares, so they outlast a relog; the store also enumerates the observers of a given conversation so
  * the send path can fan out without scanning every online player.
  *
  * <p>A spy is in one of three states. <strong>Not spying:</strong> no toggle on, no targets. <strong>ALL:
@@ -33,6 +33,14 @@ public interface SocialSpyStore {
      * puts the spy in the targeted state; it is independent of the global ALL flag.
      */
     boolean toggleTarget(PlayerRef spy, PlayerRef target);
+
+    /**
+     * Whether {@code who}'s setting was read on this server, so it can be changed. A change asked for before then is
+     * refused rather than built on a setting this server does not know.
+     */
+    default boolean ready(PlayerRef who) {
+        return true;
+    }
 
     /** Every staff member currently spying with the global ALL flag, for callers that need the ALL set. */
     List<PlayerRef> activeSpies();

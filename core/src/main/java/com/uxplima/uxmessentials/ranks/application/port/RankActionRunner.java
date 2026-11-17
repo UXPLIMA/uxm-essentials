@@ -7,7 +7,7 @@ import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 /**
  * Runs a rank's configured rankup {@code actions} for a player once the advance has been recorded. The
  * {@code :core} layer hands over the rank's raw action lines exactly as authored in {@code ranks.conf}
- * ({@code "console lp user %player% parent set citizen"}, {@code "message <green>Welcome!"}): it never decides
+ * ({@code "console lp user {uuid} parent set citizen"}, {@code "message <green>Welcome!"}): it never decides
  * how a command is dispatched, a message shown, or a sound played, nor on which thread. The adapter parses each
  * line into the shared click-action model and runs the chain through the same click-action engine the npc and
  * hologram contexts use, giving the operator's "command actions" full reach: set a permission group, run any
@@ -21,9 +21,12 @@ import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 public interface RankActionRunner {
 
     /**
-     * Run {@code actionLines} for {@code who} in their declared order. A no-op when the list is empty or the
-     * player is offline. Fire-and-forget: any per-action delay is handled internally by the adapter's engine, so
-     * the call returns at once.
+     * Run {@code actionLines} for {@code who} in their declared order, on the thread that owns {@code who}.
+     * Fire-and-forget: any per-action delay is handled internally by the adapter's engine, so the call returns at
+     * once.
+     *
+     * @return false when {@code who} is not on this server, in which case nothing ran and the caller keeps the
+     *     lines for their next join
      */
-    void run(PlayerRef who, List<String> actionLines);
+    boolean run(PlayerRef who, List<String> actionLines);
 }

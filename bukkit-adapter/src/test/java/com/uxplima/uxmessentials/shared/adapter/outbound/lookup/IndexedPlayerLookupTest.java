@@ -38,6 +38,9 @@ class IndexedPlayerLookupTest {
 
     private static final PlayerRef STEVE = new PlayerRef(UUID.randomUUID(), "Steve");
     private static final PlayerRef LOWER_STEVE = new PlayerRef(UUID.randomUUID(), "steve");
+    /** A Bedrock player through Floodgate: the Xbox user id under a zero high half, the name prefixed with a dot. */
+    private static final PlayerRef BEDROCK =
+            new PlayerRef(UUID.fromString("00000000-0000-0000-0009-01f2a3b4c5d6"), ".BedrockGamer123");
 
     private final OnlinePlayerIndex online = new OnlinePlayerIndex();
     private final ServerProfiles server = new ServerProfiles();
@@ -229,6 +232,57 @@ class IndexedPlayerLookupTest {
     }
 
     @Test
+    void anAccountSeenOnlyOnAnotherServerIsNamedFromTheStoreOffTheTickAndFromMemoryAfter() {
+        StoredNames store = new StoredNames();
+        store.rows.add(new PlayerName(BEDROCK.uuid(), BEDROCK.name(), 100L));
+        store.rows.add(new PlayerName(ALEX.uuid(), ALEX.name(), 200L));
+        // A window of one: only Alex is held in memory; the Bedrock player joined another backend only.
+        names.backWith(store, 1);
+
+        onTick = true;
+        assertThat(lookup.findByUuid(BEDROCK.uuid())).isEmpty();
+
+        onTick = false;
+        assertThat(lookup.findByUuid(BEDROCK.uuid())).contains(BEDROCK);
+
+        onTick = true;
+        assertThat(lookup.findByUuid(BEDROCK.uuid())).contains(BEDROCK);
+        assertThat(lookup.findByUuid(BEDROCK.uuid()).map(PlayerRef::name)).contains(BEDROCK.name());
+    }
+
+    @Test
+    void anAccountIsNamedAsItLastJoinedNotAsThisServersCacheRemembersIt() {
+        server.profiles.put(ALEX.uuid(), new PlayerRef(ALEX.uuid(), "OldAlex"));
+        names.record(ALEX.uuid(), ALEX.name());
+
+        assertThat(lookup.findByUuid(ALEX.uuid()).map(PlayerRef::name)).contains("Alex");
+        assertThat(server.asked).isZero();
+    }
+
+    @Test
+    void anAccountNoServerHasSeenFallsBackToThisServersCache() {
+        server.profiles.put(ALEX.uuid(), ALEX);
+        names.backWith(new StoredNames(), 10);
+
+        assertThat(lookup.findByUuid(ALEX.uuid())).contains(ALEX);
+        assertThat(lookup.findByUuid(UUID.randomUUID())).isEmpty();
+    }
+
+    @Test
+    void onlineModeAnAccountTheMemoryLetGoIsFoundInTheStoreOffTheTick() {
+        StoredNames store = new StoredNames();
+        store.rows.add(new PlayerName(BEDROCK.uuid(), BEDROCK.name(), 100L));
+        store.rows.add(new PlayerName(ALEX.uuid(), ALEX.name(), 200L));
+        names.backWith(store, 1);
+
+        assertThat(onlineMode.matchByName(".bedrockgamer123")).isEqualTo(NameMatch.found(BEDROCK));
+
+        onTick = true;
+        assertThat(onlineMode.matchByName(".bedrockgamer123")).isEqualTo(NameMatch.unknown());
+        assertThat(server.asked).isEqualTo(1);
+    }
+
+    @Test
     void offlineModeTheServerCacheAnswersOnlyForTheSpellingTyped() {
         server.profiles.put(STEVE.uuid(), STEVE);
 
@@ -331,6 +385,11 @@ class IndexedPlayerLookupTest {
                     .filter(entry -> entry.getValue() > 1)
                     .map(java.util.Map.Entry::getKey)
                     .collect(java.util.stream.Collectors.toUnmodifiableSet());
+        }
+
+        @Override
+        public java.util.Optional<PlayerName> byUuid(java.util.UUID uuid) {
+            return rows.stream().filter(row -> row.uuid().equals(uuid)).reduce((first, second) -> second);
         }
 
         @Override

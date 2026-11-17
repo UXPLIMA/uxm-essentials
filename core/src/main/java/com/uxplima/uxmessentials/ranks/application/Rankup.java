@@ -11,7 +11,6 @@ import java.util.concurrent.ConcurrentHashMap;
 
 import com.uxplima.uxmessentials.ranks.application.port.OwedCredits;
 import com.uxplima.uxmessentials.ranks.application.port.PlayerRankRepository;
-import com.uxplima.uxmessentials.ranks.application.port.RankActionRunner;
 import com.uxplima.uxmessentials.ranks.application.port.RankEconomy;
 import com.uxplima.uxmessentials.ranks.application.port.RankRequirementEvaluator;
 import com.uxplima.uxmessentials.ranks.domain.Rank;
@@ -41,7 +40,8 @@ import com.uxplima.uxmessentials.shared.domain.PlayerRef;
  *       get. A refund the economy refuses or fails is queued as owed
  *       ({@link OwedCredits}) in the same currency and paid on the next join.</li>
  *   <li><b>Finish</b>, back on the player's thread: the rank's actions run and the {@link PlayerRankedUp} event is
- *       published, both only after the advance is durable.</li>
+ *       published, both only after the advance is durable. A player who left in the meantime has the actions kept
+ *       for their next join on any server ({@link RankActions}).</li>
  * </ol>
  * The returned future completes on the player's thread, or on the caller's thread when the check refuses, so a
  * caller may message the player from it. The one exception is a player who left while the commit ran: the future
@@ -61,7 +61,7 @@ public final class Rankup {
     private final PlayerRankRepository repository;
     private final RankLadder ladder;
     private final RankRequirementEvaluator requirements;
-    private final RankActionRunner actions;
+    private final RankActions actions;
     private final Optional<RankEconomy> economy;
     private final DomainEventPublisher events;
     private final Scheduler scheduler;
@@ -74,7 +74,7 @@ public final class Rankup {
             PlayerRankRepository repository,
             RankLadder ladder,
             RankRequirementEvaluator requirements,
-            RankActionRunner actions,
+            RankActions actions,
             Optional<RankEconomy> economy,
             Optional<OwedCredits> owed,
             DomainEventPublisher events,
@@ -203,15 +203,13 @@ public final class Rankup {
 
     /**
      * On the player's thread: run the actions and raise the event when the rank was saved, then answer. When the
-     * player left before the hop there is nobody to run actions on, but the event is still raised because the new
-     * rank is durable.
+     * player left before the hop the actions are kept for their next join, and the event is still raised because the
+     * new rank is durable.
      */
     private void finish(Advance advance, RankupResult result, boolean present, CompletableFuture<RankupResult> answer) {
         try {
             if (result.status() == RankupResult.Status.RANKED_UP) {
-                if (present) {
-                    runActions(advance);
-                }
+                actions.deliver(advance.who(), advance.target().actions(), present);
                 events.publish(new PlayerRankedUp(
                         advance.who(),
                         advance.from().rank().id(),
@@ -222,15 +220,6 @@ public final class Rankup {
         } finally {
             // Always answered, or the in-flight guard would refuse this player's every later rankup.
             answer.complete(result);
-        }
-    }
-
-    private void runActions(Advance advance) {
-        try {
-            actions.run(advance.who(), advance.target().actions());
-        } catch (RuntimeException failure) {
-            // The rank is already paid for and saved; a broken action line must not hide that from the player.
-            log.error("rank actions failed for player " + advance.who().uuid(), failure);
         }
     }
 
