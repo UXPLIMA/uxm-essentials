@@ -1,7 +1,10 @@
 package com.uxplima.uxmessentials.staff.adapter;
 
+import java.util.function.BooleanSupplier;
 import java.util.function.Consumer;
 
+import com.uxplima.uxmessentials.shared.adapter.outbound.bus.Bus;
+import com.uxplima.uxmessentials.shared.adapter.outbound.bus.StaffActions;
 import com.uxplima.uxmessentials.shared.adapter.outbound.event.InProcessDomainEventPublisher;
 import com.uxplima.uxmessentials.shared.application.module.KernelPorts;
 import com.uxplima.uxmessentials.shared.domain.DomainEvent;
@@ -28,10 +31,16 @@ final class StaffAlertWiring {
 
     /**
      * Subscribe the roster-alert consumer to {@code events}, returning it so {@code Wired.stop} can unsubscribe.
-     * Returns {@code null} when the messaging audience seam is absent: nothing is registered in that case.
+     * Returns {@code null} when the messaging audience seam is absent: nothing is registered in that case. The alerts
+     * of the other backends are shown here over {@code bus} while {@code running} holds.
      */
     static @Nullable Consumer<DomainEvent> subscribe(
-            StaffSeams seams, StaffSettings settings, KernelPorts kernel, InProcessDomainEventPublisher events) {
+            StaffSeams seams,
+            StaffSettings settings,
+            KernelPorts kernel,
+            InProcessDomainEventPublisher events,
+            Bus bus,
+            BooleanSupplier running) {
         if (seams.staffAudience().isEmpty()) {
             return null;
         }
@@ -40,7 +49,9 @@ final class StaffAlertWiring {
                 kernel.messageSink(),
                 kernel.messages(),
                 kernel.scheduler(),
-                settings.staffChatNode());
+                settings.staffChatNode(),
+                new StaffActions(bus.publisher()));
+        bus.registry().register(alerts.listener(running));
         Consumer<DomainEvent> subscriber = event -> dispatch(alerts, event);
         events.subscribe(subscriber);
         return subscriber;

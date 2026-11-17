@@ -1,6 +1,8 @@
 package com.uxplima.uxmessentials.shared.adapter.outbound.bus;
 
+import java.util.Map;
 import java.util.Objects;
+import java.util.Optional;
 import java.util.UUID;
 import java.util.function.Consumer;
 
@@ -15,6 +17,8 @@ import com.uxplima.uxmessentials.shared.network.IpBanChanged;
 import com.uxplima.uxmessentials.shared.network.JailChanged;
 import com.uxplima.uxmessentials.shared.network.JailHopFailed;
 import com.uxplima.uxmessentials.shared.network.MuteChanged;
+import com.uxplima.uxmessentials.shared.network.StaffActionFrame;
+import com.uxplima.uxmessentials.shared.network.StaffActionFrame.Action;
 import org.jspecify.annotations.NullMarked;
 
 /**
@@ -53,7 +57,29 @@ import org.jspecify.annotations.NullMarked;
 @NullMarked
 public final class ModerationSync {
 
+    /** The value of a kick frame that holds the reason; blank for none. */
+    static final String KICK_REASON = "reason";
+
     private ModerationSync() {}
+
+    /** How a backend carries out a kick a peer asked of it, kept as a plain callback. */
+    @FunctionalInterface
+    public interface KickFrames {
+
+        /** A peer kicked {@code target}, connected here, with {@code reason}. */
+        void kick(PlayerRef target, Optional<String> reason);
+    }
+
+    /** A listener that hands each kick a peer asked of this backend ({@code server}) to {@code frames}, once. */
+    public static RemoteSyncListener kickListener(String server, KickFrames frames) {
+        Objects.requireNonNull(frames, "frames");
+        return StaffActions.listener(
+                server,
+                Action.KICK,
+                (StaffActionFrame frame) -> frames.kick(
+                        new PlayerRef(frame.target(), frame.targetName()),
+                        Optional.ofNullable(frame.values().get(KICK_REASON)).filter(reason -> !reason.isBlank())));
+    }
 
     /** A {@link SanctionSync} that publishes a ban/mute frame on the bus after a successful local sanction. */
     public static SanctionSync publisher(BusPublisher bus) {
@@ -121,9 +147,15 @@ public final class ModerationSync {
         Objects.requireNonNull(bus, "bus");
         return new FreezeSync() {
             @Override
-            public void freezeChanged(PlayerRef target, boolean frozen, java.time.Instant at) {
+            public void freezeChanged(PlayerRef target, boolean frozen, java.time.Instant at, String heldOn) {
                 bus.publish(new FreezeChanged(
-                        bus.serverId(), UUID.randomUUID(), target.uuid(), target.name(), frozen, at.toEpochMilli()));
+                        bus.serverId(),
+                        UUID.randomUUID(),
+                        target.uuid(),
+                        target.name(),
+                        frozen,
+                        at.toEpochMilli(),
+                        heldOn));
             }
 
             @Override
@@ -184,6 +216,11 @@ public final class ModerationSync {
         @Override
         public void ipBanChanged(String ip) {
             bus.publish(new IpBanChanged(bus.serverId(), ip));
+        }
+
+        @Override
+        public void kickElsewhere(PlayerRef target, String server, Optional<String> reason) {
+            new StaffActions(bus).send(Action.KICK, server, target, "", Map.of(KICK_REASON, reason.orElse("")));
         }
     }
 }

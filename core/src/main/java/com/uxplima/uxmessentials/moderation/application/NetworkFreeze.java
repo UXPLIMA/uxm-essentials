@@ -13,6 +13,7 @@ import com.uxplima.uxmessentials.moderation.domain.ModerationMessageKey;
 import com.uxplima.uxmessentials.shared.application.RecentIds;
 import com.uxplima.uxmessentials.shared.application.message.Notifier;
 import com.uxplima.uxmessentials.shared.application.port.NetworkPresence;
+import com.uxplima.uxmessentials.shared.domain.OnlinePlayer;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 
 /**
@@ -62,7 +63,9 @@ public final class NetworkFreeze {
             lastChange.put(target.uuid(), at);
             apply(target, frozen);
         }
-        sync.freezeChanged(target, frozen, at);
+        // The proxy keeps a frozen player on the backend they are connected to, wherever the freeze was made.
+        String heldOn = presence.find(target.uuid()).map(OnlinePlayer::server).orElse(presence.localServer());
+        sync.freezeChanged(target, frozen, at, heldOn);
     }
 
     /**

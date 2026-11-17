@@ -5,6 +5,7 @@ import java.util.Objects;
 import java.util.Optional;
 import java.util.function.BooleanSupplier;
 
+import org.bukkit.command.CommandSender;
 import org.bukkit.entity.Player;
 
 import io.papermc.paper.command.brigadier.CommandSourceStack;
@@ -15,13 +16,18 @@ import com.mojang.brigadier.context.CommandContext;
 import com.mojang.brigadier.tree.LiteralCommandNode;
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandRegistration;
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandSuggestions;
+import com.uxplima.uxmessentials.shared.adapter.outbound.bus.RemoteSyncListener;
+import com.uxplima.uxmessentials.shared.adapter.outbound.bus.StaffActions;
+import com.uxplima.uxmessentials.shared.adapter.outbound.lookup.VisibleNetwork;
 import com.uxplima.uxmessentials.shared.application.permission.EnforcementPermissions;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
 import com.uxplima.uxmessentials.shared.application.port.PlayerLookup;
 import com.uxplima.uxmessentials.shared.application.port.Scheduler;
 import com.uxplima.uxmessentials.shared.domain.NameMatch;
+import com.uxplima.uxmessentials.shared.domain.OnlinePlayer;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmessentials.shared.domain.message.SharedMessageKey;
+import com.uxplima.uxmessentials.shared.network.StaffActionFrame.Action;
 import com.uxplima.uxmessentials.staff.adapter.StaffServices;
 import com.uxplima.uxmlib.command.Gate;
 import com.uxplima.uxmlib.command.Sender;
@@ -29,7 +35,8 @@ import org.jspecify.annotations.NullMarked;
 
 /**
  * {@code /staffmode [player]} ({@code uxmessentials.staff.mode}): toggle staff mode. With no argument it
- * toggles the invoking player; with a {@code [player]} argument it toggles that online target (an admin flip).
+ * toggles the invoking player; with a {@code [player]} argument it toggles that online target (an admin flip). A
+ * target on another backend of the network is toggled there, since their inventory is held by that backend.
  *
  * <p>The toggle is the item-loss-safe heart of staff mode and runs on the <i>target's entity region thread</i>
  * through the {@code Scheduler} port: the use case captures the real loadout, commits it to the DB-backed
@@ -47,17 +54,36 @@ public final class StaffModeCommand extends StaffCommandSupport implements Comma
     private final Scheduler scheduler;
     private final PlayerLookup players;
     private final BooleanSupplier running;
+    private final VisibleNetwork network;
+    private final StaffActions actions;
 
+    /**
+     * @param network the players online on the other backends, as the sender may see them
+     * @param actions carries a toggle to the backend a target is on
+     */
     public StaffModeCommand(
             StaffServices services,
             Messages messages,
             Scheduler scheduler,
             PlayerLookup players,
-            BooleanSupplier running) {
+            BooleanSupplier running,
+            VisibleNetwork network,
+            StaffActions actions) {
         super(services, messages);
         this.scheduler = Objects.requireNonNull(scheduler, "scheduler");
         this.players = Objects.requireNonNull(players, "players");
         this.running = Objects.requireNonNull(running, "running");
+        this.network = Objects.requireNonNull(network, "network");
+        this.actions = Objects.requireNonNull(actions, "actions");
+    }
+
+    /** A listener that toggles a player connected here when staff on another backend asked for it. */
+    public RemoteSyncListener listener() {
+        // A player who left before the frame arrived is no longer here, and the toggle on their thread does nothing.
+        return StaffActions.listener(
+                actions.serverId(),
+                Action.STAFF_MODE,
+                frame -> toggle(new PlayerRef(frame.target(), frame.targetName())));
     }
 
     @Override
@@ -85,16 +111,23 @@ public final class StaffModeCommand extends StaffCommandSupport implements Comma
 
     private int toggleOther(CommandContext<CommandSourceStack> ctx) {
         String name = ctx.getArgument("player", String.class);
+        CommandSender sender = Sender.audience(ctx.getSource());
         NameMatch match = players.matchOnlineByName(name);
         Optional<PlayerRef> target = match.player();
-        if (target.isEmpty()) {
-            feedback.send(
-                    Sender.audience(ctx.getSource()),
-                    match.miss(SharedMessageKey.COMMAND_UNKNOWN_PLAYER, Map.of("player", name)));
-            return 0;
+        if (target.isPresent()) {
+            toggle(target.get());
+            return Command.SINGLE_SUCCESS;
         }
-        toggle(target.get());
-        return Command.SINGLE_SUCCESS;
+        Optional<OnlinePlayer> elsewhere = network.findElsewhere(name, sender);
+        if (elsewhere.isPresent()) {
+            OnlinePlayer remote = elsewhere.get();
+            if (running.getAsBoolean()) {
+                actions.send(Action.STAFF_MODE, remote.server(), remote.player(), sender.getName(), Map.of());
+            }
+            return Command.SINGLE_SUCCESS;
+        }
+        feedback.send(sender, match.miss(SharedMessageKey.COMMAND_UNKNOWN_PLAYER, Map.of("player", name)));
+        return 0;
     }
 
     /**

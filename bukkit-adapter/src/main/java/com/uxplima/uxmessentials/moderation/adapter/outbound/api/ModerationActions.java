@@ -199,10 +199,7 @@ public final class ModerationActions implements UxmModerationActions {
 
     private CompletableFuture<UxmOutcome> kicking(UUID targetId, Optional<String> reason) {
         Objects.requireNonNull(targetId, "targetId");
-        if (!players.isOnline(targetId)) {
-            return CompletableFuture.completedFuture(
-                    UxmOutcome.failed(UxmFailure.PLAYER_OFFLINE, "the player is not online"));
-        }
+        // The kick itself tells a player on another backend from one on none, and reaches the first there.
         PlayerRef target = subject(targetId);
         return offServer(target, () -> outcome(writes.kick().kick(actor(), target, reason, silent)));
     }

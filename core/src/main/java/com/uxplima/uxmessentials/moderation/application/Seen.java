@@ -61,7 +61,7 @@ public final class Seen {
         this.clock = Objects.requireNonNull(clock, "clock");
         this.presence = Objects.requireNonNull(presence, "presence");
         this.visibility = Objects.requireNonNull(visibility, "visibility");
-        this.live = new LiveTargetCheck(presence, this.notifier);
+        this.live = new LiveTargetCheck(presence);
     }
 
     /**

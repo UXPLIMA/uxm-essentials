@@ -11,6 +11,16 @@ announces how deep its players are vanished and whether they are staff. A server
 neither, so until it is upgraded its players are listed only to viewers who see every vanish level, and none of them
 counts as staff; upgrade every server of the network in the same window.
 
+## Staff actions reach every server
+
+On a network, `/kick`, `/freeze`, `/security force` and `reset`, `/staffmode <player>` and `/clientinfo` now act on a
+player connected to another server, and the security alt and client notices and the staff mode alerts reach staff on
+every server. The kick, the freeze and the security change are checked and recorded on the server they were run on and
+carried out by the server holding the player. A server still on an older release does not carry them out: a kick is
+recorded and announced but the player stays, and `/clientinfo` reports no brand. A player who changes server while a
+kick is on its way is not kicked either. Upgrade every server and the proxy plugin in the same window; a proxy upgraded
+before its servers keeps a frozen player on the server that froze them, as before.
+
 ## Messaging switches follow the player
 
 `/msgtoggle`, `/rtoggle`, `/broadcasttoggle`, `/socialspy` and the `/reply` partner are kept in three new tables

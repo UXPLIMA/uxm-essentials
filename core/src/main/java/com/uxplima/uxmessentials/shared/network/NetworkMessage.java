@@ -61,6 +61,7 @@ public sealed interface NetworkMessage
                 InventoryRestoreKept,
                 BroadcastFrame,
                 VoteRewardsQueued,
+                StaffActionFrame,
                 PlayerNoticesKept {
 
     /** The {@code server-id} of the backend that produced this frame; the loop sentinel keys on it. */
@@ -117,6 +118,7 @@ public sealed interface NetworkMessage
         INVENTORY_RESTORE_KEPT(40),
         BROADCAST(43),
         VOTE_REWARDS_QUEUED(44),
+        STAFF_ACTION(45),
         PLAYER_NOTICES_KEPT(46);
 
         private final byte wireTag;
