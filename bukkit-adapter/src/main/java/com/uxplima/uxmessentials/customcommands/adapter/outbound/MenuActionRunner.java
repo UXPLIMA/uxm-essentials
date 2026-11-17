@@ -155,9 +155,9 @@ public final class MenuActionRunner implements ActionRunner {
                 continue;
             }
             Ref ref = Ref.parse(token);
-            // An action that shows text escapes what was typed when the engine fills it, so it is handed the values
-            // as typed; escaping them here as well would show the escapes.
-            Map<String, String> engine = STYLED_TEXT_HEADS.contains(head) ? source : values;
+            // An action that shows text, JSON or a legacy line escapes what was typed when the engine fills it, so
+            // it is handed the values as typed; escaping them here as well would show the escapes.
+            Map<String, String> engine = escapesTyped(head) ? source : values;
             // The engine spends a live player, so an action for somebody who has left is dropped rather than run
             // against a name, the same as the engine does when its own lookup misses.
             if (step.offset().isZero()) {
@@ -323,6 +323,11 @@ public final class MenuActionRunner implements ActionRunner {
         return CommandLineArguments.lineOf(head).map(arguments::forLine).orElseGet(arguments::typed);
     }
 
+    /** Whether the action under {@code head} escapes a typed value itself when the engine fills it. */
+    private static boolean escapesTyped(String head) {
+        return STYLED_TEXT_HEADS.contains(head) || JSON_HEAD.equals(head) || LEGACY_HEAD.equals(head);
+    }
+
     /** Every value of {@code arguments} as it goes into an action with this {@code head}. */
     private static Map<String, String> forStep(String head, Map<String, String> arguments) {
         Map<String, String> ready = new LinkedHashMap<>();
@@ -336,34 +341,12 @@ public final class MenuActionRunner implements ActionRunner {
             return StyledText.escape(value);
         }
         if (JSON_HEAD.equals(head)) {
-            return jsonStringContent(value);
+            return TypedText.asJsonString(value);
         }
         if (LEGACY_HEAD.equals(head)) {
             return TypedText.withoutLegacyCodes(value);
         }
         return value;
-    }
-
-    /** {@code value} as the inside of a JSON string, so it cannot close the string and add keys of its own. */
-    private static String jsonStringContent(String value) {
-        StringBuilder escaped = new StringBuilder(value.length() + 8);
-        for (int i = 0; i < value.length(); i++) {
-            char character = value.charAt(i);
-            switch (character) {
-                case '"' -> escaped.append("\\\"");
-                // Gson also reads a string written in single quotes, so a quote of either kind is escaped.
-                case '\'' -> escaped.append("\\u0027");
-                case '\\' -> escaped.append("\\\\");
-                default -> {
-                    if (character < 0x20) {
-                        escaped.append(String.format(Locale.ROOT, "\\u%04x", (int) character));
-                    } else {
-                        escaped.append(character);
-                    }
-                }
-            }
-        }
-        return escaped.toString();
     }
 
     /** Whether the module's policy allows this action head; every head but the two privileged ones is allowed. */

@@ -735,14 +735,8 @@ public final class PluginModule {
         // deferred reference the seam populates on enable, before any menu can be clicked, the same late-init pattern
         // the economy backends use. A confirm: step needs only the confirm opener, already available above.
         AtomicReference<TextInput> menuTextInputRef = new AtomicReference<>();
-        MenuTextPrompt menuTextPrompt = (player, key, prompt, initialText, onSubmit, onCancel) -> {
-            TextInput seam = menuTextInputRef.get();
-            if (seam == null) {
-                onCancel.run();
-                return;
-            }
-            seam.promptResolved(player, key, prompt, initialText, onSubmit, onCancel);
-        };
+        // Through uxmLib's own prompt, so an input: step marked secret is never asked for in chat or on a sign.
+        MenuTextPrompt menuTextPrompt = MenuTextPrompt.through(menuTextInputRef::get);
         // The click, page and refusal sounds every window plays are the operator's, in config.conf under menu.sounds.
         // The engine has none of its own, and a reload reads the file again.
         MenuSoundsFile menuSounds =

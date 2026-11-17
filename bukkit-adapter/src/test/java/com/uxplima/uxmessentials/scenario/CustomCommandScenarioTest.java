@@ -60,6 +60,31 @@ class CustomCommandScenarioTest {
             actions = ["broadcast:<red>%argument_words%</red>"]
             """;
 
+    // A JSON broadcast and a legacy one, each with the custom command's token and the engine's.
+    private static final String ANNOUNCE = """
+            command {
+              name = "proclaim"
+              description = "Say something to everyone in JSON"
+              cost = 0
+            }
+            arguments = [
+              { name = "words", type = rest }
+            ]
+            actions = ["broadcast-json:{\\\"text\\\":\\\"%arg_words%\\\"}", "broadcast-json:{\\\"text\\\":\\\"%argument_words%\\\"}"]
+            """;
+
+    private static final String PAINT = """
+            command {
+              name = "paint"
+              description = "Say something to everyone in green"
+              cost = 0
+            }
+            arguments = [
+              { name = "words", type = rest }
+            ]
+            actions = ["broadcast-legacy:&a%arg_words%", "broadcast-legacy:&a%argument_words%"]
+            """;
+
     private static final String CLICK = "<click:run_command:'/op Mallory'>free diamonds</click>";
 
     private RunningPlugin running;
@@ -72,7 +97,11 @@ class CustomCommandScenarioTest {
                 "commands/custom/shout.conf",
                 SHOUT,
                 "commands/custom/yell.conf",
-                YELL));
+                YELL,
+                "commands/custom/proclaim.conf",
+                ANNOUNCE,
+                "commands/custom/paint.conf",
+                PAINT));
     }
 
     @Test
@@ -120,6 +149,39 @@ class CustomCommandScenarioTest {
                                 PlainTextComponentSerializer.plainText().serialize(shown))
                         .isEqualTo(CLICK));
         assertNoClicks(lines);
+        assertThat(running.problems()).isEmpty();
+    }
+
+    @Test
+    void aTypedQuoteInAJsonBroadcastIsEscapedOnceThroughEitherToken() {
+        ScenarioPlayer mallory = running.join("Marlow");
+        ScenarioPlayer reader = running.join("Rowena");
+        String typed = "it's \"free\" " + CLICK;
+
+        heardBy(reader);
+        running.run(mallory, "proclaim " + typed);
+        running.settle();
+
+        List<String> shown = heardBy(reader).stream()
+                .map(line -> PlainTextComponentSerializer.plainText().serialize(line))
+                .toList();
+        assertThat(shown).containsExactly(typed, typed);
+        assertThat(running.problems()).isEmpty();
+    }
+
+    @Test
+    void aTypedColourCodeInALegacyBroadcastIsTakenOutOnceThroughEitherToken() {
+        ScenarioPlayer mallory = running.join("Marla");
+        ScenarioPlayer reader = running.join("Rufus");
+
+        heardBy(reader);
+        running.run(mallory, "paint &cred");
+        running.settle();
+
+        List<String> shown = heardBy(reader).stream()
+                .map(line -> PlainTextComponentSerializer.plainText().serialize(line))
+                .toList();
+        assertThat(shown).containsExactly("\uff06cred", "\uff06cred");
         assertThat(running.problems()).isEmpty();
     }
 

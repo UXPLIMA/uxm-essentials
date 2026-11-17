@@ -3,6 +3,26 @@
 What an operator edits when a release renames something an operator's own files or permission grants depend on, or
 needs a setting it did not need before.
 
+## Menus show what players type as words, and ask for a warp password as a secret
+
+What a player types into a menu shows as the words typed, in every line and action of an operator's menu. That
+covers an argument of a menu's own command, an `input:` answer, a Bedrock form field and the name of a dropped
+item. It reaches `broadcast`, `message`, `title`, `action-bar`, `toast` and `whisper` as text, a
+`broadcast-json` action inside its JSON string, and a `broadcast-legacy` action with any `&` code shown as text.
+A command, a material and a condition still read it as typed. A menu that let players style their text through an
+argument loses the styling.
+
+A player warp's password is now asked for as a secret: never in chat or on a sign, whatever
+`text-input.conf` says for `pwarp.password`, but in a dialog where the server has one, else an anvil. A menu file
+already in your `modules/playerwarps/gui/` folder is never rewritten on an update, so add `secret = true` to its
+password step yourself, in `pwarp-manage.conf` and `pwarp-view.conf`:
+
+```hocon
+{ do = "input:pwarp.password", prompt = "@pwarp.gui.view.password-prompt", secret = true },
+```
+
+Any `input:` step you wrote for a password or a code takes the same flag.
+
 ## Our placeholders show players' text as words in our lines
 
 In the plugin's own lines (chat format, tab list, nametags, scoreboard, boss bar, holograms, menus and messages) a

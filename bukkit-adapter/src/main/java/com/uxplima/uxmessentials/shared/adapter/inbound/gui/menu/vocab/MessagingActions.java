@@ -6,6 +6,7 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Objects;
 import java.util.function.Consumer;
+import java.util.function.UnaryOperator;
 
 import org.bukkit.Bukkit;
 import org.bukkit.Material;
@@ -21,6 +22,7 @@ import com.uxplima.uxmessentials.shared.adapter.outbound.lookup.OnlineByName;
 import com.uxplima.uxmessentials.shared.adapter.outbound.style.StyledText;
 import com.uxplima.uxmessentials.shared.application.port.Logger;
 import com.uxplima.uxmessentials.shared.application.port.PlayerLookup;
+import com.uxplima.uxmessentials.shared.domain.message.TypedText;
 import com.uxplima.uxmlib.advancement.AdvancementFrame;
 import com.uxplima.uxmlib.advancement.Toast;
 import com.uxplima.uxmlib.advancement.Toasts;
@@ -140,14 +142,23 @@ public final class MessagingActions {
         target.sendMessage(StyledText.render(parsed.message()));
     }
 
-    /** Broadcast a raw Adventure-JSON component to the whole server; malformed json fails soft via {@link #safe}. */
+    /**
+     * Broadcast a raw Adventure-JSON component to the whole server; malformed json fails soft via {@link #safe}. A value
+     * a player typed goes in as JSON string content, so it cannot close the string and add a click of its own.
+     */
     private static void broadcastJson(MenuActionContext ctx) {
-        Bukkit.broadcast(GsonComponentSerializer.gson().deserialize(ctx.arg()));
+        Bukkit.broadcast(GsonComponentSerializer.gson().deserialize(typedAs(ctx, TypedText::asJsonString)));
     }
 
-    /** Broadcast a legacy {@code &}-coded string to the whole server. */
+    /** Broadcast a legacy {@code &}-coded string to the whole server, with no code in what a player typed. */
     private static void broadcastLegacy(MenuActionContext ctx) {
-        Bukkit.broadcast(LegacyComponentSerializer.legacyAmpersand().deserialize(ctx.arg()));
+        Bukkit.broadcast(
+                LegacyComponentSerializer.legacyAmpersand().deserialize(typedAs(ctx, TypedText::withoutLegacyCodes)));
+    }
+
+    /** The action's value with every value a player typed put through {@code escape}, and the rest as written. */
+    private static String typedAs(MenuActionContext ctx, UnaryOperator<String> escape) {
+        return ctx.args(escape).getOrDefault("value", "");
     }
 
     /** Show a {@code title|subtitle|fadeIn|stay|fadeOut} title to the viewer, defaulting the optional segments. */
