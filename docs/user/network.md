@@ -145,10 +145,10 @@ changes, trade signals and vote parties), and a second cache reload is harmless.
 
 This holds only once every backend runs the same version. During a rolling upgrade, a backend on an older version,
 or a vote party sent by one, can still pay a vote party twice. A backend remembers the ids it acted on in memory
-only, so a copy that arrives very late, after that backend restarted, can act again. Vote parties are the exception:
-a party sent over both carriers carries the time it fired, and a backend that is itself on both carriers drops one
-that fired more than 60 seconds before it started, so the late proxy copy of a party it already paid does not pay
-again. The 60 seconds cover a Redis copy sent while the backend was still starting and a sender whose clock runs a
+only, so a copy that arrives very late, after that backend restarted, can act again. Votes and vote parties are the
+exception: one sent over both carriers carries the time it was sent, and a backend that is itself on both carriers
+drops one sent more than 60 seconds before it started, so the late proxy copy of a party or a vote it already acted
+on is not paid or announced again. The 60 seconds cover a Redis copy sent while the backend was still starting and a sender whose clock runs a
 little ahead; a backend that restarts within 60 seconds of a party can still pay its late proxy copy again. A party
 sent on the proxy alone, or received by a backend on the proxy alone, is never dropped this way.
 
@@ -194,14 +194,14 @@ shared: each backend reads its own `config.conf` and module files, so keep them 
 | Player warps | Player warps, recorded per server | Visiting a player warp on another server | `playerwarps` `cross-server.enabled` |
 | Worlds | Managed worlds and settings, per server | `/worlds tp` and `/worlds spawn` to another server | `worlds` `cross-server.enabled` |
 | Teleport | Pending moves | `/tpa`, `/tpahere`, staff `/tp` and `/tphere` | `teleport` `cross-server.enabled` |
-| Moderation | Bans, mutes, warnings, IP bans, jails, history | A ban or IP ban kicks everywhere; a jail sends the player to the jail's server; a freeze holds everywhere | none |
-| Messaging | Mail, ignore lists, message and reply toggles, social spy, the `/reply` partner | `/msg`, `/reply`, `/helpop`, social spy, new-mail notices; staff chat in the staff module | none |
+| Moderation | Bans, mutes, warnings, IP bans, jails, history | A ban or IP ban kicks everywhere; `/kick` and `/freeze` reach a player on any server; a jail sends the player to the jail's server; a freeze holds everywhere | none |
+| Messaging | Mail, ignore lists, message and reply toggles, social spy, the `/reply` partner | `/msg`, `/reply`, `/helpop`, social spy, new-mail notices; staff chat, staff mode alerts and `/staffmode <player>` in the staff module | none |
 | Vanish | Vanish state | Hidden on every server | `vanish` `cross-server` |
 | Kits | One-time claims and cooldowns | First-join kits only on a player's first join to the network | none |
 | Communication | none | `/broadcast` reaches every server; no join or quit line or MOTD for a move between servers; first-join welcome once per network | `server-switch` in `communication` `join-quit.conf` |
 | Ranks | Each player's rank and prestige | none | none |
 | Vaults | Vault contents | none | none |
-| Security | Wrong PINs and codes, lockouts, proofs to carry | A lockout holds everywhere; a proof carries across a switch | `security` `join-verification.switch-grace-seconds` |
+| Security | Wrong PINs and codes, lockouts, proofs to carry | A lockout holds everywhere; a proof carries across a switch; `/security force` and `reset` and `/clientinfo` reach a player on any server; alt and client notices reach staff everywhere | `security` `join-verification.switch-grace-seconds` |
 | Holograms, NPCs, main spawn | Definitions, with a scope | Edits show on every server in scope | `network.shared-sets` |
 | Guard | Regions, with a scope | Edits apply on every server in scope | none; shared sets in `modules/guard/config.conf` |
 | Trade | Escrow | Two players on different servers trade | `trade` `cross-server` |
@@ -270,8 +270,8 @@ used on whichever server holds the player, when that server has its world. Detai
 Every backend knows which server each online player is on, from what the others announce with their heartbeats. With the
 network on, `/msg` and `/reply` reach a player on another server; that server applies the recipient's own message
 toggle, reply setting, ignore list and vanish. A spy holding `uxmessentials.msg.socialspy` sees every private message
-once, on any server; message switches and the `/reply` partner follow the player. `/helpop` and staff chat reach the
-staff of every server with the sender's server in the line. `/seen` reports a player elsewhere as online. Tab
+once, on any server; message switches, the `/reply` partner and the `/nick` follow the player. `/helpop` and staff chat
+reach the staff of every server with the sender's server in the line. `/seen` reports a player elsewhere as online. Tab
 completion, `/list`, `/staff`, `/stafflist` (a click teleports with teleport's `cross-server` on), `staff_online`,
 pickers, `/realname`, `/whois` and `/mail sendall` take in every server's players.
 
@@ -285,12 +285,12 @@ an older release from all but viewers who see every level. Vanish is kept in the
 Bans, mutes, warnings and IP bans are in the shared database and enforced on every server. A ban or an IP ban kicks the
 player, or everyone on that address, wherever they are; a mute is read on the next chat line, and reaches private
 messages and blocked commands through the bus (without a bus carrier, within a minute: every server reads its players'
-mutes again once a minute, and again after `/uxmess import`). `/kick` and `/freeze` on a player connected to another
-server are refused with that server's name, since this server cannot reach them. Whether a target is exempt is read as
-[punishment exemption](punishment-exemption.md) says. A freeze is announced over the bus and held on every server, so a
+mutes again once a minute, and again after `/uxmess import`). `/kick` on a player connected to another server is
+checked and recorded where it was run and carried out by the server holding the player. Whether a target is exempt is
+read as [punishment exemption](punishment-exemption.md) says. A freeze is announced over the bus and held on every server, so a
 frozen player who switches server stays frozen, and `/unfreeze` on any server lifts it everywhere. Over Velocity a
 server that was empty when the freeze was announced never heard it, so the proxy plugin keeps a frozen player off other
-servers and sends one who logs out frozen back to the server that froze them. Redis reaches every server, empty or not.
+servers and sends one who logs out frozen back to the server they were on. Redis reaches every server, empty or not.
 A server that restarts, or reloads its moderation module, holds no freeze any more, and the proxy lets go of the players
 frozen there once that server has a player online to carry the news. `/lockdown` is one row in the shared database, so
 it closes every server on it to new joins, but its announcement goes only to the server it was run on. Command spy and
@@ -360,7 +360,7 @@ same everywhere so transaction times agree.
 
 - Public chat, the tab list, scoreboards, and join and quit lines apart from moves: each server shows its own.
 - AFK state, `/back`, `/rtp`, `/spawn` and respawns: they stay on the server the player is on.
-- `/kick` and `/freeze` of a player on another server. `/invsee`, `/getpos` and the like name that server instead.
+- `/invsee`, `/getpos` and the like on a player on another server: they name that server instead.
 - Warps, homes, player warps, worlds and teleports to another server while their `cross-server` switch is off.
 - Settings files, message files and menus. Copy them to every backend that should behave the same.
 - Command control: configure the `commandcontrol` module on each backend; the proxy jar gates only proxy commands.

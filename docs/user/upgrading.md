@@ -10,6 +10,17 @@ line, nickname, item or sign name, or a line relayed from another server) is no 
 shows as typed. Placeholders you write into a message file, the `<prefix>`, an `@key` line's own arguments and a
 `/broadcast` line are still filled, and the `<prefix>` now fills its placeholders too.
 
+## Nicks are kept in the database
+
+A `/nick` is kept in the new `player_nicks` table, so it survives a relog and follows the player to every server; it
+was lost before. A nick that is another account's name in any case, or another player's nick, is refused; a player may
+wear their own name, a Bedrock player's dotted one too. One nick has one holder across the database, so two servers
+cannot hand it out at once, and a nick that copied a name before its account first joined is cleared when it joins.
+A nick saved in a server's player data by an earlier version is taken over at the player's next join to that server,
+under the same rules, when the database holds none; one that is taken is dropped. `/realname` also answers for a nick
+whose player is offline or on another server. A server still on an older release does not show the shared nick, so
+upgrade every server of the network in the same window.
+
 ## Lists name the players of every server
 
 On a network, tab completion, `/list`, `/staff`, `/stafflist`, `staff_online`, the player pickers, `/realname`,
@@ -17,6 +28,16 @@ On a network, tab completion, `/list`, `/staff`, `/stafflist`, `staff_online`, t
 announces how deep its players are vanished and whether they are staff. A server still on an older release announces
 neither, so until it is upgraded its players are listed only to viewers who see every vanish level, and none of them
 counts as staff; upgrade every server of the network in the same window.
+
+## Staff actions reach every server
+
+On a network, `/kick`, `/freeze`, `/security force` and `reset`, `/staffmode <player>` and `/clientinfo` now act on a
+player connected to another server, and the security alt and client notices and the staff mode alerts reach staff on
+every server. The kick, the freeze and the security change are checked and recorded on the server they were run on and
+carried out by the server holding the player. A server still on an older release does not carry them out: a kick is
+recorded and announced but the player stays, and `/clientinfo` reports no brand. A player who changes server while a
+kick is on its way is not kicked either. Upgrade every server and the proxy plugin in the same window; a proxy upgraded
+before its servers keeps a frozen player on the server that froze them, as before.
 
 ## Messaging switches follow the player
 

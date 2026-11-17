@@ -105,7 +105,14 @@ class WarnEscalationTest {
             new NoIpHistory(),
             clock);
     private final Kick kick = new Kick(
-            online, guard, notifier.notifier(), audit, history, (key, placeholders) -> broadcasts.add(key), backends);
+            online,
+            guard,
+            notifier.notifier(),
+            audit,
+            history,
+            (key, placeholders) -> broadcasts.add(key),
+            backends,
+            sync);
 
     private final WarnEscalator escalator = escalatorFor(LADDER);
     private final IssueWarn warn = new IssueWarn(
@@ -577,15 +584,15 @@ class WarnEscalationTest {
     }
 
     @Test
-    void aKickRungThatCannotReachThePlayerIsReportedAsFailed() {
+    void aKickRungOnAPlayerOnAnotherBackendIsCarriedThere() {
         IssueWarn kicking = warnUnder(ladder(rung(1, EscalationAction.KICK)));
         backends.connect(SAM, "lobby");
 
         warnTimes(kicking, 1);
 
         assertThat(online.kicked()).isEmpty();
-        assertThat(toldAlex()).containsExactly(ModerationMessageKey.MOD_WARN_ESCALATION_FAILED.key());
-        assertThat(keysToldAlex()).contains(ModerationMessageKey.TARGET_ELSEWHERE.key());
+        assertThat(sync.kickedElsewhere).containsExactly("lobby");
+        assertThat(toldAlex()).containsExactly(ModerationMessageKey.MOD_WARN_ESCALATED.key());
     }
 
     @Test
@@ -803,6 +810,7 @@ class WarnEscalationTest {
 
         private int bansChanged;
         private int mutesChanged;
+        private final List<String> kickedElsewhere = new ArrayList<>();
 
         @Override
         public void banChanged(PlayerRef target) {
@@ -817,6 +825,11 @@ class WarnEscalationTest {
         @Override
         public void ipBanChanged(String ip) {
             // No address bans on this path.
+        }
+
+        @Override
+        public void kickElsewhere(PlayerRef target, String server, Optional<String> reason) {
+            kickedElsewhere.add(server);
         }
     }
 

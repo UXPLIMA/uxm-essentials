@@ -3,9 +3,7 @@ package com.uxplima.uxmessentials.presence.adapter.inbound.command;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
-import java.util.Optional;
 
-import org.bukkit.Bukkit;
 import org.bukkit.command.CommandSender;
 import org.bukkit.entity.Player;
 
@@ -27,10 +25,10 @@ import com.uxplima.uxmessentials.shared.application.permission.SocialPermissions
 import com.uxplima.uxmessentials.shared.application.port.Messages;
 import com.uxplima.uxmessentials.shared.application.port.Scheduler;
 import com.uxplima.uxmessentials.shared.domain.OnlinePlayer;
+import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmlib.command.Gate;
 import com.uxplima.uxmlib.command.Sender;
 import org.jspecify.annotations.NullMarked;
-import org.jspecify.annotations.Nullable;
 
 /**
  * {@code /realname <player>} ({@code uxmessentials.realname.use}): resolve a display name back to the underlying
@@ -78,47 +76,50 @@ public final class RealnameCommand extends PresenceCommandSupport implements Com
         // The roster (names + display names + per-viewer canSee) is read on the global region thread (Folia forbids
         // iterating Bukkit.getOnlinePlayers() off it); the one reply then lands on the sender's own thread.
         scheduler.onGlobal(() -> {
-            Player match = findVisibleMatch(sender, query);
-            if (match == null) {
-                // A player on another backend is found by their account name; their display name stays there.
-                Optional<OnlinePlayer> elsewhere = network.findElsewhere(query, sender);
+            VisibleNameMatch.Found found = VisibleNameMatch.find(sender, query, network);
+            if (found instanceof VisibleNameMatch.Here(Player match)) {
+                String display = PLAIN.serialize(match.displayName());
+                String name = match.getName();
                 replyOnSenderThread(
                         sender,
-                        () -> elsewhere.ifPresentOrElse(
-                                found -> feedback.send(
-                                        sender,
-                                        PresenceMessageKey.REALNAME_RESULT,
-                                        Map.of(
-                                                "display",
-                                                found.player().name(),
-                                                "name",
-                                                found.player().name())),
-                                () -> feedback.send(
-                                        sender, PresenceMessageKey.REALNAME_NOT_FOUND, Map.of("query", query))));
-                return;
+                        () -> feedback.send(
+                                sender, PresenceMessageKey.REALNAME_RESULT, Map.of("display", display, "name", name)));
+            } else if (found instanceof VisibleNameMatch.Elsewhere(OnlinePlayer online)) {
+                // A player on another backend is found by their account name; their display name stays there.
+                String name = online.player().name();
+                replyOnSenderThread(
+                        sender,
+                        () -> feedback.send(
+                                sender, PresenceMessageKey.REALNAME_RESULT, Map.of("display", name, "name", name)));
+            } else {
+                // The nick may be a player's who is offline, on another server, or hidden from the sender: the
+                // database knows who carries it, and answers for each of them alike.
+                scheduler.async(() -> findStored(sender, query));
             }
-            String display = PLAIN.serialize(match.displayName());
-            String name = match.getName();
-            replyOnSenderThread(
-                    sender,
-                    () -> feedback.send(
-                            sender, PresenceMessageKey.REALNAME_RESULT, Map.of("display", display, "name", name)));
         });
         return Command.SINGLE_SUCCESS;
     }
 
-    /** First online player the sender may see whose account or display name matches {@code query}, else {@code null}. */
-    private @Nullable Player findVisibleMatch(CommandSender sender, String query) {
-        Player viewer = sender instanceof Player player ? player : null;
-        for (Player target : Bukkit.getOnlinePlayers()) {
-            if (viewer != null && !viewer.canSee(target)) {
-                continue;
-            }
-            if (target.getName().equalsIgnoreCase(query)
-                    || PLAIN.serialize(target.displayName()).equalsIgnoreCase(query)) {
-                return target;
-            }
+    /**
+     * Answer from the nicks the database holds, off the tick: the account that carries {@code query}, if any. Whether
+     * that player is online, and where, is not said, so a vanished player reads the same as one who is offline.
+     */
+    private void findStored(CommandSender sender, String query) {
+        List<PlayerRef> owners;
+        try {
+            owners = services.nickOwners().of(query);
+        } catch (RuntimeException unreachable) {
+            owners = List.of();
         }
-        return null;
+        if (owners.isEmpty()) {
+            replyOnSenderThread(
+                    sender, () -> feedback.send(sender, PresenceMessageKey.REALNAME_NOT_FOUND, Map.of("query", query)));
+            return;
+        }
+        String name = owners.getFirst().name();
+        replyOnSenderThread(
+                sender,
+                () -> feedback.send(
+                        sender, PresenceMessageKey.REALNAME_RESULT, Map.of("display", query, "name", name)));
     }
 }

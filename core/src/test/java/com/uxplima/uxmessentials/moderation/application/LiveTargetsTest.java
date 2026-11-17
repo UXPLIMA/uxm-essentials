@@ -20,6 +20,7 @@ import java.util.function.Predicate;
 import com.uxplima.uxmessentials.moderation.application.port.FreezeSync;
 import com.uxplima.uxmessentials.moderation.application.port.ModerationAudit;
 import com.uxplima.uxmessentials.moderation.application.port.SanctionHistory;
+import com.uxplima.uxmessentials.moderation.application.port.SanctionSync;
 import com.uxplima.uxmessentials.moderation.application.port.Sanctions;
 import com.uxplima.uxmessentials.moderation.application.port.SeenVisibility;
 import com.uxplima.uxmessentials.moderation.domain.ModerationError;
@@ -41,8 +42,8 @@ import com.uxplima.uxmessentials.testing.RecordingNotifier;
 import org.junit.jupiter.api.Test;
 
 /**
- * A kick, a freeze or a /seen on a player connected to another backend says where they are instead of acting on
- * nothing, and writes no history, audit or broadcast. An unfreeze still runs, so the freeze record held here can
+ * A kick or a freeze on a player connected to another backend is decided and recorded here and carried out on the
+ * backend holding them; a /seen says where they are. An unfreeze always runs, so the freeze record held here can
  * always be cleared.
  */
 class LiveTargetsTest {
@@ -72,6 +73,7 @@ class LiveTargetsTest {
     private final KeptHistory history = new KeptHistory();
     private final List<MessageKey> broadcasts = new ArrayList<>();
     private final RecordingAudit audit = new RecordingAudit();
+    private final List<String> kickedElsewhere = new ArrayList<>();
     private final Kick kick = new Kick(
             sanctions,
             new ModerationGuard(new FakePermissions()),
@@ -79,7 +81,22 @@ class LiveTargetsTest {
             audit,
             new SanctionHistoryRecorder(history, CLOCK),
             (key, placeholders) -> broadcasts.add(key),
-            presence);
+            presence,
+            new SanctionSync() {
+                @Override
+                public void banChanged(PlayerRef target) {}
+
+                @Override
+                public void muteChanged(PlayerRef target) {}
+
+                @Override
+                public void ipBanChanged(String ip) {}
+
+                @Override
+                public void kickElsewhere(PlayerRef target, String server, Optional<String> reason) {
+                    kickedElsewhere.add(target.name() + "@" + server + ":" + reason.orElse(""));
+                }
+            });
     private final Freeze freeze = new Freeze(
             new NetworkFreeze(sanctions, FreezeSync.NONE, presence, notifier.notifier(), CLOCK),
             new ModerationGuard(new FakePermissions()),
@@ -94,17 +111,36 @@ class LiveTargetsTest {
     }
 
     @Test
-    void aKickOnAPlayerOnAnotherBackendNamesTheBackendAndWritesNothing() {
-        assertThat(kick.kick(STAFF, REMOTE, Optional.of("spam"), false).errorOrThrow())
-                .isEqualTo(ModerationError.TARGET_ELSEWHERE);
+    void aKickOnAPlayerOnAnotherBackendIsCarriedThereAndRecordedHere() {
+        assertThat(kick.kick(STAFF, REMOTE, Optional.of("spam"), false).isErr()).isFalse();
 
-        assertThat(notifier.sent())
-                .containsExactly(new RecordingNotifier.Sent(
-                        STAFF, "moderation.target-elsewhere", Map.of("player", "Steve", "server", "lobby-1")));
+        assertThat(kickedElsewhere).containsExactly("Steve@lobby-1:spam");
         assertThat(sanctions.kicked).isEmpty();
+        assertThat(history.entries).extracting(SanctionHistoryEntry::target).containsExactly(REMOTE.uuid());
+        assertThat(audit.lines).containsExactly("kicked Steve");
+        assertThat(broadcasts).hasSize(1);
+        assertThat(notifier.keys()).containsExactly("moderation.kick.applied");
+    }
+
+    @Test
+    void aKickOnAPlayerOnNoServerIsRefusedAsOffline() {
+        PlayerRef gone = new PlayerRef(UUID.randomUUID(), "Gone");
+
+        assertThat(kick.kick(STAFF, gone, Optional.empty(), false).errorOrThrow())
+                .isEqualTo(ModerationError.TARGET_OFFLINE);
+
+        assertThat(kickedElsewhere).isEmpty();
         assertThat(history.entries).isEmpty();
-        assertThat(broadcasts).isEmpty();
-        assertThat(audit.lines).isEmpty();
+    }
+
+    @Test
+    void aKickAPeerAsksOfThisBackendClosesTheConnectionOfAPlayerHere() {
+        ApplyRemoteKick remote = new ApplyRemoteKick(sanctions, presence, notifier.notifier());
+
+        remote.onKick(LOCAL, Optional.of("spam"));
+        remote.onKick(REMOTE, Optional.of("spam"));
+
+        assertThat(sanctions.kicked).containsExactly(LOCAL);
     }
 
     @Test
@@ -116,12 +152,11 @@ class LiveTargetsTest {
     }
 
     @Test
-    void aFreezeOnAPlayerOnAnotherBackendIsRefused() {
-        assertThat(freeze.freeze(STAFF, REMOTE).errorOrThrow()).isEqualTo(ModerationError.TARGET_ELSEWHERE);
+    void aFreezeOnAPlayerOnAnotherBackendIsHeldAndRecorded() {
+        assertThat(freeze.freeze(STAFF, REMOTE).isErr()).isFalse();
 
-        assertThat(notifier.keys()).containsExactly("moderation.target-elsewhere");
-        assertThat(sanctions.frozen).isEmpty();
-        assertThat(audit.lines).isEmpty();
+        assertThat(sanctions.frozen).containsExactly(REMOTE);
+        assertThat(audit.lines).containsExactly("froze Steve");
     }
 
     @Test

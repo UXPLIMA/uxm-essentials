@@ -100,6 +100,22 @@ class CrossServerFreezeTest {
     }
 
     @Test
+    void staffOnOneServerFreezeAPlayerOnAnotherWhoIsHeldThereAndToldSo() {
+        steveOn(lobby, 1L);
+
+        assertThat(survival.freeze.freeze(STAFF, STEVE).isOk()).isTrue();
+        FreezeChanged sent = (FreezeChanged) NetworkMessageCodec.decode(wire.getFirst());
+        deliver(wire);
+
+        assertThat(sent.heldOn()).as("the proxy keeps him where he is").isEqualTo("lobby-1");
+        assertThat(lobby.frozen).contains(STEVE.uuid());
+        assertThat(lobby.toldSteve()).containsExactly("moderation.freeze.notify-target");
+        assertThat(survival.notifier.sent())
+                .extracting(RecordingNotifier.Sent::key)
+                .contains("moderation.freeze.applied");
+    }
+
+    @Test
     void anUnfreezeOnAnyServerLiftsItEverywhereAndTellsThePlayerWhereTheyAre() {
         steveOn(survival, 1L);
         survival.freeze.freeze(STAFF, STEVE);
@@ -159,8 +175,8 @@ class CrossServerFreezeTest {
             this.track = new TrackNetworkPresence(roster, NetworkPresenceBroadcast.NONE, NO_NAMES, clock);
             FreezeSync bus = new FreezeSync() {
                 @Override
-                public void freezeChanged(PlayerRef target, boolean isFrozen, Instant at) {
-                    wire.add(NetworkMessageCodec.encode(frame(target, isFrozen, at)));
+                public void freezeChanged(PlayerRef target, boolean isFrozen, Instant at, String heldOn) {
+                    wire.add(NetworkMessageCodec.encode(frame(target, isFrozen, at, heldOn)));
                 }
 
                 @Override
@@ -185,9 +201,9 @@ class CrossServerFreezeTest {
                     .toList();
         }
 
-        private NetworkMessage frame(PlayerRef target, boolean isFrozen, Instant at) {
+        private NetworkMessage frame(PlayerRef target, boolean isFrozen, Instant at, String heldOn) {
             return new FreezeChanged(
-                    name, UUID.randomUUID(), target.uuid(), target.name(), isFrozen, at.toEpochMilli());
+                    name, UUID.randomUUID(), target.uuid(), target.name(), isFrozen, at.toEpochMilli(), heldOn);
         }
     }
 

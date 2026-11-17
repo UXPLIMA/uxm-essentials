@@ -5,6 +5,7 @@ import java.util.Objects;
 import com.uxplima.uxmessentials.presence.application.ClearAfkOnActivity;
 import com.uxplima.uxmessentials.presence.application.ClearNick;
 import com.uxplima.uxmessentials.presence.application.MarkAfk;
+import com.uxplima.uxmessentials.presence.application.NickOwners;
 import com.uxplima.uxmessentials.presence.application.SetNick;
 import org.jspecify.annotations.NullMarked;
 
@@ -22,14 +23,17 @@ import org.jspecify.annotations.NullMarked;
  * @param clearAfk the sync activity listeners' return-from-AFK on move/chat/command
  * @param setNick {@code /nick <name>} and {@code /nick <player> <name>}
  * @param clearNick {@code /nick off}
+ * @param nickOwners the accounts that carry a nick, for {@code /realname}
  */
 @NullMarked
-public record PresenceServices(MarkAfk markAfk, ClearAfkOnActivity clearAfk, SetNick setNick, ClearNick clearNick) {
+public record PresenceServices(
+        MarkAfk markAfk, ClearAfkOnActivity clearAfk, SetNick setNick, ClearNick clearNick, NickOwners nickOwners) {
 
     public PresenceServices {
         Objects.requireNonNull(markAfk, "markAfk");
         Objects.requireNonNull(clearAfk, "clearAfk");
         Objects.requireNonNull(setNick, "setNick");
         Objects.requireNonNull(clearNick, "clearNick");
+        Objects.requireNonNull(nickOwners, "nickOwners");
     }
 }

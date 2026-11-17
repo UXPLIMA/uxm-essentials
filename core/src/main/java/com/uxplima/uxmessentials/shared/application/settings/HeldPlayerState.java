@@ -59,6 +59,7 @@ public final class HeldPlayerState<V> implements HeldSettings {
     private final Scheduler scheduler;
     private final Logger log;
     private final Consumer<UUID> written;
+    private final Consumer<UUID> read;
     private final ConcurrentHashMap<UUID, V> held = new ConcurrentHashMap<>();
     private final ConcurrentHashMap<UUID, V> stored = new ConcurrentHashMap<>();
     private final ConcurrentHashMap<UUID, V> unwritten = new ConcurrentHashMap<>();
@@ -74,12 +75,32 @@ public final class HeldPlayerState<V> implements HeldSettings {
      */
     public HeldPlayerState(
             String kind, Storage<V> storage, V empty, Scheduler scheduler, Logger log, Consumer<UUID> written) {
+        this(kind, storage, empty, scheduler, log, written, player -> {});
+    }
+
+    /**
+     * A held state that also tells {@code read} when a read from the database became what is held for a player, on
+     * the thread that read it, so a caller can show a change another backend made.
+     *
+     * @param kind what the state is, for the log
+     * @param written told, on the async lane, that a player's state was written
+     * @param read told after a player's stored state was read into memory
+     */
+    public HeldPlayerState(
+            String kind,
+            Storage<V> storage,
+            V empty,
+            Scheduler scheduler,
+            Logger log,
+            Consumer<UUID> written,
+            Consumer<UUID> read) {
         this.kind = Objects.requireNonNull(kind, "kind");
         this.storage = Objects.requireNonNull(storage, "storage");
         this.empty = Objects.requireNonNull(empty, "empty");
         this.scheduler = Objects.requireNonNull(scheduler, "scheduler");
         this.log = Objects.requireNonNull(log, "log");
         this.written = Objects.requireNonNull(written, "written");
+        this.read = Objects.requireNonNull(read, "read");
     }
 
     /** The state of {@code player}: what is held for them, or {@code empty}. Never reads the database. */
@@ -151,9 +172,9 @@ public final class HeldPlayerState<V> implements HeldSettings {
     /** One read of the row into memory; whether it settled the player. */
     private boolean readOnce(UUID player) {
         long before = changedAt.getOrDefault(player, 0L);
-        V read;
+        V row;
         try {
-            read = storage.read(player);
+            row = storage.read(player);
         } catch (RuntimeException unreachable) {
             log.warn(
                     "event=player_state_read_failed kind={} player={} reason={}; changes wait for the next login",
@@ -163,16 +184,21 @@ public final class HeldPlayerState<V> implements HeldSettings {
             return true;
         }
         boolean[] settled = {true};
+        boolean[] taken = {false};
         held.compute(player, (id, current) -> {
             if (!behind(player, before)) {
-                stored.put(player, read);
-                return read;
+                stored.put(player, row);
+                taken[0] = true;
+                return row;
             }
             // A change made here is newer than the row: keep it, or bring back the one still being written.
             V newer = current != null ? current : unsettled.get(player);
             settled[0] = newer != null;
             return newer;
         });
+        if (taken[0]) {
+            read.accept(player);
+        }
         return settled[0];
     }
 
