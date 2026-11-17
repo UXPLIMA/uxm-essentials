@@ -7,6 +7,8 @@ import java.util.concurrent.CompletableFuture;
 import com.uxplima.uxmessentials.api.action.UxmFailure;
 import com.uxplima.uxmessentials.api.action.UxmInvRollbackActions;
 import com.uxplima.uxmessentials.api.action.UxmOutcome;
+import com.uxplima.uxmessentials.api.action.UxmResult;
+import com.uxplima.uxmessentials.api.view.UxmRestoreDelivery;
 import com.uxplima.uxmessentials.invrollback.adapter.inbound.gui.SnapshotRestorer;
 import com.uxplima.uxmessentials.invrollback.domain.SnapshotId;
 import com.uxplima.uxmessentials.shared.adapter.outbound.api.ApiValues;
@@ -43,6 +45,31 @@ public final class InvRollbackActions implements UxmInvRollbackActions {
                 SnapshotId.of(snapshotId),
                 outcome -> answer.complete(translate(outcome)));
         return answer;
+    }
+
+    @Override
+    public CompletableFuture<UxmResult<UxmRestoreDelivery>> restoreOrKeep(UUID playerId, UUID snapshotId) {
+        Objects.requireNonNull(playerId, "playerId");
+        Objects.requireNonNull(snapshotId, "snapshotId");
+        CompletableFuture<UxmResult<UxmRestoreDelivery>> answer = new CompletableFuture<>();
+        restorer.restoreOrKeep(
+                ApiValues.subject(players, playerId),
+                SnapshotId.of(snapshotId),
+                outcome -> answer.complete(delivery(outcome)));
+        return answer;
+    }
+
+    private static UxmResult<UxmRestoreDelivery> delivery(SnapshotRestorer.Outcome outcome) {
+        if (outcome instanceof SnapshotRestorer.Outcome.Restored) {
+            return UxmResult.ok(UxmRestoreDelivery.APPLIED);
+        }
+        if (outcome instanceof SnapshotRestorer.Outcome.Kept) {
+            return UxmResult.ok(UxmRestoreDelivery.KEPT);
+        }
+        if (outcome instanceof SnapshotRestorer.Outcome.Gone) {
+            return UxmResult.failed(UxmFailure.NOT_FOUND, "no snapshot with that id is held any more");
+        }
+        return UxmResult.failed(UxmFailure.FAILED, "the restore could be neither applied nor kept");
     }
 
     private static UxmOutcome translate(SnapshotRestorer.Outcome outcome) {

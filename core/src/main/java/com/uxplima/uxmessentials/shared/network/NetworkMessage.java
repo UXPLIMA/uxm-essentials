@@ -57,7 +57,8 @@ public sealed interface NetworkMessage
                 PlayerSkinChanged,
                 PlayerSettingsChanged,
                 MailArrivedFrame,
-                RankActionsKept {
+                RankActionsKept,
+                InventoryRestoreKept {
 
     /** The {@code server-id} of the backend that produced this frame; the loop sentinel keys on it. */
     String originServer();
@@ -109,7 +110,8 @@ public sealed interface NetworkMessage
         PLAYER_SKIN_CHANGED(36),
         PLAYER_SETTINGS_CHANGED(37),
         MAIL_ARRIVED(38),
-        RANK_ACTIONS_KEPT(39);
+        RANK_ACTIONS_KEPT(39),
+        INVENTORY_RESTORE_KEPT(40);
 
         private final byte wireTag;
 
