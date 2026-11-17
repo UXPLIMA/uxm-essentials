@@ -229,6 +229,22 @@ class IndexedPlayerLookupTest {
     }
 
     @Test
+    void onTheTickTheServersPlayerDataIsNeverReadForATypedName() {
+        server.profiles.put(STEVE.uuid(), STEVE);
+        onTick = true;
+
+        assertThat(lookup.matchByName("Steve")).isEqualTo(NameMatch.unknown());
+        assertThat(onlineMode.matchByName("steve")).isEqualTo(NameMatch.unknown());
+        assertThat(server.asked).isZero();
+
+        onTick = false;
+        assertThat(lookup.matchByNameFromMemory("Steve")).isEqualTo(NameMatch.unknown());
+        assertThat(onlineMode.matchByNameFromMemory("steve")).isEqualTo(NameMatch.unknown());
+        assertThat(server.asked).isZero();
+        assertThat(lookup.matchByName("Steve")).isEqualTo(NameMatch.found(STEVE));
+    }
+
+    @Test
     void offlineModeTheServerCacheAnswersOnlyForTheSpellingTyped() {
         server.profiles.put(STEVE.uuid(), STEVE);
 

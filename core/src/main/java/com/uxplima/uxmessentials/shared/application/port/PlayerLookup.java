@@ -45,7 +45,9 @@ public interface PlayerLookup {
 
     /**
      * Like {@link #findByName}, but says when the name could mean several accounts. Off the tick it may read the
-     * durable name store to settle a name typed in another case.
+     * durable name store to settle a name typed in another case, and the server's player data for an account the
+     * store lacks. On a tick thread it answers from memory, as {@link #matchByNameFromMemory} does, so a command whose
+     * target may be offline resolves the name on the async lane.
      */
     default NameMatch matchByName(String name) {
         return NameMatch.of(findByName(name));
