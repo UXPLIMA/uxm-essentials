@@ -10,6 +10,7 @@ import com.uxplima.uxmessentials.shared.application.port.ConfigStore;
 import com.uxplima.uxmessentials.shared.domain.LocalServer;
 import com.uxplima.uxmessentials.shared.domain.ServerScope;
 import com.uxplima.uxmessentials.shared.network.BusChannel;
+import com.uxplima.uxmessentials.shared.network.BusSecret;
 import org.jspecify.annotations.NullMarked;
 
 /**

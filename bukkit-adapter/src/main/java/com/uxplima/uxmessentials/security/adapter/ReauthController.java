@@ -3,6 +3,7 @@ package com.uxplima.uxmessentials.security.adapter;
 import java.time.Clock;
 import java.util.Map;
 import java.util.Objects;
+import java.util.OptionalLong;
 
 import org.bukkit.Bukkit;
 import org.bukkit.entity.Player;
@@ -10,8 +11,6 @@ import org.bukkit.entity.Player;
 import com.uxplima.uxmessentials.security.adapter.inbound.gui.KeypadActions;
 import com.uxplima.uxmessentials.security.adapter.inbound.gui.PinKeypadView;
 import com.uxplima.uxmessentials.security.application.AttemptLimiter;
-import com.uxplima.uxmessentials.security.application.VerifyResult;
-import com.uxplima.uxmessentials.security.application.VerifyTwoFactor;
 import com.uxplima.uxmessentials.security.application.port.TwoFactorRegistration;
 import com.uxplima.uxmessentials.security.application.port.TwoFactorRepository;
 import com.uxplima.uxmessentials.security.domain.SecurityMessageKey;
@@ -38,7 +37,7 @@ import org.jspecify.annotations.NullMarked;
 public final class ReauthController implements KeypadActions {
 
     private final TwoFactorRepository repository;
-    private final VerifyTwoFactor verify;
+    private final ProofChecks checks;
     private final AttemptLimiter limiter;
     private final ReauthState reauthState;
     private final ReauthSessions sessions;
@@ -51,7 +50,7 @@ public final class ReauthController implements KeypadActions {
 
     public ReauthController(
             TwoFactorRepository repository,
-            VerifyTwoFactor verify,
+            ProofChecks checks,
             AttemptLimiter limiter,
             ReauthState reauthState,
             ReauthSessions sessions,
@@ -62,7 +61,7 @@ public final class ReauthController implements KeypadActions {
             MessageSink sink,
             Clock clock) {
         this.repository = Objects.requireNonNull(repository, "repository");
-        this.verify = Objects.requireNonNull(verify, "verify");
+        this.checks = Objects.requireNonNull(checks, "checks");
         this.limiter = Objects.requireNonNull(limiter, "limiter");
         this.reauthState = Objects.requireNonNull(reauthState, "reauthState");
         this.sessions = Objects.requireNonNull(sessions, "sessions");
@@ -138,26 +137,48 @@ public final class ReauthController implements KeypadActions {
     }
 
     private void verifySubmission(Player player, PlayerRef viewer, String candidate, boolean reopenOnFailure) {
-        if (!sessions.isPending(viewer.uuid())) {
+        OptionalLong token = sessions.token(viewer.uuid());
+        if (token.isEmpty()) {
             return;
         }
         scheduler.async(() -> {
-            VerifyResult result = verify.verify(viewer.uuid(), candidate, clock.instant());
-            scheduler.onEntity(viewer, () -> applyResult(player, viewer, result, reopenOnFailure));
+            // The shared budget is a database record, so the proof is checked here, off the tick, before the answer
+            // goes back to the player's thread. One check runs per player; a submission made meanwhile is dropped.
+            ProofChecks.Checked checked = checks.check(viewer.uuid(), candidate);
+            scheduler.onEntity(viewer, () -> applyResult(player, viewer, checked, token.getAsLong(), reopenOnFailure));
         });
     }
 
-    private void applyResult(Player player, PlayerRef viewer, VerifyResult result, boolean reopenOnFailure) {
-        switch (result) {
-            case SUCCESS, NOT_ENROLLED -> succeed(viewer);
-            case INVALID -> fail(player, viewer, reopenOnFailure);
+    private void applyResult(
+            Player player, PlayerRef viewer, ProofChecks.Checked checked, long token, boolean reopenOnFailure) {
+        if (!sessions.isPending(viewer.uuid(), token)) {
+            // The prompt this proof was for is over: they left, or ran another protected command meanwhile.
+            return;
+        }
+        if (checked.status() == ProofChecks.Status.LOCKED_NOW
+                || checked.status() == ProofChecks.Status.ALREADY_LOCKED
+                || limiter.knownLockedOut(viewer.uuid(), clock.instant())) {
+            fail(player, viewer, new AttemptLimiter.Outcome(true, 0), reopenOnFailure);
+            return;
+        }
+        switch (checked.status()) {
+            case PASSED -> succeed(viewer);
+            case WRONG -> fail(player, viewer, new AttemptLimiter.Outcome(false, checked.remaining()), reopenOnFailure);
+            case UNAVAILABLE -> {
+                notify(viewer, SecurityMessageKey.SECURITY_VERIFY_UNAVAILABLE);
+                askAgain(player, viewer, reopenOnFailure);
+            }
+            // The check already running answers too; a typed entry is gone once submitted, so this one asks again.
+            case BUSY -> askAgain(player, viewer, reopenOnFailure);
+            case LOCKED_NOW, ALREADY_LOCKED -> {
+                // Handled above.
+            }
         }
     }
 
     private void succeed(PlayerRef viewer) {
         String commandLine = sessions.pendingCommand(viewer.uuid());
         sessions.clear(viewer.uuid());
-        limiter.recordSuccess(viewer.uuid());
         reauthState.stamp(viewer.uuid(), clock.instant());
         keypad.closeFor(viewer);
         notify(viewer, SecurityMessageKey.SECURITY_REAUTH_SUCCESS);
@@ -166,8 +187,7 @@ public final class ReauthController implements KeypadActions {
         }
     }
 
-    private void fail(Player player, PlayerRef viewer, boolean reopenOnFailure) {
-        AttemptLimiter.Outcome outcome = limiter.recordFailure(viewer.uuid(), clock.instant());
+    private void fail(Player player, PlayerRef viewer, AttemptLimiter.Outcome outcome, boolean reopenOnFailure) {
         if (outcome.lockedOut()) {
             // Too many wrong proofs on the shared budget, abandon the prompt and lock the account out of every
             // surface.
@@ -190,17 +210,25 @@ public final class ReauthController implements KeypadActions {
         scheduler.onEntity(ref, () -> redispatch(ref, commandLine));
     }
 
-    private void reopenKeypad(Player player, PlayerRef viewer) {
-        if (sessions.isPending(viewer.uuid())) {
-            keypad.open(player, viewer, hasTotp(viewer));
+    /** Ask for the entry again: the keypad after an authenticator prompt, or the typed prompt a submission ended. */
+    private void askAgain(Player player, PlayerRef viewer, boolean reopenOnFailure) {
+        if (reopenOnFailure) {
+            reopenKeypad(player, viewer);
+        } else {
+            keypad.retry(player, viewer);
         }
     }
 
-    private boolean hasTotp(PlayerRef viewer) {
-        return repository
-                .find(viewer.uuid())
-                .map(TwoFactorRegistration::totpEnabled)
-                .orElse(false);
+    /**
+     * Bring the keypad back after the authenticator prompt: on its dismissal, or after a code it took was refused. That
+     * prompt is reached only through the keypad's authenticator button, which shows only for a player with an
+     * authenticator, so the button is shown again without reading the registration, which would block the player's
+     * thread on the database.
+     */
+    private void reopenKeypad(Player player, PlayerRef viewer) {
+        if (sessions.isPending(viewer.uuid())) {
+            keypad.open(player, viewer, true);
+        }
     }
 
     /** Re-run the original command now that the window is open; performCommand does not re-fire the guard listener. */

@@ -6,6 +6,7 @@ import java.util.ArrayList;
 import java.util.List;
 
 import com.uxplima.uxmessentials.shared.application.port.Logger;
+import com.uxplima.uxmessentials.shared.network.FrameSeal;
 import org.junit.jupiter.api.Test;
 
 /** A refused frame is reported at once, a stream of them at most once a minute, and every one is counted. */

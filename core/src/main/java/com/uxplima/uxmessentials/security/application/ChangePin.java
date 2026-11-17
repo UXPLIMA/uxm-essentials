@@ -36,19 +36,28 @@ public final class ChangePin {
         Objects.requireNonNull(oldPin, "oldPin");
         Objects.requireNonNull(newPin, "newPin");
         Objects.requireNonNull(now, "now");
-        if (limiter.isLockedOut(playerId, now)) {
-            return PinChangeResult.LOCKED_OUT;
-        }
         TwoFactorRegistration registration = repository.find(playerId).orElse(null);
         if (registration == null || !registration.pinSet()) {
-            return PinChangeResult.NOT_SET;
+            return limiter.isLockedOut(playerId, now) ? PinChangeResult.LOCKED_OUT : PinChangeResult.NOT_SET;
         }
-        if (!repository.verifyPin(playerId, oldPin)) {
-            return limiter.recordFailure(playerId, now).lockedOut()
-                    ? PinChangeResult.LOCKED_OUT
-                    : PinChangeResult.INVALID_PIN;
+        AttemptLimiter.Checked checked = limiter.check(playerId, now, () -> {
+            TwoFactorRepository.PinCheck stored = repository.pinCheck(playerId);
+            return () -> stored.matches(oldPin);
+        });
+        switch (checked.verdict()) {
+            case PASSED -> {
+                // Proven: go on below.
+            }
+            case WRONG -> {
+                return PinChangeResult.INVALID_PIN;
+            }
+            case LOCKED_NOW, ALREADY_LOCKED -> {
+                return PinChangeResult.LOCKED_OUT;
+            }
+            case BUSY -> {
+                return PinChangeResult.BUSY;
+            }
         }
-        limiter.recordSuccess(playerId);
         return switch (pinPolicy.validate(newPin)) {
             case OK -> {
                 repository.setPin(playerId, newPin);

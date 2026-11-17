@@ -21,6 +21,7 @@ import com.uxplima.uxmessentials.security.application.ForceReverification;
 import com.uxplima.uxmessentials.security.application.ForceReverification.ForceResult;
 import com.uxplima.uxmessentials.security.application.ResetFactors;
 import com.uxplima.uxmessentials.security.application.ResetFactors.ResetResult;
+import com.uxplima.uxmessentials.security.application.SessionCarry;
 import com.uxplima.uxmessentials.security.application.port.TwoFactorRegistration;
 import com.uxplima.uxmessentials.security.application.port.TwoFactorRepository;
 import com.uxplima.uxmessentials.security.domain.SecurityMessageKey;
@@ -45,7 +46,8 @@ import org.jspecify.annotations.NullMarked;
 /**
  * {@code /security}: the operator surface over <em>another</em> player's second factors. {@code status <player>} to
  * see which factors they hold, {@code force <player>} to push them back into verification, and {@code reset <player>
- * [totp|pin|all]} to clear a factor they can no longer prove.
+ * [totp|pin|all]} to clear a factor they can no longer prove. {@code forget-proxy} makes the network forget that it
+ * had the proxy plugin, after the plugin was removed, so proofs carry on the address again.
  *
  * <p>These verbs live here rather than on {@code /2fa} and {@code /pin} on purpose. Those two are self-service and
  * factor-scoped: each manages exactly one of the caller's own factors. An admin verb on either would blur both lines
@@ -76,6 +78,7 @@ public final class SecurityCommand extends SecurityCommandSupport implements Com
     private final ForceReverification forceReverification;
     private final ResetFactors resetFactors;
     private final VerificationController verification;
+    private final SessionCarry carry;
     private final PlayerLookup lookup;
     private final Logger log;
 
@@ -84,6 +87,7 @@ public final class SecurityCommand extends SecurityCommandSupport implements Com
             ForceReverification forceReverification,
             ResetFactors resetFactors,
             VerificationController verification,
+            SessionCarry carry,
             PlayerLookup lookup,
             Logger log,
             Scheduler scheduler,
@@ -94,6 +98,7 @@ public final class SecurityCommand extends SecurityCommandSupport implements Com
         this.forceReverification = Objects.requireNonNull(forceReverification, "forceReverification");
         this.resetFactors = Objects.requireNonNull(resetFactors, "resetFactors");
         this.verification = Objects.requireNonNull(verification, "verification");
+        this.carry = Objects.requireNonNull(carry, "carry");
         this.lookup = Objects.requireNonNull(lookup, "lookup");
         this.log = Objects.requireNonNull(log, "log");
     }
@@ -117,13 +122,16 @@ public final class SecurityCommand extends SecurityCommandSupport implements Com
                                 .then(Commands.argument("factor", Args.token())
                                         .suggests(CommandSuggestions.fromStrings(() -> SCOPES))
                                         .executes(this::resetScoped))))
+                .then(Commands.literal("forget-proxy")
+                        .requires(Gate.permission(RESET_PERMISSION))
+                        .executes(this::forgetProxy))
                 .executes(ctx -> usage(ctx, SecurityMessageKey.SECURITY_ADMIN_USAGE))
                 .build();
     }
 
     @Override
     public String description() {
-        return "/security status, force or reset a player's second factors.";
+        return "/security status, force or reset a player's second factors, or forget the proxy plugin.";
     }
 
     private int usage(CommandContext<CommandSourceStack> ctx, MessageKey key) {
@@ -171,6 +179,21 @@ public final class SecurityCommand extends SecurityCommandSupport implements Com
             verification.forceReverify(target);
             notifySender(sender, SecurityMessageKey.SECURITY_ADMIN_FORCE_DONE, Map.of("player", target.name()));
         }));
+        return Command.SINGLE_SUCCESS;
+    }
+
+    /**
+     * {@code /security forget-proxy}: the network forgets that it had the proxy plugin, on every backend at once. It is
+     * recorded again the next time the proxy plugin confirms a join, so it only changes something once the plugin is
+     * gone. Logged, since it lets proofs carry on the address again.
+     */
+    private int forgetProxy(CommandContext<CommandSourceStack> ctx) {
+        CommandSender sender = Sender.audience(ctx.getSource());
+        scheduler.async(() -> {
+            carry.forgetProxy();
+            log.info("event=security_proxy_forgotten operator={}", sender.getName());
+            notifySender(sender, SecurityMessageKey.SECURITY_ADMIN_PROXY_FORGOTTEN, Map.of());
+        });
         return Command.SINGLE_SUCCESS;
     }
 

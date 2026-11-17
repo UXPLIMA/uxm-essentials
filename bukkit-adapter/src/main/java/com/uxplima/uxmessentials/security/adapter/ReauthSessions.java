@@ -1,8 +1,10 @@
 package com.uxplima.uxmessentials.security.adapter;
 
 import java.util.Objects;
+import java.util.OptionalLong;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.atomic.AtomicLong;
 
 import org.jspecify.annotations.NullMarked;
 import org.jspecify.annotations.Nullable;
@@ -22,12 +24,31 @@ import org.jspecify.annotations.Nullable;
 @NullMarked
 public final class ReauthSessions {
 
-    /** UUID → the command line to retry once the player re-authenticates; presence means a re-auth is pending. */
-    private final ConcurrentHashMap<UUID, String> pending = new ConcurrentHashMap<>();
+    /** UUID → the prompt pending for them, with the command line to retry; presence means a re-auth is pending. */
+    private final ConcurrentHashMap<UUID, Prompt> pending = new ConcurrentHashMap<>();
 
-    /** Mark {@code playerId} as awaiting a re-auth to run {@code commandLine}. */
-    public void begin(UUID playerId, String commandLine) {
-        pending.put(Objects.requireNonNull(playerId, "playerId"), Objects.requireNonNull(commandLine, "commandLine"));
+    /** Hands out the tokens. Monotonic for the process lifetime, so no two prompts ever share one. */
+    private final AtomicLong tokens = new AtomicLong();
+
+    /** Mark {@code playerId} as awaiting a re-auth to run {@code commandLine}, and return the token of this prompt. */
+    public long begin(UUID playerId, String commandLine) {
+        long token = tokens.incrementAndGet();
+        pending.put(
+                Objects.requireNonNull(playerId, "playerId"),
+                new Prompt(Objects.requireNonNull(commandLine, "commandLine"), token));
+        return token;
+    }
+
+    /** The token of {@code playerId}'s pending prompt, empty when none is pending. */
+    public OptionalLong token(UUID playerId) {
+        Prompt prompt = pending.get(Objects.requireNonNull(playerId, "playerId"));
+        return prompt == null ? OptionalLong.empty() : OptionalLong.of(prompt.token());
+    }
+
+    /** Whether {@code playerId} is still in the specific prompt that {@code token} identifies. */
+    public boolean isPending(UUID playerId, long token) {
+        Prompt prompt = pending.get(Objects.requireNonNull(playerId, "playerId"));
+        return prompt != null && prompt.token() == token;
     }
 
     /** Whether {@code playerId} is currently being asked to re-authenticate for a protected command. */
@@ -37,7 +58,8 @@ public final class ReauthSessions {
 
     /** The command line {@code playerId} is re-authenticating for, or {@code null} when none is pending. */
     public @Nullable String pendingCommand(UUID playerId) {
-        return pending.get(Objects.requireNonNull(playerId, "playerId"));
+        Prompt prompt = pending.get(Objects.requireNonNull(playerId, "playerId"));
+        return prompt == null ? null : prompt.commandLine();
     }
 
     /** Clear {@code playerId}'s pending re-auth, on a successful proof, an abandon, or a disconnect. */
@@ -49,4 +71,6 @@ public final class ReauthSessions {
     public void clearAll() {
         pending.clear();
     }
+
+    private record Prompt(String commandLine, long token) {}
 }

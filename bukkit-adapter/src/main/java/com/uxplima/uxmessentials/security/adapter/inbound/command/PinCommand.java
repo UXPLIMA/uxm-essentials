@@ -189,7 +189,8 @@ public final class PinCommand extends SecurityCommandSupport implements CommandR
         String oldPin = ctx.getArgument("old", String.class);
         String newPin = ctx.getArgument("new", String.class);
         PlayerRef who = ref(player);
-        scheduler.async(() -> deliverChange(who, changePin.change(who.uuid(), oldPin, newPin, clock.instant())));
+        scheduler.async(() -> unavailableOnFailure(
+                who, () -> deliverChange(who, changePin.change(who.uuid(), oldPin, newPin, clock.instant()))));
         return Command.SINGLE_SUCCESS;
     }
 
@@ -205,7 +206,8 @@ public final class PinCommand extends SecurityCommandSupport implements CommandR
         }
         String pin = ctx.getArgument("pin", String.class);
         PlayerRef who = ref(player);
-        scheduler.async(() -> notify(who, removeMessage(removePin.remove(who.uuid(), pin, clock.instant()))));
+        scheduler.async(() -> unavailableOnFailure(
+                who, () -> notify(who, removeMessage(removePin.remove(who.uuid(), pin, clock.instant())))));
         return Command.SINGLE_SUCCESS;
     }
 
@@ -244,6 +246,7 @@ public final class PinCommand extends SecurityCommandSupport implements CommandR
             case TOO_LONG -> notifyTooLong(who);
             case NOT_NUMERIC -> notify(who, SecurityMessageKey.SECURITY_PIN_NOT_NUMERIC);
             case BLOCKED -> notify(who, SecurityMessageKey.SECURITY_PIN_BLOCKED);
+            case BUSY -> notify(who, SecurityMessageKey.SECURITY_VERIFY_UNAVAILABLE);
         }
     }
 
@@ -267,6 +270,7 @@ public final class PinCommand extends SecurityCommandSupport implements CommandR
             case NOT_SET -> SecurityMessageKey.SECURITY_PIN_NOT_SET;
             case INVALID_PIN -> SecurityMessageKey.SECURITY_PIN_INVALID;
             case LOCKED_OUT -> SecurityMessageKey.SECURITY_PIN_LOCKED_OUT;
+            case BUSY -> SecurityMessageKey.SECURITY_VERIFY_UNAVAILABLE;
         };
     }
 }

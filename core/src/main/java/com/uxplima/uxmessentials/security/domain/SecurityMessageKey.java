@@ -95,6 +95,7 @@ public enum SecurityMessageKey implements MessageKey {
     SECURITY_ADMIN_FORCE_NOT_ENROLLED("security.admin.force-not-enrolled"),
     SECURITY_ADMIN_RESET_USAGE("security.admin.reset-usage"),
     SECURITY_ADMIN_RESET_DONE("security.admin.reset-done"),
+    SECURITY_ADMIN_PROXY_FORGOTTEN("security.admin.proxy-forgotten"),
     SECURITY_ADMIN_RESET_NOTHING("security.admin.reset-nothing"),
 
     // Join verification: the freeze prompt on join, the keypad GUI (title, digit/clear/submit/TOTP buttons

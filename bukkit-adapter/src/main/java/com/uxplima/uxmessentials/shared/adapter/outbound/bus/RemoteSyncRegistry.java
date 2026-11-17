@@ -23,8 +23,14 @@ import org.jspecify.annotations.NullMarked;
 public final class RemoteSyncRegistry {
 
     private final List<RemoteSyncListener> listeners = new CopyOnWriteArrayList<>();
+    private final CarrierReceipts receipts = new CarrierReceipts(System::nanoTime);
     private final List<Runnable> resyncs = new CopyOnWriteArrayList<>();
     private final List<Runnable> playerCacheDrops = new CopyOnWriteArrayList<>();
+
+    /** Which connection carried each proxy frame these listeners hear, for the listener that must know. */
+    public CarrierReceipts receipts() {
+        return receipts;
+    }
 
     /** Add a listener the bus invokes for every inbound frame from a peer. */
     public void register(RemoteSyncListener listener) {

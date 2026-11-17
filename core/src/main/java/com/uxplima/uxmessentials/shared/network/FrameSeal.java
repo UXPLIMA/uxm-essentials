@@ -1,4 +1,4 @@
-package com.uxplima.uxmessentials.shared.adapter.outbound.bus;
+package com.uxplima.uxmessentials.shared.network;
 
 import java.nio.ByteBuffer;
 import java.nio.charset.StandardCharsets;
@@ -16,7 +16,7 @@ import javax.crypto.spec.SecretKeySpec;
 import org.jspecify.annotations.NullMarked;
 
 /**
- * Signs the frames a backend sends on the plugin channel and checks the ones it receives, with the shared
+ * Signs the frames a backend or the proxy plugin sends on the plugin channel and checks the ones a backend receives, with the shared
  * {@link BusSecret}. Without it a backend cannot tell a frame another backend sent through the proxy broker from one a
  * player's client wrote, since anything in front of the backend that does not stop the channel passes the client's
  * message on.
@@ -38,7 +38,7 @@ import org.jspecify.annotations.NullMarked;
  * that send and receive.
  */
 @NullMarked
-final class FrameSeal {
+public final class FrameSeal {
 
     private static final String ALGORITHM = "HmacSHA256";
     private static final int MAC_BYTES = 32;
@@ -47,18 +47,18 @@ final class FrameSeal {
     private static final byte[] DOMAIN = "uxm-bus-v1".getBytes(StandardCharsets.US_ASCII);
 
     /** What sealing adds to a frame: the signed time and the signature. */
-    static final int TRAILER_BYTES = Long.BYTES + MAC_BYTES;
+    public static final int TRAILER_BYTES = Long.BYTES + MAC_BYTES;
 
     /**
      * How far the signed time may be from this backend's clock, either way. Frames are sealed when they leave and the
      * broker keeps no queue, so this covers the clock difference between backends, not the time a frame travels.
      */
-    static final Duration CLOCK_TOLERANCE = Duration.ofSeconds(60);
+    public static final Duration CLOCK_TOLERANCE = Duration.ofSeconds(60);
 
     private final SecretKeySpec key;
     private final LongSupplier clock;
 
-    FrameSeal(BusSecret secret, LongSupplier clock) {
+    public FrameSeal(BusSecret secret, LongSupplier clock) {
         Objects.requireNonNull(secret, "secret");
         if (!secret.usable()) {
             throw new IllegalArgumentException("the bus secret is blank or too short to sign with");
@@ -68,7 +68,7 @@ final class FrameSeal {
     }
 
     /** {@code frame} with the current time and its signature appended. */
-    byte[] seal(byte[] frame) {
+    public byte[] seal(byte[] frame) {
         Objects.requireNonNull(frame, "frame");
         byte[] sealed = Arrays.copyOf(frame, frame.length + TRAILER_BYTES);
         ByteBuffer.wrap(sealed, frame.length, Long.BYTES).putLong(clock.getAsLong());
@@ -78,7 +78,7 @@ final class FrameSeal {
     }
 
     /** Whether {@code sealed} was signed with this secret within the clock tolerance, and if not, why. */
-    Check check(byte[] sealed) {
+    public Check check(byte[] sealed) {
         Objects.requireNonNull(sealed, "sealed");
         if (sealed.length <= TRAILER_BYTES) {
             return Check.SIGNATURE;
@@ -97,7 +97,7 @@ final class FrameSeal {
     }
 
     /** The frame inside {@code sealed}, without the trailer; only meaningful once {@link #check} trusted it. */
-    static byte[] frame(byte[] sealed) {
+    public static byte[] frame(byte[] sealed) {
         Objects.requireNonNull(sealed, "sealed");
         return Arrays.copyOf(sealed, Math.max(0, sealed.length - TRAILER_BYTES));
     }
@@ -117,7 +117,7 @@ final class FrameSeal {
     }
 
     /** What checking a frame found. */
-    enum Check {
+    public enum Check {
         /** Signed with this secret, within the clock tolerance. */
         TRUSTED,
         /** Not signed with this secret: unsigned, signed with another secret, or changed on the way. */

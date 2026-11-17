@@ -15,6 +15,8 @@
 - [Economy](user/economy.md): currencies, payments, tax and the admin commands.
 - [Trade](user/trade.md): where the offered items go when a trade ends, and the items kept for a player who left.
 - [Moderation](user/moderation.md): bans, mutes, warnings and their ladder, jails, IP bans, lockdown and freeze.
+- [Punishment exemption](user/punishment-exemption.md): where the exemption of an offline player or one on another
+  server is read, and what each permission setup can tell.
 - [Invsee and endersee](user/invsee.md): how a window on a player's inventory saves, online or offline, and what
   happens when it cannot.
 - [Importing](user/import.md): moving in from EssentialsX, LiteBans, player warp plugins and WorldGuard.

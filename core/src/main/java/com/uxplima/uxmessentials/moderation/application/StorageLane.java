@@ -4,7 +4,6 @@ import java.util.Collection;
 import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.Objects;
-import java.util.Optional;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
@@ -20,6 +19,8 @@ import com.uxplima.uxmessentials.shared.application.port.Logger;
 import com.uxplima.uxmessentials.shared.application.port.Permissions;
 import com.uxplima.uxmessentials.shared.application.port.PlayerLookup;
 import com.uxplima.uxmessentials.shared.application.port.Scheduler;
+import com.uxplima.uxmessentials.shared.application.port.StoredPermissions;
+import com.uxplima.uxmessentials.shared.application.port.StoredPermissions.Answer;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmessentials.shared.domain.message.SharedMessageKey;
 import org.jspecify.annotations.Nullable;
@@ -33,10 +34,11 @@ import org.jspecify.annotations.Nullable;
  * <p>The permission questions a sanction asks are answered before the work runs, and the work runs with those answers
  * bound in the {@link PermissionScope}, since the permission plugin cannot be read safely from a worker. How long the
  * staff member may ban or mute for is read on the calling thread, theirs. Whether the target is immune is read on the
- * target's own thread, which on Folia is often another region's, so the work waits for that answer before it starts,
- * still in its place in the target's queue. When the answer cannot be had (the target left on the way, or their
- * thread did not answer in time) the target counts as immune, the staff member is told why, and no sanction lands on
- * a player who may be exempt.
+ * target's own thread, which on Folia is often another region's, or, for a target who is not online here, from what
+ * the permission plugin stored for them, off the tick. The work waits for that answer before it starts, still in its
+ * place in the target's queue. When the answer cannot be had (the target left on the way, their thread or the
+ * storage did not answer in time, or nothing here can read a target who is away) the target counts as immune, the
+ * staff member is told why, and no sanction lands on a player who may be exempt.
  *
  * <p>Work about one player runs in the order it was asked for: a mute and the unmute right after it are stored in that
  * order, whichever worker picks them up. Work about nobody in particular is not ordered.
@@ -55,12 +57,21 @@ public final class StorageLane {
     private final ConcurrentMap<UUID, CompletableFuture<Void>> tails = new ConcurrentHashMap<>();
 
     public StorageLane(
-            Scheduler scheduler, Notifier notifier, Permissions permissions, PlayerLookup players, Logger log) {
+            Scheduler scheduler,
+            Notifier notifier,
+            Permissions permissions,
+            StoredPermissions stored,
+            PlayerLookup players,
+            Logger log) {
         this.scheduler = Objects.requireNonNull(scheduler, "scheduler");
         this.notifier = Objects.requireNonNull(notifier, "notifier");
         this.permissions = Objects.requireNonNull(permissions, "permissions");
         this.log = Objects.requireNonNull(log, "log");
-        this.exemption = new TargetExemption(permissions, scheduler, Objects.requireNonNull(players, "players"));
+        this.exemption = new TargetExemption(
+                permissions,
+                Objects.requireNonNull(stored, "stored"),
+                scheduler,
+                Objects.requireNonNull(players, "players"));
     }
 
     /** Run {@code work} for {@code actor} on the async lane, in no particular order. Call it on the server thread. */
@@ -81,7 +92,7 @@ public final class StorageLane {
         Objects.requireNonNull(targets, "targets");
         Objects.requireNonNull(work, "work");
         PermissionSnapshot.Builder answers = LanePermissions.capture(permissions, actor);
-        Map<PlayerRef, CompletableFuture<Optional<Boolean>>> exempt = new LinkedHashMap<>();
+        Map<PlayerRef, CompletableFuture<Answer>> exempt = new LinkedHashMap<>();
         for (PlayerRef target : targets) {
             exempt.put(target, exemption.read(target));
         }
@@ -107,7 +118,7 @@ public final class StorageLane {
         Objects.requireNonNull(target, "target");
         Objects.requireNonNull(work, "work");
         PermissionSnapshot.Builder answers = LanePermissions.capture(permissions, actor);
-        CompletableFuture<Optional<Boolean>> exempt = exemption.read(target);
+        CompletableFuture<Answer> exempt = exemption.read(target);
         after(
                 target.uuid(),
                 actor,
@@ -148,7 +159,7 @@ public final class StorageLane {
         Objects.requireNonNull(target, "target");
         Objects.requireNonNull(work, "work");
         PermissionSnapshot.Builder answers = LanePermissions.capture(permissions, actor);
-        CompletableFuture<Optional<Boolean>> exempt = exemption.read(target);
+        CompletableFuture<Answer> exempt = exemption.read(target);
         CompletableFuture<T> answer = new CompletableFuture<>();
         after(
                 target.uuid(),
@@ -199,19 +210,24 @@ public final class StorageLane {
 
     /**
      * The snapshot with the target's immunity added. An immunity that could not be read counts as held, so the
-     * sanction is refused, and the staff member is told why rather than only that the player is exempt.
+     * sanction is refused, and the staff member is told why rather than only that the player is exempt: to try again
+     * when the read only missed, or that it cannot be read here at all while the target is away.
      */
     private PermissionSnapshot.Builder withExemption(
-            PermissionSnapshot.Builder answers,
-            PlayerRef actor,
-            PlayerRef target,
-            CompletableFuture<Optional<Boolean>> exempt) {
-        Optional<Boolean> read = exempt.getNow(Optional.empty());
-        if (read.isEmpty()) {
-            log.warn("event=moderation_exemption_unread actor={} target={}", actor.name(), target.name());
-            notifier.send(actor, ModerationMessageKey.TARGET_EXEMPTION_UNREAD, Map.of("player", target.name()));
+            PermissionSnapshot.Builder answers, PlayerRef actor, PlayerRef target, CompletableFuture<Answer> exempt) {
+        Answer read = exempt.getNow(Answer.NO_ANSWER);
+        switch (read) {
+            case HELD, NOT_HELD -> {}
+            case NO_ANSWER -> {
+                log.warn("event=moderation_exemption_unread actor={} target={}", actor.name(), target.name());
+                notifier.send(actor, ModerationMessageKey.TARGET_EXEMPTION_UNREAD, Map.of("player", target.name()));
+            }
+            case NO_SOURCE -> {
+                log.warn("event=moderation_exemption_unknowable actor={} target={}", actor.name(), target.name());
+                notifier.send(actor, ModerationMessageKey.TARGET_EXEMPTION_UNKNOWN, Map.of("player", target.name()));
+            }
         }
-        return answers.answered(target, ModerationGuard.EXEMPT_NODE, read.orElse(true));
+        return answers.answered(target, ModerationGuard.EXEMPT_NODE, read != Answer.NOT_HELD);
     }
 
     private void guarded(PlayerRef actor, PermissionSnapshot answers, Runnable work) {
