@@ -16,6 +16,7 @@ import net.kyori.adventure.text.minimessage.tag.resolver.Placeholder;
 import net.kyori.adventure.text.minimessage.tag.resolver.TagResolver;
 
 import com.uxplima.uxmessentials.shared.adapter.outbound.BukkitRefs;
+import com.uxplima.uxmessentials.shared.adapter.outbound.action.ResolvedNameFill;
 import com.uxplima.uxmessentials.shared.adapter.outbound.hud.HudText;
 import com.uxplima.uxmessentials.shared.adapter.outbound.papi.PlaceholderApiSupport;
 import com.uxplima.uxmessentials.shared.adapter.outbound.style.ChatCentre;
@@ -28,7 +29,6 @@ import com.uxplima.uxmessentials.vanish.application.VanishConfig;
 import com.uxplima.uxmessentials.vanish.application.port.VanishLevelResolver;
 import com.uxplima.uxmessentials.vanish.domain.VanishLevel;
 import com.uxplima.uxmessentials.vanish.domain.VanishLevels;
-import com.uxplima.uxmlib.condition.action.NameFill;
 import com.uxplima.uxmlib.text.CenteredTextPadder;
 import org.jspecify.annotations.NullMarked;
 
@@ -171,7 +171,7 @@ public final class VanishConnectionMessenger {
         if (line.isBlank()) {
             return Optional.empty();
         }
-        return NameFill.into(line, name).map(filled -> {
+        return ResolvedNameFill.into(line, name).map(filled -> {
             String expanded = bridge.apply(filled);
             TagResolver tags = TagResolver.resolver(
                     Placeholder.component("display_name", display), Placeholder.parsed("prefix", prefix));
