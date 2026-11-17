@@ -68,23 +68,42 @@ public final class BukkitMessageSink implements MessageSink {
     public void deliver(PlayerRef viewer, String renderedText) {
         Objects.requireNonNull(viewer, "viewer");
         Objects.requireNonNull(renderedText, "renderedText");
-        String expanded = preParse.apply(viewer.uuid()).apply(renderedText);
-        TagResolver prefix = Placeholder.parsed("prefix", prefixTemplate);
-        Optional<String> centred = ChatCentre.afterMarker(expanded);
-        Component component = centred.isPresent()
-                ? CenteredTextPadder.centred(StyledText.render(centred.get(), prefix))
-                : StyledText.render(expanded, prefix);
+        Component component = component(viewer, renderedText);
         if (viewer.isSystem()) {
             scheduler.onGlobal(() -> Bukkit.getConsoleSender().sendMessage(component));
             return;
         }
-        scheduler.onEntity(viewer, () -> sendTo(viewer, component));
+        scheduler.onEntity(viewer, () -> sendTo(viewer, component, () -> {}));
     }
 
-    private void sendTo(PlayerRef viewer, Component component) {
+    @Override
+    public void deliver(PlayerRef viewer, String renderedText, Runnable unreached) {
+        Objects.requireNonNull(unreached, "unreached");
+        if (viewer.isSystem()) {
+            deliver(viewer, renderedText);
+            return;
+        }
+        Objects.requireNonNull(renderedText, "renderedText");
+        Component component = component(viewer, renderedText);
+        // A player still logging in has no entity yet and one quitting loses it; either way the line did not land.
+        scheduler.onEntity(viewer, () -> sendTo(viewer, component, unreached), unreached);
+    }
+
+    private Component component(PlayerRef viewer, String renderedText) {
+        String expanded = preParse.apply(viewer.uuid()).apply(renderedText);
+        TagResolver prefix = Placeholder.parsed("prefix", prefixTemplate);
+        Optional<String> centred = ChatCentre.afterMarker(expanded);
+        return centred.isPresent()
+                ? CenteredTextPadder.centred(StyledText.render(centred.get(), prefix))
+                : StyledText.render(expanded, prefix);
+    }
+
+    private void sendTo(PlayerRef viewer, Component component, Runnable unreached) {
         Player player = Bukkit.getPlayer(viewer.uuid());
         if (player != null) {
             player.sendMessage(component);
+        } else {
+            unreached.run();
         }
     }
 }

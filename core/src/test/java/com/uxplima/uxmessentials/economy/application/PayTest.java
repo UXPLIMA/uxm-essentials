@@ -7,6 +7,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import java.math.BigDecimal;
+import java.time.Instant;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -14,6 +15,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
+import java.util.UUID;
 
 import com.uxplima.uxmessentials.economy.application.port.PayPreferences;
 import com.uxplima.uxmessentials.economy.application.port.PendingPayRegistry;
@@ -22,8 +24,16 @@ import com.uxplima.uxmessentials.economy.domain.CurrencyId;
 import com.uxplima.uxmessentials.economy.domain.Money;
 import com.uxplima.uxmessentials.economy.domain.PendingPay;
 import com.uxplima.uxmessentials.economy.domain.TransferError;
+import com.uxplima.uxmessentials.shared.application.message.DeferredPlayerNotices;
+import com.uxplima.uxmessentials.shared.application.message.Notifier;
+import com.uxplima.uxmessentials.shared.application.port.PendingPlayerNotices;
+import com.uxplima.uxmessentials.shared.application.port.PlayerNotices;
+import com.uxplima.uxmessentials.shared.domain.PlayerNotice;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmessentials.shared.domain.message.MessageKey;
+import com.uxplima.uxmessentials.testing.ManualScheduler;
+import com.uxplima.uxmessentials.testing.OnlineLookup;
+import com.uxplima.uxmessentials.testing.QuietLog;
 import org.junit.jupiter.api.Test;
 
 class PayTest {
@@ -48,6 +58,10 @@ class PayTest {
     private final List<Money> taxSink = new ArrayList<>();
 
     private Pay pay(PayTaxation taxation) {
+        return pay(taxation, notifier::send);
+    }
+
+    private Pay pay(PayTaxation taxation, PlayerNotices payees) {
         PayPreferences preferences = new PayPreferences() {
             @Override
             public boolean acceptsPay(PlayerRef target) {
@@ -59,7 +73,7 @@ class PayTest {
                 return payOff.add(who) || !payOff.remove(who);
             }
         };
-        return new Pay(bank, preferences, staged, notifier, notifier::send, taxation, CLOCK);
+        return new Pay(bank, preferences, staged, notifier, payees, taxation, CLOCK);
     }
 
     private Pay pay() {
@@ -68,6 +82,31 @@ class PayTest {
 
     private static Money dollars(String amount) {
         return Money.of(DOLLARS, new BigDecimal(amount));
+    }
+
+    @Test
+    void aPayeeWhoCannotBeToldIsStillPaidAndPayAllCarriesOnToEveryone() {
+        PlayerRef kim = new PlayerRef(UUID.fromString("00000000-0000-0000-0000-0000000000c1"), "Kim");
+        bank.set(ALEX, dollars("100"));
+        QuietLog log = new QuietLog();
+        // Nobody is online here and the store the line would wait in is down: the money has moved all the same.
+        DeferredPlayerNotices unkeepable = new DeferredPlayerNotices(
+                new DownStore(),
+                new OnlineLookup(),
+                new Notifier((viewer, key, args) -> key.key(), (viewer, text) -> {}),
+                new ManualScheduler(),
+                log,
+                CLOCK,
+                10);
+        PayAll payAll = new PayAll(pay(PayTaxation.none(), unkeepable), notifier);
+
+        payAll.payAll(ALEX, List.of(SAM, kim), dollars("10"));
+
+        assertThat(bank.balance(SAM, DOLLARS).amount()).isEqualByComparingTo("10");
+        assertThat(bank.balance(kim, DOLLARS).amount()).isEqualByComparingTo("10");
+        assertThat(bank.balance(ALEX, DOLLARS).amount()).isEqualByComparingTo("80");
+        assertThat(lines).contains("Alex:wallet.payall-sent$10.00");
+        assertThat(log.errors()).hasSize(2);
     }
 
     @Test
@@ -188,6 +227,25 @@ class PayTest {
 
         assertThat(steep.tax(dollars("20")).amount()).isEqualByComparingTo("20");
         assertThat(TaxPolicy.disabled().tax(dollars("20")).isZero()).isTrue();
+    }
+
+    /** A kept-line store whose database is down. */
+    private static final class DownStore implements PendingPlayerNotices {
+
+        @Override
+        public void keep(PlayerNotice notice) {
+            throw new IllegalStateException("database unreachable");
+        }
+
+        @Override
+        public List<PlayerNotice> take(UUID recipient) {
+            throw new IllegalStateException("database unreachable");
+        }
+
+        @Override
+        public int purgeOlderThan(Instant cutoff) {
+            throw new IllegalStateException("database unreachable");
+        }
     }
 
     /** One staged payment per payer. */

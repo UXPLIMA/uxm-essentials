@@ -1,5 +1,6 @@
 package com.uxplima.uxmessentials.shared.adapter.outbound.bus;
 
+import java.time.Instant;
 import java.util.List;
 import java.util.Objects;
 import java.util.UUID;
@@ -76,6 +77,11 @@ public final class NoticeSync {
         @Override
         public List<PlayerNotice> take(UUID recipient) {
             return delegate.take(recipient);
+        }
+
+        @Override
+        public int purgeOlderThan(Instant cutoff) {
+            return delegate.purgeOlderThan(cutoff);
         }
     }
 }

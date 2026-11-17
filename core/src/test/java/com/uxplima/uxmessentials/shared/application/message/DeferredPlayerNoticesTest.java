@@ -14,12 +14,15 @@ import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
 
+import com.uxplima.uxmessentials.shared.application.port.MessageSink;
 import com.uxplima.uxmessentials.shared.application.port.PendingPlayerNotices;
 import com.uxplima.uxmessentials.shared.application.port.PlayerLookup;
 import com.uxplima.uxmessentials.shared.domain.PlayerNotice;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmessentials.shared.domain.message.MessageKey;
 import com.uxplima.uxmessentials.shared.domain.message.MessageLine;
+import com.uxplima.uxmessentials.testing.ManualScheduler;
+import com.uxplima.uxmessentials.testing.QuietLog;
 import org.junit.jupiter.api.Test;
 
 /**
@@ -35,14 +38,98 @@ class DeferredPlayerNoticesTest {
 
     private final Online online = new Online();
     private final Kept kept = new Kept();
-    private final List<String> shown = new ArrayList<>();
-    private final DeferredPlayerNotices notices = new DeferredPlayerNotices(
-            kept,
-            online,
-            new Notifier(
-                    (viewer, key, args) -> key.key() + " " + args.get("player") + " " + args.get("amount"),
-                    (viewer, text) -> shown.add(viewer.name() + ": " + text)),
-            CLOCK);
+    private final Chat chat = new Chat();
+    private final List<String> shown = chat.shown;
+    private final ManualScheduler lanes = new ManualScheduler();
+    private final QuietLog log = new QuietLog();
+    private final DeferredPlayerNotices notices = noticesShowing(10);
+
+    private DeferredPlayerNotices noticesShowing(int atOnce) {
+        return new DeferredPlayerNotices(
+                kept,
+                online,
+                new Notifier(
+                        (viewer, key, args) -> args.containsKey("count")
+                                ? key.key() + " " + args.get("count")
+                                : key.key() + " " + args.get("player") + " " + args.get("amount"),
+                        chat),
+                lanes,
+                log,
+                CLOCK,
+                atOnce);
+    }
+
+    private static MessageLine paid(String amount) {
+        return new MessageLine(PAID, Map.of("player", "Alex", "amount", amount));
+    }
+
+    @Test
+    void aPlayerBackToManyLinesIsShownTheNewestAndToldHowManyMoreThereWere() {
+        DeferredPlayerNotices showingTwo = noticesShowing(2);
+        for (int i = 1; i <= 5; i++) {
+            showingTwo.tell(SAM, paid("$" + i));
+        }
+        online.here.add(SAM.uuid());
+
+        assertThat(showingTwo.deliver(SAM)).isEqualTo(5);
+
+        assertThat(shown)
+                .containsExactly(
+                        "Sam: common.notices-more 3",
+                        "Sam: economy.pay-received Alex $4",
+                        "Sam: economy.pay-received Alex $5");
+        assertThat(kept.rows.getOrDefault(SAM.uuid(), List.of())).isEmpty();
+    }
+
+    @Test
+    void aStoreThatCannotKeepALineDoesNotFailTheTell() {
+        kept.refuse = true;
+
+        notices.tell(SAM, LINE);
+
+        assertThat(log.errors()).hasSize(1);
+        assertThat(shown).isEmpty();
+    }
+
+    @Test
+    void aStoreThatCannotHandBackLinesDoesNotFailTheJoin() {
+        kept.refuseTake = true;
+        online.here.add(SAM.uuid());
+
+        assertThat(notices.deliver(SAM)).isZero();
+
+        assertThat(log.errors()).hasSize(1);
+    }
+
+    @Test
+    void aLineThatFailedToShowIsKeptAndTheRestAreStillShown() {
+        notices.tell(SAM, paid("$1"));
+        notices.tell(SAM, paid("$2"));
+        notices.tell(SAM, paid("$3"));
+        online.here.add(SAM.uuid());
+        chat.failOn = "$2";
+
+        notices.deliver(SAM);
+
+        assertThat(shown).containsExactly("Sam: economy.pay-received Alex $1", "Sam: economy.pay-received Alex $3");
+        assertThat(kept.rows.get(SAM.uuid()))
+                .singleElement()
+                .satisfies(notice -> assertThat(notice.line()).isEqualTo(paid("$2")));
+    }
+
+    @Test
+    void aLineForAPlayerStillLoggingInIsKeptRatherThanLost() {
+        online.here.add(SAM.uuid());
+        chat.unreachable = true;
+
+        notices.tell(SAM, LINE);
+        lanes.runAsync();
+
+        assertThat(shown).isEmpty();
+        assertThat(kept.rows.get(SAM.uuid()))
+                .singleElement()
+                .satisfies(notice -> assertThat(notice.line()).isEqualTo(LINE));
+    }
 
     @Test
     void aPlayerOnlineHereIsToldAtOnce() {
@@ -100,20 +187,58 @@ class DeferredPlayerNoticesTest {
         }
     }
 
-    /** The kept lines, as the database holds them. */
+    /** The kept lines, as the database holds them; it can be made to refuse, as a database that is down does. */
     private static final class Kept implements PendingPlayerNotices {
 
         private final Map<UUID, List<PlayerNotice>> rows = new HashMap<>();
+        private boolean refuse;
+        private boolean refuseTake;
 
         @Override
         public void keep(PlayerNotice notice) {
+            if (refuse) {
+                throw new IllegalStateException("database unreachable");
+            }
             rows.computeIfAbsent(notice.recipient(), id -> new ArrayList<>()).add(notice);
         }
 
         @Override
         public List<PlayerNotice> take(UUID recipient) {
+            if (refuseTake) {
+                throw new IllegalStateException("database unreachable");
+            }
             List<PlayerNotice> taken = rows.remove(recipient);
-            return taken == null ? List.of() : List.copyOf(taken);
+            return taken == null ? List.of() : new ArrayList<>(taken);
+        }
+
+        @Override
+        public int purgeOlderThan(Instant cutoff) {
+            return 0;
+        }
+    }
+
+    /** The chat: what each player was shown, failing on one line or reaching nobody when the test says so. */
+    private static final class Chat implements MessageSink {
+
+        private final List<String> shown = new ArrayList<>();
+        private String failOn = "";
+        private boolean unreachable;
+
+        @Override
+        public void deliver(PlayerRef viewer, String renderedText) {
+            if (!failOn.isEmpty() && renderedText.endsWith(failOn)) {
+                throw new IllegalStateException("the chat refused the line");
+            }
+            shown.add(viewer.name() + ": " + renderedText);
+        }
+
+        @Override
+        public void deliver(PlayerRef viewer, String renderedText, Runnable unreached) {
+            if (unreachable) {
+                unreached.run();
+                return;
+            }
+            deliver(viewer, renderedText);
         }
     }
 }

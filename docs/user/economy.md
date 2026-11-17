@@ -77,7 +77,10 @@ transferred, the amount is at least the minimum, the receiver accepts payments (
 the money. A payment above the confirm threshold waits for `/payconfirm`, and is checked again when confirmed.
 
 The receiver may be offline or on another server of the database: the money arrives at once, and the receiver is
-told they were paid when they are next online, at once on the server they are on, or as they next join.
+told they were paid when they are next online, at once on the server they are on, or as they next join. The `notices`
+block of `config.conf` bounds what waits for them: at most `kept-per-player` lines (50) are kept, the oldest dropped
+first, a line waits `keep-days` (30) at most, and a returning player is shown the newest `shown-at-once` (10) with
+one more line counting the rest.
 
 With a tax, the receiver is credited the payment and the tax is then taken from them: paying 50 with a 10 percent
 and 1 flat tax sends 50, takes 6, and the receiver keeps 44. The tax is never more than the payment.

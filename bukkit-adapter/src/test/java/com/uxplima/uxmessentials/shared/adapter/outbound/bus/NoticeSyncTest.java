@@ -58,6 +58,11 @@ class NoticeSyncTest {
             public List<PlayerNotice> take(UUID recipient) {
                 return List.of();
             }
+
+            @Override
+            public int purgeOlderThan(Instant cutoff) {
+                return 0;
+            }
         };
         BusPublisher ordered = new BusPublisher() {
             @Override

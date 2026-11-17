@@ -1,14 +1,14 @@
 package com.uxplima.uxmessentials.persistence.notice;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import java.time.Instant;
-import java.util.List;
 import java.util.Map;
 import java.util.UUID;
-import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.atomic.AtomicInteger;
 
+import com.uxplima.uxmessentials.persistence.runtime.PersistenceException;
 import com.uxplima.uxmessentials.persistence.testing.EveryBackend;
 import com.uxplima.uxmessentials.persistence.testing.TestDatabase;
 import com.uxplima.uxmessentials.shared.application.port.Logger;
@@ -25,8 +25,8 @@ import org.junit.jupiter.api.Test;
 
 /**
  * Kept lines come back with their key and every value intact, in the order they were kept, only for their recipient,
- * and are handed out once: a second server taking after the first gets nothing. A take the database fails part way
- * through still hands back the lines it already removed.
+ * and are handed out once: a second server taking after the first gets nothing. A take the database fails leaves every
+ * line for the next one. A player holds only so many lines, the newest, and old lines are dropped.
  */
 @EveryBackend
 class JooqPendingPlayerNoticesTest {
@@ -34,6 +34,7 @@ class JooqPendingPlayerNoticesTest {
     private static final UUID SAM = UUID.fromString("00000000-0000-0000-0000-000000000005");
     private static final UUID KIM = UUID.fromString("00000000-0000-0000-0000-0000000000c1");
     private static final Instant FIRST = Instant.parse("2030-05-01T12:00:00Z");
+    private static final int KEPT = 50;
 
     private DSLContext dsl;
 
@@ -44,7 +45,7 @@ class JooqPendingPlayerNoticesTest {
 
     @Test
     void keptLinesComeBackWholeInOrderAndOnlyForTheirRecipient() {
-        PendingPlayerNotices store = new JooqPendingPlayerNotices(dsl, new Quiet());
+        PendingPlayerNotices store = new JooqPendingPlayerNotices(dsl, new Quiet(), KEPT);
         PlayerNotice paid = notice(SAM, Map.of("player", "Alex", "amount", "$1,000.50 & change=yes"), FIRST);
         PlayerNotice later = notice(SAM, Map.of(), FIRST.plusSeconds(60));
         PlayerNotice kims = notice(KIM, Map.of("player", "Ünal"), FIRST);
@@ -58,8 +59,8 @@ class JooqPendingPlayerNoticesTest {
 
     @Test
     void aLineIsHandedOutOnceAcrossServers() {
-        PendingPlayerNotices lobby = new JooqPendingPlayerNotices(dsl, new Quiet());
-        PendingPlayerNotices survival = new JooqPendingPlayerNotices(dsl, new Quiet());
+        PendingPlayerNotices lobby = new JooqPendingPlayerNotices(dsl, new Quiet(), KEPT);
+        PendingPlayerNotices survival = new JooqPendingPlayerNotices(dsl, new Quiet(), KEPT);
         lobby.keep(notice(SAM, Map.of("player", "Alex"), FIRST));
 
         assertThat(survival.take(SAM)).hasSize(1);
@@ -67,23 +68,47 @@ class JooqPendingPlayerNoticesTest {
     }
 
     @Test
-    void aTakeThatFailsPartWayHandsBackTheLinesItRemovedAndKeepsTheRest() {
-        PendingPlayerNotices store = new JooqPendingPlayerNotices(dsl, new Quiet());
+    void aTakeTheDatabaseFailsLeavesEveryLineForTheNextOne() {
+        PendingPlayerNotices store = new JooqPendingPlayerNotices(dsl, new Quiet(), KEPT);
         store.keep(notice(SAM, Map.of("amount", "1"), FIRST));
         store.keep(notice(SAM, Map.of("amount", "2"), FIRST.plusSeconds(1)));
         store.keep(notice(SAM, Map.of("amount", "3"), FIRST.plusSeconds(2)));
-        Errors errors = new Errors();
-        PendingPlayerNotices failing = new JooqPendingPlayerNotices(failingOnDelete(2), errors);
+        PendingPlayerNotices failing = new JooqPendingPlayerNotices(failingOnDelete(1), new Quiet(), KEPT);
 
-        assertThat(failing.take(SAM))
-                .as("the first line is gone from the table, so it must be shown")
-                .extracting(kept -> kept.line().args().get("amount"))
-                .containsExactly("1");
-        assertThat(errors.lines).hasSize(1);
+        assertThatThrownBy(() -> failing.take(SAM)).isInstanceOf(PersistenceException.class);
+
         assertThat(store.take(SAM))
-                .as("the lines the failed take left are handed out by the next one")
                 .extracting(kept -> kept.line().args().get("amount"))
-                .containsExactly("2", "3");
+                .containsExactly("1", "2", "3");
+    }
+
+    @Test
+    void aPlayerSentMoreLinesThanAreKeptHoldsTheNewest() {
+        PendingPlayerNotices store = new JooqPendingPlayerNotices(dsl, new Quiet(), 3);
+        for (int i = 1; i <= 200; i++) {
+            store.keep(notice(SAM, Map.of("amount", Integer.toString(i)), FIRST.plusSeconds(i)));
+        }
+        store.keep(notice(KIM, Map.of("amount", "kim"), FIRST));
+
+        assertThat(store.take(SAM))
+                .extracting(kept -> kept.line().args().get("amount"))
+                .containsExactly("198", "199", "200");
+        assertThat(store.take(KIM)).hasSize(1);
+    }
+
+    @Test
+    void linesOlderThanTheCutoffAreDroppedAndNewerOnesKept() {
+        PendingPlayerNotices store = new JooqPendingPlayerNotices(dsl, new Quiet(), KEPT);
+        store.keep(notice(SAM, Map.of("amount", "old"), FIRST));
+        store.keep(notice(KIM, Map.of("amount", "old"), FIRST.plusSeconds(10)));
+        store.keep(notice(SAM, Map.of("amount", "new"), FIRST.plusSeconds(3600)));
+
+        assertThat(store.purgeOlderThan(FIRST.plusSeconds(60))).isEqualTo(2);
+
+        assertThat(store.take(SAM))
+                .extracting(kept -> kept.line().args().get("amount"))
+                .containsExactly("new");
+        assertThat(store.take(KIM)).isEmpty();
     }
 
     /** The shared database, failing the {@code nth} delete it is asked to run, as a deadlock or a pool timeout does. */
@@ -110,26 +135,6 @@ class JooqPendingPlayerNoticesTest {
         assertThat(actual.line().key().key()).isEqualTo(expected.line().key().key());
         assertThat(actual.line().args()).isEqualTo(expected.line().args());
         assertThat(actual.at()).isEqualTo(expected.at());
-    }
-
-    /** Keeps the error lines, which are what an operator would be told. */
-    private static final class Errors implements Logger {
-
-        private final List<String> lines = new CopyOnWriteArrayList<>();
-
-        @Override
-        public void info(String message, Object... args) {}
-
-        @Override
-        public void warn(String message, Object... args) {}
-
-        @Override
-        public void error(String message, Throwable cause) {
-            lines.add(message);
-        }
-
-        @Override
-        public void debug(String message, Object... args) {}
     }
 
     private static final class Quiet implements Logger {

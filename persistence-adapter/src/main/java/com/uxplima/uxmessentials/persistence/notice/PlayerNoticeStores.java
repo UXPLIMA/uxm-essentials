@@ -14,9 +14,12 @@ public final class PlayerNoticeStores {
 
     private PlayerNoticeStores() {}
 
-    /** The lines kept for players who were not online, over the shared persistence DSL. */
-    public static PendingPlayerNotices pending(Persistence persistence, Logger log) {
+    /**
+     * The lines kept for players who were not online, over the shared persistence DSL, at most {@code keptPerPlayer}
+     * for one player.
+     */
+    public static PendingPlayerNotices pending(Persistence persistence, Logger log, int keptPerPlayer) {
         Objects.requireNonNull(persistence, "persistence");
-        return new JooqPendingPlayerNotices(persistence.dsl(), log);
+        return new JooqPendingPlayerNotices(persistence.dsl(), log, keptPerPlayer);
     }
 }

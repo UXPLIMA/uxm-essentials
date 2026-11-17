@@ -255,6 +255,8 @@ import com.uxplima.uxmessentials.shared.adapter.outbound.lookup.CachingPlayerNam
 import com.uxplima.uxmessentials.shared.adapter.outbound.lookup.ServerKnownPlayers;
 import com.uxplima.uxmessentials.shared.adapter.outbound.message.LocaleResolver;
 import com.uxplima.uxmessentials.shared.adapter.outbound.meta.PlayerMeta;
+import com.uxplima.uxmessentials.shared.adapter.outbound.notice.KeptNoticeSettings;
+import com.uxplima.uxmessentials.shared.adapter.outbound.notice.KeptNoticeSweep;
 import com.uxplima.uxmessentials.shared.adapter.outbound.papi.BukkitPlayerFacts;
 import com.uxplima.uxmessentials.shared.adapter.outbound.papi.BukkitServerMetrics;
 import com.uxplima.uxmessentials.shared.adapter.outbound.papi.GateModerationPlaceholders;
@@ -316,6 +318,7 @@ import com.uxplima.uxmessentials.shared.application.port.ConfigStore;
 import com.uxplima.uxmessentials.shared.application.port.IpHistoryStore;
 import com.uxplima.uxmessentials.shared.application.port.IpTokens;
 import com.uxplima.uxmessentials.shared.application.port.NetworkPresence;
+import com.uxplima.uxmessentials.shared.application.port.PendingPlayerNotices;
 import com.uxplima.uxmessentials.shared.application.port.PlayerNameRepository;
 import com.uxplima.uxmessentials.shared.application.reload.ReloadTask;
 import com.uxplima.uxmessentials.shared.application.teleport.PaidTeleports;
@@ -1313,12 +1316,28 @@ public final class PluginModule {
         links.kitResets = ClaimLedgers.kitResets(persistence);
         // A line for a player who is not online here, such as being paid, is kept in the shared database and shown
         // when they are next online: at once on the server they are on, which the keep announces, or as they join.
+        // A player away for long, or sent a flood of lines, holds only so many and only for so long.
+        KeptNoticeSettings noticeSettings = KeptNoticeSettings.from(config, kernel.log());
+        PendingPlayerNotices keptNotices =
+                PlayerNoticeStores.pending(persistence, kernel.log(), noticeSettings.keptPerPlayer());
         DeferredPlayerNotices notices = new DeferredPlayerNotices(
-                NoticeSync.pending(
-                        PlayerNoticeStores.pending(persistence, kernel.log()), bus.publisher(), kernel.log()),
+                NoticeSync.pending(keptNotices, bus.publisher(), kernel.log()),
                 kernel.playerLookup(),
                 new Notifier(kernel.messages(), kernel.messageSink()),
-                Clock.systemUTC());
+                kernel.scheduler(),
+                kernel.log(),
+                Clock.systemUTC(),
+                noticeSettings.shownAtOnce());
+        AutoCloseable noticeSweep = new KeptNoticeSweep(
+                        keptNotices, noticeSettings.keepFor(), kernel.scheduler(), Clock.systemUTC(), kernel.log())
+                .start();
+        resources.onClose(() -> {
+            try {
+                noticeSweep.close();
+            } catch (Exception closeFailure) {
+                kernel.log().warn("event=notice_sweep_close_failed detail={}", closeFailure.toString());
+            }
+        });
         bus.registry().register(NoticeSync.listener(notices::deliver, kernel.playerLookup(), kernel.scheduler()));
         resources.addListener(new KeptNoticeJoinListener(notices, kernel.scheduler()));
         links.playerNotices = notices;

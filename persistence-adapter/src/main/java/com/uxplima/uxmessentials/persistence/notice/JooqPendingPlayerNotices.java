@@ -27,59 +27,84 @@ import org.jooq.DSLContext;
 /**
  * jOOQ-backed {@link PendingPlayerNotices} over the {@code player_notices} table, one row per kept line. The values a
  * line is filled with are stored as {@code name=value} pairs joined by {@code &}, each side percent-encoded as UTF-8,
- * so a value may hold any character. A take deletes each row on its own and returns only the lines whose delete removed
- * a row, so two takes at once hand each line to one of them. A row whose values do not decode is removed and logged
- * rather than shown wrong.
+ * so a value may hold any character. A row whose values do not decode is removed and logged rather than shown wrong.
+ *
+ * <p>A keep drops the recipient's oldest rows past {@code keptPerPlayer} in the same transaction, so one player never
+ * holds more. A take reads the recipient's rows and removes them with one delete, in one transaction; a delete that
+ * removed fewer rows than were read means another server took some of them first, so the take is rolled back and
+ * hands out nothing, and the rows still there wait for the next take. A line is therefore handed to one taker only,
+ * and a take the database fails leaves every row where it was.
  */
 public final class JooqPendingPlayerNotices extends JooqRepository implements PendingPlayerNotices {
 
     private final Logger log;
+    private final int keptPerPlayer;
 
-    public JooqPendingPlayerNotices(DSLContext dsl, Logger log) {
+    /** @param keptPerPlayer how many lines are kept for one player at most, at least one */
+    public JooqPendingPlayerNotices(DSLContext dsl, Logger log, int keptPerPlayer) {
         super(dsl);
         this.log = Objects.requireNonNull(log, "log");
+        if (keptPerPlayer < 1) {
+            throw new IllegalArgumentException("keptPerPlayer must be at least 1: " + keptPerPlayer);
+        }
+        this.keptPerPlayer = keptPerPlayer;
     }
 
     @Override
     public void keep(PlayerNotice notice) {
         Objects.requireNonNull(notice, "notice");
-        write(dsl -> dsl.insertInto(PLAYER_NOTICES)
-                .set(PLAYER_NOTICES.ID, UUID.randomUUID().toString())
-                .set(PLAYER_NOTICES.RECIPIENT, notice.recipient().toString())
-                .set(PLAYER_NOTICES.MESSAGE_KEY, notice.line().key().key())
-                .set(PLAYER_NOTICES.ARGS, encode(notice.line().args()))
-                .set(PLAYER_NOTICES.CREATED_AT, notice.at().toEpochMilli())
-                .execute());
+        String recipient = notice.recipient().toString();
+        write(dsl -> {
+            dsl.insertInto(PLAYER_NOTICES)
+                    .set(PLAYER_NOTICES.ID, UUID.randomUUID().toString())
+                    .set(PLAYER_NOTICES.RECIPIENT, recipient)
+                    .set(PLAYER_NOTICES.MESSAGE_KEY, notice.line().key().key())
+                    .set(PLAYER_NOTICES.ARGS, encode(notice.line().args()))
+                    .set(PLAYER_NOTICES.CREATED_AT, notice.at().toEpochMilli())
+                    .execute();
+            // The ids are read and then deleted by name: MySQL refuses a delete that reads its own table.
+            List<String> newestFirst = dsl.select(PLAYER_NOTICES.ID)
+                    .from(PLAYER_NOTICES)
+                    .where(PLAYER_NOTICES.RECIPIENT.eq(recipient))
+                    .orderBy(PLAYER_NOTICES.CREATED_AT.desc(), PLAYER_NOTICES.ID.desc())
+                    .fetch(PLAYER_NOTICES.ID);
+            if (newestFirst.size() <= keptPerPlayer) {
+                return 0;
+            }
+            return dsl.deleteFrom(PLAYER_NOTICES)
+                    .where(PLAYER_NOTICES.ID.in(newestFirst.subList(keptPerPlayer, newestFirst.size())))
+                    .execute();
+        });
     }
 
     @Override
     public List<PlayerNotice> take(UUID recipient) {
         Objects.requireNonNull(recipient, "recipient");
-        List<PlayerNoticesRecord> rows = read(dsl -> dsl.selectFrom(PLAYER_NOTICES)
-                .where(PLAYER_NOTICES.RECIPIENT.eq(recipient.toString()))
-                .orderBy(PLAYER_NOTICES.CREATED_AT, PLAYER_NOTICES.ID)
-                .fetch());
-        List<PlayerNotice> taken = new ArrayList<>();
+        List<PlayerNoticesRecord> rows;
+        try {
+            rows = write(dsl -> {
+                List<PlayerNoticesRecord> read = dsl.selectFrom(PLAYER_NOTICES)
+                        .where(PLAYER_NOTICES.RECIPIENT.eq(recipient.toString()))
+                        .orderBy(PLAYER_NOTICES.CREATED_AT, PLAYER_NOTICES.ID)
+                        .fetch();
+                if (read.isEmpty()) {
+                    return read;
+                }
+                List<String> ids = read.stream().map(PlayerNoticesRecord::getId).toList();
+                int removed = dsl.deleteFrom(PLAYER_NOTICES)
+                        .where(PLAYER_NOTICES.ID.in(ids))
+                        .execute();
+                if (removed != ids.size()) {
+                    throw new LostRace();
+                }
+                return read;
+            });
+        } catch (LostRace race) {
+            // Another server took some of these lines first; it shows those, and the rest wait for the next take.
+            return List.of();
+        }
+        List<PlayerNotice> taken = new ArrayList<>(rows.size());
         for (PlayerNoticesRecord row : rows) {
-            String id = row.getId();
-            boolean removed;
-            try {
-                removed = write(dsl -> dsl.deleteFrom(PLAYER_NOTICES)
-                                .where(PLAYER_NOTICES.ID.eq(id))
-                                .execute()
-                        == 1);
-            } catch (RuntimeException failure) {
-                // The lines removed so far are gone from the table, so they are handed back to be shown rather than
-                // lost with the throw; the rest stay kept for the next take.
-                log.error(
-                        "kept notice take stopped for player " + recipient + " after " + taken.size() + " of "
-                                + rows.size() + " lines",
-                        failure);
-                break;
-            }
-            if (!removed) {
-                continue;
-            }
             Map<String, String> args;
             try {
                 args = decode(row.getArgs());
@@ -93,6 +118,24 @@ public final class JooqPendingPlayerNotices extends JooqRepository implements Pe
                     Instant.ofEpochMilli(row.getCreatedAt())));
         }
         return taken;
+    }
+
+    @Override
+    public int purgeOlderThan(Instant cutoff) {
+        Objects.requireNonNull(cutoff, "cutoff");
+        return write(dsl -> dsl.deleteFrom(PLAYER_NOTICES)
+                .where(PLAYER_NOTICES.CREATED_AT.lt(cutoff.toEpochMilli()))
+                .execute());
+    }
+
+    /** Rolls back a take that found another server had taken some of its lines first. */
+    private static final class LostRace extends RuntimeException {
+
+        private static final long serialVersionUID = 1L;
+
+        LostRace() {
+            super(null, null, false, false);
+        }
     }
 
     /** The values in name order, so one line always stores the same text. */
