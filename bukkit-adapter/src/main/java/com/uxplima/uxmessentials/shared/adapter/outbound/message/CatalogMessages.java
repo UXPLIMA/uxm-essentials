@@ -71,8 +71,8 @@ public final class CatalogMessages implements Messages {
      *
      * <p>The line is handed to PlaceholderAPI for its reader after it is filled, so a value is shielded first (see
      * {@link PlaceholderShield}): a placeholder the operator wrote in the template is filled, and one inside a value,
-     * which a player may have typed, reads as written. A value inside a click or insertion argument is left exact,
-     * since it is a command or an address rather than words on screen.
+     * which a player may have typed, reads as written. The marks come off again in a click or an insertion when the line
+     * is drawn, since those carry a command, an address or text to copy that has to stay exact.
      */
     public static String fill(String template, Map<String, String> placeholders) {
         return fill(template, placeholders, true);
@@ -86,26 +86,10 @@ public final class CatalogMessages implements Messages {
         StringBuilder out = new StringBuilder();
         while (matcher.find()) {
             String value = placeholders.get(matcher.group(1));
-            String inserted = value == null
-                    ? matcher.group()
-                    : shield && !exactText(template, matcher.start()) ? PlaceholderShield.shield(value) : value;
+            String inserted = value == null ? matcher.group() : shield ? PlaceholderShield.shield(value) : value;
             matcher.appendReplacement(out, Matcher.quoteReplacement(inserted));
         }
         matcher.appendTail(out);
         return out.toString();
-    }
-
-    /**
-     * Whether the token at {@code at} is inside a click or insertion tag's argument: a command, an address or text to
-     * copy, which has to stay byte for byte what it was (a setup link holds {@code %3A}), and which nobody reads on
-     * screen.
-     */
-    private static boolean exactText(String template, int at) {
-        int open = template.lastIndexOf('<', at);
-        if (open < 0 || template.indexOf('>', open) < at) {
-            return false;
-        }
-        String tag = template.substring(open + 1, at).toLowerCase(Locale.ROOT);
-        return tag.startsWith("click:") || tag.startsWith("insert:") || tag.startsWith("insertion:");
     }
 }

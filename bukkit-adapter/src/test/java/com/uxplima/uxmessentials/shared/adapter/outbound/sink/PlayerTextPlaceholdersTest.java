@@ -10,6 +10,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Optional;
 import java.util.UUID;
 import java.util.function.Function;
@@ -19,6 +20,8 @@ import org.bukkit.Bukkit;
 import org.bukkit.OfflinePlayer;
 
 import net.kyori.adventure.text.Component;
+import net.kyori.adventure.text.TranslatableComponent;
+import net.kyori.adventure.text.event.ClickEvent;
 import net.kyori.adventure.text.serializer.plain.PlainTextComponentSerializer;
 
 import com.uxplima.uxmessentials.communication.domain.CommunicationMessageKey;
@@ -30,6 +33,8 @@ import com.uxplima.uxmessentials.shared.adapter.outbound.message.CatalogMessages
 import com.uxplima.uxmessentials.shared.adapter.outbound.message.ClientLocales;
 import com.uxplima.uxmessentials.shared.adapter.outbound.message.HoconLocaleCatalog;
 import com.uxplima.uxmessentials.shared.adapter.outbound.message.LocaleResolver;
+import com.uxplima.uxmessentials.shared.adapter.outbound.papi.PlaceholderShield;
+import com.uxplima.uxmessentials.shared.adapter.outbound.style.StyledText;
 import com.uxplima.uxmessentials.shared.adapter.outbound.style.ThemeFile;
 import com.uxplima.uxmessentials.shared.application.port.LocaleStore;
 import com.uxplima.uxmessentials.shared.application.port.Logger;
@@ -59,7 +64,7 @@ import org.mockbukkit.mockbukkit.entity.PlayerMock;
  */
 class PlayerTextPlaceholdersTest {
 
-    private static final String BREAK = "‌";
+    private static final String BREAK = "\u200C";
 
     @TempDir
     Path messagesDir;
@@ -138,9 +143,64 @@ class PlayerTextPlaceholdersTest {
     void aValueInAClickStaysExactSoASetupLinkStillCopies() {
         String uri = "otpauth://totp/Uxm%3AAlex?secret=ABC";
 
-        String line = messages().resolve(staffRef, SecurityMessageKey.SECURITY_2FA_SETUP_URI, Map.of("uri", uri));
+        sink("<prefix>")
+                .deliver(
+                        staffRef,
+                        messages().resolve(staffRef, SecurityMessageKey.SECURITY_2FA_SETUP_URI, Map.of("uri", uri)));
 
-        assertThat(line).contains("<click:copy_to_clipboard:'" + uri + "'>");
+        assertThat(clicks(nextComponent())).containsExactly(uri);
+    }
+
+    @Test
+    void twoTypedValuesCannotTurnTheOperatorsClosingPercentIntoAPlaceholder() throws IOException {
+        // The operator puts a placeholder right before one value, with another value earlier in the line. A value's
+        // percent that could close the operator's placeholder would make its closing percent open %player_ip%.
+        Files.writeString(
+                messagesDir.resolve("messages_en.conf"),
+                "\"staff.chat.format-remote\" = \"{player} <gray>%luckperms_prefix%{message}\"\n");
+        CatalogMessages messages = messages();
+        BusStaffChatNetwork network = new BusStaffChatNetwork(new NoBus());
+        network.bind(new SendStaffChat(
+                new MessagingStaffChannel(node -> List.of(staffRef), messages, sink("<prefix>"), "staff.chat"),
+                event -> {},
+                network,
+                new Inline()));
+
+        network.onFrame(new StaffChatFrame("lobby", UUID.randomUUID(), alex.uuid(), "%x_y", "player_ip%"));
+
+        String seen = nextLine();
+        assertThat(seen).isEqualTo("%x_y [VIP]player_ip%");
+        assertThat(seen).doesNotContain("203.0.113.7");
+    }
+
+    @Test
+    void aValueTypedIntoAClickIsNeitherFilledNorChanged() throws IOException {
+        Files.writeString(
+                messagesDir.resolve("messages_en.conf"),
+                "\"msg.received\" = \"<click:suggest_command:'/msg {player} {message}'>{player}</click>\"\n");
+        BukkitMessageDelivery delivery = new BukkitMessageDelivery(messages(), sink("<prefix>"));
+
+        delivery.deliverMessage(alex, staffRef, MessageBody.of("%player_ip% 50%"));
+
+        assertThat(clicks(nextComponent())).containsExactly("/msg Alex %player_ip% 50%");
+    }
+
+    @Test
+    void aClickInsideATranslationArgumentAlsoCarriesTheValueExactly() {
+        String source = "<lang:chat.square_brackets:'<click:run_command:\"/say "
+                + PlaceholderShield.shield("50% off")
+                + "\">x</click>'>";
+
+        Component drawn = StyledText.render(source);
+
+        assertThat(drawn).isInstanceOf(TranslatableComponent.class);
+        List<String> found = new ArrayList<>();
+        ((TranslatableComponent) drawn).arguments().forEach(argument -> {
+            if (argument.value() instanceof Component component) {
+                found.addAll(clicks(component));
+            }
+        });
+        assertThat(found).containsExactly("/say 50% off");
     }
 
     private CatalogMessages messages() {
@@ -152,12 +212,36 @@ class PlayerTextPlaceholdersTest {
         return new BukkitMessageSink(new Inline(), prefix, PlayerTextPlaceholdersTest::placeholderApi);
     }
 
-    /** PlaceholderAPI's own parser with its player expansion, which is what the server would run for the reader. */
+    /**
+     * PlaceholderAPI's own parser with the player and LuckPerms expansions, called the way the plugin calls it for the
+     * reader: through the shield, which keeps a value's percent out of its sight.
+     */
     private static UnaryOperator<String> placeholderApi(UUID reader) {
         OfflinePlayer player = Bukkit.getOfflinePlayer(reader);
-        Function<String, @Nullable PlaceholderExpansion> lookup =
-                identifier -> identifier.equals("player") ? new PlayerExpansion() : null;
-        return text -> new CharsReplacer(Replacer.Closure.PERCENT).apply(text, player, lookup);
+        Function<String, @Nullable PlaceholderExpansion> lookup = identifier -> switch (identifier) {
+            case "player" -> new PlayerExpansion();
+            case "luckperms" -> new PrefixExpansion();
+            default -> null;
+        };
+        return PlaceholderShield.around(
+                text -> new CharsReplacer(Replacer.Closure.PERCENT).apply(text, player, lookup));
+    }
+
+    private Component nextComponent() {
+        Component line = staff.nextComponentMessage();
+        assertThat(line).as("a line was delivered").isNotNull();
+        return Objects.requireNonNull(line);
+    }
+
+    /** What every click in {@code line} carries, in order. */
+    private static List<String> clicks(Component line) {
+        List<String> found = new ArrayList<>();
+        ClickEvent<?> click = line.clickEvent();
+        if (click != null && click.payload() instanceof ClickEvent.Payload.Text text) {
+            found.add(text.value());
+        }
+        line.children().forEach(child -> found.addAll(clicks(child)));
+        return found;
     }
 
     /** The next line the staff member saw, as text, with the invisible break the shield adds set aside. */
@@ -165,6 +249,30 @@ class PlayerTextPlaceholdersTest {
         Component line = staff.nextComponentMessage();
         assertThat(line).as("a line was delivered").isNotNull();
         return PlainTextComponentSerializer.plainText().serialize(line).replace(BREAK, "");
+    }
+
+    /** LuckPerms' expansion, as far as these lines ask it: everyone's prefix is [VIP]. */
+    private static final class PrefixExpansion extends PlaceholderExpansion {
+
+        @Override
+        public String getIdentifier() {
+            return "luckperms";
+        }
+
+        @Override
+        public String getAuthor() {
+            return "test";
+        }
+
+        @Override
+        public String getVersion() {
+            return "1";
+        }
+
+        @Override
+        public @Nullable String onRequest(@Nullable OfflinePlayer player, String params) {
+            return params.equals("prefix") ? "[VIP]" : null;
+        }
     }
 
     /** PlaceholderAPI's player expansion, as far as these lines ask it. */
