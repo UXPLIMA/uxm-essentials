@@ -20,6 +20,7 @@ import org.bukkit.Bukkit;
 import org.bukkit.OfflinePlayer;
 
 import net.kyori.adventure.text.Component;
+import net.kyori.adventure.text.TranslatableComponent;
 import net.kyori.adventure.text.event.ClickEvent;
 import net.kyori.adventure.text.serializer.plain.PlainTextComponentSerializer;
 
@@ -33,6 +34,7 @@ import com.uxplima.uxmessentials.shared.adapter.outbound.message.ClientLocales;
 import com.uxplima.uxmessentials.shared.adapter.outbound.message.HoconLocaleCatalog;
 import com.uxplima.uxmessentials.shared.adapter.outbound.message.LocaleResolver;
 import com.uxplima.uxmessentials.shared.adapter.outbound.papi.PlaceholderShield;
+import com.uxplima.uxmessentials.shared.adapter.outbound.style.StyledText;
 import com.uxplima.uxmessentials.shared.adapter.outbound.style.ThemeFile;
 import com.uxplima.uxmessentials.shared.application.port.LocaleStore;
 import com.uxplima.uxmessentials.shared.application.port.Logger;
@@ -62,7 +64,7 @@ import org.mockbukkit.mockbukkit.entity.PlayerMock;
  */
 class PlayerTextPlaceholdersTest {
 
-    private static final String BREAK = "‌";
+    private static final String BREAK = "\u200C";
 
     @TempDir
     Path messagesDir;
@@ -181,6 +183,24 @@ class PlayerTextPlaceholdersTest {
         delivery.deliverMessage(alex, staffRef, MessageBody.of("%player_ip% 50%"));
 
         assertThat(clicks(nextComponent())).containsExactly("/msg Alex %player_ip% 50%");
+    }
+
+    @Test
+    void aClickInsideATranslationArgumentAlsoCarriesTheValueExactly() {
+        String source = "<lang:chat.square_brackets:'<click:run_command:\"/say "
+                + PlaceholderShield.shield("50% off")
+                + "\">x</click>'>";
+
+        Component drawn = StyledText.render(source);
+
+        assertThat(drawn).isInstanceOf(TranslatableComponent.class);
+        List<String> found = new ArrayList<>();
+        ((TranslatableComponent) drawn).arguments().forEach(argument -> {
+            if (argument.value() instanceof Component component) {
+                found.addAll(clicks(component));
+            }
+        });
+        assertThat(found).containsExactly("/say 50% off");
     }
 
     private CatalogMessages messages() {

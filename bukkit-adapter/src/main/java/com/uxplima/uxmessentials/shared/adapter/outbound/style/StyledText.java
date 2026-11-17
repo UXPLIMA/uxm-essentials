@@ -4,6 +4,8 @@ import java.util.List;
 import java.util.Objects;
 
 import net.kyori.adventure.text.Component;
+import net.kyori.adventure.text.TranslatableComponent;
+import net.kyori.adventure.text.TranslationArgument;
 import net.kyori.adventure.text.event.ClickEvent;
 import net.kyori.adventure.text.format.Style;
 import net.kyori.adventure.text.minimessage.tag.resolver.TagResolver;
@@ -59,7 +61,21 @@ public final class StyledText {
         }
         List<Component> children =
                 drawn.children().stream().map(StyledText::exactActions).toList();
-        return drawn.style(style).children(children);
+        Component walked = drawn.style(style).children(children);
+        // A <lang:...> line carries its arguments as components of their own, and a click can sit in one of them.
+        if (walked instanceof TranslatableComponent translatable
+                && !translatable.arguments().isEmpty()) {
+            return translatable.arguments(translatable.arguments().stream()
+                    .map(StyledText::exactArgument)
+                    .toList());
+        }
+        return walked;
+    }
+
+    private static TranslationArgument exactArgument(TranslationArgument argument) {
+        return argument.value() instanceof Component component
+                ? TranslationArgument.component(exactActions(component))
+                : argument;
     }
 
     private static ClickEvent<?> exact(ClickEvent<?> click, String value) {

@@ -1,6 +1,7 @@
 package com.uxplima.uxmessentials.shared.adapter.outbound.papi;
 
 import java.util.Objects;
+import java.util.concurrent.ThreadLocalRandom;
 import java.util.function.UnaryOperator;
 
 import org.jspecify.annotations.NullMarked;
@@ -12,20 +13,21 @@ import org.jspecify.annotations.NullMarked;
  * has it filled in against whoever reads the line.
  *
  * <p>It works in two steps. {@link #shield} marks every {@code %} in a value by following it with a zero width
- * non-joiner, which the game's font draws with no width, so the reader sees the value as written. Then, at the call
- * into PlaceholderAPI, {@link #hide} swaps every marked {@code %} for a character PlaceholderAPI does not read, and
- * {@link #reveal} puts the marked {@code %} back in the answer. PlaceholderAPI therefore never sees a value's
- * {@code %} at all: it can neither open a placeholder nor close one the operator opened, whatever the template around
- * it. The swap happens only around that call, so nothing new reaches a log, Discord or a screen.
+ * non-joiner, which the game's font draws with no width, so the reader sees the value as written. Then
+ * {@link #around} wraps the call into PlaceholderAPI: every marked {@code %} is swapped for a token made for that one
+ * call, and the token is swapped back in the answer. PlaceholderAPI therefore never sees a value's {@code %} at all: it
+ * can neither open a placeholder nor close one the operator opened, whatever the template around it. The swap happens
+ * only around that call, so nothing new reaches a log, Discord or a screen, and nothing an expansion answers, nor any
+ * other text, can be mistaken for the token, since nobody outside the call knows it.
  */
 @NullMarked
 public final class PlaceholderShield {
 
     /** The zero width non-joiner, which the game's font draws with no width. */
-    static final char BREAK = '‌';
+    static final char BREAK = '\u200C';
 
-    /** A Unicode noncharacter, never used in text, that stands for a marked {@code %} while PlaceholderAPI reads. */
-    static final char HIDDEN = '﷐';
+    /** A Unicode noncharacter, never used in text, that opens and closes the token a marked {@code %} becomes. */
+    static final char HIDDEN = '\uFDD0';
 
     private static final String MARKED = "%" + BREAK;
 
@@ -33,25 +35,24 @@ public final class PlaceholderShield {
 
     /**
      * {@code value} with every {@code %} marked as a value's. A break the value starts with is dropped, since right after
-     * the operator's own {@code %} it would mark that one instead; a value already shielded comes back unchanged.
+     * the operator's own {@code %} it would mark that one instead; the noncharacter the call token is built from is
+     * dropped first, so it cannot hide a break from that check. A value already shielded comes back unchanged.
      */
     public static String shield(String value) {
         Objects.requireNonNull(value, "value");
+        String kept = value.indexOf(HIDDEN) < 0 ? value : value.replace(String.valueOf(HIDDEN), "");
         int start = 0;
-        while (start < value.length() && value.charAt(start) == BREAK) {
+        while (start < kept.length() && kept.charAt(start) == BREAK) {
             start++;
         }
-        if (start == 0 && value.indexOf('%') < 0 && value.indexOf(HIDDEN) < 0) {
-            return value;
+        if (kept.indexOf('%', start) < 0) {
+            return start == 0 ? kept : kept.substring(start);
         }
-        StringBuilder shielded = new StringBuilder(value.length() + 4);
-        for (int i = start; i < value.length(); i++) {
-            char character = value.charAt(i);
-            if (character == HIDDEN) {
-                continue;
-            }
+        StringBuilder shielded = new StringBuilder(kept.length() + 4);
+        for (int i = start; i < kept.length(); i++) {
+            char character = kept.charAt(i);
             shielded.append(character);
-            boolean markedAlready = i + 1 < value.length() && value.charAt(i + 1) == BREAK;
+            boolean markedAlready = i + 1 < kept.length() && kept.charAt(i + 1) == BREAK;
             if (character == '%' && !markedAlready) {
                 shielded.append(BREAK);
             }
@@ -60,25 +61,25 @@ public final class PlaceholderShield {
     }
 
     /**
-     * {@code fill}, a call into PlaceholderAPI, made so that it never sees a value's {@code %}: the text goes in
-     * {@link #hide hidden} and the answer comes back {@link #reveal revealed}. Every call into PlaceholderAPI with a line
-     * that may hold values goes through here.
+     * {@code fill}, a call into PlaceholderAPI, made so that it never sees a value's {@code %}: every marked {@code %}
+     * goes in as a token made for this call, and comes back marked in the answer. Every call into PlaceholderAPI with a
+     * line that may hold values goes through here.
      */
     public static UnaryOperator<String> around(UnaryOperator<String> fill) {
         Objects.requireNonNull(fill, "fill");
-        return text -> reveal(fill.apply(hide(text)));
+        return text -> {
+            if (!text.contains(MARKED)) {
+                return fill.apply(text);
+            }
+            String token = HIDDEN + Long.toHexString(ThreadLocalRandom.current().nextLong()) + HIDDEN;
+            return fill.apply(text.replace(MARKED, token)).replace(token, MARKED);
+        };
     }
 
-    /** {@code text} as PlaceholderAPI is to read it: every marked {@code %} out of its sight. */
-    public static String hide(String text) {
+    /** {@code text} without the values' marked {@code %}: what PlaceholderAPI is shown of it. */
+    public static String withoutValues(String text) {
         Objects.requireNonNull(text, "text");
-        return text.contains(MARKED) ? text.replace(MARKED, String.valueOf(HIDDEN)) : text;
-    }
-
-    /** What PlaceholderAPI answered for a {@link #hide hidden} text, with every marked {@code %} back in place. */
-    public static String reveal(String text) {
-        Objects.requireNonNull(text, "text");
-        return text.indexOf(HIDDEN) < 0 ? text : text.replace(String.valueOf(HIDDEN), MARKED);
+        return text.contains(MARKED) ? text.replace(MARKED, "") : text;
     }
 
     /**

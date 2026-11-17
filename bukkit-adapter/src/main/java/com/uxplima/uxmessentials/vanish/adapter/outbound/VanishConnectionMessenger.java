@@ -101,7 +101,11 @@ public final class VanishConnectionMessenger {
                 String template = canSee ? staffTemplate : publicTemplate;
                 if (!template.isBlank()) {
                     recipients.add(new Recipient(
-                            online, viewer, new Pending(HudText.lineFor(viewer.uuid(), template), prefix(viewer))));
+                            online,
+                            viewer,
+                            new Pending(
+                                    HudText.lineFor(viewer.uuid(), template),
+                                    messages.resolve(viewer, PREFIX, Map.of()))));
                 }
             }
             if (recipients.isEmpty()) {
@@ -121,21 +125,22 @@ public final class VanishConnectionMessenger {
     }
 
     /**
-     * The chat prefix as {@code viewer} reads it, its placeholders filled for them, the same as the prefix of every line
-     * the message sink draws.
+     * Runs on the subject's thread, which is where the subject's placeholders are read. Each line is then drawn on its
+     * reader's own thread, where the prefix's placeholders are filled for that reader, the same as the prefix of every
+     * line the message sink draws.
      */
-    private String prefix(PlayerRef viewer) {
-        return PlaceholderApiSupport.messageBridge(viewer.uuid()).apply(messages.resolve(viewer, PREFIX, Map.of()));
-    }
-
     private void deliver(List<Recipient> recipients, PlayerRef who, Component display, UnaryOperator<String> subject) {
-        List<Optional<Component>> lines =
-                finish(recipients.stream().map(Recipient::pending).toList(), who.name(), display, subject);
-        for (int index = 0; index < recipients.size(); index++) {
-            Recipient recipient = recipients.get(index);
-            lines.get(index)
-                    .ifPresent(line -> scheduler.onEntity(
-                            recipient.ref(), () -> recipient.player().sendMessage(line)));
+        Map<String, String> expanded = new HashMap<>();
+        UnaryOperator<String> once = source -> expanded.computeIfAbsent(source, subject);
+        for (Recipient recipient : recipients) {
+            Pending pending = recipient.pending();
+            subjectLine(pending.line(), who.name(), once)
+                    .ifPresent(line -> scheduler.onEntity(recipient.ref(), () -> {
+                        String prefix = PlaceholderApiSupport.messageBridge(
+                                        recipient.ref().uuid())
+                                .apply(pending.prefix());
+                        recipient.player().sendMessage(draw(line, display, prefix));
+                    }));
         }
     }
 
@@ -172,17 +177,24 @@ public final class VanishConnectionMessenger {
      */
     static Optional<Component> render(
             String line, String name, Component display, UnaryOperator<String> bridge, String prefix) {
+        return subjectLine(line, name, bridge).map(expanded -> draw(expanded, display, prefix));
+    }
+
+    /** {@code line} with {@code {player}} as {@code name} and the subject's placeholders read through {@code bridge}. */
+    private static Optional<String> subjectLine(String line, String name, UnaryOperator<String> bridge) {
         if (line.isBlank()) {
             return Optional.empty();
         }
-        return ResolvedNameFill.into(line, name).map(filled -> {
-            String expanded = bridge.apply(filled);
-            TagResolver tags = TagResolver.resolver(
-                    Placeholder.component("display_name", display), Placeholder.parsed("prefix", prefix));
-            Optional<String> centred = ChatCentre.afterMarker(expanded);
-            return centred.isPresent()
-                    ? CenteredTextPadder.centred(StyledText.render(centred.get(), tags))
-                    : StyledText.render(expanded, tags);
-        });
+        return ResolvedNameFill.into(line, name).map(bridge);
+    }
+
+    /** An {@link #subjectLine expanded} line drawn with the subject's display name and the reader's prefix. */
+    private static Component draw(String expanded, Component display, String prefix) {
+        TagResolver tags = TagResolver.resolver(
+                Placeholder.component("display_name", display), Placeholder.parsed("prefix", prefix));
+        Optional<String> centred = ChatCentre.afterMarker(expanded);
+        return centred.isPresent()
+                ? CenteredTextPadder.centred(StyledText.render(centred.get(), tags))
+                : StyledText.render(expanded, tags);
     }
 }

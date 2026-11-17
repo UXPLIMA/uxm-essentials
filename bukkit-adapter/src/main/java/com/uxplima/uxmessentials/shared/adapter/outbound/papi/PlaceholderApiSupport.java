@@ -146,7 +146,7 @@ public final class PlaceholderApiSupport {
             return UnaryOperator.identity();
         }
         return source -> {
-            if (!hasRelational(PlaceholderShield.hide(source))) {
+            if (!hasRelational(PlaceholderShield.withoutValues(source))) {
                 return source;
             }
             Player one = Bukkit.getPlayer(viewer);
@@ -186,7 +186,7 @@ public final class PlaceholderApiSupport {
      */
     public static boolean hasPlaceholder(String source) {
         Objects.requireNonNull(source, "source");
-        String unmarked = PlaceholderShield.hide(source);
+        String unmarked = PlaceholderShield.withoutValues(source);
         int open = unmarked.indexOf('%');
         return open >= 0 && unmarked.indexOf('%', open + 1) > open;
     }
