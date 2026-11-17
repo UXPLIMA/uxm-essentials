@@ -36,8 +36,9 @@ import org.jspecify.annotations.Nullable;
  *
  * <p>On an offline-mode server a listed name matches only as spelled ({@link OperatorList}), and the server's user
  * cache, which matches any case, may vouch for a uuid only when the name it holds is the one typed. An {@code /op}
- * whose name an online player has only in another case is refused whether or not the list is on: the server finds
- * the player by name in any case, so it would make that other account the operator. The name case is asked on every
+ * whose name the server would resolve to another spelling, an online player's or one in its profile cache, is
+ * refused whether or not the list is on: the server finds the player by name in any case, so it would make that
+ * other account the operator. An {@code /op} run through {@code /execute ... run} is read the same way. The name case is asked on every
  * check, since a server can turn out to be offline-mode while it runs.
  */
 @NullMarked
@@ -111,14 +112,14 @@ public final class OperatorLock {
             return false;
         }
         PlayerRef who = CommandFeedback.refOf(sender);
-        Optional<String> otherSpelling = onlineInAnotherCase(target.get());
+        Optional<String> otherSpelling = anotherCase(target.get());
         if (otherSpelling.isPresent()) {
             sink.deliver(
                     who,
                     messages.resolve(
                             who,
                             SecurityMessageKey.SECURITY_OPERATORS_OTHER_SPELLING,
-                            Map.of("player", target.get(), "online", otherSpelling.get())));
+                            Map.of("player", target.get(), "match", otherSpelling.get())));
             return true;
         }
         OperatorList current = list;
@@ -155,16 +156,22 @@ public final class OperatorLock {
     }
 
     /**
-     * On an offline-mode server, the spelling of the online player the server's own {@code /op} would pick for
-     * {@code name} when it is not the one typed. The server looks a name up in any case, so it would make that other
-     * account the operator.
+     * On an offline-mode server, the spelling of the account the server's own {@code /op} would pick for {@code name}
+     * when it is not the one typed. The server looks the name up in any case, among the online players first and then
+     * in its profile cache, so it would make that other account the operator, online or not, and with the list off
+     * for good.
      */
-    private Optional<String> onlineInAnotherCase(String name) {
+    private Optional<String> anotherCase(String name) {
         if (name.startsWith("@") || names.get() != NameCase.SENSITIVE) {
             return Optional.empty();
         }
         Player online = server.getPlayerExact(name);
-        return online == null || online.getName().equals(name) ? Optional.empty() : Optional.of(online.getName());
+        if (online != null) {
+            return online.getName().equals(name) ? Optional.empty() : Optional.of(online.getName());
+        }
+        OfflinePlayer cached = server.getOfflinePlayerIfCached(name);
+        String spelled = cached == null ? null : cached.getName();
+        return spelled == null || spelled.equals(name) ? Optional.empty() : Optional.of(spelled);
     }
 
     private boolean permitted(OperatorList current, String name) {
@@ -178,21 +185,38 @@ public final class OperatorLock {
         return current.permits(id, name, nameCase);
     }
 
-    /** The player an {@code /op} or {@code /namespace:op} command names, or empty for any other command. */
+    /**
+     * The player an {@code /op} or {@code /namespace:op} command names, also when it is what an {@code /execute ... run}
+     * runs, through any number of nested {@code execute}s; empty for any other command.
+     */
     static Optional<String> opTarget(String command) {
         String body = command.strip();
         if (body.startsWith("/")) {
             body = body.substring(1);
         }
-        String[] words = body.split("\\s+", 3);
-        if (words.length < 2) {
-            return Optional.empty();
+        String[] words = body.split("\\s+", -1);
+        int at = 0;
+        while (at < words.length) {
+            String root = unqualified(words[at]);
+            if (root.equals("op")) {
+                return at + 1 < words.length ? Optional.of(words[at + 1]) : Optional.empty();
+            }
+            if (!root.equals("execute")) {
+                return Optional.empty();
+            }
+            int run = at + 1;
+            while (run < words.length && !words[run].equalsIgnoreCase("run")) {
+                run++;
+            }
+            at = run + 1;
         }
-        String root = words[0].toLowerCase(Locale.ROOT);
-        int colon = root.indexOf(':');
-        if (!(colon < 0 ? root : root.substring(colon + 1)).equals("op")) {
-            return Optional.empty();
-        }
-        return Optional.of(words[1]);
+        return Optional.empty();
+    }
+
+    /** {@code word} lower-cased without a {@code namespace:} in front. */
+    private static String unqualified(String word) {
+        String lower = word.toLowerCase(Locale.ROOT);
+        int colon = lower.indexOf(':');
+        return colon < 0 ? lower : lower.substring(colon + 1);
     }
 }

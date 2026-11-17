@@ -28,12 +28,13 @@ class OperatorLockTest {
 
     private final List<String> told = new ArrayList<>();
     private NameCase nameCase = NameCase.SENSITIVE;
-    private ServerMock server;
+    private ProfileCachingServer server;
+    private org.mockbukkit.mockbukkit.entity.PlayerMock admin;
 
     @BeforeEach
     void mock() {
-        server = MockBukkit.mock();
-        server.addPlayer("aDMIN");
+        server = MockBukkit.mock(new ProfileCachingServer());
+        admin = server.addPlayer("aDMIN");
     }
 
     @AfterEach
@@ -59,6 +60,39 @@ class OperatorLockTest {
     }
 
     @Test
+    void offlineModeAnOpOfANameOnlyACachedOfflineAccountHasInAnotherCaseIsRefused() {
+        admin.disconnect();
+        server.profiles.add(admin);
+        OperatorLock lock = lock(OperatorList.of(false, List.of()));
+
+        assertThat(lock.refuses(server.getConsoleSender(), "/op Admin")).isTrue();
+        assertThat(told).containsExactly(SecurityMessageKey.SECURITY_OPERATORS_OTHER_SPELLING.key() + " Admin aDMIN");
+    }
+
+    @Test
+    void offlineModeAnOpRunThroughExecuteIsReadTheSameWay() {
+        OperatorLock lock = lock(OperatorList.of(false, List.of()));
+
+        assertThat(lock.refuses(server.getConsoleSender(), "execute as @s at @s run op Admin"))
+                .isTrue();
+        assertThat(lock.refuses(server.getConsoleSender(), "/minecraft:execute run execute run minecraft:op Admin"))
+                .isTrue();
+        assertThat(lock.refuses(server.getConsoleSender(), "/execute as @s run say op Admin"))
+                .isFalse();
+    }
+
+    @Test
+    void anOpIsFoundWhereverTheCommandRunsIt() {
+        assertThat(OperatorLock.opTarget("/op Admin")).contains("Admin");
+        assertThat(OperatorLock.opTarget("minecraft:op Admin")).contains("Admin");
+        assertThat(OperatorLock.opTarget("execute as @a run op Admin")).contains("Admin");
+        assertThat(OperatorLock.opTarget("execute run execute positioned 0 0 0 run minecraft:op Admin"))
+                .contains("Admin");
+        assertThat(OperatorLock.opTarget("execute as @a run")).isEmpty();
+        assertThat(OperatorLock.opTarget("/deop Admin")).isEmpty();
+    }
+
+    @Test
     void withAuthenticatedLoginsAnyCaseNamesTheOneAccount() {
         nameCase = NameCase.INSENSITIVE;
 
@@ -72,7 +106,7 @@ class OperatorLockTest {
                 server,
                 new AtOnce(),
                 (viewer, key, placeholders) ->
-                        key.key() + " " + placeholders.get("player") + " " + placeholders.getOrDefault("online", "-"),
+                        key.key() + " " + placeholders.get("player") + " " + placeholders.getOrDefault("match", "-"),
                 (viewer, text) -> told.add(text),
                 new Quiet(),
                 () -> nameCase,
@@ -120,5 +154,26 @@ class OperatorLockTest {
 
         @Override
         public void debug(String message, Object... args) {}
+    }
+
+    /**
+     * MockBukkit with the server's profile cache as Paper keeps it: one profile per lower-cased name, looked up in any
+     * case.
+     */
+    // ServerMock's raw getBanList override is inherited, not written here, and javac reports it on every subclass.
+    @SuppressWarnings("unchecked")
+    private static final class ProfileCachingServer extends ServerMock {
+
+        final List<org.bukkit.OfflinePlayer> profiles = new ArrayList<>();
+
+        @Override
+        public org.bukkit.@org.jspecify.annotations.Nullable OfflinePlayer getOfflinePlayerIfCached(String name) {
+            for (org.bukkit.OfflinePlayer profile : profiles) {
+                if (name.equalsIgnoreCase(profile.getName())) {
+                    return profile;
+                }
+            }
+            return super.getOfflinePlayerIfCached(name);
+        }
     }
 }
