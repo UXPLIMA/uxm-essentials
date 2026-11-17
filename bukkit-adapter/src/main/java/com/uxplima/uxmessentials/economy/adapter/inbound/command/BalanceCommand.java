@@ -14,6 +14,7 @@ import com.mojang.brigadier.context.CommandContext;
 import com.mojang.brigadier.tree.LiteralCommandNode;
 import com.uxplima.uxmessentials.economy.adapter.EconomyServices;
 import com.uxplima.uxmessentials.economy.domain.Currency;
+import com.uxplima.uxmessentials.economy.domain.EconomyMessageKey;
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandRegistration;
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandSuggestions;
 import com.uxplima.uxmessentials.shared.application.permission.EconomyPermissions;
@@ -99,7 +100,7 @@ public final class BalanceCommand extends EconomyCommandSupport implements Comma
     }
 
     private void resolveAndShow(PlayerRef viewer, String targetName, Currency currency) {
-        NameMatch match = services.players().matchByName(targetName);
+        NameMatch match = lookUp(viewer, targetName, EconomyMessageKey.PAY_TARGET_LOOKUP_FAILED);
         Optional<PlayerRef> target = match.player();
         if (target.isEmpty()) {
             rejectUnknownTarget(viewer, targetName, match);

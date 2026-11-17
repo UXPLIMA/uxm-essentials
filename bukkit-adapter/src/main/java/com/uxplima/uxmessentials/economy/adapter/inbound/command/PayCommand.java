@@ -12,6 +12,7 @@ import com.mojang.brigadier.context.CommandContext;
 import com.mojang.brigadier.tree.LiteralCommandNode;
 import com.uxplima.uxmessentials.economy.adapter.EconomyServices;
 import com.uxplima.uxmessentials.economy.domain.Currency;
+import com.uxplima.uxmessentials.economy.domain.EconomyMessageKey;
 import com.uxplima.uxmessentials.economy.domain.Money;
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandRegistration;
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandSuggestions;
@@ -85,7 +86,7 @@ public final class PayCommand extends EconomyCommandSupport implements CommandRe
     }
 
     private void resolveAndPay(Player sender, PlayerRef from, String targetName, Money amount) {
-        NameMatch match = services.players().matchByName(targetName);
+        NameMatch match = lookUp(from, targetName, EconomyMessageKey.PAY_TARGET_LOOKUP_FAILED);
         Optional<PlayerRef> target = match.player();
         if (target.isEmpty()) {
             rejectUnknownTarget(from, targetName, match);

@@ -342,17 +342,9 @@ public final class EcoCommand extends EconomyCommandSupport implements CommandRe
         return match.player();
     }
 
-    /**
-     * Who {@code name} means, read off the tick. A lookup that fails is reported to {@code actor}, who would otherwise
-     * hear nothing at all, and then rethrown so the async lane logs its cause.
-     */
+    /** Who {@code name} means, read off the tick; a lookup that fails tells {@code actor} and is rethrown. */
     private NameMatch lookUp(PlayerRef actor, String name) {
-        try {
-            return services.players().matchByName(name);
-        } catch (RuntimeException unreadable) {
-            services.notifier().send(actor, EconomyMessageKey.ECO_ADMIN_LOOKUP_FAILED, Map.of("player", name));
-            throw unreadable;
-        }
+        return lookUp(actor, name, EconomyMessageKey.ECO_ADMIN_LOOKUP_FAILED);
     }
 
     private int runExport(CommandContext<CommandSourceStack> ctx) {
