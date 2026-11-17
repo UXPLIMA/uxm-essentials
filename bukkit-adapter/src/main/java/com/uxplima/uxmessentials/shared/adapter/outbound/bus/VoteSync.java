@@ -13,10 +13,12 @@ import java.util.function.Consumer;
 import com.uxplima.uxmessentials.persistence.vote.CachedVoteRepository;
 import com.uxplima.uxmessentials.shared.application.RecentIds;
 import com.uxplima.uxmessentials.shared.application.port.Logger;
+import com.uxplima.uxmessentials.shared.application.port.NetworkPresence;
 import com.uxplima.uxmessentials.shared.application.port.PlayerLookup;
 import com.uxplima.uxmessentials.shared.application.port.Scheduler;
 import com.uxplima.uxmessentials.shared.display.BroadcastChannel;
 import com.uxplima.uxmessentials.shared.domain.DomainEvent;
+import com.uxplima.uxmessentials.shared.domain.OnlinePlayer;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmessentials.shared.network.VoteCounterChanged;
 import com.uxplima.uxmessentials.shared.network.VotePartyFired;
@@ -69,9 +71,9 @@ public final class VoteSync {
     static final int MAX_VOTERS_ON_WIRE = 1000;
 
     /**
-     * How long before this listener started a both-carrier party may have fired and still be run. Its Redis copy can
-     * have been published while this server was still subscribing, and the sender's clock can run ahead of this
-     * one's, so only a party clearly older than the start is taken for a late proxy copy.
+     * How long before this listener started a both-carrier party or vote may have been sent and still be run. Its
+     * Redis copy can have been published while this server was still subscribing, and the sender's clock can run ahead
+     * of this one's, so only a frame clearly older than the start is taken for a late proxy copy.
      */
     static final Duration LATE_COPY_GRACE = Duration.ofSeconds(60);
 
@@ -80,15 +82,18 @@ public final class VoteSync {
     /**
      * A {@link RemoteVoter} that announces a vote credited to a player on another server as a {@link VoteRewardsQueued}
      * frame, so that server pays the queued rewards now. Each announcement carries a fresh vote id, which is what lets a
-     * receiver drop the second copy of one frame. A lost announcement only means the rewards wait for the player's next
-     * join.
+     * receiver drop the second copy of one frame, and the time from {@code clock} with whether {@code bothCarriers} are
+     * in use, which is what lets a receiver that restarted tell a late copy from a new vote. A lost announcement only
+     * means the rewards wait for the player's next join.
      */
-    public static RemoteVoter remoteVoter(BusPublisher bus, Logger log) {
+    public static RemoteVoter remoteVoter(BusPublisher bus, Logger log, Clock clock, boolean bothCarriers) {
         Objects.requireNonNull(bus, "bus");
         Objects.requireNonNull(log, "log");
+        Objects.requireNonNull(clock, "clock");
         return (voter, serviceName) -> {
             try {
-                bus.publish(new VoteRewardsQueued(bus.serverId(), UUID.randomUUID(), voter.uuid(), serviceName));
+                bus.publish(new VoteRewardsQueued(
+                        bus.serverId(), UUID.randomUUID(), voter.uuid(), serviceName, clock.instant(), bothCarriers));
             } catch (RuntimeException failure) {
                 log.error("failed to announce the queued vote rewards of player " + voter.uuid(), failure);
             }
@@ -99,19 +104,33 @@ public final class VoteSync {
      * A listener that, on a remote {@link VoteRewardsQueued} for a player online here, hands the player and the vote site
      * to {@code pay} ({@link PayRemoteVote#pay}) off the tick. The sender announces a vote only once its rewards are
      * stored, so one drain finds them all. A vote id already paid here is dropped, since with
-     * {@code network.transport = both} each frame arrives twice and the vote must be published once. Whether the player
-     * is here is asked again on the async lane: one who left meanwhile keeps the queue for their next join, rather than
-     * having commands run for a player who is not here.
+     * {@code network.transport = both} each frame arrives twice and the vote must be published once. A both-carrier
+     * frame sent more than {@link #LATE_COPY_GRACE} before {@code listeningSince} is the late proxy copy of a vote this
+     * server already heard of before it restarted, so it is dropped too; a backend on one carrier passes
+     * {@link Instant#MIN} and drops none.
+     *
+     * <p>While a player moves between servers both can have them connected for a moment; only the server the network
+     * places them on takes the vote, so the vote is announced once. Whether the player is here is asked again on the
+     * async lane: one who left meanwhile keeps the queue for their next join, rather than having commands run for a
+     * player who is not here.
      */
     public static RemoteSyncListener queuedListener(
-            BiConsumer<PlayerRef, String> pay, PlayerLookup players, Scheduler scheduler) {
+            BiConsumer<PlayerRef, String> pay,
+            PlayerLookup players,
+            NetworkPresence presence,
+            Scheduler scheduler,
+            Instant listeningSince) {
         Objects.requireNonNull(pay, "pay");
         Objects.requireNonNull(players, "players");
+        Objects.requireNonNull(presence, "presence");
         Objects.requireNonNull(scheduler, "scheduler");
+        Objects.requireNonNull(listeningSince, "listeningSince");
+        Instant lateBefore = listeningSince.equals(Instant.MIN) ? Instant.MIN : listeningSince.minus(LATE_COPY_GRACE);
         RecentIds paid = new RecentIds();
         return message -> {
             if (message instanceof VoteRewardsQueued queued
-                    && players.isOnline(queued.player())
+                    && !queued.sentBefore(lateBefore)
+                    && isHere(queued.player(), players, presence)
                     && paid.firstTime(queued.voteId())) {
                 players.findByUuid(queued.player())
                         .ifPresent(voter -> scheduler.async(() -> {
@@ -121,6 +140,18 @@ public final class VoteSync {
                         }));
             }
         };
+    }
+
+    /**
+     * Whether {@code player} is connected here and the network places them here: a player moving in still shows on the
+     * server they left until it hears of the move, and only one of the two is the one the network names.
+     */
+    private static boolean isHere(UUID player, PlayerLookup players, NetworkPresence presence) {
+        if (!players.isOnline(player)) {
+            return false;
+        }
+        String here = presence.localServer();
+        return presence.find(player).map(OnlinePlayer::server).map(here::equals).orElse(true);
     }
 
     /** A {@link VoteRepository} that broadcasts a {@link VoteCounterChanged} after every counter mutation. */

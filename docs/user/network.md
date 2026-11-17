@@ -145,10 +145,10 @@ changes, trade signals and vote parties), and a second cache reload is harmless.
 
 This holds only once every backend runs the same version. During a rolling upgrade, a backend on an older version,
 or a vote party sent by one, can still pay a vote party twice. A backend remembers the ids it acted on in memory
-only, so a copy that arrives very late, after that backend restarted, can act again. Vote parties are the exception:
-a party sent over both carriers carries the time it fired, and a backend that is itself on both carriers drops one
-that fired more than 60 seconds before it started, so the late proxy copy of a party it already paid does not pay
-again. The 60 seconds cover a Redis copy sent while the backend was still starting and a sender whose clock runs a
+only, so a copy that arrives very late, after that backend restarted, can act again. Votes and vote parties are the
+exception: one sent over both carriers carries the time it was sent, and a backend that is itself on both carriers
+drops one sent more than 60 seconds before it started, so the late proxy copy of a party or a vote it already acted
+on is not paid or announced again. The 60 seconds cover a Redis copy sent while the backend was still starting and a sender whose clock runs a
 little ahead; a backend that restarts within 60 seconds of a party can still pay its late proxy copy again. A party
 sent on the proxy alone, or received by a backend on the proxy alone, is never dropped this way.
 
