@@ -106,6 +106,7 @@ import com.uxplima.uxmessentials.shared.application.port.Logger;
 import com.uxplima.uxmessentials.shared.application.port.Scheduler;
 import com.uxplima.uxmessentials.shared.domain.DomainEvent;
 import com.uxplima.uxmessentials.shared.domain.LocalServer;
+import com.uxplima.uxmlib.bedrock.BedrockDetector;
 import com.uxplima.uxmlib.gui.input.TextInput;
 import com.uxplima.uxmlib.hologram.HologramManager;
 import com.uxplima.uxmlib.item.SerializedItems;
@@ -159,7 +160,8 @@ public final class HologramsWiring {
             GuiLayouts guiLayouts,
             TextInput textInput,
             Menus menus,
-            MenuBindings menuBindings) {
+            MenuBindings menuBindings,
+            BedrockDetector bedrock) {
         Objects.requireNonNull(plugin, "plugin");
         Objects.requireNonNull(ctx, "ctx");
         Objects.requireNonNull(persistence, "persistence");
@@ -229,7 +231,8 @@ public final class HologramsWiring {
                 kernel.messages(),
                 HologramsMessageKey.HOLOGRAM_ACTION_COST_DENIED,
                 SerializedItems::decode,
-                kernel.log());
+                kernel.log(),
+                bedrock);
         // A click on a hologram's box reaches the server as a click on an entity it does not know. The router answers
         // it for the hologram whose box it is, on the clicking player's own thread.
         PaperScheduler frames = new PaperScheduler(plugin);

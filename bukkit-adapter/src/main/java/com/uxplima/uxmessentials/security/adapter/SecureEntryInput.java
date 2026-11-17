@@ -114,7 +114,8 @@ public final class SecureEntryInput {
         Objects.requireNonNull(onSubmit, "onSubmit");
         Objects.requireNonNull(onCancel, "onCancel");
         if (showsForm(player) || settings.modeFor(key) != InputMode.CHAT) {
-            textInput.prompt(player, InputRequest.of(key, label), onSubmit, onCancel);
+            // A PIN or a code is a secret, so the seam never asks for it in chat or on a sign whatever the mode.
+            textInput.prompt(player, InputRequest.of(key, label).asSecret(), onSubmit, onCancel);
             return;
         }
         if (chatRefusalLogged.compareAndSet(false, true)) {

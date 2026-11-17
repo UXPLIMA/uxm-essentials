@@ -11,10 +11,11 @@ import com.uxplima.uxmessentials.kits.application.port.KitActionRunner;
 import com.uxplima.uxmessentials.kits.domain.KitAction;
 import com.uxplima.uxmessentials.kits.domain.KitActionType;
 import com.uxplima.uxmessentials.kits.domain.KitDefinition;
-import com.uxplima.uxmessentials.shared.adapter.outbound.action.ResolvedNameFill;
 import com.uxplima.uxmessentials.shared.application.port.Logger;
 import com.uxplima.uxmessentials.shared.application.port.Scheduler;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
+import com.uxplima.uxmlib.bedrock.BedrockDetector;
+import com.uxplima.uxmlib.condition.action.NameFill;
 import org.jspecify.annotations.NullMarked;
 
 /**
@@ -44,10 +45,12 @@ public final class BukkitKitActionRunner implements KitActionRunner {
     private final Scheduler scheduler;
     private final KitActionEffects effects;
     private final Logger log;
+    private final BedrockDetector bedrock;
 
-    public BukkitKitActionRunner(Scheduler scheduler, Logger log) {
+    public BukkitKitActionRunner(Scheduler scheduler, Logger log, BedrockDetector bedrock) {
         this.scheduler = Objects.requireNonNull(scheduler, "scheduler");
         this.log = Objects.requireNonNull(log, "log");
+        this.bedrock = Objects.requireNonNull(bedrock, "bedrock");
         this.effects = new KitActionEffects(log);
     }
 
@@ -143,8 +146,8 @@ public final class BukkitKitActionRunner implements KitActionRunner {
      * {@code <player>} and {@code %player_name%}, and the kit id for {@code %kit%} and {@code {kit}}. Empty when the
      * line names the player and the name is not one an account could have, which is a line that must not run.
      */
-    private static Optional<String> filled(String raw, PlayerRef who, KitDefinition kit) {
-        return ResolvedNameFill.into(raw, who.name())
+    private Optional<String> filled(String raw, PlayerRef who, KitDefinition kit) {
+        return NameFill.intoConnected(raw, who.name(), bedrock.namePrefix())
                 .map(line -> line.replace("%kit%", kit.id().value())
                         .replace("{kit}", kit.id().value()));
     }

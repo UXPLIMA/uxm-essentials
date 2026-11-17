@@ -54,6 +54,7 @@ import com.uxplima.uxmessentials.vanish.application.port.VanishPickupPreferences
 import com.uxplima.uxmessentials.vanish.application.port.VanishStore;
 import com.uxplima.uxmessentials.vanish.application.port.VanishView;
 import com.uxplima.uxmessentials.vanish.domain.VanishLevel;
+import com.uxplima.uxmlib.bedrock.BedrockDetector;
 import org.jspecify.annotations.NullMarked;
 import org.jspecify.annotations.Nullable;
 
@@ -100,7 +101,8 @@ public final class VanishWiring {
             Persistence persistence,
             Bus bus,
             NetworkPresence presence,
-            Consumer<UUID> vanishChanged) {
+            Consumer<UUID> vanishChanged,
+            BedrockDetector bedrock) {
         Objects.requireNonNull(plugin, "plugin");
         Objects.requireNonNull(ctx, "ctx");
         Objects.requireNonNull(persistence, "persistence");
@@ -157,7 +159,7 @@ public final class VanishWiring {
                 new VanishLoginListener(remember, kernel.scheduler(), kernel.log(), config.loadTimeout());
         Function<UUID, Optional<String>> networkName = network::nameOf;
         VanishConnectionMessenger messenger =
-                new VanishConnectionMessenger(kernel.scheduler(), kernel.messages(), levels, config);
+                new VanishConnectionMessenger(kernel.scheduler(), kernel.messages(), levels, config, bedrock);
         VanishActionBar actionBar =
                 new VanishActionBar(plugin.getServer(), kernel.scheduler(), kernel.messages(), store, config);
 

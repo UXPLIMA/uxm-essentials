@@ -53,6 +53,7 @@ import com.uxplima.uxmessentials.shared.application.module.KernelPorts;
 import com.uxplima.uxmessentials.shared.application.module.ModuleContext;
 import com.uxplima.uxmessentials.shared.application.permission.EconomyPermissions;
 import com.uxplima.uxmessentials.shared.application.port.Logger;
+import com.uxplima.uxmlib.bedrock.BedrockDetector;
 import com.uxplima.uxmlib.item.SerializedItems;
 import com.uxplima.uxmlib.menu.Menus;
 import com.uxplima.uxmlib.menu.binding.MenuBindings;
@@ -91,7 +92,8 @@ public final class RanksWiring {
             Bus bus,
             ManagementGuiRegistry guiRegistry,
             Menus menus,
-            MenuBindings menuBindings) {
+            MenuBindings menuBindings,
+            BedrockDetector bedrock) {
         Objects.requireNonNull(plugin, "plugin");
         Objects.requireNonNull(ctx, "ctx");
         Objects.requireNonNull(persistence, "persistence");
@@ -118,7 +120,7 @@ public final class RanksWiring {
         // Kept actions are announced on the bus, so the backend the player is on runs them now; the take deletes each
         // row first, so that backend and a later join can never both run one line.
         RankActions actions = new RankActions(
-                actionRunner(plugin, kernel),
+                actionRunner(plugin, kernel, bedrock),
                 RankSync.pendingActions(
                         PlayerRankRepositories.pendingActions(persistence), bus.publisher(), kernel.log()),
                 kernel.scheduler(),
@@ -239,7 +241,7 @@ public final class RanksWiring {
     }
 
     /** The rank action runner over the same shared click-action engine the npc and hologram contexts use. */
-    private static RankActionRunner actionRunner(Plugin plugin, KernelPorts kernel) {
+    private static RankActionRunner actionRunner(Plugin plugin, KernelPorts kernel, BedrockDetector bedrock) {
         ClickCommandRunner commandRunner = new FilteredClickCommandRunner(
                 new BukkitClickCommandRunner(), BlockedCommands.of(List.of()), kernel.log());
         ClickActionRunner clickRunner = new BukkitClickActionRunner(
@@ -251,7 +253,8 @@ public final class RanksWiring {
                 kernel.messages(),
                 RanksMessageKey.RANKS_RANKUP_COST,
                 SerializedItems::decode,
-                kernel.log());
+                kernel.log(),
+                bedrock);
         return new BukkitRankActionRunner(plugin.getServer(), clickRunner, kernel.log());
     }
 
