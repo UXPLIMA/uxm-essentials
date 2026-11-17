@@ -227,7 +227,7 @@ public final class VoteWiring {
                 broadcastThrottle,
                 broadcastVisibility,
                 party,
-                VoteSync.remoteVoter(bus.publisher(), kernel.log()),
+                VoteSync.remoteVoter(bus.publisher(), kernel.log(), Clock.systemUTC(), bothCarriers),
                 streakGraceDays,
                 voteLinks,
                 siteCatalog,
@@ -288,7 +288,14 @@ public final class VoteWiring {
             // A vote for a player on another server queues the rewards and tells this server, which pays them out now.
             // With auto-claim off the queue waits for /vote claim, so a frame must not pay it out either.
             PayRemoteVote payRemote = new PayRemoteVote(services.applyQueuedRewards(), kernel.events());
-            bus.registry().register(VoteSync.queuedListener(payRemote::pay, kernel.playerLookup(), kernel.scheduler()));
+            bus.registry()
+                    .register(VoteSync.queuedListener(
+                            payRemote::pay,
+                            kernel.playerLookup(),
+                            presence,
+                            kernel.scheduler(),
+                            // As for a party: only a backend on both carriers can get a late copy of a vote it heard.
+                            bothCarriers ? Clock.systemUTC().instant() : Instant.MIN));
         }
         boolean loginNag = ctx.config().getBoolean("reminders.login", true);
         int loginDelaySecs = Math.max(0, ctx.config().getInt("reminders.login-delay-seconds", 5));
