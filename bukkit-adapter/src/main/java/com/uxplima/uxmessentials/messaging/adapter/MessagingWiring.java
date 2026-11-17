@@ -173,6 +173,8 @@ public final class MessagingWiring {
             Clock clock) {
         Notifier notifier = new Notifier(kernel.messages(), kernel.messageSink());
         MessageDelivery delivery = new BukkitMessageDelivery(kernel.messages(), kernel.messageSink());
+        SendMail sendMail =
+                new SendMail(stores.mail(), stores.ignores(), delivery, mute, notifier, kernel.events(), clock);
         SendMessage sendMessage = new SendMessage(
                 delivery,
                 stores.ignores(),
@@ -181,7 +183,7 @@ public final class MessagingWiring {
                 stores.socialSpy(),
                 mute,
                 afk,
-                stores.mail(),
+                sendMail,
                 settings.offlineToMail(),
                 notifier,
                 kernel.events(),
@@ -208,7 +210,7 @@ public final class MessagingWiring {
                         settings.replyTtl(),
                         clock,
                         relay),
-                new SendMail(stores.mail(), stores.ignores(), delivery, mute, notifier, kernel.events(), clock),
+                sendMail,
                 new SendMailToAll(stores.mail(), clock),
                 new ReadMail(stores.mail(), delivery, notifier),
                 new ClearMail(stores.mail(), notifier),
