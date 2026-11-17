@@ -83,8 +83,21 @@ class EssentialsXImportTest {
     }
 
     @Test
-    void aPlayerWithNoLastAccountNameIsNamedByTheirNickname() {
-        assertThat(user(BRAMBLEWICK).owner()).isEqualTo(new PlayerRef(BRAMBLEWICK, "Bramblewick"));
+    void aPlayerWithNoLastAccountNameIsNamedFromTheUsermapNeverByTheirNickname() {
+        assertThat(user(BRAMBLEWICK).owner()).isEqualTo(new PlayerRef(BRAMBLEWICK, "bramble_wick"));
+    }
+
+    @Test
+    void everyAccountIsRecordedUnderTheNameItLogsInWithTheUserdataNameFirstAndANicknameNever() {
+        assertThat(only(records, ImportRecord.AccountRecord.class))
+                .extracting(
+                        account -> account.account().uuid(),
+                        account -> account.account().name())
+                .containsExactlyInAnyOrder(
+                        tuple(STEVE, "Steve"),
+                        tuple(ALEX, "Alex"),
+                        tuple(BRAMBLEWICK, "bramble_wick"),
+                        tuple(UUID.fromString("9a8b7c6d-5e4f-4a3b-8c2d-1e0f9a8b7c6d"), "gone_player"));
     }
 
     @Test

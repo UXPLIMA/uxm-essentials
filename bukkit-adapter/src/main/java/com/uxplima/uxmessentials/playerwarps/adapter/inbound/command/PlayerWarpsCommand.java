@@ -1,7 +1,5 @@
 package com.uxplima.uxmessentials.playerwarps.adapter.inbound.command;
 
-import java.util.Optional;
-
 import org.bukkit.entity.Player;
 
 import io.papermc.paper.command.brigadier.CommandSourceStack;
@@ -13,12 +11,11 @@ import com.mojang.brigadier.tree.LiteralCommandNode;
 import com.uxplima.uxmessentials.playerwarps.adapter.PlayerWarpServices;
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandRegistration;
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandSuggestions;
+import com.uxplima.uxmessentials.shared.adapter.inbound.command.OffTickNames;
 import com.uxplima.uxmessentials.shared.application.permission.DestinationPermissions;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
-import com.uxplima.uxmessentials.shared.domain.NameMatch;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmlib.command.Gate;
-import com.uxplima.uxmlib.command.Sender;
 import org.jspecify.annotations.NullMarked;
 
 /**
@@ -33,8 +30,11 @@ public final class PlayerWarpsCommand extends PlayerWarpCommandSupport implement
 
     private static final String PERMISSION = DestinationPermissions.PWARP_LIST;
 
+    private final OffTickNames names;
+
     public PlayerWarpsCommand(PlayerWarpServices services, Messages messages) {
         super(services, messages);
+        this.names = new OffTickNames(services.players(), services.scheduler(), feedback);
     }
 
     @Override
@@ -69,15 +69,12 @@ public final class PlayerWarpsCommand extends PlayerWarpCommandSupport implement
             return 0;
         }
         String ownerName = ctx.getArgument("player", String.class);
-        NameMatch match = services.players().matchByName(ownerName);
-        Optional<PlayerRef> owner = match.player();
-        if (owner.isEmpty()) {
-            unknownPlayer(Sender.audience(ctx.getSource()), ownerName, match);
-            return 0;
-        }
         PlayerRef viewer = ref(sender);
-        PlayerRef resolved = owner.get();
-        services.scheduler().async(() -> services.listPlayerWarps().publicOf(viewer, resolved, resolved.name()));
+        names.resolve(
+                sender,
+                ownerName,
+                match -> unknownPlayer(sender, ownerName, match),
+                resolved -> services.listPlayerWarps().publicOf(viewer, resolved, resolved.name()));
         return Command.SINGLE_SUCCESS;
     }
 }

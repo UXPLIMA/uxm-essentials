@@ -34,6 +34,7 @@ final class BoardPlaceholders {
 
     private static final String BALANCE = "balance";
     private static final Pattern ACCOUNT_NAME = Pattern.compile("[A-Za-z0-9_]{3,16}");
+    private static final int MOJANG_UUID_VERSION = 4;
 
     /** One line of the reader's own catalogue, as plain text. */
     @FunctionalInterface
@@ -137,8 +138,17 @@ final class BoardPlaceholders {
         }
     }
 
-    /** The name when an account can have it, so the account's own skin is drawn; the id otherwise. */
+    /**
+     * What a {@code <head:...>} tag draws the holder with. The tag takes a name, a uuid or a texture path, never a
+     * skin of our own, and the client asks Mojang about the first two. So a Mojang account (a version 4 uuid) is
+     * drawn by its name, or its uuid when an account cannot have that name. Any other account, an offline-mode one
+     * (version 3) or a Bedrock one through Floodgate (version 0), would be drawn as whoever owns its name at Mojang,
+     * so it gets the plain head instead.
+     */
     private static String headOf(PlayerRef player) {
+        if (player.uuid().version() != MOJANG_UUID_VERSION) {
+            return EMPTY_HEAD;
+        }
         return ACCOUNT_NAME.matcher(player.name()).matches()
                 ? player.name()
                 : player.uuid().toString();

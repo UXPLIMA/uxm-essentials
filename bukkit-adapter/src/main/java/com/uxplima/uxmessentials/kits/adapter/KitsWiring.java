@@ -53,6 +53,7 @@ import com.uxplima.uxmessentials.kits.application.port.KitGranter;
 import com.uxplima.uxmessentials.kits.application.port.KitRepository;
 import com.uxplima.uxmessentials.kits.application.port.KitStockStore;
 import com.uxplima.uxmessentials.kits.application.port.KitUnlockStore;
+import com.uxplima.uxmessentials.kits.application.port.PendingKitResets;
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandRegistration;
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.ListDisplayMode;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.GuiLayout;
@@ -103,6 +104,7 @@ public final class KitsWiring {
             Optional<KitEconomy> economy,
             Optional<NetworkClaims> networkClaims,
             PlayerClaimLedger ledger,
+            PendingKitResets pendingResets,
             GuiLayouts guiLayouts,
             TextInput textInput,
             Menus menus,
@@ -112,6 +114,7 @@ public final class KitsWiring {
         Objects.requireNonNull(economy, "economy");
         Objects.requireNonNull(networkClaims, "networkClaims");
         Objects.requireNonNull(ledger, "ledger");
+        Objects.requireNonNull(pendingResets, "pendingResets");
         Objects.requireNonNull(guiLayouts, "guiLayouts");
         Objects.requireNonNull(textInput, "textInput");
         Objects.requireNonNull(menus, "menus");
@@ -125,7 +128,13 @@ public final class KitsWiring {
         KitCategoryRepository categoryRepository = ConfigurateKitCategoryRepository.load(categoriesDir, kernel.log());
         Optional<LocalKitClaims> localClaims = networkClaims.isPresent()
                 ? Optional.empty()
-                : Optional.of(new LocalKitClaims(new PdcKitClaims(plugin), ledger, kernel.scheduler(), kernel.log()));
+                : Optional.of(new LocalKitClaims(
+                        new PdcKitClaims(plugin),
+                        ledger,
+                        pendingResets,
+                        kernel.playerLookup(),
+                        kernel.scheduler(),
+                        kernel.log()));
         KitClaimStore claims =
                 networkClaims.<KitClaimStore>map(NetworkKitClaims::new).orElseGet(localClaims::orElseThrow);
         KitUnlockStore unlocks = new PdcKitUnlocks(plugin);

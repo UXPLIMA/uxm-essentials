@@ -13,6 +13,7 @@ import com.uxplima.uxmessentials.messaging.domain.MessageBody;
 import com.uxplima.uxmessentials.messaging.domain.MessagingError;
 import com.uxplima.uxmessentials.shared.application.message.Notifier;
 import com.uxplima.uxmessentials.shared.application.port.PlayerLookup;
+import com.uxplima.uxmessentials.shared.application.port.Scheduler;
 import com.uxplima.uxmessentials.shared.domain.OnlinePlayer;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmessentials.shared.domain.Result;
@@ -27,7 +28,10 @@ import com.uxplima.uxmessentials.shared.domain.Unit;
  * never leaks that a vanished partner is still on the server.
  *
  * <p>A partner on another backend of the network is answered there through {@link RelayPrivateMessage}, so a
- * conversation started across servers can be replied to from either side.
+ * conversation started across servers can be replied to from either side. A fresh partner who cannot take the reply
+ * live (offline everywhere, hidden from the sender, or with reply routing off) gets it as mail when offline-to-mail is
+ * on, exactly like a {@code /msg} to an offline player; with it off the reply finds no one. The three cases read
+ * the same, so a reply never tells the sender which one it was.
  *
  * <p>Once the target is resolved and fresh, delivery and every downstream gate (mute, ignore, toggle,
  * socialspy, the both-sides reply capture, the event) are the {@link SendMessage} engine's job: this use
@@ -44,6 +48,7 @@ public final class Reply {
     private final Duration replyTtl;
     private final Clock clock;
     private final RelayPrivateMessage relay;
+    private final Scheduler scheduler;
 
     public Reply(
             SendMessage sendMessage,
@@ -54,7 +59,8 @@ public final class Reply {
             Notifier notifier,
             Duration replyTtl,
             Clock clock,
-            RelayPrivateMessage relay) {
+            RelayPrivateMessage relay,
+            Scheduler scheduler) {
         this.sendMessage = Objects.requireNonNull(sendMessage, "sendMessage");
         this.conversations = Objects.requireNonNull(conversations, "conversations");
         this.players = Objects.requireNonNull(players, "players");
@@ -64,6 +70,7 @@ public final class Reply {
         this.replyTtl = Objects.requireNonNull(replyTtl, "replyTtl");
         this.clock = Objects.requireNonNull(clock, "clock");
         this.relay = Objects.requireNonNull(relay, "relay");
+        this.scheduler = Objects.requireNonNull(scheduler, "scheduler");
     }
 
     /** Reply with {@code body} to {@code sender}'s last fresh conversation. */
@@ -82,21 +89,30 @@ public final class Reply {
             // A partner on another backend gets the reply there; their backend applies the reply-routing switch.
             Optional<OnlinePlayer> elsewhere = relay.elsewhere(partner.uuid());
             if (elsewhere.isEmpty()) {
-                return reject(sender);
+                return unreachable(sender, partner, body);
             }
             relay.reply(sender, elsewhere.get(), body);
             return Result.ok();
         }
         Optional<PlayerRef> online = players.findByUuid(partner.uuid());
         if (online.isEmpty() || vanish.isHiddenFrom(sender, partner)) {
-            return reject(sender);
+            return unreachable(sender, partner, body);
         }
         if (!replyRouting.acceptsReplies(online.get())) {
-            // The partner turned reply routing off via /rtoggle. Decline as if there were no fresh
-            // conversation, so the back-channel reply never leaks that they are on the server.
-            return reject(sender);
+            // The partner turned reply routing off via /rtoggle. Treat them as offline, so the back-channel
+            // reply never leaks that they are on the server.
+            return unreachable(sender, partner, body);
         }
         return sendMessage.deliver(sender, online.get(), body);
+    }
+
+    private Result<Unit, MessagingError> unreachable(PlayerRef sender, PlayerRef partner, MessageBody body) {
+        if (!sendMessage.leavesMail()) {
+            return reject(sender);
+        }
+        // Mail is storage work, so it runs on the async lane.
+        scheduler.async(() -> sendMessage.replyOffline(sender, partner, body));
+        return Result.ok();
     }
 
     private Result<Unit, MessagingError> reject(PlayerRef sender) {

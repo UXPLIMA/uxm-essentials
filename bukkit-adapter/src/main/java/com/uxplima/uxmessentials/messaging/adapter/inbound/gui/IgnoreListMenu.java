@@ -127,8 +127,8 @@ public final class IgnoreListMenu {
 
     /**
      * Resolve {@code name} to a player who has played here, online or not, and ignore them through the use case, then
-     * reopen the list. An unknown name reopens the list unchanged (the same resolution {@code /ignore <player>} applies; the
-     * self-check and idempotency are the use case's). This is the seam the add prompt routes a submitted line to; it
+     * reopen the list. An unknown name is reported and reopens the list unchanged (the same resolution
+     * {@code /ignore <player>} applies; the self-check and idempotency are the use case's). This is the seam the add prompt routes a submitted line to; it
      * is public only so the golden test can drive it without firing a live prompt.
      */
     public void addByName(Player owner, String name) {
@@ -137,7 +137,8 @@ public final class IgnoreListMenu {
         // Offline-capable, as /ignore resolves it: the window took only who was online.
         Optional<PlayerRef> target = players.findByName(name);
         scheduler.async(() -> {
-            target.ifPresent(ref -> ignoreUseCase.ignore(BukkitRefs.toRef(owner), ref));
+            PlayerRef self = BukkitRefs.toRef(owner);
+            target.ifPresentOrElse(ref -> ignoreUseCase.ignore(self, ref), () -> ignoreUseCase.unknown(self, name));
             open(owner);
         });
     }

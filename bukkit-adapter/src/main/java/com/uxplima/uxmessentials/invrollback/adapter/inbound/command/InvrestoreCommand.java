@@ -3,7 +3,6 @@ package com.uxplima.uxmessentials.invrollback.adapter.inbound.command;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
-import java.util.Optional;
 
 import org.bukkit.command.CommandSender;
 import org.bukkit.entity.Player;
@@ -26,13 +25,13 @@ import com.uxplima.uxmessentials.invrollback.domain.Snapshot;
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandFeedback;
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandRegistration;
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandSuggestions;
+import com.uxplima.uxmessentials.shared.adapter.inbound.command.OffTickNames;
 import com.uxplima.uxmessentials.shared.adapter.outbound.BukkitRefs;
 import com.uxplima.uxmessentials.shared.application.permission.EnforcementPermissions;
 import com.uxplima.uxmessentials.shared.application.port.MessageSink;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
 import com.uxplima.uxmessentials.shared.application.port.PlayerLookup;
 import com.uxplima.uxmessentials.shared.application.port.Scheduler;
-import com.uxplima.uxmessentials.shared.domain.NameMatch;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmessentials.shared.domain.message.SharedMessageKey;
 import com.uxplima.uxmlib.command.Args;
@@ -71,11 +70,10 @@ public final class InvrestoreCommand implements CommandRegistration {
     private final SnapshotExporter exporter;
     private final SnapshotTeleporter teleporter;
     private final SnapshotRepository repository;
-    private final PlayerLookup lookup;
-    private final Scheduler scheduler;
     private final Messages messages;
     private final MessageSink messageSink;
     private final CommandFeedback feedback;
+    private final OffTickNames names;
 
     public InvrestoreCommand(
             SnapshotListView listView,
@@ -90,11 +88,11 @@ public final class InvrestoreCommand implements CommandRegistration {
         this.exporter = Objects.requireNonNull(exporter, "exporter");
         this.teleporter = Objects.requireNonNull(teleporter, "teleporter");
         this.repository = Objects.requireNonNull(repository, "repository");
-        this.lookup = Objects.requireNonNull(lookup, "lookup");
-        this.scheduler = Objects.requireNonNull(scheduler, "scheduler");
         this.messages = Objects.requireNonNull(messages, "messages");
         this.messageSink = Objects.requireNonNull(messageSink, "messageSink");
         this.feedback = new CommandFeedback(messages);
+        this.names = new OffTickNames(
+                Objects.requireNonNull(lookup, "lookup"), Objects.requireNonNull(scheduler, "scheduler"), feedback);
     }
 
     @Override
@@ -147,13 +145,13 @@ public final class InvrestoreCommand implements CommandRegistration {
             return 0;
         }
         String name = StringArgumentType.getString(ctx, "player");
-        NameMatch match = lookup.matchByName(name);
-        Optional<PlayerRef> target = match.player();
-        if (target.isEmpty()) {
-            feedback.send(staff, match.miss(SharedMessageKey.COMMAND_UNKNOWN_PLAYER, Map.of("player", name)));
-            return Command.SINGLE_SUCCESS;
-        }
-        listView.open(BukkitRefs.toRef(staff), target.get());
+        PlayerRef staffRef = BukkitRefs.toRef(staff);
+        // The view opens on the staff member's own thread, once the name is settled off it.
+        names.resolve(
+                staff,
+                name,
+                SharedMessageKey.COMMAND_UNKNOWN_PLAYER,
+                target -> names.onSenderThread(staff, () -> listView.open(staffRef, target)));
         return Command.SINGLE_SUCCESS;
     }
 
@@ -179,15 +177,8 @@ public final class InvrestoreCommand implements CommandRegistration {
         }
         String name = StringArgumentType.getString(ctx, "player");
         int index = IntegerArgumentType.getInteger(ctx, "index");
-        NameMatch match = lookup.matchByName(name);
-        Optional<PlayerRef> resolved = match.player();
-        if (resolved.isEmpty()) {
-            feedback.send(staff, match.miss(SharedMessageKey.COMMAND_UNKNOWN_PLAYER, Map.of("player", name)));
-            return Command.SINGLE_SUCCESS;
-        }
         PlayerRef staffRef = BukkitRefs.toRef(staff);
-        PlayerRef targetRef = resolved.get();
-        scheduler.async(() -> {
+        names.resolve(staff, name, SharedMessageKey.COMMAND_UNKNOWN_PLAYER, targetRef -> {
             List<Snapshot> snapshots = repository.list(targetRef.uuid());
             if (index < 1 || index > snapshots.size()) {
                 messageSink.deliver(

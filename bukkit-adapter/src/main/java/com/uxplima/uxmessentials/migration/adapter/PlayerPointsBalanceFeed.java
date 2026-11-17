@@ -2,7 +2,6 @@ package com.uxplima.uxmessentials.migration.adapter;
 
 import java.lang.reflect.Method;
 import java.math.BigDecimal;
-import java.util.Arrays;
 import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
@@ -35,10 +34,12 @@ final class PlayerPointsBalanceFeed implements BalanceFeed {
     private static final String API_CLASS = "org.black_ixx.playerpoints.PlayerPoints";
 
     private final Plugin plugin;
+    private final FeedAccounts accounts;
     private final Logger log;
 
-    PlayerPointsBalanceFeed(Plugin plugin, Logger log) {
+    PlayerPointsBalanceFeed(Plugin plugin, FeedAccounts accounts, Logger log) {
         this.plugin = Objects.requireNonNull(plugin, "plugin");
+        this.accounts = Objects.requireNonNull(accounts, "accounts");
         this.log = Objects.requireNonNull(log, "log");
     }
 
@@ -61,13 +62,12 @@ final class PlayerPointsBalanceFeed implements BalanceFeed {
             log.warn("PlayerPoints import skipped: its API could not be reached: {}", reflectionFailure.toString());
             return Stream.empty();
         }
-        return Arrays.stream(plugin.getServer().getOfflinePlayers())
-                .map(op -> toUser(op, lookup))
-                .flatMap(Optional::stream);
+        return accounts.all().map(account -> toUser(account, lookup)).flatMap(Optional::stream);
     }
 
     /** Maps one offline player to a balance-only user, or empty on no positive points or a per-player read failure. */
-    private Optional<ImportedUser> toUser(OfflinePlayer op, Lookup lookup) {
+    private Optional<ImportedUser> toUser(FeedAccounts.Account account, Lookup lookup) {
+        OfflinePlayer op = account.player();
         int points;
         try {
             points = (Integer) lookup.look().invoke(lookup.api(), op.getUniqueId());
@@ -78,13 +78,8 @@ final class PlayerPointsBalanceFeed implements BalanceFeed {
         if (points <= 0) {
             return Optional.empty();
         }
-        PlayerRef owner = new PlayerRef(op.getUniqueId(), name(op));
+        PlayerRef owner = new PlayerRef(op.getUniqueId(), account.name());
         return Optional.of(new ImportedUser(owner, List.of(), Optional.of(BigDecimal.valueOf(points)), List.of()));
-    }
-
-    private static String name(OfflinePlayer op) {
-        String name = op.getName();
-        return name != null ? name : op.getUniqueId().toString();
     }
 
     /** The resolved PlayerPoints API handle and its {@code look(UUID)} method, bound once per stream. */

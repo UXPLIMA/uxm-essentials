@@ -5,6 +5,7 @@ import java.util.Objects;
 import com.uxplima.uxmessentials.itemworld.application.ItemworldConfig;
 import com.uxplima.uxmessentials.itemworld.application.port.ItemworldAudit;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.GuiLayout;
+import com.uxplima.uxmessentials.shared.adapter.outbound.skin.HeadTextures;
 import com.uxplima.uxmessentials.shared.application.module.KernelPorts;
 import org.jspecify.annotations.NullMarked;
 
@@ -24,15 +25,21 @@ import org.jspecify.annotations.NullMarked;
  * @param audit the abusable-verb audit trail on the {@code com.uxplima.uxmessentials.audit} channel
  * @param config the live, immutable {@code itemworld.conf} view (sub-feature-group + per-command gate, caps)
  * @param disposalLayout the externalised {@code /disposal} window layout (its row count) loaded once at wire time
+ * @param heads the textures {@code /skull} draws a head with
  */
 @NullMarked
 public record ItemworldServices(
-        KernelPorts kernel, ItemworldAudit audit, ItemworldConfig config, GuiLayout disposalLayout) {
+        KernelPorts kernel,
+        ItemworldAudit audit,
+        ItemworldConfig config,
+        GuiLayout disposalLayout,
+        HeadTextures heads) {
 
     public ItemworldServices {
         Objects.requireNonNull(kernel, "kernel");
         Objects.requireNonNull(audit, "audit");
         Objects.requireNonNull(config, "config");
         Objects.requireNonNull(disposalLayout, "disposalLayout");
+        Objects.requireNonNull(heads, "heads");
     }
 }
