@@ -58,7 +58,9 @@ import org.jspecify.annotations.Nullable;
  * hot-reloads the single file, off the tick thread). The interactions mirror the OGUI editor: left-click a filled cell
  * opens its item editor, left-click an empty cell adds a default item and opens that same editor, right-click picks a
  * cell up and the next click drops it (moving, or swapping with the target), and shift-click clears a cell behind a
- * confirm. Selection is shown by glowing the picked-up cell.
+ * confirm. Selection is shown by glowing the picked-up cell. Every gesture past the left click also has a left-click
+ * path through the item editor, for a Bedrock client that cannot send it: its remove button clears the cell, and its
+ * slots field moves the item.
  *
  * <p>The operator can also arrange the canvas by dragging or placing their own items straight onto it: the engine's
  * capture grid cancels every real transfer touching the top canvas and instead copies the held item's definition into
