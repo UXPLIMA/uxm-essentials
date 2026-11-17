@@ -38,7 +38,8 @@ told why and stays put; the request is used up. A request is not refused for a c
 [Cooldowns](#cooldowns)). Requests cost nothing.
 
 `/tptoggle` and `/tpauto` are kept in the player's data on that server and survive a relog. The `/tpblock` list is
-kept in memory and empties on a restart.
+kept in memory and empties on a restart. `/tpblock` and `/tpunblock` take any player the server knows, including one
+who logged off or is on another server.
 
 ## Staff teleports
 
