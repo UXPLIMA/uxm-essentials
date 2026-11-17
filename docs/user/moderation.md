@@ -273,13 +273,13 @@ A frozen player cannot move to another block; they can still look around, chat a
 when they try to walk, at most once every `freeze.notice-interval-seconds` (3 by default; 0 sends nothing).
 
 A freeze is kept in memory and is not stored in the database. It lasts until `/unfreeze`, or until the server
-restarts or the module reloads. Logging out does not lift it: a frozen player who logs back in is still frozen. You
-can only freeze a player connected to your server.
+restarts or the module reloads. Logging out does not lift it: a frozen player who logs back in is still frozen. On
+a network you can freeze a player connected to any server.
 
 On a network the freeze is announced over the bus, and every server that hears it holds the player frozen too, so
 switching server does not lift it. `/unfreeze` on any server lifts it everywhere. With the proxy plugin, a frozen
 player cannot change server at all (`/server` and server selectors are refused with a line saying why), and one who
-logs out frozen is sent back to the server that froze them when they return. A proxy restart forgets the freezes it
+logs out frozen is sent back to the server they were on when they were frozen. A proxy restart forgets the freezes it
 saw; the servers still hold theirs.
 
 ## Lockdown
@@ -374,9 +374,8 @@ The plugin has no appeal system. The ban, IP ban, kick and lockdown screens are 
 With `network.enabled = true` every server reads bans, mutes, warnings, jails, IP bans and the lockdown flag from the
 shared database, so a sanction holds on every server: a ban or an IP ban kicks the player wherever they are and every
 server refuses their login, a mute applies at once, and a jail sends the player to the jail's server (see
-[Jails on a network](#jails-on-a-network)). `/kick` and `/freeze` act only on players connected to your server; a
-freeze then holds on every server. Freezes are held in memory; command spy and the staff broadcast stay on one
-server. [network.md](network.md#moderation) has the details and the setup, and [import.md](import.md) brings bans,
+[Jails on a network](#jails-on-a-network)). `/kick` and `/freeze` reach a player on any server; a freeze then
+holds on every server. Freezes are held in memory; command spy and the staff broadcast stay on one server. [network.md](network.md#moderation) has the details and the setup, and [import.md](import.md) brings bans,
 mutes, warnings and jails over from EssentialsX and LiteBans.
 
 ## Settings

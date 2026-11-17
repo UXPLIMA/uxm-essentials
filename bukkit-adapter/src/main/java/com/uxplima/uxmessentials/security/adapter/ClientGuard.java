@@ -87,21 +87,22 @@ public final class ClientGuard {
     public ClientVerdict evaluate(Player player, PlayerRef ref, @Nullable String brand) {
         Objects.requireNonNull(player, "player");
         Objects.requireNonNull(ref, "ref");
-        if (brand != null && !brand.isBlank()) {
-            registry.record(ref.uuid(), brand);
+        // The policy judges what the client sent; what is kept and shown to staff is only ever the safe form of it.
+        String shown = brand == null ? "" : ReportedBrand.shown(brand);
+        if (!shown.isBlank()) {
+            registry.record(ref.uuid(), shown);
         }
         ClientVerdict verdict = policy.judge(brand);
         if (!verdict.allowed()) {
             scheduler.onEntity(ref, () -> kick(ref));
-            announce(ref, brand);
+            announce(ref, shown);
         } else if (verdict.flagged()) {
-            announce(ref, brand);
+            announce(ref, shown);
         }
         return verdict;
     }
 
-    private void announce(PlayerRef ref, @Nullable String brand) {
-        String shown = brand == null ? "" : brand;
+    private void announce(PlayerRef ref, String shown) {
         notifier.notifyStaff(
                 SecurityMessageKey.SECURITY_CLIENT_FLAGGED,
                 Map.of("player", ref.name(), "brand", shown),

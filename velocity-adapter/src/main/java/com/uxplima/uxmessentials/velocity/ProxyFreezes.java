@@ -8,6 +8,7 @@ import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.LongSupplier;
 
+import com.uxplima.uxmessentials.shared.network.FrameSeal;
 import com.uxplima.uxmessentials.shared.network.FreezeChanged;
 import com.uxplima.uxmessentials.shared.network.FreezeReset;
 import com.uxplima.uxmessentials.shared.network.NetworkMessage;
@@ -17,7 +18,7 @@ import org.jspecify.annotations.NullMarked;
 /**
  * Which players are frozen, and on which server, as the freeze frames the broker relays tell it. A freeze is held in
  * memory by every backend, but a backend nobody was on when the freeze was announced never heard it, so the proxy,
- * which sees every frame a backend sends, keeps a frozen player on the server that froze them.
+ * which sees every frame a backend sends, keeps a frozen player on the server they were connected to when frozen.
  *
  * <p>Only frames a backend sent reach this: the broker never reads a frame a client wrote. Changes are kept by the
  * time they were made, so a freeze and its release relayed out of order leave the later one. A release is remembered
@@ -52,7 +53,9 @@ final class ProxyFreezes {
         }
         NetworkMessage message;
         try {
-            message = NetworkMessageCodec.decode(frame);
+            // A relayed frame carries the backend's seal after the body; read with it, a field an older backend did
+            // not write would be read out of the seal's bytes instead of found missing.
+            message = NetworkMessageCodec.decode(FrameSeal.frame(frame));
         } catch (IllegalArgumentException malformed) {
             // A body that does not read is no change to hold.
             return;
@@ -60,7 +63,10 @@ final class ProxyFreezes {
         long now = clock.getAsLong();
         latest.values().removeIf(held -> !held.frozen() && now - held.seenAt() > RELEASE_MEMORY.toMillis());
         if (message instanceof FreezeChanged freeze) {
-            Change next = new Change(freeze.frozen(), sourceServer, freeze.changedAtMillis(), now);
+            // Kept on the server the player was connected to, which is the one that froze them unless staff froze
+            // them from another backend.
+            String heldOn = freeze.heldOn().isBlank() ? sourceServer : freeze.heldOn();
+            Change next = new Change(freeze.frozen(), heldOn, freeze.changedAtMillis(), now);
             latest.merge(freeze.target(), next, (held, incoming) -> incoming.at() < held.at() ? held : incoming);
         } else if (message instanceof FreezeReset reset) {
             latest.values()

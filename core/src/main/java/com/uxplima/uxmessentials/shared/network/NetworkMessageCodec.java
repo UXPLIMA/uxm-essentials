@@ -9,7 +9,9 @@ import java.io.UncheckedIOException;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.HashSet;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
 import java.util.UUID;
@@ -306,6 +308,7 @@ public final class NetworkMessageCodec {
                 out.writeUTF(freeze.targetName());
                 out.writeBoolean(freeze.frozen());
                 out.writeLong(freeze.changedAtMillis());
+                out.writeUTF(freeze.heldOn());
             }
             case FreezeReset reset -> out.writeLong(reset.clearedAtMillis());
             case AllBalancesChanged swept -> out.writeUTF(swept.currencyId());
@@ -340,6 +343,20 @@ public final class NetworkMessageCodec {
                 writeUuid(out, queued.voteId());
                 writeUuid(out, queued.player());
                 out.writeUTF(queued.service());
+            }
+            case StaffActionFrame action -> {
+                writeUuid(out, action.frameId());
+                out.writeUTF(action.action());
+                out.writeUTF(action.toServer());
+                writeUuid(out, action.target());
+                out.writeUTF(action.targetName());
+                out.writeUTF(action.actorName());
+                out.writeUTF(action.key());
+                out.writeInt(action.values().size());
+                for (Map.Entry<String, String> value : action.values().entrySet()) {
+                    out.writeUTF(value.getKey());
+                    out.writeUTF(value.getValue());
+                }
             }
         }
     }
@@ -443,8 +460,7 @@ public final class NetworkMessageCodec {
                         in.readUTF(),
                         in.readInt());
             case WORLD_CHANGED -> new WorldChanged(origin, readUuid(in), in.readUTF(), in.readUTF());
-            case FREEZE_CHANGED ->
-                new FreezeChanged(origin, readUuid(in), readUuid(in), in.readUTF(), in.readBoolean(), in.readLong());
+            case FREEZE_CHANGED -> readFreeze(in, origin);
             case FREEZE_RESET -> new FreezeReset(origin, in.readLong());
             case ALL_BALANCES_CHANGED -> new AllBalancesChanged(origin, in.readUTF());
             case PERMISSION_QUERY ->
@@ -458,7 +474,38 @@ public final class NetworkMessageCodec {
             case INVENTORY_RESTORE_KEPT -> new InventoryRestoreKept(origin, readUuid(in));
             case BROADCAST -> new BroadcastFrame(origin, readUuid(in), in.readUTF());
             case VOTE_REWARDS_QUEUED -> new VoteRewardsQueued(origin, readUuid(in), readUuid(in), in.readUTF());
+            case STAFF_ACTION -> readStaffAction(in, origin);
         };
+    }
+
+    /** The server the player is held on follows the change, so an older decoder still reads the change it knew. */
+    private static FreezeChanged readFreeze(DataInputStream in, String origin) throws IOException {
+        UUID frameId = readUuid(in);
+        UUID target = readUuid(in);
+        String targetName = in.readUTF();
+        boolean frozen = in.readBoolean();
+        long changedAt = in.readLong();
+        String heldOn = in.available() >= 2 ? in.readUTF() : origin;
+        return new FreezeChanged(origin, frameId, target, targetName, frozen, changedAt, heldOn);
+    }
+
+    private static StaffActionFrame readStaffAction(DataInputStream in, String origin) throws IOException {
+        UUID frameId = readUuid(in);
+        String action = in.readUTF();
+        String toServer = in.readUTF();
+        UUID target = readUuid(in);
+        String targetName = in.readUTF();
+        String actorName = in.readUTF();
+        String key = in.readUTF();
+        int count = in.readInt();
+        if (count < 0 || count > StaffActionFrame.MAX_VALUES) {
+            throw new IllegalArgumentException("staff action names an impossible value count: " + count);
+        }
+        Map<String, String> values = new LinkedHashMap<>();
+        for (int i = 0; i < count; i++) {
+            values.put(in.readUTF(), in.readUTF());
+        }
+        return new StaffActionFrame(origin, frameId, action, toServer, target, targetName, actorName, key, values);
     }
 
     /**

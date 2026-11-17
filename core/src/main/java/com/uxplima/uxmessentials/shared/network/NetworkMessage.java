@@ -60,7 +60,8 @@ public sealed interface NetworkMessage
                 RankActionsKept,
                 InventoryRestoreKept,
                 BroadcastFrame,
-                VoteRewardsQueued {
+                VoteRewardsQueued,
+                StaffActionFrame {
 
     /** The {@code server-id} of the backend that produced this frame; the loop sentinel keys on it. */
     String originServer();
@@ -115,7 +116,8 @@ public sealed interface NetworkMessage
         RANK_ACTIONS_KEPT(39),
         INVENTORY_RESTORE_KEPT(40),
         BROADCAST(43),
-        VOTE_REWARDS_QUEUED(44);
+        VOTE_REWARDS_QUEUED(44),
+        STAFF_ACTION(45);
 
         private final byte wireTag;
 
