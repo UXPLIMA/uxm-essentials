@@ -6,6 +6,8 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.Set;
+import java.util.function.Function;
 
 import com.uxplima.uxmessentials.economy.application.port.EconomyProvider;
 import com.uxplima.uxmessentials.economy.application.port.PendingTransactionRepository;
@@ -27,6 +29,9 @@ import org.jspecify.annotations.NullMarked;
  * rejoin, two servers on one database) never pay the same row twice. A credit that does not land is put back for
  * the next join rather than dropped. A player who already left by the time delivery runs is skipped and their rows
  * stay queued, since a physical credit could not reach them and the notice would go nowhere.
+ *
+ * <p>A currency whose reset still waits to be applied to the player keeps its credits queued: they came after the
+ * reset, and paying them first would let the reset take them away again.
  */
 @NullMarked
 public final class DeliverPendingCredits {
@@ -36,6 +41,7 @@ public final class DeliverPendingCredits {
     private final EconomyNotifier notifier;
     private final PlayerLookup players;
     private final Logger log;
+    private final Function<PlayerRef, Set<String>> held;
 
     public DeliverPendingCredits(
             EconomyProvider economy,
@@ -43,6 +49,21 @@ public final class DeliverPendingCredits {
             EconomyNotifier notifier,
             PlayerLookup players,
             Logger log) {
+        this(economy, pending, notifier, players, log, player -> Set.of());
+    }
+
+    /**
+     * @param held the currencies, lower case, whose credits a player must not be paid yet; it may throw, which leaves
+     *     every credit queued
+     */
+    public DeliverPendingCredits(
+            EconomyProvider economy,
+            PendingTransactionRepository pending,
+            EconomyNotifier notifier,
+            PlayerLookup players,
+            Logger log,
+            Function<PlayerRef, Set<String>> held) {
+        this.held = Objects.requireNonNull(held, "held");
         this.economy = Objects.requireNonNull(economy, "economy");
         this.pending = Objects.requireNonNull(pending, "pending");
         this.notifier = Objects.requireNonNull(notifier, "notifier");
@@ -58,7 +79,9 @@ public final class DeliverPendingCredits {
         }
         List<PendingTransaction> queued;
         try {
-            queued = pending.getAndClearPending(player.uuid());
+            // The held currencies are left on the queue, not taken and put back, so a put-back that fails cannot
+            // lose them.
+            queued = pending.getAndClearPending(player.uuid(), held.apply(player));
         } catch (RuntimeException failure) {
             // Only rows this take deleted are handed over, so a failed take leaves them queued for the next join.
             log.error("event=pending_credit_read_failed player=" + player.uuid(), failure);

@@ -12,7 +12,7 @@ import java.util.function.Supplier;
 import org.jspecify.annotations.NullMarked;
 
 /**
- * One piece of inventory work handed to a player's own thread while the caller waits for it with a bound.
+ * One piece of work on a player (their inventory, their experience) handed to a player's own thread while the caller waits for it with a bound.
  *
  * <p>A wait that runs out cannot take back a task the scheduler already holds, and a credit that lands after the
  * caller was told "not paid" pays twice: a sale gives the items back and the coins arrive as well. So the waiter and
@@ -23,10 +23,10 @@ import org.jspecify.annotations.NullMarked;
  * @param <T> what the work answers
  */
 @NullMarked
-final class EntityHandoff<T> {
+public final class EntityHandoff<T> {
 
     /** What happened when the work was waited for, so the caller can report a timeout or a failure. */
-    interface Outcomes {
+    public interface Outcomes {
 
         void timedOut();
 
@@ -41,7 +41,7 @@ final class EntityHandoff<T> {
     private final CompletableFuture<T> result = new CompletableFuture<>();
 
     /** On the player's thread: run {@code work}, unless the waiter already gave up on it. */
-    void run(Supplier<T> work) {
+    public void run(Supplier<T> work) {
         Objects.requireNonNull(work, "work");
         if (!state.compareAndSet(WAITING, RUNNING)) {
             return;
@@ -59,7 +59,7 @@ final class EntityHandoff<T> {
     }
 
     /** The player's thread will never run the work (the player left first): answer {@code fallback}. */
-    void retire(T fallback) {
+    public void retire(T fallback) {
         if (state.compareAndSet(WAITING, ABANDONED)) {
             result.complete(fallback);
         }
@@ -70,7 +70,7 @@ final class EntityHandoff<T> {
      * {@code fallback} is answered. If it has started, its own answer is waited for: its effect on the inventory
      * lands either way, and the caller must hear about it.
      */
-    T await(Duration timeout, T fallback, Outcomes outcomes) {
+    public T await(Duration timeout, T fallback, Outcomes outcomes) {
         Objects.requireNonNull(timeout, "timeout");
         Objects.requireNonNull(outcomes, "outcomes");
         try {

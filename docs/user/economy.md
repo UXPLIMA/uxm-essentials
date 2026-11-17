@@ -79,6 +79,79 @@ the money. A payment above the confirm threshold waits for `/payconfirm`, and is
 With a tax, the receiver is credited the payment and the tax is then taken from them: paying 50 with a 10 percent
 and 1 flat tax sends 50, takes 6, and the receiver keeps 44. The tax is never more than the payment.
 
+## Changing every balance
+
+`/eco giveall <amount> [currency]` and `/eco resetall --confirm [currency]` change the balance of every player who
+has joined a server of this database: players who are offline, players on other servers of a network, and Bedrock
+players who join through Geyser and Floodgate (by the id and the prefixed name Floodgate gives them). Before it
+starts, the server adds the players it knows from its own player list. `resetall` puts each balance back to the
+currency's `starting` figure and asks for `--confirm` first.
+
+Other plugins can open accounts through Vault for things that are not players, such as a town's bank or a tax holding
+account. On this plugin's ledger these are left alone unless `--all-accounts` ends the command:
+`/eco giveall 100 --all-accounts`, `/eco resetall --confirm coins --all-accounts`. The bulk screen of the `/eco` menu
+reaches players only.
+
+`/eco giveall <amount> [currency] --online` gives the amount only to the players online on the server that runs it,
+one by one, the way a scheduled reward for being online wants, whatever kind of currency it is. It replies with the
+number of players and fires the usual credit event for each of them. For an item currency, or experience, it is a
+delivery per player handed over at once, so what does not fit an inventory waits for the next join, as below; the
+reply then also says how many players had no room for all of it.
+
+How the change reaches the players depends on where the currency's money is kept:
+
+- **This plugin's ledger** (the usual case): a few hundred accounts at a time, each step one short transaction that
+  changes the balances and writes their history lines together.
+- **A balance that changes only while its player is online**: an item currency, or a backend such as `exp` that
+  cannot reach an offline player. Each step queues one delivery per player. A player online on any server gets it at
+  once, the others when they next join any server; each delivery is handed over once, however many servers try. What
+  does not fit in the inventory is not dropped: it waits for the next join. Gives queued while a player is away add
+  up in one delivery, so the waiting list stays one line per player and currency however many runs there are.
+  A `resetall` sets the balance (for an item currency, the coins a player carries in their inventory) to the
+  starting figure when they are next online, and drops the gives and the offline credits of that currency still
+  waiting for them. It is applied before anything given after it, and while it waits, credits of that currency
+  wait with it. Coins in chests and ender chests are not part of the balance and are left alone.
+- **Another plugin keeps the money** (a Vault or Treasury economy provides the server's economy, or the currency's
+  `backend` is another plugin): each step hands up to fifty players to that plugin, one call per player. A Vault
+  economy is called on the server thread, ten players a tick; Treasury and the other backends off it. `resetall`
+  takes or adds the difference to the starting figure. These calls cannot be undone together, so they are made at
+  most once: a player whose call was under way when the server stopped, or whose call failed, is counted as
+  uncertain, named in the console (`event=economy_sweep_uncertain`) and not paid again; check those players by
+  hand. A balance the plugin did not return is left as it was and counted as left out. `--all-accounts` adds
+  nothing here, since the other plugin's accounts cannot be listed.
+
+- The change runs in the background and the reply comes once it is done, with the number of accounts changed.
+  Each step locks only its own accounts, for a moment, so payments and other plugins' calls carry on while it runs.
+  `giveall` leaves out an account the amount would take past `max-balance`, or one the other plugin refuses, and
+  says how many it left out.
+- If the server stops or the database fails part way, the change pauses after the last finished step and tells you
+  how far it got. It carries on by itself every minute, or when any server of the database starts again, and no
+  account is changed twice. A player who joins for the first time while it runs is reached only if they sort after
+  the players already done, so they may or may not get the change.
+- A delivery handed over while the database cannot record it is remembered by that server and recorded once the
+  database is back. If that server restarts before then, the delivery is handed over again after ten minutes, so the
+  player gets it twice; the console says so (`event=swept_items_finish_failed`).
+- A reset that cannot be applied (the player's balance does not answer) holds that currency's gives and offline
+  credits for the player and is named once in the console (`event=swept_items_reset_stuck`); it is tried again on
+  every pass and join.
+- If the database refuses a step for good, for example a balance too large for its column, the change stops there
+  and says how many accounts it changed; those keep the change. So does a change whose currency is removed from the
+  configuration before it finishes.
+- Every changed account gets its own line in the transaction history (an item delivery when it is handed over); the
+  audit log gets one line for the command.
+- The other servers of a network are told, drop the balances they held in memory, and hand item deliveries to their
+  players online.
+- A currency has one unfinished change at a time across every server of the database. Running the command again
+  while one is running or paused is refused and names it, so a repeated command cannot pay everyone twice.
+- `/eco sweeps` lists the unfinished changes with their id, progress and last error; `/eco sweeps cancel <id>` stops
+  one, and the accounts it already changed keep the change. The first eight characters of the id are enough.
+
+When it is done, plugins hear `UxmBalanceSweepEvent` once, with what was done, the amount and the number of accounts.
+On the ledger and for items there is no credit or debit event per account; through another plugin each call fires
+the usual one. The REST add-on streams it as `economy.balance-sweep`.
+
+`/eco giverandom <amount> [currency]` gives the amount to one player online on this server.
+
 ## Commands
 
 | Command | Permission | What it does |
@@ -99,7 +172,9 @@ and 1 flat tax sends 50, takes 6, and the receiver keeps 44. The tax is never mo
 | `/exchange` | `uxmessentials.economy.exchange` | Converts between currencies. |
 | `/eco give\|take\|set <player> <amount> [currency]` | `uxmessentials.economy.admin.give`, `.take`, `.set` | Changes a balance. |
 | `/eco reset <player> [currency]` | `uxmessentials.economy.admin.set` | Resets a balance. |
-| `/eco giveall\|resetall` | `uxmessentials.economy.admin.bulk` | Changes every balance; `resetall` needs `--confirm`. |
+| `/eco giveall\|resetall` | `uxmessentials.economy.admin.bulk` | Changes every player's balance, online or not; `resetall` needs `--confirm`, `--all-accounts` adds other plugins' accounts, `giveall --online` only the players online here. See [Changing every balance](#changing-every-balance). |
+| `/eco giverandom <amount> [currency]` | `uxmessentials.economy.admin.bulk` | Gives the amount to one random player online here. |
+| `/eco sweeps [cancel <id>]` | `uxmessentials.economy.admin.sweeps` | Lists the unfinished changes to every balance, or stops one. |
 | `/eco give-random` | `uxmessentials.economy.admin.give` | Gives a random amount between a minimum and a maximum. |
 | `/eco note give <player> <amount> [currency]` | `uxmessentials.economy.admin.note` | Gives a banknote without taking money from anyone. |
 | `/eco history [player]` | `uxmessentials.economy.admin.history` | Opens a player's transaction history, your own when none is named. In game only. |

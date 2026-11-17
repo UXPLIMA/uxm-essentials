@@ -2,7 +2,6 @@ package com.uxplima.uxmessentials.economy.application;
 
 import static com.uxplima.uxmessentials.testing.Fixtures.ALEX;
 import static com.uxplima.uxmessentials.testing.Fixtures.CLOCK;
-import static com.uxplima.uxmessentials.testing.Fixtures.SAM;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import java.math.BigDecimal;
@@ -17,6 +16,8 @@ import java.util.UUID;
 import com.uxplima.uxmessentials.economy.application.port.BaltopRow;
 import com.uxplima.uxmessentials.economy.application.port.EconomyAudit;
 import com.uxplima.uxmessentials.economy.application.port.HistoryRecord;
+import com.uxplima.uxmessentials.economy.application.port.KnownPlayers;
+import com.uxplima.uxmessentials.economy.application.port.ProviderLane;
 import com.uxplima.uxmessentials.economy.application.port.TransactionHistory;
 import com.uxplima.uxmessentials.economy.application.port.WalletRepository;
 import com.uxplima.uxmessentials.economy.domain.Currency;
@@ -24,12 +25,16 @@ import com.uxplima.uxmessentials.economy.domain.CurrencyId;
 import com.uxplima.uxmessentials.economy.domain.EconomyMessageKey;
 import com.uxplima.uxmessentials.economy.domain.EconomyReason;
 import com.uxplima.uxmessentials.economy.domain.Money;
+import com.uxplima.uxmessentials.economy.domain.SweepMode;
 import com.uxplima.uxmessentials.economy.domain.TransferError;
 import com.uxplima.uxmessentials.economy.domain.Wallet;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmessentials.shared.domain.Result;
 import com.uxplima.uxmessentials.shared.domain.Unit;
 import com.uxplima.uxmessentials.shared.domain.message.MessageKey;
+import com.uxplima.uxmessentials.testing.ManualScheduler;
+import com.uxplima.uxmessentials.testing.QuietLog;
+import com.uxplima.uxmessentials.testing.RecordingEvents;
 import org.junit.jupiter.api.Test;
 
 /**
@@ -49,13 +54,37 @@ class EcoAdminTest {
     private final Audit audit = new Audit();
     private final History history = new History();
     private final List<String> lines = new ArrayList<>();
+    private final List<Map<String, String>> placeholders = new ArrayList<>();
     private final EconomyNotifier notifier = new EconomyNotifier(
-            (PlayerRef viewer, MessageKey key, Map<String, String> placeholders) -> {
+            (PlayerRef viewer, MessageKey key, Map<String, String> values) -> {
                 lines.add(viewer.name() + ":" + key.key());
+                placeholders.add(values);
                 return key.key();
             },
             (viewer, text) -> {});
-    private final EcoAdmin admin = new EcoAdmin(bank, wallets, audit, notifier, history, CLOCK);
+    private final EcoAdmin admin = new EcoAdmin(
+            bank,
+            wallets,
+            audit,
+            notifier,
+            history,
+            new SweepRunner(
+                    NoSweeps.JOURNAL,
+                    new SweepRunner.Paths(
+                            currency -> SweepMode.LEDGER,
+                            bank,
+                            history,
+                            currency -> ProviderLane.inPlace(),
+                            () -> {},
+                            (online, amount, reason) -> new DeliverSweptItems.OnlineGive(0, 0),
+                            KnownPlayers.none()),
+                    new ManualScheduler(),
+                    audit,
+                    notifier,
+                    new RecordingEvents(),
+                    new QuietLog(),
+                    CLOCK),
+            CLOCK);
 
     private static Money coins(String amount) {
         return Money.of(COINS, new BigDecimal(amount));
@@ -102,21 +131,6 @@ class EcoAdminTest {
         assertThat(bank.balance(ALEX, COINS).amount()).isEqualByComparingTo("70");
         assertThat(history.lines).isEmpty();
         assertThat(audit.lines).isEmpty();
-    }
-
-    @Test
-    void aResetAllLeavesOutTheTargetsTheStoreCouldNotSet() {
-        bank.set(ALEX, coins("70"));
-        bank.set(SAM, coins("30"));
-        wallets.refuse(ALEX);
-
-        int affected = admin.resetAll(ADMIN, List.of(ALEX, SAM), COINS);
-
-        assertThat(affected).isEqualTo(1);
-        assertThat(bank.balance(ALEX, COINS).amount()).isEqualByComparingTo("70");
-        assertThat(bank.balance(SAM, COINS).amount()).isEqualByComparingTo("10");
-        assertThat(history.lines).containsExactly("debit:20:ADMIN_RESETALL");
-        assertThat(audit.lines).containsExactly("bulk:1:ADMIN_RESETALL");
     }
 
     /** Exact-balance writes land in the bank, except for owners whose holder thread will not take the change. */

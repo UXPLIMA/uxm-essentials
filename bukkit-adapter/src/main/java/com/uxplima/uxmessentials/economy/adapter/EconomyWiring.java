@@ -60,6 +60,7 @@ import com.uxplima.uxmessentials.economy.application.SellItem;
 import com.uxplima.uxmessentials.economy.application.SetWorth;
 import com.uxplima.uxmessentials.economy.application.WorthSource;
 import com.uxplima.uxmessentials.economy.application.WorthTable;
+import com.uxplima.uxmessentials.economy.application.port.AccountSweep;
 import com.uxplima.uxmessentials.economy.application.port.BaltopExemption;
 import com.uxplima.uxmessentials.economy.application.port.CurrencyBackendRegistry;
 import com.uxplima.uxmessentials.economy.application.port.EconomyAudit;
@@ -188,6 +189,72 @@ public final class EconomyWiring {
 
         ResolvedEconomy resolved =
                 resolveProvider(plugin, ctx, kernel, hooks, settings, currencies, decoratedRepository, clock);
+        // giveall and resetall reach every player wherever a currency's money is kept: the ledger's rows, items in
+        // inventories (queued deliveries, handed over when the player is online), or another plugin's accounts (paid
+        // one player at a time through it).
+        AccountSweep journal = WalletSync.sweep(
+                WalletRepositories.accountSweep(persistence, ledger.telemetry(), currencies, clock, kernel.log()),
+                cached,
+                bus.publisher());
+        java.util.function.Function<Currency, Optional<com.uxplima.uxmessentials.economy.application.port.ItemPurse>>
+                purses = deferredPurses(
+                        resolved,
+                        new com.uxplima.uxmessentials.economy.adapter.outbound.BukkitItemPurse(
+                                kernel.scheduler(), calculations, kernel.log()));
+        EconomyNotifier deliveryNotifier =
+                new EconomyNotifier(kernel.messages(), kernel.messageSink(), settings.amountFormat());
+        // The swept deliveries pay the credits a reset held back as soon as it lands, and the credits ask the
+        // deliveries which currencies a reset still holds: each needs the other, so one is reached through this.
+        java.util.concurrent.atomic.AtomicReference<com.uxplima.uxmessentials.economy.application.DeliverPendingCredits>
+                creditsAfterReset = new java.util.concurrent.atomic.AtomicReference<>();
+        com.uxplima.uxmessentials.economy.application.DeliverSweptItems sweptItems =
+                new com.uxplima.uxmessentials.economy.application.DeliverSweptItems(
+                        WalletRepositories.itemDeliveries(persistence, clock),
+                        purses,
+                        currencies,
+                        ledger.telemetry(),
+                        deliveryNotifier,
+                        kernel.events(),
+                        player -> {
+                            com.uxplima.uxmessentials.economy.application.DeliverPendingCredits credits =
+                                    creditsAfterReset.get();
+                            if (credits != null) {
+                                credits.deliver(player);
+                            }
+                        },
+                        kernel.playerLookup(),
+                        kernel.scheduler(),
+                        kernel.log(),
+                        clock);
+        com.uxplima.uxmessentials.economy.application.DeliverPendingCredits pendingCredits =
+                new com.uxplima.uxmessentials.economy.application.DeliverPendingCredits(
+                        resolved.provider(),
+                        pendingRepo,
+                        deliveryNotifier,
+                        kernel.playerLookup(),
+                        kernel.log(),
+                        sweptItems::heldCurrencies);
+        creditsAfterReset.set(pendingCredits);
+        Runnable handOver = new com.uxplima.uxmessentials.economy.adapter.outbound.OnlineItemHandover(
+                kernel.scheduler(), sweptItems, kernel.log());
+        // Another server's sweep over an item currency queued deliveries for players who may be online here.
+        bus.registry().register(message -> {
+            if (message instanceof com.uxplima.uxmessentials.shared.network.AllBalancesChanged) {
+                handOver.run();
+            }
+        });
+        SweepParts sweep = new SweepParts(
+                journal,
+                sweepModes(resolved.ledgerInPlay(), purses),
+                sweepLanes(resolved.vaultForeign(), kernel.scheduler()),
+                sweptItems,
+                pendingCredits,
+                handOver,
+                new com.uxplima.uxmessentials.economy.adapter.outbound.ServerKnownPlayers(
+                        plugin.getServer(),
+                        kernel.scheduler(),
+                        new com.uxplima.uxmessentials.persistence.lookup.JooqPlayerNameRepository(persistence.dsl()),
+                        kernel.log()));
         return assemble(
                 plugin,
                 ctx,
@@ -200,7 +267,7 @@ public final class EconomyWiring {
                 resolved.provider(),
                 resolved.backends(),
                 decoratedRepository,
-                pendingRepo,
+                sweep,
                 textInput,
                 picker,
                 menus,
@@ -240,12 +307,15 @@ public final class EconomyWiring {
         if (foreign.isPresent()) {
             kernel.log().info("event=economy_provider_deferred (consuming foreign economy)");
             return new ResolvedEconomy(
-                    new PublishingEconomyProvider(foreign.get(), kernel.events(), clock, kernel.log()), backends);
+                    new PublishingEconomyProvider(foreign.get(), kernel.events(), clock, kernel.log()),
+                    backends,
+                    false,
+                    foreign.get() instanceof com.uxplima.uxmessentials.economy.adapter.vault.VaultEconomyAdapter);
         }
         logBackendsInUse(currencies, kernel.log());
         if (!settings.registerProvider()) {
             kernel.log().info("native economy provider registration disabled by config; using it locally");
-            return new ResolvedEconomy(nativeProvider, backends);
+            return new ResolvedEconomy(nativeProvider, backends, true, false);
         }
         EconomyProviderRegistrar registrar = new EconomyProviderRegistrar(
                 plugin.getServer().getServicesManager(), plugin, kernel.log(), settings.registerPriority());
@@ -257,7 +327,7 @@ public final class EconomyWiring {
             ForeignEconomyProviders.publishNative(
                     plugin, resolved, currencies, settings.registerPriority(), kernel.log());
         }
-        return new ResolvedEconomy(resolved, backends);
+        return new ResolvedEconomy(resolved, backends, resolved == nativeProvider, false);
     }
 
     /**
@@ -284,8 +354,91 @@ public final class EconomyWiring {
                 currency.backendId()));
     }
 
-    /** The provider the plugin talks through and the backend set it routes over, resolved together at start. */
-    private record ResolvedEconomy(EconomyProvider provider, CurrencyBackendRegistry backends) {}
+    /**
+     * The provider the plugin talks through and the backend set it routes over, resolved together at start, and
+     * whether that provider is this plugin's own, so its ledger is where native currencies are kept.
+     */
+    private record ResolvedEconomy(
+            EconomyProvider provider, CurrencyBackendRegistry backends, boolean ledgerInPlay, boolean vaultForeign) {}
+
+    /**
+     * What a sweep over every account needs besides its journal.
+     *
+     * @param modes where each currency's money is kept, as a sweep reaches it
+     * @param lanes where the calls to the plugin that keeps a currency run
+     * @param items hands over the deliveries a sweep queued, on join
+     * @param credits pays the offline credits on join, holding a currency whose reset still waits
+     * @param handOver one pass handing the players online here what was queued for them
+     * @param knownPlayers tops up the list of players a sweep reaches
+     */
+    private record SweepParts(
+            AccountSweep journal,
+            java.util.function.Function<Currency, com.uxplima.uxmessentials.economy.domain.SweepMode> modes,
+            java.util.function.Function<Currency, com.uxplima.uxmessentials.economy.application.port.ProviderLane>
+                    lanes,
+            com.uxplima.uxmessentials.economy.application.DeliverSweptItems items,
+            com.uxplima.uxmessentials.economy.application.DeliverPendingCredits credits,
+            Runnable handOver,
+            com.uxplima.uxmessentials.economy.application.port.KnownPlayers knownPlayers) {}
+
+    /**
+     * The balance a deferred currency's deliveries change: items in the inventory for an item currency, whoever
+     * provides the economy; the backend itself for a backend of this plugin's that cannot change an offline player's
+     * balance (experience), while this plugin's economy is the one in play. Empty for every other currency.
+     */
+    private static java.util.function.Function<
+                    Currency, Optional<com.uxplima.uxmessentials.economy.application.port.ItemPurse>>
+            deferredPurses(
+                    ResolvedEconomy resolved, com.uxplima.uxmessentials.economy.application.port.ItemPurse items) {
+        return currency -> {
+            if (currency.isPhysical()) {
+                return Optional.of(items);
+            }
+            if (!resolved.ledgerInPlay()) {
+                return Optional.empty();
+            }
+            return resolved.backends()
+                    .find(currency.backendId())
+                    .filter(backend -> !backend.worksOffline())
+                    .map(com.uxplima.uxmessentials.economy.application.BackendPurse::new);
+        };
+    }
+
+    /**
+     * A currency whose balance changes only while its player is online is reached through deliveries; a currency on
+     * this plugin's ledger through its rows while that ledger is the economy in play; anything else through the plugin
+     * that keeps it.
+     */
+    private static java.util.function.Function<Currency, com.uxplima.uxmessentials.economy.domain.SweepMode> sweepModes(
+            boolean ledgerInPlay,
+            java.util.function.Function<
+                            Currency, Optional<com.uxplima.uxmessentials.economy.application.port.ItemPurse>>
+                    purses) {
+        return currency -> {
+            if (purses.apply(currency).isPresent()) {
+                return com.uxplima.uxmessentials.economy.domain.SweepMode.DEFERRED;
+            }
+            boolean onLedger = ledgerInPlay && NativeCurrencyBackend.ID.equals(currency.backendId());
+            return onLedger
+                    ? com.uxplima.uxmessentials.economy.domain.SweepMode.LEDGER
+                    : com.uxplima.uxmessentials.economy.domain.SweepMode.PROVIDER;
+        };
+    }
+
+    /**
+     * A Vault economy, whether it won the provider or backs one currency, is called on the server thread a few per
+     * tick. Treasury's calls are asynchronous and the other currency backends move to the thread they need by
+     * themselves, so they are called in place, off the tick.
+     */
+    private static java.util.function.Function<
+                    Currency, com.uxplima.uxmessentials.economy.application.port.ProviderLane>
+            sweepLanes(boolean vaultForeign, com.uxplima.uxmessentials.shared.application.port.Scheduler scheduler) {
+        com.uxplima.uxmessentials.economy.application.port.ProviderLane global =
+                new com.uxplima.uxmessentials.economy.adapter.outbound.GlobalRegionLane(scheduler);
+        com.uxplima.uxmessentials.economy.application.port.ProviderLane inPlace =
+                com.uxplima.uxmessentials.economy.application.port.ProviderLane.inPlace();
+        return currency -> vaultForeign || "vault".equals(currency.backendId()) ? global : inPlace;
+    }
 
     private static Wired assemble(
             Plugin plugin,
@@ -299,7 +452,7 @@ public final class EconomyWiring {
             EconomyProvider resolved,
             CurrencyBackendRegistry backends,
             WalletRepository repository,
-            PendingTransactionRepository pendingRepo,
+            SweepParts sweep,
             com.uxplima.uxmlib.gui.input.@org.jspecify.annotations.Nullable TextInput textInput,
             com.uxplima.uxmessentials.shared.adapter.inbound.gui.@org.jspecify.annotations.Nullable PlayerPickerView
                     picker,
@@ -332,6 +485,7 @@ public final class EconomyWiring {
                 settings,
                 currencies,
                 repository,
+                sweep,
                 resolved,
                 snapshots,
                 ledger.telemetry(),
@@ -356,7 +510,6 @@ public final class EconomyWiring {
                     guiText,
                     kernel.messages(),
                     kernel.scheduler(),
-                    plugin.getServer(),
                     picker,
                     currencyPicker,
                     textInput,
@@ -382,9 +535,7 @@ public final class EconomyWiring {
 
         java.util.List<org.bukkit.event.Listener> listenersList = new java.util.ArrayList<>();
         listenersList.add(new com.uxplima.uxmessentials.economy.adapter.inbound.listener.PendingTransactionListener(
-                new com.uxplima.uxmessentials.economy.application.DeliverPendingCredits(
-                        resolved, pendingRepo, services.notifier(), kernel.playerLookup(), kernel.log()),
-                kernel.scheduler()));
+                sweep.credits(), sweep.items(), kernel.scheduler()));
         // Always on, like the pending credits above: items kept for a seller who left must reach them even after the
         // operator turned selling off.
         listenersList.add(new ItemReturnListener(services.returnUnsoldItems(), kernel.scheduler()));
@@ -477,7 +628,8 @@ public final class EconomyWiring {
                 services.ecoAdmin(),
                 services.returnUnsoldItems(),
                 settings.allowNonAtomicRecurring(),
-                cached);
+                cached,
+                () -> kernel.scheduler().async(services.ecoAdmin()::resumeSweeps));
     }
 
     /**
@@ -551,6 +703,7 @@ public final class EconomyWiring {
             EconomyConfig settings,
             CurrencyRegistry currencies,
             WalletRepository repository,
+            SweepParts sweep,
             EconomyProvider resolved,
             BaltopSnapshots snapshots,
             com.uxplima.uxmessentials.economy.application.port.TransactionHistory history,
@@ -741,6 +894,23 @@ public final class EconomyWiring {
                         audit,
                         notifier,
                         history,
+                        new com.uxplima.uxmessentials.economy.application.SweepRunner(
+                                sweep.journal(),
+                                new com.uxplima.uxmessentials.economy.application.SweepRunner.Paths(
+                                        sweep.modes(),
+                                        new com.uxplima.uxmessentials.economy.application.UncountedEconomyProvider(
+                                                resolved),
+                                        history,
+                                        sweep.lanes(),
+                                        sweep.handOver(),
+                                        sweep.items()::giveNow,
+                                        sweep.knownPlayers()),
+                                kernel.scheduler(),
+                                audit,
+                                notifier,
+                                kernel.events(),
+                                kernel.log(),
+                                clock),
                         clock),
                 exchangeService,
                 currencies,
@@ -792,6 +962,7 @@ public final class EconomyWiring {
      *     which the modules that bill on a timer ask before they start
      * @param cache the cache under the broadcasting repository, which the importer writes through so a large
      *     import updates this server without one cross-server frame per row
+     * @param resumeSweeps hands the sweeps over every account a stop left running to the async lane, to carry on
      */
     public record Wired(
             List<CommandRegistration> commands,
@@ -818,7 +989,8 @@ public final class EconomyWiring {
             EcoAdmin admin,
             ReturnUnsoldItems returns,
             boolean allowNonAtomicRecurring,
-            CachedWalletRepository cache) {
+            CachedWalletRepository cache,
+            Runnable resumeSweeps) {
 
         public Wired {
             commands = List.copyOf(commands);
@@ -841,6 +1013,7 @@ public final class EconomyWiring {
             Objects.requireNonNull(admin, "admin");
             Objects.requireNonNull(walletView, "walletView");
             Objects.requireNonNull(returns, "returns");
+            Objects.requireNonNull(resumeSweeps, "resumeSweeps");
         }
 
         /** Arm the settle, telemetry, and baltop-refresh loops. Called once after the module starts. */
@@ -855,6 +1028,7 @@ public final class EconomyWiring {
             }
             maintenanceTask.start();
             bankInterestTask.start();
+            resumeSweeps.run();
         }
 
         /** Drain the queues, stop the loops, and drop this plugin's provider registration. */

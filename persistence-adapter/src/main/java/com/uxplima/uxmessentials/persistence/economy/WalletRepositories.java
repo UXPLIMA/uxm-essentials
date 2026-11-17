@@ -4,6 +4,7 @@ import java.time.Clock;
 import java.time.Duration;
 import java.util.Objects;
 
+import com.uxplima.uxmessentials.economy.application.port.AccountSweep;
 import com.uxplima.uxmessentials.economy.application.port.PayPreferences;
 import com.uxplima.uxmessentials.economy.application.port.WalletRepository;
 import com.uxplima.uxmessentials.economy.application.port.WorthOverrideStore;
@@ -97,6 +98,29 @@ public final class WalletRepositories {
         DebouncedWalletWriter writer = new DebouncedWalletWriter(repository, scheduler, log, writeDebounce);
         TransactionTelemetry telemetry = new TransactionTelemetry(persistence.dsl(), scheduler, log, batchFlush);
         return new WalletLedger(repository, writer, telemetry);
+    }
+
+    /**
+     * The journalled sweep over every account, for every place a currency's money is kept, drawing its ledger ids from the allocator
+     * {@code telemetry} uses, so its rows and the buffered ones never share an id.
+     */
+    public static AccountSweep accountSweep(
+            Persistence persistence,
+            TransactionTelemetry telemetry,
+            CurrencyRegistry currencies,
+            Clock clock,
+            Logger log) {
+        Objects.requireNonNull(persistence, "persistence");
+        Objects.requireNonNull(telemetry, "telemetry");
+        return new JooqAccountSweep(
+                persistence.dsl(), telemetry::reserveIds, telemetry::windIdsForward, currencies, clock, log);
+    }
+
+    /** The item deliveries a sweep over an item currency queued, claimed once across every server. */
+    public static com.uxplima.uxmessentials.economy.application.port.ItemDeliveryQueue itemDeliveries(
+            Persistence persistence, Clock clock) {
+        Objects.requireNonNull(persistence, "persistence");
+        return new JooqItemDeliveries(persistence.dsl(), clock);
     }
 
     /** The jOOQ-backed {@code /paytoggle} accept-pay flag over the shared persistence DSL. */

@@ -9,6 +9,7 @@ import org.bukkit.event.Listener;
 import org.bukkit.event.player.PlayerJoinEvent;
 
 import com.uxplima.uxmessentials.economy.application.DeliverPendingCredits;
+import com.uxplima.uxmessentials.economy.application.DeliverSweptItems;
 import com.uxplima.uxmessentials.shared.adapter.outbound.BukkitRefs;
 import com.uxplima.uxmessentials.shared.application.port.Scheduler;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
@@ -25,16 +26,24 @@ public final class PendingTransactionListener implements Listener {
     private static final Duration SETTLE_DELAY = Duration.ofMillis(500);
 
     private final DeliverPendingCredits credits;
+    private final DeliverSweptItems sweptItems;
     private final Scheduler scheduler;
 
-    public PendingTransactionListener(DeliverPendingCredits credits, Scheduler scheduler) {
+    public PendingTransactionListener(
+            DeliverPendingCredits credits, DeliverSweptItems sweptItems, Scheduler scheduler) {
         this.credits = Objects.requireNonNull(credits, "credits");
+        this.sweptItems = Objects.requireNonNull(sweptItems, "sweptItems");
         this.scheduler = Objects.requireNonNull(scheduler, "scheduler");
     }
 
     @EventHandler(priority = EventPriority.MONITOR)
     public void onPlayerJoin(PlayerJoinEvent event) {
         PlayerRef ref = BukkitRefs.toRef(event.getPlayer());
-        scheduler.asyncAfter(SETTLE_DELAY, () -> credits.deliver(ref));
+        scheduler.asyncAfter(SETTLE_DELAY, () -> {
+            // What a giveall or resetall queued for them, on whichever server it ran, goes first: a reset decides the
+            // balance, and the credits queued while they were away came after it, so they land on top of it.
+            sweptItems.onJoin(ref);
+            credits.deliver(ref);
+        });
     }
 }

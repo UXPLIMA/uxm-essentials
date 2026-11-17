@@ -1,8 +1,13 @@
 package com.uxplima.uxmessentials.economy.adapter.vault;
 
 import java.math.BigDecimal;
+import java.time.Duration;
 import java.util.List;
 import java.util.Objects;
+import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicLong;
+import java.util.function.LongSupplier;
 
 import org.bukkit.OfflinePlayer;
 import org.bukkit.Server;
@@ -11,6 +16,7 @@ import com.uxplima.uxmessentials.economy.application.MoneyFormat;
 import com.uxplima.uxmessentials.economy.application.port.EconomyProvider;
 import com.uxplima.uxmessentials.economy.domain.Currency;
 import com.uxplima.uxmessentials.economy.domain.Money;
+import com.uxplima.uxmessentials.shared.application.port.Logger;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import net.milkbowl.vault.economy.Economy;
 import net.milkbowl.vault.economy.EconomyResponse;
@@ -53,15 +59,31 @@ public final class NativeVaultEconomy implements Economy {
     private static final String NOT_A_BANK = "uxmEssentials has no named bank accounts";
     private static final String UNKNOWN_PLAYER = "unknown player";
     private static final String NEGATIVE_AMOUNT = "amount must not be negative";
+    private static final String UNREACHABLE =
+            "the ledger failed during the change and cannot say whether it was stored; check the balance";
+
+    /** At most one failed write is logged with its cause per this window; the ones in between are counted. */
+    private static final Duration LOG_EVERY = Duration.ofMinutes(1);
 
     private final EconomyProvider provider;
     private final Currency currency;
     private final Server server;
+    private final Logger log;
+    private final LongSupplier nanos;
+    private final AtomicLong nextLogAt = new AtomicLong();
+    private final AtomicBoolean loggedOnce = new AtomicBoolean();
+    private final AtomicInteger suppressed = new AtomicInteger();
 
-    public NativeVaultEconomy(EconomyProvider provider, Currency currency, Server server) {
+    public NativeVaultEconomy(EconomyProvider provider, Currency currency, Server server, Logger log) {
+        this(provider, currency, server, log, System::nanoTime);
+    }
+
+    NativeVaultEconomy(EconomyProvider provider, Currency currency, Server server, Logger log, LongSupplier nanos) {
         this.provider = Objects.requireNonNull(provider, "provider");
         this.currency = Objects.requireNonNull(currency, "currency");
         this.server = Objects.requireNonNull(server, "server");
+        this.log = Objects.requireNonNull(log, "log");
+        this.nanos = Objects.requireNonNull(nanos, "nanos");
     }
 
     @Override
@@ -122,7 +144,15 @@ public final class NativeVaultEconomy implements Economy {
 
     @Override
     public double getBalance(OfflinePlayer player) {
-        return provider.balance(ref(player), currency).amount().doubleValue();
+        PlayerRef owner = ref(player);
+        try {
+            return provider.balance(owner, currency).amount().doubleValue();
+        } catch (RuntimeException unreachable) {
+            // Vault's balance has no failure shape; an exception would land in the calling plugin's code. Nothing
+            // is reported as held, so a has() check on it refuses rather than lets a payment through.
+            logFailure("balance", owner, Money.zero(currency), unreachable);
+            return 0d;
+        }
     }
 
     @Override
@@ -169,9 +199,24 @@ public final class NativeVaultEconomy implements Economy {
         }
         PlayerRef owner = ref(player);
         Money moved = Money.of(currency, BigDecimal.valueOf(amount));
-        Money before = provider.balance(owner, currency);
-        if (provider.debit(owner, moved).isErr()) {
-            return failure(amount, before.amount().doubleValue(), "insufficient funds");
+        Money before;
+        try {
+            before = provider.balance(owner, currency);
+        } catch (RuntimeException unreachable) {
+            // The balance did not answer, so nothing was taken yet: Vault's failure answer, not an exception.
+            logFailure("withdraw", owner, moved, unreachable);
+            return failure(amount, 0d, UNREACHABLE);
+        }
+        try {
+            if (provider.debit(owner, moved).isErr()) {
+                return failure(amount, before.amount().doubleValue(), "insufficient funds");
+            }
+        } catch (RuntimeException unreachable) {
+            // The calling plugin gets Vault's failure answer, the one shape it handles, rather than an exception
+            // thrown into its own code. A failure at commit leaves the outcome unknown, so the answer does not claim
+            // that nothing moved.
+            logFailure("withdraw", owner, moved, unreachable);
+            return failure(amount, before.amount().doubleValue(), UNREACHABLE);
         }
         return success(amount, before.minus(moved).amount().doubleValue());
     }
@@ -199,14 +244,49 @@ public final class NativeVaultEconomy implements Economy {
         }
         PlayerRef owner = ref(player);
         Money moved = Money.of(currency, BigDecimal.valueOf(amount));
-        Money before = provider.balance(owner, currency);
+        Money before;
+        try {
+            before = provider.balance(owner, currency);
+        } catch (RuntimeException unreachable) {
+            logFailure("deposit", owner, moved, unreachable);
+            return failure(amount, 0d, UNREACHABLE);
+        }
         // No ensureAccount here: a native credit opens the account itself, and against a foreign backend the
         // call does nothing at all. Asking for it separately is a database write per reward paid, on whichever
         // thread the caller holds.
-        if (provider.credit(owner, moved).isErr()) {
-            return failure(amount, before.amount().doubleValue(), "the balance ceiling would be passed");
+        try {
+            if (provider.credit(owner, moved).isErr()) {
+                return failure(amount, before.amount().doubleValue(), "the balance ceiling would be passed");
+            }
+        } catch (RuntimeException unreachable) {
+            logFailure("deposit", owner, moved, unreachable);
+            return failure(amount, before.amount().doubleValue(), UNREACHABLE);
         }
         return success(amount, before.plus(moved).amount().doubleValue());
+    }
+
+    /**
+     * Tell the console a write failed. A database outage fails every reward another plugin pays, possibly every
+     * tick, so the cause is logged once per {@link #LOG_EVERY} and the failures in between are counted into the next
+     * line.
+     */
+    private void logFailure(String op, PlayerRef owner, Money moved, RuntimeException failure) {
+        long now = nanos.getAsLong();
+        if (loggedOnce.compareAndSet(false, true)) {
+            nextLogAt.set(now + LOG_EVERY.toNanos());
+        } else {
+            long due = nextLogAt.get();
+            if (now - due < 0 || !nextLogAt.compareAndSet(due, now + LOG_EVERY.toNanos())) {
+                suppressed.incrementAndGet();
+                return;
+            }
+        }
+        log.error(
+                "event=vault_write_failed op=" + op + " owner=" + owner.uuid() + " amount="
+                        + moved.amount().toPlainString() + " currency="
+                        + currency.id().value() + " suppressed="
+                        + suppressed.getAndSet(0) + " (the outcome is not known; check the balance)",
+                failure);
     }
 
     @Override

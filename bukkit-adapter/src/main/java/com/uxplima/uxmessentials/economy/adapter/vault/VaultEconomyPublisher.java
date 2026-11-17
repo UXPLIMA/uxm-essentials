@@ -45,7 +45,7 @@ public final class VaultEconomyPublisher {
             return;
         }
         services.register(
-                Economy.class, new NativeVaultEconomy(provider, currency, plugin.getServer()), plugin, priority);
+                Economy.class, new NativeVaultEconomy(provider, currency, plugin.getServer(), log), plugin, priority);
         log.info(
                 "event=vault_economy_registered currency={} priority={}",
                 currency.id().value(),

@@ -1,12 +1,10 @@
 package com.uxplima.uxmessentials.economy.adapter.inbound.gui;
 
 import java.nio.file.Path;
-import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
 import java.util.function.BiConsumer;
 
-import org.bukkit.Server;
 import org.bukkit.entity.Player;
 
 import net.kyori.adventure.text.Component;
@@ -36,14 +34,13 @@ import org.jspecify.annotations.NullMarked;
 /**
  * Registers the server-wide eco-admin screen with the menu engine and opens it. A three-row panel reached from the
  * bare-/eco hub's [Server-wide] button: Give to All (an amount captured through the shared input seam, credited to
- * every online wallet) and Reset All (confirm-gated, zeroing every online balance), with, when more than one
- * currency is configured: a shared paginated {@link CurrencyPickerMenu} between them to switch the active currency.
- * Both ops operate on the currently-online roster, the same scope the {@code /eco giveall|resetall} commands use.
+ * every player's account) and Reset All (confirm-gated, putting every player's account back to the starting balance), with,
+ * when more than one currency is configured: a shared paginated {@link CurrencyPickerMenu} between them to switch the
+ * active currency. Both ops reach the accounts {@code /eco giveall|resetall} reach without {@code --all-accounts}.
  *
  * <p>The screen carries only the active currency as its {@link BulkSubject}, so each button's active-currency line
- * fills from the shared {@code eco_currency} placeholder without the renderer touching a port. The roster is
- * enumerated on the global region thread (the one thread {@code Server.getOnlinePlayers()} is safely readable on
- * Folia) when an op fires, snapshotted to {@link PlayerRef}s, and the bulk op runs off the tick thread. The menu holds no new domain logic. Every visible string resolves from the economy catalog.
+ * fills from the shared {@code eco_currency} placeholder without the renderer touching a port. The bulk op runs off
+ * the tick thread. The menu holds no new domain logic. Every visible string resolves from the economy catalog.
  *
  * <p>The shared {@code eco_currency} placeholder and the {@code economy:multi-currency} view condition are
  * registered by {@link EconomyTargetMenu} (both screens are wired against one {@code MenuBindings}), so this menu
@@ -62,7 +59,6 @@ public final class EconomyBulkMenu {
     private final GuiText guiText;
     private final Scheduler scheduler;
     private final TextInput textInput;
-    private final Server server;
     private final EcoAdminOps ops;
     private final CurrencyRegistry currencies;
     private final EconomyNotifier notifier;
@@ -74,7 +70,6 @@ public final class EconomyBulkMenu {
             GuiText guiText,
             Scheduler scheduler,
             TextInput textInput,
-            Server server,
             EcoAdminOps ops,
             CurrencyRegistry currencies,
             EconomyNotifier notifier,
@@ -84,7 +79,6 @@ public final class EconomyBulkMenu {
         this.guiText = Objects.requireNonNull(guiText, "guiText");
         this.scheduler = Objects.requireNonNull(scheduler, "scheduler");
         this.textInput = Objects.requireNonNull(textInput, "textInput");
-        this.server = Objects.requireNonNull(server, "server");
         this.ops = Objects.requireNonNull(ops, "ops");
         this.currencies = Objects.requireNonNull(currencies, "currencies");
         this.notifier = Objects.requireNonNull(notifier, "notifier");
@@ -117,7 +111,7 @@ public final class EconomyBulkMenu {
         menus.open(viewer, SPEC_ID, new BulkSubject(active));
     }
 
-    /** Capture an amount through the input seam, then credit every online wallet. */
+    /** Capture an amount through the input seam, then credit every player's account. */
     private void promptGiveAll(MenuActionContext ctx) {
         Player viewer = ctx.player();
         PlayerRef viewerRef = BukkitRefs.toRef(ctx.viewer());
@@ -130,8 +124,7 @@ public final class EconomyBulkMenu {
     }
 
     /**
-     * Parse the typed amount, and on success snapshot the online roster on the global thread and credit it off the
-     * tick thread, then re-open. A malformed amount sends the existing parse-error rejection and re-opens, no op
+     * Parse the typed amount, and on success credit every player's account off the tick thread, then re-open. A malformed amount sends the existing parse-error rejection and re-opens, no op
      * runs. Package-private so the amount branch is unit-tested without driving a live anvil.
      */
     void applyGiveAll(Player viewer, PlayerRef viewerRef, Currency active, String raw) {
@@ -142,14 +135,11 @@ public final class EconomyBulkMenu {
             return;
         }
         Money money = parsed.orElseThrow();
-        scheduler.onGlobal(() -> {
-            List<PlayerRef> roster = roster();
-            scheduler.async(() -> ops.giveAll(viewerRef, roster, money));
-        });
+        scheduler.async(() -> ops.giveAll(viewerRef, money));
         open(viewer, viewerRef, active);
     }
 
-    /** Confirm-gate the reset-all through the engine confirm dialog; yes zeroes every online balance and re-opens. */
+    /** Confirm-gate the reset-all through the engine confirm dialog; yes resets every player's account and re-opens. */
     private void confirmResetAll(MenuActionContext ctx) {
         Player viewer = ctx.player();
         PlayerRef viewerRef = BukkitRefs.toRef(ctx.viewer());
@@ -159,12 +149,9 @@ public final class EconomyBulkMenu {
                 ctx.viewer(), title, () -> resetAll(viewer, viewerRef, active), () -> open(viewer, viewerRef, active));
     }
 
-    /** Snapshot the online roster on the global thread and reset it off the tick thread, then re-open. */
+    /** Reset every player's account off the tick thread, then re-open. */
     void resetAll(Player viewer, PlayerRef viewerRef, Currency active) {
-        scheduler.onGlobal(() -> {
-            List<PlayerRef> roster = roster();
-            scheduler.async(() -> ops.resetAll(viewerRef, roster, active));
-        });
+        scheduler.async(() -> ops.resetAll(viewerRef, active));
         open(viewer, viewerRef, active);
     }
 
@@ -175,14 +162,6 @@ public final class EconomyBulkMenu {
         Currency active = ctx.subject(BulkSubject.class).active();
         List<Currency> all = List.copyOf(currencies.all());
         currencyPicker.open(viewer, viewerRef, all, active, chosen -> open(viewer, viewerRef, chosen));
-    }
-
-    private List<PlayerRef> roster() {
-        List<PlayerRef> refs = new ArrayList<>();
-        for (Player online : server.getOnlinePlayers()) {
-            refs.add(BukkitRefs.toRef(online));
-        }
-        return List.copyOf(refs);
     }
 
     /**

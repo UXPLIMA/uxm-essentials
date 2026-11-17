@@ -5,6 +5,7 @@ import java.util.function.Function;
 
 import org.jooq.DSLContext;
 import org.jooq.exception.DataAccessException;
+import org.jooq.exception.SQLStateClass;
 import org.jspecify.annotations.NullMarked;
 
 /**
@@ -35,6 +36,30 @@ public final class Transactions {
             return dsl.transactionResult(configuration -> work.apply(configuration.dsl()));
         } catch (DataAccessException cause) {
             throw new PersistenceException("transaction failed and was rolled back", cause);
+        }
+    }
+
+    /**
+     * Run {@code work} like {@link #inTransaction}, and run it again, up to {@code attempts} times in all, when the
+     * database rolled it back to break a deadlock or a serialisation conflict (SQLSTATE class 40). Such a transaction
+     * committed nothing, so running it again cannot apply it twice; any other failure is passed on at once. For short
+     * units of work a player waits on, such as a payment, where losing a lock cycle to a long writer must not fail
+     * the payment.
+     */
+    public static <T> T inTransactionRetrying(DSLContext dsl, int attempts, Function<DSLContext, T> work) {
+        Objects.requireNonNull(dsl, "dsl");
+        Objects.requireNonNull(work, "work");
+        if (attempts < 1) {
+            throw new IllegalArgumentException("attempts must be at least 1: " + attempts);
+        }
+        for (int attempt = 1; ; attempt++) {
+            try {
+                return dsl.transactionResult(configuration -> work.apply(configuration.dsl()));
+            } catch (DataAccessException cause) {
+                if (attempt >= attempts || cause.sqlStateClass() != SQLStateClass.C40_TRANSACTION_ROLLBACK) {
+                    throw new PersistenceException("transaction failed and was rolled back", cause);
+                }
+            }
         }
     }
 }

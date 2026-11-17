@@ -110,6 +110,34 @@ public final class BukkitInventoryCalculations {
     }
 
     /**
+     * Adds up to {@code amount} to the player's inventory in the largest denominations and drops nothing: what does not
+     * fit stays out. Returns the value that went in, so the caller can keep the rest for later.
+     */
+    public BigDecimal creditFitting(Player player, Money amount) {
+        Currency currency = amount.currency();
+        BigDecimal remaining = amount.amount();
+        List<Denomination> sortedDenoms = new ArrayList<>(currency.denominations());
+        sortedDenoms.sort((d1, d2) -> d2.value().compareTo(d1.value()));
+        BigDecimal leftOut = BigDecimal.ZERO;
+        for (Denomination denomination : sortedDenoms) {
+            BigDecimal[] divideAndRemainder = remaining.divideAndRemainder(denomination.value());
+            int count = divideAndRemainder[0].intValue();
+            if (count <= 0) {
+                continue;
+            }
+            remaining = divideAndRemainder[1];
+            for (ItemStack leftover : player.getInventory()
+                    .addItem(createItemStack(denomination, count))
+                    .values()) {
+                leftOut = leftOut.add(denomination.value().multiply(BigDecimal.valueOf(leftover.getAmount())));
+            }
+        }
+        // A remainder below the smallest denomination has no item to be, as with a plain credit; only what did not
+        // fit is kept back.
+        return amount.amount().subtract(leftOut);
+    }
+
+    /**
      * Debits the player's inventory by removing the exact value.
      * Uses a greedy selection algorithm and breaks down larger denominations to return change if necessary.
      */

@@ -3,8 +3,6 @@ package com.uxplima.uxmessentials.economy.adapter.inbound.gui;
 import java.nio.file.Path;
 import java.util.Objects;
 
-import org.bukkit.Server;
-
 import com.uxplima.uxmessentials.economy.application.EcoAdmin;
 import com.uxplima.uxmessentials.economy.application.EconomyNotifier;
 import com.uxplima.uxmessentials.economy.application.port.EconomyProvider;
@@ -53,7 +51,6 @@ public final class EconomyAdminGuiViews {
             GuiText guiText,
             Messages messages,
             Scheduler scheduler,
-            Server server,
             PlayerPickerView picker,
             CurrencyPickerMenu currencyPicker,
             com.uxplima.uxmlib.gui.input.TextInput textInput,
@@ -86,7 +83,6 @@ public final class EconomyAdminGuiViews {
                 guiText,
                 scheduler,
                 textInput,
-                server,
                 ops,
                 currencies,
                 notifier,

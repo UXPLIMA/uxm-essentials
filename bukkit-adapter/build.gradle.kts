@@ -79,6 +79,8 @@ dependencies {
     // The integration scenarios enable the whole plugin on MockBukkit, so they need what the loader provisions at
     // boot, and a logging backend so a warning the plugin writes through SLF4J reaches the scenario.
     testImplementation(uxm.mockbukkit)
+    // The Vault bridge's own tests call it the way another plugin does, through Vault's types.
+    testImplementation(libs.vault.api)
     testRuntimeOnly(libs.configurate.yaml)
     testRuntimeOnly(libs.gson)
     testRuntimeOnly(libs.bundles.db)

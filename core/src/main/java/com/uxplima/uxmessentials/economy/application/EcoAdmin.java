@@ -1,10 +1,15 @@
 package com.uxplima.uxmessentials.economy.application;
 
 import java.time.Clock;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Optional;
 
+import com.uxplima.uxmessentials.economy.application.port.AccountSweep.SweepOutcome;
+import com.uxplima.uxmessentials.economy.application.port.AccountSweep.SweepStatus;
 import com.uxplima.uxmessentials.economy.application.port.EconomyAudit;
 import com.uxplima.uxmessentials.economy.application.port.EconomyProvider;
 import com.uxplima.uxmessentials.economy.application.port.TransactionHistory;
@@ -13,6 +18,8 @@ import com.uxplima.uxmessentials.economy.domain.Currency;
 import com.uxplima.uxmessentials.economy.domain.EconomyMessageKey;
 import com.uxplima.uxmessentials.economy.domain.EconomyReason;
 import com.uxplima.uxmessentials.economy.domain.Money;
+import com.uxplima.uxmessentials.economy.domain.SweepKind;
+import com.uxplima.uxmessentials.economy.domain.SweepScope;
 import com.uxplima.uxmessentials.economy.domain.TransferError;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmessentials.shared.domain.Result;
@@ -27,7 +34,11 @@ import com.uxplima.uxmessentials.shared.domain.Unit;
  * the native ledger expresses, so they go through the {@link WalletRepository} the economy context owns.
  *
  * <p>A {@code set}/{@code reset} the store could not apply returns {@link TransferError#PLAYER_OFFLINE}, tells the
- * actor, and records no ledger row or audit entry; {@code resetall} leaves that target out of its count.
+ * actor, and records no ledger row or audit entry.
+ *
+ * <p>{@code giveall} and {@code resetall} reach every player, not the players one server happens to see, wherever the
+ * currency's money is kept: the {@link SweepRunner} runs them chunk by chunk and tells the actor the count once the
+ * last chunk is stored. {@code giveall --online} is the one bulk verb that reads the roster of this server.
  *
  * <p>An offline target is first materialised via {@link WalletRepository#ensureOwner}, so a give/set to a
  * never-joined player never breaks a foreign key: every ledger row names an owner that exists.
@@ -39,6 +50,7 @@ public final class EcoAdmin {
     private final EconomyAudit audit;
     private final EconomyNotifier notifier;
     private final TransactionHistory history;
+    private final SweepRunner sweeps;
     private final Clock clock;
 
     public EcoAdmin(
@@ -47,12 +59,14 @@ public final class EcoAdmin {
             EconomyAudit audit,
             EconomyNotifier notifier,
             TransactionHistory history,
+            SweepRunner sweeps,
             Clock clock) {
         this.economy = Objects.requireNonNull(economy, "economy");
         this.repository = Objects.requireNonNull(repository, "repository");
         this.audit = Objects.requireNonNull(audit, "audit");
         this.notifier = Objects.requireNonNull(notifier, "notifier");
         this.history = Objects.requireNonNull(history, "history");
+        this.sweeps = Objects.requireNonNull(sweeps, "sweeps");
         this.clock = Objects.requireNonNull(clock, "clock");
     }
 
@@ -95,15 +109,51 @@ public final class EcoAdmin {
         return Result.ok();
     }
 
-    /** {@code /eco giveall <amount> [currency]}: credit every wallet in {@code targets} by {@code amount}. */
-    public int giveAll(PlayerRef actor, List<PlayerRef> targets, Money amount) {
+    /**
+     * {@code /eco giveall <amount> [currency] [--all-accounts]}: credit every account in {@code scope} by
+     * {@code amount}. Returns the accounts credited when the sweep finished here, else 0; an account the credit would
+     * push past the currency's {@code max} is left out, and the actor is told how many were.
+     */
+    public int giveAll(PlayerRef actor, Money amount, SweepScope scope) {
         validateBulk(actor, amount);
-        int affected = creditEach(targets, amount, EconomyReason.ADMIN_GIVEALL);
+        return sweep(actor, SweepKind.CREDIT, scope, amount, EconomyReason.ADMIN_GIVEALL);
+    }
+
+    /**
+     * {@code /eco giveall <amount> [currency] --online}: credit each of {@code online}, the players online on the
+     * issuing server, one by one, the way a scheduled reward for being online expects. Returns how many were credited.
+     * A currency whose balance changes only while its player is online (items, experience) is queued per player and
+     * handed over at once, so what does not fit an inventory waits for the next join instead of being dropped.
+     */
+    public int giveOnline(PlayerRef actor, List<PlayerRef> online, Money amount) {
+        validateBulk(actor, amount);
+        DeliverSweptItems.OnlineGive given = sweeps.deferred(amount.currency())
+                ? sweeps.giveOnline(List.copyOf(online), amount, EconomyReason.ADMIN_GIVEALL)
+                : new DeliverSweptItems.OnlineGive(creditEach(online, amount), 0);
+        int affected = given.players();
         audit.bulkMutation(actor, amount, affected, EconomyReason.ADMIN_GIVEALL);
         notifier.send(
                 actor,
-                EconomyMessageKey.ECO_ADMIN_GIVEALL,
+                EconomyMessageKey.ECO_ADMIN_GIVEALL_ONLINE,
                 Map.of("count", Integer.toString(affected), "amount", notifier.amount(amount)));
+        if (given.heldBack() > 0) {
+            notifier.send(
+                    actor,
+                    EconomyMessageKey.ECO_ADMIN_GIVEALL_ONLINE_HELD,
+                    Map.of("count", Integer.toString(given.heldBack())));
+        }
+        return affected;
+    }
+
+    private int creditEach(List<PlayerRef> online, Money amount) {
+        int affected = 0;
+        for (PlayerRef target : List.copyOf(online)) {
+            repository.ensureOwner(target);
+            if (economy.credit(target, amount).isOk()) {
+                history.recordCredit(ownerId(target), amount, EconomyReason.ADMIN_GIVEALL, clock.millis());
+                affected++;
+            }
+        }
         return affected;
     }
 
@@ -151,23 +201,101 @@ public final class EcoAdmin {
         return Result.ok(amount);
     }
 
-    /** {@code /eco resetall [currency] --confirm}: reset every wallet in {@code targets} to {@code starting}. */
-    public int resetAll(PlayerRef actor, List<PlayerRef> targets, Currency currency) {
+    /**
+     * {@code /eco resetall --confirm [currency] [--all-accounts]}: put every account in {@code scope} back to the
+     * currency's starting figure. Returns the accounts whose balance changed when the sweep finished here, else 0; one
+     * already at the starting figure is not counted.
+     */
+    public int resetAll(PlayerRef actor, Currency currency, SweepScope scope) {
         Money starting = Money.of(currency, currency.starting());
         validateBulk(actor, starting);
-        int affected = 0;
-        for (PlayerRef target : List.copyOf(targets)) {
-            repository.ensureOwner(target);
-            Money before = economy.balance(target, currency);
-            if (!settle(target, starting)) {
-                continue;
-            }
-            recordNetChange(target, before, starting, EconomyReason.ADMIN_RESETALL);
-            affected++;
+        return sweep(actor, SweepKind.RESET, scope, starting, EconomyReason.ADMIN_RESETALL);
+    }
+
+    /**
+     * Carry on every sweep over every account a stop left running, on any server. Called once when the economy
+     * starts, off the tick.
+     */
+    public void resumeSweeps() {
+        sweeps.resumeUnfinished();
+    }
+
+    /** {@code /eco sweeps}: tell {@code actor} every unfinished sweep, how far it got and why it last stopped. */
+    public void listSweeps(PlayerRef actor) {
+        Objects.requireNonNull(actor, "actor");
+        List<SweepStatus> unfinished = sweeps.unfinished();
+        if (unfinished.isEmpty()) {
+            notifier.send(actor, EconomyMessageKey.ECO_ADMIN_SWEEPS_NONE, Map.of());
+            return;
         }
-        audit.bulkMutation(actor, starting, affected, EconomyReason.ADMIN_RESETALL);
-        notifier.send(actor, EconomyMessageKey.ECO_ADMIN_RESETALL, Map.of("count", Integer.toString(affected)));
-        return affected;
+        notifier.send(
+                actor, EconomyMessageKey.ECO_ADMIN_SWEEPS_HEADER, Map.of("count", Integer.toString(unfinished.size())));
+        for (SweepStatus status : unfinished) {
+            Map<String, String> values = new HashMap<>();
+            values.put("id", SweepRunner.shortId(status.id()));
+            values.put("kind", status.kind() == SweepKind.CREDIT ? "giveall" : "resetall");
+            values.put("amount", amount(status));
+            values.put("currency", status.currency());
+            values.put("scope", status.scope().name().toLowerCase(Locale.ROOT));
+            values.put("state", status.state().name().toLowerCase(Locale.ROOT));
+            values.put("count", Integer.toString(status.total().changed()));
+            values.put("actor", status.actor().name());
+            notifier.send(actor, EconomyMessageKey.ECO_ADMIN_SWEEPS_ENTRY, values);
+            String error = status.lastError();
+            if (error != null) {
+                notifier.send(actor, EconomyMessageKey.ECO_ADMIN_SWEEPS_ERROR, Map.of("error", error));
+            }
+        }
+    }
+
+    /**
+     * {@code /eco sweeps cancel <id>}: stop an unfinished sweep. The accounts it already changed keep the change, and
+     * the audit gets one line with their count, as for a sweep that ran to its end.
+     */
+    public boolean cancelSweep(PlayerRef actor, String id) {
+        Objects.requireNonNull(actor, "actor");
+        Objects.requireNonNull(id, "id");
+        Optional<SweepStatus> cancelled = sweeps.cancel(actor, id);
+        if (cancelled.isEmpty()) {
+            notifier.send(actor, EconomyMessageKey.ECO_ADMIN_SWEEP_UNKNOWN, Map.of("id", id));
+            return false;
+        }
+        SweepStatus status = cancelled.get();
+        currency(status.currency())
+                .ifPresent(currency -> audit.bulkMutation(
+                        status.actor(),
+                        Money.of(currency, status.amount()),
+                        status.total().changed(),
+                        status.reason()));
+        notifier.send(
+                actor,
+                EconomyMessageKey.ECO_ADMIN_SWEEP_CANCELLED,
+                Map.of(
+                        "id",
+                        SweepRunner.shortId(status.id()),
+                        "count",
+                        Integer.toString(status.total().changed())));
+        return true;
+    }
+
+    private Optional<Currency> currency(String id) {
+        return economy.currencies().stream()
+                .filter(currency -> currency.id().value().equals(id))
+                .findFirst();
+    }
+
+    /** The sweep's amount as money, or as a bare figure when its currency is no longer configured. */
+    private String amount(SweepStatus status) {
+        return currency(status.currency())
+                .map(currency -> notifier.amount(Money.of(currency, status.amount())))
+                .orElseGet(() -> status.amount().stripTrailingZeros().toPlainString());
+    }
+
+    /** Run one sweep; the runner tells the actor the count, a sweep already unfinished, or a pause. */
+    private int sweep(PlayerRef actor, SweepKind kind, SweepScope scope, Money amount, EconomyReason reason) {
+        Objects.requireNonNull(scope, "scope");
+        SweepOutcome outcome = sweeps.start(kind, scope, amount, reason, actor);
+        return outcome == null ? 0 : outcome.changed();
     }
 
     /**
@@ -248,18 +376,6 @@ public final class EcoAdmin {
         } else {
             history.recordDebit(ownerId(target), delta, reason, clock.millis());
         }
-    }
-
-    private int creditEach(List<PlayerRef> targets, Money amount, EconomyReason reason) {
-        int affected = 0;
-        for (PlayerRef target : List.copyOf(targets)) {
-            repository.ensureOwner(target);
-            if (economy.credit(target, amount).isOk()) {
-                history.recordCredit(ownerId(target), amount, reason, clock.millis());
-                affected++;
-            }
-        }
-        return affected;
     }
 
     private void notify(PlayerRef actor, PlayerRef target, Money amount, EconomyMessageKey feedback) {

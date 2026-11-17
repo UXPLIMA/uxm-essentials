@@ -39,6 +39,7 @@ final class OutboundFrames {
     /** The frames whose loss leaves a peer wrong in a way that matters before its cache refreshes. */
     private static final Set<MessageType> PROTECTED = EnumSet.of(
             MessageType.BALANCE_CHANGED,
+            MessageType.ALL_BALANCES_CHANGED,
             MessageType.VAULT_CHANGED,
             MessageType.BAN_CHANGED,
             MessageType.IP_BAN_CHANGED,

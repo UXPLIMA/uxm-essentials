@@ -964,7 +964,16 @@ public final class PlaceholderResolver {
         if (seam.isEmpty()) {
             return EMPTY;
         }
-        EconomyPlaceholders economy = seam.get();
+        try {
+            return economyTail(who, seam.get(), tail);
+        } catch (RuntimeException unreadable) {
+            // A balance that did not answer in time (experience read on the player's thread, a database that is
+            // down) shows as empty: an exception would reach the plugin that asked, every refresh of its board.
+            return EMPTY;
+        }
+    }
+
+    private String economyTail(PlayerRef who, EconomyPlaceholders economy, String tail) {
         switch (tail) {
             case "balance" -> {
                 return plainAmount(economy.balance(who));

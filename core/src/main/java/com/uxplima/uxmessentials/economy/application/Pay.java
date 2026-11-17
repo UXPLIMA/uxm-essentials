@@ -15,6 +15,7 @@ import com.uxplima.uxmessentials.economy.domain.PendingPay;
 import com.uxplima.uxmessentials.economy.domain.TransferError;
 import com.uxplima.uxmessentials.economy.domain.TransferResult;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
+import com.uxplima.uxmessentials.shared.domain.message.SharedMessageKey;
 
 /**
  * {@code /pay <player> <amount> [currency]} and {@code /payconfirm}: move value between two players atomically.
@@ -118,7 +119,16 @@ public final class Pay {
     }
 
     private PayOutcome settle(PlayerRef from, PlayerRef to, Money amount) {
-        TransferResult result = economy.transfer(from, to, amount);
+        TransferResult result;
+        try {
+            result = economy.transfer(from, to, amount);
+        } catch (RuntimeException failure) {
+            // The ledger could not complete the move and committed nothing (a deadlock it lost even after its own
+            // retries, or a lost connection). The payer must hear that rather than wait for a reply that never
+            // comes; the failure still escapes so the async lane logs it.
+            notifier.send(from, SharedMessageKey.COMMAND_ERROR);
+            throw failure;
+        }
         return switch (result) {
             case TransferResult.Allow ignored -> sent(from, to, amount);
             case TransferResult.InsufficientFunds ignored -> reject(from, TransferError.INSUFFICIENT_FUNDS, amount);

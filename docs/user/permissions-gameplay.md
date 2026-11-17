@@ -12,13 +12,14 @@ Contents: [economy](#economy) · [homes](#homes) · [kits](#kits) · [playerstat
 |---|---|---|
 | `uxmessentials.economy.admin` | Umbrella for eco-admin mutations (/eco give, take, set). | op |
 | `uxmessentials.economy.admin.backup` | /eco backup and /eco export: write every wallet balance to a timestamped JSON backup or a CSV export under backups/economy/. | op |
-| `uxmessentials.economy.admin.bulk` | /eco giveall, /eco giverandom, /eco resetall server-wide bulk mutations. | op |
+| `uxmessentials.economy.admin.bulk` | /eco giveall, /eco giverandom, /eco resetall: change every player's balance, or those of the players online here. | op |
 | `uxmessentials.economy.admin.give` | /eco give <player> <amount> [currency] only. | op |
 | `uxmessentials.economy.admin.history` | /eco history [player]: open the transaction history of yourself or another player, online or not. | op |
 | `uxmessentials.economy.admin.logs` | /eco logs: open the server-wide transaction log. | op |
 | `uxmessentials.economy.admin.note` | /eco note give <player> <amount> [currency]: hand an online player a banknote without debiting anyone. | op |
 | `uxmessentials.economy.admin.restore` | /eco restore <player> <backup>: put one player's wallet balances back from an /eco backup file. | op |
 | `uxmessentials.economy.admin.set` | /eco set <player> <amount> [currency] and /eco reset only. | op |
+| `uxmessentials.economy.admin.sweeps` | /eco sweeps and /eco sweeps cancel <id>: list the unfinished changes to every balance and stop one. | op |
 | `uxmessentials.economy.admin.take` | /eco take <player> <amount> [currency] only. | op |
 | `uxmessentials.economy.balance` | /balance [currency] to see your own balance. | true |
 | `uxmessentials.economy.balance.others` | /balance <player> [currency] to view another player's balance. | op |

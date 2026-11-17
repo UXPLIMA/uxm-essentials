@@ -34,6 +34,10 @@ import org.jspecify.annotations.NullMarked;
  * concurrent debits and an over-draw updates zero rows ({@link TransferError#INSUFFICIENT_FUNDS}). A transfer
  * is that guarded debit plus the credit in one transaction: both legs commit together or neither does. No
  * application-level lock exists or is wanted; a JVM lock would be wrong the moment two servers share the DB.
+ *
+ * <p>Every write is run again when the database rolls it back to break a deadlock: a payment locks two rows in its
+ * own order and can meet a sweep over every account or another payment going the other way. The rolled-back attempt
+ * committed nothing, so the retry cannot pay twice, and the payer gets an answer instead of an error.
  */
 @NullMarked
 public final class JooqWalletRepository extends JooqRepository implements WalletRepository {
@@ -69,7 +73,7 @@ public final class JooqWalletRepository extends JooqRepository implements Wallet
     @Override
     public Wallet ensureOwner(PlayerRef owner) {
         Objects.requireNonNull(owner, "owner");
-        return write(dsl -> {
+        return writeRetrying(dsl -> {
             upsertOwner(dsl, owner);
             return WalletRows.toWallet(
                     owner,
@@ -84,7 +88,7 @@ public final class JooqWalletRepository extends JooqRepository implements Wallet
     public void upsertBalance(PlayerRef owner, Money balance) {
         Objects.requireNonNull(owner, "owner");
         Objects.requireNonNull(balance, "balance");
-        write(dsl -> {
+        writeRetrying(dsl -> {
             upsertOwner(dsl, owner);
             dsl.insertInto(WALLET_BALANCES)
                     .set(WALLET_BALANCES.OWNER, WalletRows.ownerKey(owner))
@@ -109,7 +113,7 @@ public final class JooqWalletRepository extends JooqRepository implements Wallet
         // would otherwise commit (the write helper only rolls back on a throw), leaving `from` debited while
         // `to` was never credited. This is the same shape as exchange, across two owners of one currency.
         try {
-            return write(dsl -> {
+            return writeRetrying(dsl -> {
                 if (guardedDebit(dsl, from, amount) == 0) {
                     return Result.err(TransferError.INSUFFICIENT_FUNDS);
                 }
@@ -131,7 +135,7 @@ public final class JooqWalletRepository extends JooqRepository implements Wallet
     public Result<Unit, TransferError> debit(PlayerRef owner, Money amount) {
         Objects.requireNonNull(owner, "owner");
         Objects.requireNonNull(amount, "amount");
-        return write(dsl ->
+        return writeRetrying(dsl ->
                 guardedDebit(dsl, owner, amount) == 0 ? Result.err(TransferError.INSUFFICIENT_FUNDS) : Result.ok());
     }
 
@@ -139,7 +143,7 @@ public final class JooqWalletRepository extends JooqRepository implements Wallet
     public Result<Unit, TransferError> credit(PlayerRef owner, Money amount) {
         Objects.requireNonNull(owner, "owner");
         Objects.requireNonNull(amount, "amount");
-        return write(dsl -> {
+        return writeRetrying(dsl -> {
             BigDecimal max = amount.currency().max();
             BigDecimal current = balanceWithin(dsl, owner, amount.currency());
             if (current.add(amount.amount()).compareTo(max) > 0) {
@@ -162,7 +166,7 @@ public final class JooqWalletRepository extends JooqRepository implements Wallet
         // debit has taken, so a clamp breach throws a rollback signal to undo the committed debit: a returned
         // err would otherwise commit (the write helper only rolls back on a throw), leaving the source debited.
         try {
-            return write(dsl -> {
+            return writeRetrying(dsl -> {
                 if (guardedDebit(dsl, owner, debit) == 0) {
                     return Result.err(TransferError.INSUFFICIENT_FUNDS);
                 }

@@ -2,6 +2,7 @@ package com.uxplima.uxmessentials.economy.adapter.outbound.api;
 
 import java.util.Objects;
 
+import com.uxplima.uxmessentials.api.bukkit.event.economy.UxmBalanceSweepEvent;
 import com.uxplima.uxmessentials.api.bukkit.event.economy.UxmBankDepositEvent;
 import com.uxplima.uxmessentials.api.bukkit.event.economy.UxmBankWithdrawEvent;
 import com.uxplima.uxmessentials.api.bukkit.event.economy.UxmLoanDisburseEvent;
@@ -13,6 +14,9 @@ import com.uxplima.uxmessentials.api.view.UxmEconomyRejection;
 import com.uxplima.uxmessentials.api.view.UxmMoney;
 import com.uxplima.uxmessentials.economy.domain.EconomyError;
 import com.uxplima.uxmessentials.economy.domain.Money;
+import com.uxplima.uxmessentials.economy.domain.SweepKind;
+import com.uxplima.uxmessentials.economy.domain.SweepScope;
+import com.uxplima.uxmessentials.economy.domain.event.BalancesSwept;
 import com.uxplima.uxmessentials.economy.domain.event.BankDeposited;
 import com.uxplima.uxmessentials.economy.domain.event.BankWithdrawn;
 import com.uxplima.uxmessentials.economy.domain.event.LoanDisbursed;
@@ -27,8 +31,9 @@ import org.jspecify.annotations.NullMarked;
 /**
  * Which Bukkit event each economy fact becomes.
  *
- * <p>All of them follow the player whose money moved, which is where a listener would act: crediting a scoreboard,
- * playing a sound, writing to its own ledger. Money is published as its currency id plus a scaled amount, never as a
+ * <p>All of them but one follow the player whose money moved, which is where a listener would act: crediting a
+ * scoreboard, playing a sound, writing to its own ledger. A sweep over every account has no single player, so it is
+ * delivered on the global region. Money is published as its currency id plus a scaled amount, never as a
  * double, so a listener reading a balance reads exactly what the database holds.
  */
 @NullMarked
@@ -107,6 +112,23 @@ public final class EconomyEventBridges {
                         money(fact.paid()),
                         money(fact.remaining())),
                 fact -> Region.entity(fact.debtor()));
+        registry.register(
+                BalancesSwept.class,
+                UxmBalanceSweepEvent.getHandlerList(),
+                fact -> new UxmBalanceSweepEvent(
+                        fact.kind() == SweepKind.CREDIT
+                                ? UxmBalanceSweepEvent.Kind.GIVE_ALL
+                                : UxmBalanceSweepEvent.Kind.RESET_ALL,
+                        fact.scope() == SweepScope.PLAYERS
+                                ? UxmBalanceSweepEvent.Scope.PLAYERS
+                                : UxmBalanceSweepEvent.Scope.ALL_ACCOUNTS,
+                        money(fact.amount()),
+                        fact.accounts(),
+                        fact.skipped(),
+                        fact.actor().uuid(),
+                        fact.actor().name(),
+                        fact.occurredAt()),
+                fact -> Region.global());
     }
 
     // Money crosses the boundary as a currency id and an already-scaled amount. It lives here rather than in the
