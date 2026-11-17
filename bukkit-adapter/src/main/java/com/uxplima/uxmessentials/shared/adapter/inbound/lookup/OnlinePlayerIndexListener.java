@@ -63,12 +63,16 @@ public final class OnlinePlayerIndexListener implements Listener {
         index.left(event.getPlayer().getUniqueId(), event.getPlayer());
     }
 
-    /** A connection closed: a login that never joined leaves no player behind in the index. */
+    /**
+     * A connection closed: a login that never joined leaves no player behind in the index. The entry is taken only
+     * when its own connection is the one gone, so the late close of an earlier connection leaves a newer login alone.
+     */
     @EventHandler(priority = EventPriority.MONITOR)
     public void onClose(PlayerConnectionCloseEvent event) {
-        Player never = joining.remove(event.getPlayerUniqueId());
-        if (never != null) {
-            index.left(event.getPlayerUniqueId(), never);
+        UUID account = event.getPlayerUniqueId();
+        Player pending = joining.get(account);
+        if (pending != null && !pending.isConnected() && joining.remove(account, pending)) {
+            index.left(account, pending);
         }
     }
 }

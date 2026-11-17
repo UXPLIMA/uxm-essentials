@@ -26,6 +26,10 @@ public final class NameCaseEvidenceListener implements Listener {
     /** A completed join: a login another check refused never gets here, so it is no evidence. */
     @EventHandler(priority = EventPriority.MONITOR)
     public void onJoin(PlayerJoinEvent event) {
+        // A player with no network address is a fake connection a bot or NPC plugin made, which proves nothing.
+        if (event.getPlayer().getAddress() == null) {
+            return;
+        }
         nameCase.observe(event.getPlayer().getUniqueId(), event.getPlayer().getName());
     }
 }

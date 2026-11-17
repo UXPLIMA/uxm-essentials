@@ -67,6 +67,8 @@ public final class CachingPlayerNameIndex implements PlayerNameIndex {
      * recorded and learned, so the tick can tell a lone holder from one of several without reading the store.
      */
     private final Set<String> sharedNames = ConcurrentHashMap.newKeySet();
+    /** Whether {@link #sharedNames} has been read from the store; until then every name may be shared. */
+    private volatile boolean warmed;
 
     /** How many accounts are held. Unbounded until the store is attached, before which nobody can have joined. */
     private volatile int limit = Integer.MAX_VALUE;
@@ -94,6 +96,7 @@ public final class CachingPlayerNameIndex implements PlayerNameIndex {
         for (int i = recent.size() - 1; i >= 0; i--) {
             remember(recent.get(i));
         }
+        warmed = true;
         log.info("event=name_index_warmed rows={}", String.valueOf(recent.size()));
     }
 
@@ -142,11 +145,23 @@ public final class CachingPlayerNameIndex implements PlayerNameIndex {
     public boolean shared(String name) {
         Objects.requireNonNull(name, "name");
         String key = key(name.strip());
-        if (sharedNames.contains(key)) {
+        // Before the store has said which names have several holders, a lone holder in memory proves nothing.
+        if (!warmed || sharedNames.contains(key)) {
             return true;
         }
         synchronized (lock) {
             return byLowerName.getOrDefault(key, Set.of()).size() > 1;
+        }
+    }
+
+    @Override
+    public void joining(UUID uuid, String name) {
+        Objects.requireNonNull(uuid, "uuid");
+        Objects.requireNonNull(name, "name");
+        PlayerNameRepository store = repository.get();
+        String trimmed = name.strip();
+        if (store != null && !trimmed.isEmpty()) {
+            noteIfShared(store, uuid, trimmed);
         }
     }
 
