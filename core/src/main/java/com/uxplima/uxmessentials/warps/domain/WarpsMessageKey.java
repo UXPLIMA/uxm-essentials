@@ -147,6 +147,16 @@ public enum WarpsMessageKey implements MessageKey {
     WARP_EDITOR_WELCOME_MANAGER_CLEAR_NAME("warp.editor.welcome-manager.clear.name"),
     WARP_EDITOR_WELCOME_MANAGER_CLEAR_LORE("warp.editor.welcome-manager.clear.lore"),
 
+    // one welcome message's panel
+    WARP_EDITOR_WELCOME_ENTRY_TITLE("warp.editor.welcome-entry.title"),
+    WARP_EDITOR_WELCOME_ENTRY_TEXT_NAME("warp.editor.welcome-entry.text.name"),
+    WARP_EDITOR_WELCOME_ENTRY_TEXT_LORE("warp.editor.welcome-entry.text.lore"),
+    WARP_EDITOR_WELCOME_ENTRY_TYPE_NAME("warp.editor.welcome-entry.type.name"),
+    WARP_EDITOR_WELCOME_ENTRY_TYPE_LORE("warp.editor.welcome-entry.type.lore"),
+    WARP_EDITOR_WELCOME_ENTRY_REMOVE_NAME("warp.editor.welcome-entry.remove.name"),
+    WARP_EDITOR_WELCOME_ENTRY_REMOVE_LORE("warp.editor.welcome-entry.remove.lore"),
+    WARP_EDITOR_WELCOME_ENTRY_BACK("warp.editor.welcome-entry.back"),
+
     // signs
     WARP_SIGN_NO_PERMISSION_CREATE("warp.sign.no-permission-create"),
     WARP_SIGN_NO_PERMISSION_USE("warp.sign.no-permission-use"),

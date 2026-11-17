@@ -7,6 +7,7 @@ import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.TimeUnit;
 import java.util.function.BooleanSupplier;
+import java.util.function.Consumer;
 
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.EventPriority;
@@ -28,6 +29,9 @@ import org.jspecify.annotations.NullMarked;
  * the async pool through the {@link Scheduler} port and is waited on for at most the configured timeout. A slow
  * Mojang, a MineSkin outage or a Geyser endpoint that hangs lets the player in wearing whatever they had, and
  * nothing thrown here reaches the server's login handling.
+ *
+ * <p>The stored skin is read fresh for every login rather than from the cache: another server sharing the database
+ * may have changed it while this one, empty, heard no announcement.
  */
 @NullMarked
 public final class SkinLoginListener implements Listener {
@@ -37,14 +41,21 @@ public final class SkinLoginListener implements Listener {
     private final Logger log;
     private final Duration timeout;
     private final BooleanSupplier active;
+    private final Consumer<UUID> forgetCached;
 
     public SkinLoginListener(
-            DressLogin dressLogin, Scheduler scheduler, Logger log, Duration timeout, BooleanSupplier active) {
+            DressLogin dressLogin,
+            Scheduler scheduler,
+            Logger log,
+            Duration timeout,
+            BooleanSupplier active,
+            Consumer<UUID> forgetCached) {
         this.dressLogin = Objects.requireNonNull(dressLogin, "dressLogin");
         this.scheduler = Objects.requireNonNull(scheduler, "scheduler");
         this.log = Objects.requireNonNull(log, "log");
         this.timeout = Objects.requireNonNull(timeout, "timeout");
         this.active = Objects.requireNonNull(active, "active");
+        this.forgetCached = Objects.requireNonNull(forgetCached, "forgetCached");
     }
 
     /**
@@ -68,7 +79,10 @@ public final class SkinLoginListener implements Listener {
     /** The join order's answer, or empty when it did not arrive in time or failed outright. */
     private Optional<DressLogin.Dressed> resolve(UUID player, String username) {
         CompletableFuture<Optional<DressLogin.Dressed>> answer = new CompletableFuture<>();
-        scheduler.async(() -> answer.complete(dressLogin.resolve(player, username)));
+        scheduler.async(() -> {
+            forgetCached.accept(player);
+            answer.complete(dressLogin.resolve(player, username));
+        });
         try {
             return answer.get(timeout.toMillis(), TimeUnit.MILLISECONDS);
         } catch (InterruptedException interrupted) {
