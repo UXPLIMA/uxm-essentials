@@ -1,5 +1,6 @@
 package com.uxplima.uxmessentials.shared.domain.message;
 
+import java.util.Locale;
 import java.util.Objects;
 
 /**
@@ -33,6 +34,32 @@ public final class TypedText {
             kept.append(code ? NO_CODE : character);
         }
         return kept.toString();
+    }
+
+    /**
+     * {@code typed} as the inside of a JSON string, so it cannot close the string and add keys of its own. A quote of
+     * either kind is escaped, since Gson also reads a string written in single quotes, and so are a backslash and every
+     * control character.
+     */
+    public static String asJsonString(String typed) {
+        Objects.requireNonNull(typed, "typed");
+        StringBuilder escaped = new StringBuilder(typed.length() + 8);
+        for (int i = 0; i < typed.length(); i++) {
+            char character = typed.charAt(i);
+            switch (character) {
+                case '"' -> escaped.append("\\\"");
+                case '\'' -> escaped.append("\\u0027");
+                case '\\' -> escaped.append("\\\\");
+                default -> {
+                    if (character < 0x20) {
+                        escaped.append(String.format(Locale.ROOT, "\\u%04x", (int) character));
+                    } else {
+                        escaped.append(character);
+                    }
+                }
+            }
+        }
+        return escaped.toString();
     }
 
     /**
