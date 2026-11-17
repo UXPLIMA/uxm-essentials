@@ -25,7 +25,9 @@ import com.uxplima.uxmessentials.shared.adapter.outbound.IpLiteral;
 import com.uxplima.uxmessentials.shared.application.permission.EnforcementPermissions;
 import com.uxplima.uxmessentials.shared.application.port.MessageSink;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
+import com.uxplima.uxmessentials.shared.domain.NameMatch;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
+import com.uxplima.uxmessentials.shared.domain.message.MessageLine;
 import com.uxplima.uxmlib.command.Gate;
 import com.uxplima.uxmlib.command.Sender;
 import org.jspecify.annotations.NullMarked;
@@ -98,20 +100,28 @@ public final class BanipCommand extends ModerationCommandSupport implements Comm
     }
 
     /**
-     * How the command finds the address to ban, decided on the command thread: an address typed is used as it is, a
-     * player name is looked up here and their last address read from their seen record on the async lane. Empty, after
-     * a line to the sender, when the argument is neither.
+     * How the command finds the address to ban, decided on the command thread: an address literal is used as it is,
+     * anything else is a player name looked up here, whose last address is read from their seen record on the async
+     * lane. Empty, after a line to the sender, when the argument is neither.
      */
     private Optional<Resolving> resolveTarget(
             CommandContext<CommandSourceStack> ctx, String argument, PlayerRef actor) {
-        if (IpLiteral.looksLikeAddress(argument)) {
-            Optional<String> ip = IpLiteral.canonical(argument);
-            if (ip.isEmpty()) {
-                notify(ctx, ModerationMessageKey.BANIP_INVALID_IP, Map.of());
-            }
+        Optional<String> ip = IpLiteral.canonical(argument);
+        if (ip.isPresent()) {
             return ip.map(address -> () -> Optional.of(new BanIp.Target(address, Optional.empty())));
         }
-        return targetByName(ctx, argument).map(player -> () -> byPlayer(actor, player));
+        NameMatch match = services.targets().resolve(argument);
+        Optional<PlayerRef> player = match.player();
+        if (player.isEmpty()) {
+            if (IpLiteral.malformedAddress(argument)) {
+                notify(ctx, ModerationMessageKey.BANIP_INVALID_IP, Map.of());
+            } else {
+                MessageLine miss = match.miss(UNKNOWN_PLAYER, Map.of("player", argument));
+                notify(ctx, miss.key(), miss.args());
+            }
+            return Optional.empty();
+        }
+        return player.map(found -> () -> byPlayer(actor, found));
     }
 
     /** The address a player was last seen on, read from storage; empty, after a line to the actor, when none. */

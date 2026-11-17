@@ -38,6 +38,23 @@ class IpLiteralTest {
         assertThat(IpLiteral.canonical("010.000.113.007")).isEmpty();
     }
 
+    @Test
+    void aFloodgateNameIsNotTakenForAnAddress() {
+        assertThat(IpLiteral.canonical(".SteveBE")).isEmpty();
+        assertThat(IpLiteral.malformedAddress(".SteveBE")).isFalse();
+        assertThat(IpLiteral.malformedAddress(".123")).isFalse();
+        assertThat(IpLiteral.malformedAddress("BE.Steve")).isFalse();
+        assertThat(IpLiteral.malformedAddress("Steve")).isFalse();
+    }
+
+    @Test
+    void aMistypedAddressIsToldApartFromAName() {
+        assertThat(IpLiteral.malformedAddress("203.0.113")).isTrue();
+        assertThat(IpLiteral.malformedAddress("203.0.113.700")).isTrue();
+        assertThat(IpLiteral.malformedAddress("2001:db8::7::1")).isTrue();
+        assertThat(IpLiteral.malformedAddress("203.0.113.7")).isFalse();
+    }
+
     /** The text the login check and the live kick read for a player connected from {@code address}. */
     private static String connectedFrom(byte[] address) throws UnknownHostException {
         return InetAddress.getByAddress(address).getHostAddress();
