@@ -180,14 +180,27 @@ class IndexedPlayerLookupTest {
     }
 
     @Test
-    void offlineModeOnTheTickALoneAccountInAnotherCaseIsNotTakenOnTrust() {
+    void offlineModeOnTheTickALoneAccountUnderANameNobodyElseHoldsIsFoundInAnyCase() {
         names.record(STEVE.uuid(), STEVE.name());
         onTick = true;
 
-        // The memory is a window; only the store could say no other account is spelled STEVE.
-        assertThat(lookup.matchByName("STEVE")).isEqualTo(NameMatch.unknown());
+        assertThat(lookup.matchByName("STEVE")).isEqualTo(NameMatch.found(STEVE));
         assertThat(lookup.matchByName("Steve")).isEqualTo(NameMatch.found(STEVE));
+        assertThat(lookup.matchByNameFromMemory("steve")).isEqualTo(NameMatch.found(STEVE));
+    }
+
+    @Test
+    void offlineModeOnTheTickALoneAccountUnderANameOthersHoldIsNotTakenOnTrust() {
+        StoredNames store = new StoredNames();
+        store.rows.add(new PlayerName(STEVE.uuid(), STEVE.name(), 100L));
+        store.rows.add(new PlayerName(LOWER_STEVE.uuid(), LOWER_STEVE.name(), 200L));
+        // A window of one: only steve is held in memory, but the store says Steve holds the name too.
+        names.backWith(store, 1);
+        onTick = true;
+
+        assertThat(lookup.matchByName("STEVE")).isEqualTo(NameMatch.unknown());
         assertThat(lookup.matchByNameFromMemory("STEVE")).isEqualTo(NameMatch.unknown());
+        assertThat(lookup.matchByName("steve")).isEqualTo(NameMatch.found(LOWER_STEVE));
     }
 
     @Test
@@ -295,6 +308,19 @@ class IndexedPlayerLookupTest {
                     .filter(row -> row.name().equalsIgnoreCase(name.strip()))
                     .limit(limit)
                     .toList();
+        }
+
+        @Override
+        public java.util.Set<String> sharedNames() {
+            return rows.stream()
+                    .collect(java.util.stream.Collectors.groupingBy(
+                            row -> row.name().toLowerCase(java.util.Locale.ROOT),
+                            java.util.stream.Collectors.counting()))
+                    .entrySet()
+                    .stream()
+                    .filter(entry -> entry.getValue() > 1)
+                    .map(java.util.Map.Entry::getKey)
+                    .collect(java.util.stream.Collectors.toUnmodifiableSet());
         }
 
         @Override

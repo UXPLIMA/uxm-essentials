@@ -60,10 +60,11 @@ final class RunningPlugin implements AutoCloseable {
 
     /**
      * What the plugin rightly warns about on MockBukkit and nowhere else: the offline adapters reach into the
-     * server's internals to read player files, and turn themselves off without them.
+     * server's internals to read player files, and turn themselves off without them; and MockBukkit's players carry
+     * the name-derived uuids of an offline-mode login, which the plugin reports as evidence of an offline-mode network.
      */
     private static final List<String> WARNED_ONLY_WITHOUT_SERVER_INTERNALS =
-            List.of("event=tpoffline_unavailable", "event=offline_inventories_unavailable");
+            List.of("event=tpoffline_unavailable", "event=offline_inventories_unavailable", "event=name_case_detected");
 
     private static final String WORLD = "world";
 

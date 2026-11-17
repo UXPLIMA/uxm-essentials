@@ -26,6 +26,7 @@ import com.uxplima.uxmessentials.shared.adapter.outbound.lookup.BukkitPlayerLoca
 import com.uxplima.uxmessentials.shared.adapter.outbound.lookup.BukkitWorldLookup;
 import com.uxplima.uxmessentials.shared.adapter.outbound.lookup.CachingPlayerNameIndex;
 import com.uxplima.uxmessentials.shared.adapter.outbound.lookup.IndexedPlayerLookup;
+import com.uxplima.uxmessentials.shared.adapter.outbound.lookup.NameCaseStateFile;
 import com.uxplima.uxmessentials.shared.adapter.outbound.lookup.OnlinePlayerIndex;
 import com.uxplima.uxmessentials.shared.adapter.outbound.lookup.ServerNameCase;
 import com.uxplima.uxmessentials.shared.adapter.outbound.message.AdventureTranslations;
@@ -236,10 +237,13 @@ final class KernelWiring {
         CachingPlayerNameIndex nameIndex = new CachingPlayerNameIndex(scheduler, log);
         OnlinePlayerIndex online = new OnlinePlayerIndex();
         // A backend behind a proxy reports the proxy's online mode from settings that default to online, so on auto
-        // the answer is also corrected by the first offline-mode login (NameCaseEvidenceListener).
+        // the answer is also corrected by the first offline-mode join (NameCaseEvidenceListener), and that finding is
+        // kept in the data folder for the next start.
         LiveNameCase nameCase = new LiveNameCase(
                 LiveNameCase.Setting.parse(config.getString(NAME_CASE_PATH, "auto"), log),
                 ServerNameCase.of(plugin.getServer()),
+                plugin.getServer().getOnlineMode(),
+                new NameCaseStateFile(plugin.getDataFolder().toPath(), scheduler, log),
                 log);
 
         // One skin fetch for every context that dresses something in a player's skin. It asks Mojang directly

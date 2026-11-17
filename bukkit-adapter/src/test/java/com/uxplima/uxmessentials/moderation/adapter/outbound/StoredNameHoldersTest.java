@@ -59,6 +59,11 @@ class StoredNameHoldersTest {
         }
 
         @Override
+        public java.util.Set<String> sharedNames() {
+            return java.util.Set.of();
+        }
+
+        @Override
         public void upsert(PlayerName record) {
             rows.add(record);
         }

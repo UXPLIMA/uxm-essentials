@@ -13,6 +13,7 @@ import com.uxplima.uxmessentials.persistence.runtime.JooqRepository;
 import com.uxplima.uxmessentials.shared.application.port.PlayerNameRepository;
 import com.uxplima.uxmessentials.shared.domain.PlayerName;
 import org.jooq.DSLContext;
+import org.jooq.impl.DSL;
 import org.jspecify.annotations.NullMarked;
 
 /**
@@ -118,6 +119,15 @@ public final class JooqPlayerNameRepository extends JooqRepository implements Pl
             });
         }
         return added;
+    }
+
+    @Override
+    public Set<String> sharedNames() {
+        return read(dsl -> Set.copyOf(dsl.select(PLAYER_NAMES.LOWER_NAME)
+                .from(PLAYER_NAMES)
+                .groupBy(PLAYER_NAMES.LOWER_NAME)
+                .having(DSL.count().gt(1))
+                .fetch(PLAYER_NAMES.LOWER_NAME)));
     }
 
     /** Every player the list already holds, so a caller reads names only for the ones it lacks. */

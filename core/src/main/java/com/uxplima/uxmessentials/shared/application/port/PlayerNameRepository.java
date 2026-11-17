@@ -1,6 +1,7 @@
 package com.uxplima.uxmessentials.shared.application.port;
 
 import java.util.List;
+import java.util.Set;
 
 import com.uxplima.uxmessentials.shared.domain.PlayerName;
 
@@ -20,6 +21,12 @@ public interface PlayerNameRepository {
      * first and at most {@code limit} of them. Two accounts share a name in different cases on an offline-mode server.
      */
     List<PlayerName> underName(String name, int limit);
+
+    /**
+     * Every lower-cased name more than one account holds, in different cases. Small on any server: one entry per name
+     * with case variants.
+     */
+    Set<String> sharedNames();
 
     /** Insert or update the row for this account. */
     void upsert(PlayerName record);

@@ -13,7 +13,8 @@ import org.junit.jupiter.api.Test;
 
 /**
  * A server that reports authenticated logins but lets offline-mode players in (a proxy in offline mode whose backend
- * keeps Paper's default proxy settings) is found out by its first offline-mode join.
+ * keeps Paper's default proxy settings) is found out by its first offline-mode join, and remembers it. A server that
+ * authenticates its own logins is never switched by one.
  */
 class LiveNameCaseTest {
 
@@ -23,10 +24,11 @@ class LiveNameCaseTest {
     private static final UUID FLOODGATE = UUID.fromString("00000000-0000-0000-0009-01f2a3b4c5d6");
 
     private final Lines log = new Lines();
+    private final Kept memory = new Kept();
 
     @Test
-    void onAutoAnOfflineModeJoinSwitchesToCaseSensitiveAndSaysSoOnce() {
-        LiveNameCase names = new LiveNameCase(LiveNameCase.Setting.AUTO, NameCase.INSENSITIVE, log);
+    void onAutoAnOfflineModeJoinSwitchesToCaseSensitiveWarnsOnceAndIsKept() {
+        LiveNameCase names = behindAProxy(LiveNameCase.Setting.AUTO);
 
         names.observe(ONLINE_ACCOUNT, "Notch");
         names.observe(FLOODGATE, ".BedrockGamer");
@@ -36,19 +38,49 @@ class LiveNameCaseTest {
         names.observe(UUID.nameUUIDFromBytes("OfflinePlayer:Alex".getBytes(StandardCharsets.UTF_8)), "Alex");
 
         assertThat(names.get()).isEqualTo(NameCase.SENSITIVE);
-        assertThat(log.infos).hasSize(1).first().asString().contains("name_case_detected", "Steve");
+        assertThat(log.warnings).hasSize(1).first().asString().contains("name_case_detected", "Steve");
+        assertThat(memory.detected).isTrue();
+    }
+
+    @Test
+    void theNextStartBeginsCaseSensitiveFromWhatWasKept() {
+        memory.detected = true;
+
+        assertThat(behindAProxy(LiveNameCase.Setting.AUTO).get()).isEqualTo(NameCase.SENSITIVE);
+    }
+
+    @Test
+    void sayingInsensitiveForgetsWhatWasKept() {
+        memory.detected = true;
+
+        LiveNameCase names = behindAProxy(LiveNameCase.Setting.INSENSITIVE);
+
+        assertThat(names.get()).isEqualTo(NameCase.INSENSITIVE);
+        assertThat(memory.detected).isFalse();
+    }
+
+    @Test
+    void aServerThatAuthenticatesItsOwnLoginsIsNeverSwitched() {
+        memory.detected = true;
+        LiveNameCase names = new LiveNameCase(LiveNameCase.Setting.AUTO, NameCase.INSENSITIVE, true, memory, log);
+
+        names.observe(OFFLINE_STEVE, "Steve");
+
+        assertThat(names.get()).isEqualTo(NameCase.INSENSITIVE);
+        assertThat(log.warnings).isEmpty();
     }
 
     @Test
     void aForcedSettingIsKeptWhateverJoins() {
-        LiveNameCase insensitive = new LiveNameCase(LiveNameCase.Setting.INSENSITIVE, NameCase.SENSITIVE, log);
-        LiveNameCase sensitive = new LiveNameCase(LiveNameCase.Setting.SENSITIVE, NameCase.INSENSITIVE, log);
+        LiveNameCase insensitive =
+                new LiveNameCase(LiveNameCase.Setting.INSENSITIVE, NameCase.SENSITIVE, false, memory, log);
+        LiveNameCase sensitive = behindAProxy(LiveNameCase.Setting.SENSITIVE);
 
         insensitive.observe(OFFLINE_STEVE, "Steve");
 
         assertThat(insensitive.get()).isEqualTo(NameCase.INSENSITIVE);
         assertThat(sensitive.get()).isEqualTo(NameCase.SENSITIVE);
-        assertThat(log.infos).isEmpty();
+        assertThat(log.warnings).isEmpty();
     }
 
     @Test
@@ -58,6 +90,32 @@ class LiveNameCaseTest {
 
         assertThat(LiveNameCase.Setting.parse("cracked", log)).isEqualTo(LiveNameCase.Setting.AUTO);
         assertThat(log.warnings).hasSize(1);
+    }
+
+    /** A backend behind a proxy that reports authenticated logins, with online mode off on the backend itself. */
+    private LiveNameCase behindAProxy(LiveNameCase.Setting setting) {
+        return new LiveNameCase(setting, NameCase.INSENSITIVE, false, memory, log);
+    }
+
+    /** What is kept across restarts, in memory. */
+    private static final class Kept implements LiveNameCase.Memory {
+
+        boolean detected;
+
+        @Override
+        public boolean detected() {
+            return detected;
+        }
+
+        @Override
+        public void remember() {
+            detected = true;
+        }
+
+        @Override
+        public void forget() {
+            detected = false;
+        }
     }
 
     /** Keeps the info and warning lines, template followed by arguments. */

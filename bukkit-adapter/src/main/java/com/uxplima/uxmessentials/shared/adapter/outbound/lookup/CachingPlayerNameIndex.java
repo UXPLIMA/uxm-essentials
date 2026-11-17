@@ -13,6 +13,7 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
 import java.util.UUID;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicReference;
 
 import com.uxplima.uxmessentials.shared.application.port.Logger;
@@ -61,6 +62,11 @@ public final class CachingPlayerNameIndex implements PlayerNameIndex {
     private final Object lock = new Object();
     private final LinkedHashMap<UUID, PlayerName> byAccount = new LinkedHashMap<>();
     private final Map<String, Set<UUID>> byLowerName = new HashMap<>();
+    /**
+     * The lower-cased names more than one account holds, read from the store at warm-up and kept current as names are
+     * recorded and learned, so the tick can tell a lone holder from one of several without reading the store.
+     */
+    private final Set<String> sharedNames = ConcurrentHashMap.newKeySet();
 
     /** How many accounts are held. Unbounded until the store is attached, before which nobody can have joined. */
     private volatile int limit = Integer.MAX_VALUE;
@@ -82,6 +88,7 @@ public final class CachingPlayerNameIndex implements PlayerNameIndex {
         Objects.requireNonNull(store, "store");
         repository.set(store);
         limit = Math.max(1, warmLimit);
+        sharedNames.addAll(store.sharedNames());
         List<PlayerName> recent = store.loadRecent(warmLimit);
         // Oldest first, so the most recently seen accounts are the last the window lets go.
         for (int i = recent.size() - 1; i >= 0; i--) {
@@ -132,6 +139,18 @@ public final class CachingPlayerNameIndex implements PlayerNameIndex {
     }
 
     @Override
+    public boolean shared(String name) {
+        Objects.requireNonNull(name, "name");
+        String key = key(name.strip());
+        if (sharedNames.contains(key)) {
+            return true;
+        }
+        synchronized (lock) {
+            return byLowerName.getOrDefault(key, Set.of()).size() > 1;
+        }
+    }
+
+    @Override
     public void record(UUID uuid, String name) {
         Objects.requireNonNull(uuid, "uuid");
         Objects.requireNonNull(name, "name");
@@ -145,7 +164,10 @@ public final class CachingPlayerNameIndex implements PlayerNameIndex {
         if (store == null) {
             return;
         }
-        scheduler.async(() -> store.upsert(row));
+        scheduler.async(() -> {
+            store.upsert(row);
+            noteIfShared(store, uuid, trimmed);
+        });
     }
 
     @Override
@@ -157,6 +179,24 @@ public final class CachingPlayerNameIndex implements PlayerNameIndex {
             return;
         }
         remember(new PlayerName(uuid, trimmed, System.currentTimeMillis()));
+        PlayerNameRepository store = repository.get();
+        if (store != null) {
+            // The backend the player joined writes the row, but another holder of the name may be known only there.
+            scheduler.async(() -> noteIfShared(store, uuid, trimmed));
+        }
+    }
+
+    /**
+     * Mark {@code name} shared when the store holds another account under it, one the memory may have let go. Reads
+     * the store, so it runs off the tick.
+     */
+    private void noteIfShared(PlayerNameRepository store, UUID uuid, String name) {
+        for (PlayerName row : store.underName(name, 2)) {
+            if (!row.uuid().equals(uuid)) {
+                sharedNames.add(key(name));
+                return;
+            }
+        }
     }
 
     /**
@@ -170,9 +210,11 @@ public final class CachingPlayerNameIndex implements PlayerNameIndex {
                 unlink(previous);
             }
             byAccount.put(row.uuid(), row);
-            byLowerName
-                    .computeIfAbsent(key(row.name()), name -> new LinkedHashSet<>())
-                    .add(row.uuid());
+            Set<UUID> holders = byLowerName.computeIfAbsent(key(row.name()), name -> new LinkedHashSet<>());
+            holders.add(row.uuid());
+            if (holders.size() > 1) {
+                sharedNames.add(key(row.name()));
+            }
             Iterator<PlayerName> oldest = byAccount.values().iterator();
             while (byAccount.size() > limit && oldest.hasNext()) {
                 PlayerName gone = oldest.next();

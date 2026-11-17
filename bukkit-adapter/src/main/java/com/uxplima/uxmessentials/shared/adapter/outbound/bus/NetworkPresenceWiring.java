@@ -40,7 +40,8 @@ public final class NetworkPresenceWiring {
         Objects.requireNonNull(scheduler, "scheduler");
         Objects.requireNonNull(log, "log");
         Clock clock = Clock.systemUTC();
-        NetworkRoster roster = new NetworkRoster(network.serverId(), clock, network.peerLivenessWindow(), nameCase);
+        NetworkRoster roster =
+                new NetworkRoster(network.serverId(), clock, network.peerLivenessWindow(), nameCase, names::shared);
         TrackNetworkPresence track =
                 new TrackNetworkPresence(roster, NetworkPresenceSync.publisher(bus.publisher()), names, clock);
         bus.registry().register(NetworkPresenceSync.listener(track));
