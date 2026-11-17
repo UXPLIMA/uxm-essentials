@@ -361,8 +361,7 @@ same everywhere so transaction times agree.
   Use a proxy chat plugin for network chat.
 - AFK state, `/back`, `/rtp`, `/spawn` and respawns: they stay on the server the player is on.
 - `/kick` and `/freeze` of a player on another server, and `/invsee` or `/endersee` of one.
-- Warps, homes, player warps, worlds and teleports to another server while that module's `cross-server` switch is
-  off.
+- Warps, homes, player warps, worlds and teleports to another server while their `cross-server` switch is off.
 - Settings files, message files and menus. Copy them to every backend that should behave the same.
 - Command control: configure the `commandcontrol` module on each backend; the proxy jar gates only proxy commands.
 
