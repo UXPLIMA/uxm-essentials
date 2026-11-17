@@ -38,6 +38,7 @@ import com.uxplima.uxmessentials.shared.application.module.KernelPorts;
 import com.uxplima.uxmessentials.shared.application.module.ModuleContext;
 import com.uxplima.uxmessentials.shared.application.permission.EconomyPermissions;
 import com.uxplima.uxmessentials.shared.application.port.ConfigStore;
+import com.uxplima.uxmessentials.shared.application.port.NetworkPresence;
 import com.uxplima.uxmessentials.shared.application.port.Scheduler;
 import com.uxplima.uxmessentials.shared.display.BroadcastChannel;
 import com.uxplima.uxmessentials.shared.domain.DomainEvent;
@@ -68,6 +69,7 @@ import com.uxplima.uxmessentials.vote.application.ForceParty;
 import com.uxplima.uxmessentials.vote.application.GiveVote;
 import com.uxplima.uxmessentials.vote.application.HandleVote;
 import com.uxplima.uxmessentials.vote.application.PartyConfig;
+import com.uxplima.uxmessentials.vote.application.PayRemoteVote;
 import com.uxplima.uxmessentials.vote.application.ReceiveNamedVote;
 import com.uxplima.uxmessentials.vote.application.ResetVoterTotals;
 import com.uxplima.uxmessentials.vote.application.RewardEngine;
@@ -84,6 +86,7 @@ import com.uxplima.uxmessentials.vote.application.VoteReminderEligibility;
 import com.uxplima.uxmessentials.vote.application.port.BroadcastThrottle;
 import com.uxplima.uxmessentials.vote.application.port.BroadcastVisibility;
 import com.uxplima.uxmessentials.vote.application.port.ParkedVotes;
+import com.uxplima.uxmessentials.vote.application.port.RemoteVoter;
 import com.uxplima.uxmessentials.vote.application.port.RewardApplier;
 import com.uxplima.uxmessentials.vote.application.port.VoteAudience;
 import com.uxplima.uxmessentials.vote.application.port.VoteBroadcaster;
@@ -154,6 +157,7 @@ public final class VoteWiring {
             MenuBindings menuBindings,
             ObjLongConsumer<UUID> board,
             boolean bothCarriers,
+            NetworkPresence presence,
             BedrockDetector bedrock) {
         Objects.requireNonNull(plugin, "plugin");
         Objects.requireNonNull(ctx, "ctx");
@@ -163,9 +167,10 @@ public final class VoteWiring {
         Objects.requireNonNull(guiRegistry, "guiRegistry");
         Objects.requireNonNull(menus, "menus");
         Objects.requireNonNull(menuBindings, "menuBindings");
+        Objects.requireNonNull(presence, "presence");
         Objects.requireNonNull(bedrock, "bedrock");
         KernelPorts kernel = ctx.kernel();
-        CachedVoteRepository cachedRepository = VoteRepositories.cachedConcrete(persistence);
+        CachedVoteRepository cachedRepository = VoteRepositories.cachedConcrete(persistence, kernel.log());
         VoteRepository repository =
                 new BoardCountingVotes(VoteSync.repository(cachedRepository, bus.publisher()), board);
         Notifier notifier = new Notifier(kernel.messages(), kernel.messageSink());
@@ -178,6 +183,7 @@ public final class VoteWiring {
         VoteContext context = new BukkitVoteContext(
                 kernel.permissions(),
                 kernel.playerLookup(),
+                presence,
                 OwningThreadReads.onServer(kernel.scheduler(), plugin, kernel.log()));
         Set<String> disabledWorlds = Set.copyOf(ctx.config().getStringList("reward.disabled-worlds", List.of()));
         RewardEngine engine = new RewardEngine(loadCatalog(plugin, kernel), disabledWorlds);
@@ -221,6 +227,7 @@ public final class VoteWiring {
                 broadcastThrottle,
                 broadcastVisibility,
                 party,
+                VoteSync.remoteVoter(bus.publisher(), kernel.log()),
                 streakGraceDays,
                 voteLinks,
                 siteCatalog,
@@ -277,6 +284,12 @@ public final class VoteWiring {
         // Build the join listener with reminder support when enabled. Auto-claim drains the offline queue on
         // join (the default); with it off the player pays the queue out with /vote claim.
         boolean autoClaim = ctx.config().getBoolean("claim.auto", true);
+        if (autoClaim) {
+            // A vote for a player on another server queues the rewards and tells this server, which pays them out now.
+            // With auto-claim off the queue waits for /vote claim, so a frame must not pay it out either.
+            PayRemoteVote payRemote = new PayRemoteVote(services.applyQueuedRewards(), kernel.events());
+            bus.registry().register(VoteSync.queuedListener(payRemote::pay, kernel.playerLookup(), kernel.scheduler()));
+        }
         boolean loginNag = ctx.config().getBoolean("reminders.login", true);
         int loginDelaySecs = Math.max(0, ctx.config().getInt("reminders.login-delay-seconds", 5));
         VoteJoinListener joinListener;
@@ -449,6 +462,7 @@ public final class VoteWiring {
             BroadcastThrottle broadcastThrottle,
             BroadcastVisibility broadcastVisibility,
             PartyConfig party,
+            RemoteVoter remote,
             int streakGraceDays,
             List<String> voteLinks,
             VoteSiteCatalog siteCatalog,
@@ -466,6 +480,7 @@ public final class VoteWiring {
                 broadcastThrottle,
                 kernel.events(),
                 party,
+                remote,
                 streakGraceDays,
                 ZoneId.systemDefault());
         ApplyQueuedRewards applyQueuedRewards = new ApplyQueuedRewards(

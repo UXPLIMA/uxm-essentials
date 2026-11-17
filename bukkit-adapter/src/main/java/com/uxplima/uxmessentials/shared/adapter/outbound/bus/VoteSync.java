@@ -7,16 +7,24 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
 import java.util.UUID;
+import java.util.function.BiConsumer;
 import java.util.function.Consumer;
 
 import com.uxplima.uxmessentials.persistence.vote.CachedVoteRepository;
 import com.uxplima.uxmessentials.shared.application.RecentIds;
+import com.uxplima.uxmessentials.shared.application.port.Logger;
+import com.uxplima.uxmessentials.shared.application.port.PlayerLookup;
+import com.uxplima.uxmessentials.shared.application.port.Scheduler;
 import com.uxplima.uxmessentials.shared.display.BroadcastChannel;
 import com.uxplima.uxmessentials.shared.domain.DomainEvent;
+import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmessentials.shared.network.VoteCounterChanged;
 import com.uxplima.uxmessentials.shared.network.VotePartyFired;
+import com.uxplima.uxmessentials.shared.network.VoteRewardsQueued;
+import com.uxplima.uxmessentials.vote.application.PayRemoteVote;
 import com.uxplima.uxmessentials.vote.application.RewardNetworkParty;
 import com.uxplima.uxmessentials.vote.application.port.ForwardingVoteRepository;
+import com.uxplima.uxmessentials.vote.application.port.RemoteVoter;
 import com.uxplima.uxmessentials.vote.application.port.VoteBroadcaster;
 import com.uxplima.uxmessentials.vote.application.port.VoteRepository;
 import com.uxplima.uxmessentials.vote.domain.VoteMessageKey;
@@ -68,6 +76,52 @@ public final class VoteSync {
     static final Duration LATE_COPY_GRACE = Duration.ofSeconds(60);
 
     private VoteSync() {}
+
+    /**
+     * A {@link RemoteVoter} that announces a vote credited to a player on another server as a {@link VoteRewardsQueued}
+     * frame, so that server pays the queued rewards now. Each announcement carries a fresh vote id, which is what lets a
+     * receiver drop the second copy of one frame. A lost announcement only means the rewards wait for the player's next
+     * join.
+     */
+    public static RemoteVoter remoteVoter(BusPublisher bus, Logger log) {
+        Objects.requireNonNull(bus, "bus");
+        Objects.requireNonNull(log, "log");
+        return (voter, serviceName) -> {
+            try {
+                bus.publish(new VoteRewardsQueued(bus.serverId(), UUID.randomUUID(), voter.uuid(), serviceName));
+            } catch (RuntimeException failure) {
+                log.error("failed to announce the queued vote rewards of player " + voter.uuid(), failure);
+            }
+        };
+    }
+
+    /**
+     * A listener that, on a remote {@link VoteRewardsQueued} for a player online here, hands the player and the vote site
+     * to {@code pay} ({@link PayRemoteVote#pay}) off the tick. The sender announces a vote only once its rewards are
+     * stored, so one drain finds them all. A vote id already paid here is dropped, since with
+     * {@code network.transport = both} each frame arrives twice and the vote must be published once. Whether the player
+     * is here is asked again on the async lane: one who left meanwhile keeps the queue for their next join, rather than
+     * having commands run for a player who is not here.
+     */
+    public static RemoteSyncListener queuedListener(
+            BiConsumer<PlayerRef, String> pay, PlayerLookup players, Scheduler scheduler) {
+        Objects.requireNonNull(pay, "pay");
+        Objects.requireNonNull(players, "players");
+        Objects.requireNonNull(scheduler, "scheduler");
+        RecentIds paid = new RecentIds();
+        return message -> {
+            if (message instanceof VoteRewardsQueued queued
+                    && players.isOnline(queued.player())
+                    && paid.firstTime(queued.voteId())) {
+                players.findByUuid(queued.player())
+                        .ifPresent(voter -> scheduler.async(() -> {
+                            if (players.isOnline(voter.uuid())) {
+                                pay.accept(voter, queued.service());
+                            }
+                        }));
+            }
+        };
+    }
 
     /** A {@link VoteRepository} that broadcasts a {@link VoteCounterChanged} after every counter mutation. */
     public static VoteRepository repository(CachedVoteRepository delegate, BusPublisher bus) {

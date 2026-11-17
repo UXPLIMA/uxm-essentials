@@ -336,6 +336,11 @@ public final class NetworkMessageCodec {
                 writeUuid(out, broadcast.broadcastId());
                 out.writeUTF(broadcast.body());
             }
+            case VoteRewardsQueued queued -> {
+                writeUuid(out, queued.voteId());
+                writeUuid(out, queued.player());
+                out.writeUTF(queued.service());
+            }
         }
     }
 
@@ -452,6 +457,7 @@ public final class NetworkMessageCodec {
             case RANK_ACTIONS_KEPT -> new RankActionsKept(origin, readUuid(in));
             case INVENTORY_RESTORE_KEPT -> new InventoryRestoreKept(origin, readUuid(in));
             case BROADCAST -> new BroadcastFrame(origin, readUuid(in), in.readUTF());
+            case VOTE_REWARDS_QUEUED -> new VoteRewardsQueued(origin, readUuid(in), readUuid(in), in.readUTF());
         };
     }
 
