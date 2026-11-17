@@ -59,6 +59,15 @@ class JooqPlayerNameRepositoryTest {
     }
 
     @Test
+    void anAccountIsNamedByItsUuidAndAnUnseenOneIsNot() {
+        names.upsert(new PlayerName(BEDROCK, ".BedrockGamer123", 100L));
+        names.upsert(new PlayerName(BEDROCK, ".BedrockGamer124", 200L));
+
+        assertThat(names.byUuid(BEDROCK)).contains(new PlayerName(BEDROCK, ".BedrockGamer124", 200L));
+        assertThat(names.byUuid(ALEX)).isEmpty();
+    }
+
+    @Test
     void onlyANameMoreThanOneAccountHoldsIsShared() {
         names.upsert(new PlayerName(ALEX, "Alex", 100L));
         names.upsert(new PlayerName(new UUID(0L, 4L), "ALEX", 200L));

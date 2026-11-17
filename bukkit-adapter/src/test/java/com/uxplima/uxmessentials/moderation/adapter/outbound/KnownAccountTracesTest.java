@@ -70,6 +70,11 @@ class KnownAccountTracesTest {
         }
 
         @Override
+        public java.util.Optional<PlayerName> byUuid(java.util.UUID uuid) {
+            return rows.stream().filter(row -> row.uuid().equals(uuid)).reduce((first, second) -> second);
+        }
+
+        @Override
         public void upsert(PlayerName record) {
             rows.add(record);
         }

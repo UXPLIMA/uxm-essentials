@@ -26,6 +26,7 @@ import com.uxplima.uxmessentials.shared.adapter.outbound.BukkitRefs;
 import com.uxplima.uxmessentials.shared.application.permission.EconomyPermissions;
 import com.uxplima.uxmessentials.shared.application.port.Logger;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
+import com.uxplima.uxmessentials.shared.application.port.PlayerLookup;
 import com.uxplima.uxmessentials.shared.application.port.Scheduler;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmessentials.shared.domain.message.SharedMessageKey;
@@ -73,12 +74,14 @@ public final class RanksCommand implements CommandRegistration {
             RankLadder ladder,
             Optional<RanksPanelMenu> panel,
             CurrentRank currentRank,
+            PlayerLookup players,
             Scheduler scheduler,
             Logger log,
             Messages messages) {
         this.setRank = new SetRankExecutor(
                 Objects.requireNonNull(setRank, "setRank"),
                 Objects.requireNonNull(ladder, "ladder"),
+                Objects.requireNonNull(players, "players"),
                 Objects.requireNonNull(scheduler, "scheduler"),
                 Objects.requireNonNull(log, "log"),
                 messages);
@@ -94,9 +97,7 @@ public final class RanksCommand implements CommandRegistration {
     public LiteralCommandNode<CommandSourceStack> build() {
         LiteralArgumentBuilder<CommandSourceStack> root = Commands.literal("ranks")
                 .requires(Gate.permission(PERMISSION).or(Gate.permission(GUI_PERMISSION)))
-                .then(Commands.literal("setrank")
-                        .requires(Gate.permission(PERMISSION))
-                        .then(setRank.arguments()));
+                .then(setRank.under(Commands.literal("setrank").requires(Gate.permission(PERMISSION))));
         // The no-argument branch is always wired. Which answer it gives is the GUI switch: the panel when it
         // is on, the line when it is off. The self-service node gates both, because both are the same
         // question asked two ways.

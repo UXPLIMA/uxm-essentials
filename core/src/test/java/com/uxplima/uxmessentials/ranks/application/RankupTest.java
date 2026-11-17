@@ -49,6 +49,8 @@ class RankupTest {
     private final CachedPlayerRankRepository cache = new CachedPlayerRankRepository(rows, scheduler, log);
     private final Requirements requirements = new Requirements(scheduler);
     private final Actions actions = new Actions();
+    private final InMemoryPendingRankActions pending = new InMemoryPendingRankActions();
+    private final RankActions rankActions = new RankActions(actions, pending, scheduler, log);
     private final Purse purse = new Purse();
     private final Owed owed = new Owed();
     private final RecordingEvents events = new RecordingEvents();
@@ -57,7 +59,7 @@ class RankupTest {
             cache,
             LADDER,
             requirements,
-            actions,
+            rankActions,
             Optional.of(purse),
             Optional.of(owed),
             events,
@@ -251,7 +253,7 @@ class RankupTest {
     }
 
     @Test
-    void aPlayerWhoLeavesWhileSavingKeepsTheRankWithoutActions() {
+    void aPlayerWhoLeavesWhileSavingKeepsTheRankAndGetsItsActionsOnTheirNextJoin() {
         purse.balance = 100;
         online(ALEX);
 
@@ -262,7 +264,15 @@ class RankupTest {
         assertThat(result.join().status()).isEqualTo(Status.RANKED_UP);
         assertThat(rows.row(ALEX.uuid())).contains(new PlayerRank(RankId.of("b"), Prestige.INITIAL));
         assertThat(actions.ran).isEmpty();
+        assertThat(pending.keptFor(ALEX.uuid())).containsExactly("message welcome to b");
         assertThat(events.published()).hasSize(1);
+
+        scheduler.arrive(ALEX);
+        rankActions.joined(ALEX);
+        scheduler.runAsync();
+
+        assertThat(actions.ran).containsExactly("message welcome to b");
+        assertThat(pending.keptFor(ALEX.uuid())).isEmpty();
     }
 
     /**
@@ -372,8 +382,9 @@ class RankupTest {
         final List<String> ran = new ArrayList<>();
 
         @Override
-        public void run(PlayerRef who, List<String> actionLines) {
+        public boolean run(PlayerRef who, List<String> actionLines) {
             ran.addAll(actionLines);
+            return true;
         }
     }
 

@@ -22,7 +22,8 @@
 - [Importing](user/import.md): moving in from EssentialsX, LiteBans, player warp plugins and WorldGuard.
 - [Guard](user/guard.md): the region protection nodes and placeholders.
 - [Worlds and dimensions](user/worlds.md): how the worlds module names and imports the dimensions of Paper 26.2.
-- [Upgrading](user/upgrading.md): what an operator edits when a release renames a node or a placeholder.
+- [Upgrading](user/upgrading.md): what an operator edits when a release changes a setting, a default or a behaviour their files depend on.
+- [Renamed exemptions and placeholders](user/upgrading-renames.md): the node and placeholder map of the release that renamed them.
 - [Overview](internals/overview.md): how the plugin is put together.
 - [Guard internals](internals/guard.md): how a protection check is answered, and the traps.
 - [Development](operations/development.md): build, run, release.
