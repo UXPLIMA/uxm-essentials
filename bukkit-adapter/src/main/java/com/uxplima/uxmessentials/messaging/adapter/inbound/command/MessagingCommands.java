@@ -4,6 +4,7 @@ import java.util.List;
 import java.util.function.Supplier;
 
 import com.uxplima.uxmessentials.messaging.adapter.MessagingServices;
+import com.uxplima.uxmessentials.messaging.adapter.PrivateMessageRoute;
 import com.uxplima.uxmessentials.messaging.adapter.inbound.gui.MessagingGuiViews;
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandRegistration;
 import com.uxplima.uxmessentials.shared.application.port.MessageSink;
@@ -27,9 +28,10 @@ public final class MessagingCommands {
             Messages messages,
             MessageSink sink,
             MessagingGuiViews views,
-            Supplier<List<PlayerRef>> elsewhere) {
+            Supplier<List<PlayerRef>> elsewhere,
+            PrivateMessageRoute route) {
         return List.of(
-                new MsgCommand(services, messages, sink),
+                new MsgCommand(services, messages, sink, route),
                 new ReplyCommand(services, messages, sink),
                 new MailCommand(services, messages, sink, views, elsewhere),
                 new MsgToggleCommand(services, messages, sink),

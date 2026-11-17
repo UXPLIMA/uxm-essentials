@@ -3058,6 +3058,14 @@ public final class PluginModule {
         resources.onClose(wired::stop);
         links.mutePolicy = wired.mutePolicy();
         links.afkStatus = wired.afkStatus();
+        // A menu's whisper action is a private message from the clicking player, routed as /msg routes one. The text
+        // is the operator's, so it keeps its styling.
+        MessagingActions.bindWhispers((from, target, text) -> wired.privateMessages()
+                .send(
+                        com.uxplima.uxmessentials.shared.adapter.outbound.BukkitRefs.toRef(from),
+                        target,
+                        com.uxplima.uxmessentials.messaging.domain.MessageBody.of(text.replace('§', ' '))));
+        resources.onClose(MessagingActions::unbindWhispers);
         // The messaging PAPI seam reads the same mail/conversation/toggle/socialspy/ignore stores the messaging
         // commands hold, so a placeholder matches the player's in-game mail count and toggle state.
         links.placeholders.messaging(wired.placeholders());

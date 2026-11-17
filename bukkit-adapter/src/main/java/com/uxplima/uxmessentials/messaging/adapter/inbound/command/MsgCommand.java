@@ -1,7 +1,6 @@
 package com.uxplima.uxmessentials.messaging.adapter.inbound.command;
 
-import java.util.Map;
-import java.util.Optional;
+import java.util.Objects;
 
 import org.bukkit.entity.Player;
 
@@ -13,16 +12,13 @@ import com.mojang.brigadier.arguments.StringArgumentType;
 import com.mojang.brigadier.context.CommandContext;
 import com.mojang.brigadier.tree.LiteralCommandNode;
 import com.uxplima.uxmessentials.messaging.adapter.MessagingServices;
+import com.uxplima.uxmessentials.messaging.adapter.PrivateMessageRoute;
 import com.uxplima.uxmessentials.messaging.domain.MessageBody;
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandRegistration;
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandSuggestions;
 import com.uxplima.uxmessentials.shared.application.permission.SocialPermissions;
 import com.uxplima.uxmessentials.shared.application.port.MessageSink;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
-import com.uxplima.uxmessentials.shared.domain.NameMatch;
-import com.uxplima.uxmessentials.shared.domain.OnlinePlayer;
-import com.uxplima.uxmessentials.shared.domain.PlayerRef;
-import com.uxplima.uxmessentials.shared.domain.message.MessageLine;
 import com.uxplima.uxmlib.command.Gate;
 import org.jspecify.annotations.NullMarked;
 
@@ -53,8 +49,11 @@ public final class MsgCommand extends MessagingCommandSupport implements Command
 
     private static final String PERMISSION = SocialPermissions.MSG_USE;
 
-    public MsgCommand(MessagingServices services, Messages messages, MessageSink sink) {
+    private final PrivateMessageRoute route;
+
+    public MsgCommand(MessagingServices services, Messages messages, MessageSink sink, PrivateMessageRoute route) {
         super(services, messages, sink);
+        this.route = Objects.requireNonNull(route, "route");
     }
 
     @Override
@@ -81,38 +80,7 @@ public final class MsgCommand extends MessagingCommandSupport implements Command
         if (text == null) {
             return 0;
         }
-        PlayerRef from = ref(sender);
-        String name = ctx.getArgument("player", String.class);
-        Optional<PlayerRef> online = services.players().findOnlineByName(name);
-        if (online.isPresent()) {
-            PlayerRef target = online.get();
-            if (services.vanish().isHiddenFrom(from, target)) {
-                // The target is online but the sender cannot see them. Route through the offline path so the
-                // outcome is identical to a genuinely-offline target (mail when offline-to-mail is on, the
-                // TARGET_OFFLINE rejection when it is off), never a live delivery, never a hidden-only tell.
-                services.sendMessage().send(from, target, text, false);
-                return Command.SINGLE_SUCCESS;
-            }
-            // The online path: a visible target takes the live delivery through the 3-arg send (targetOnline=true).
-            services.sendMessage().send(from, target, text);
-            return Command.SINGLE_SUCCESS;
-        }
-        Optional<OnlinePlayer> elsewhere = services.relay().elsewhere(name);
-        if (elsewhere.isPresent()) {
-            // Online on another backend: the message goes there, and that backend applies the target's switches.
-            services.relay().send(from, elsewhere.get(), text);
-            return Command.SINGLE_SUCCESS;
-        }
-        NameMatch match = services.players().matchByName(name);
-        Optional<PlayerRef> offline = match.player();
-        if (offline.isEmpty()) {
-            MessageLine miss = match.miss(UNKNOWN_PLAYER, Map.of("player", name));
-            notify(from, miss.key(), miss.args());
-            return 0;
-        }
-        // The offline path: a played-before profile that is not online. The 4-arg send with targetOnline=false
-        // hands the use case the offline → mail fallback (gated by the offline-to-mail policy in core).
-        services.sendMessage().send(from, offline.get(), text, false);
+        route.send(ref(sender), ctx.getArgument("player", String.class), text);
         return Command.SINGLE_SUCCESS;
     }
 }
