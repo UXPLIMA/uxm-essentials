@@ -2,6 +2,7 @@ package com.uxplima.uxmessentials.security.adapter;
 
 import java.util.Map;
 import java.util.Objects;
+import java.util.OptionalLong;
 import java.util.UUID;
 import java.util.function.Consumer;
 
@@ -146,13 +147,22 @@ public final class PinEnrolmentController implements KeypadActions {
             restart(player, viewer);
             return;
         }
+        OptionalLong token = sessions.token(viewer.uuid());
+        if (token.isEmpty()) {
+            return;
+        }
         scheduler.async(() -> {
             PinSetResult result = setPin.set(viewer.uuid(), candidate);
-            scheduler.onEntity(viewer, () -> applyResult(player, viewer, result));
+            scheduler.onEntity(viewer, () -> applyResult(player, viewer, result, token.getAsLong()));
         });
     }
 
-    private void applyResult(Player player, PlayerRef viewer, PinSetResult result) {
+    private void applyResult(Player player, PlayerRef viewer, PinSetResult result, long token) {
+        if (!sessions.isPending(viewer.uuid(), token)) {
+            // The session these entries were made in is over (they left, or a verify freeze took its place): what
+            // holds the player now is not this session's to lift.
+            return;
+        }
         if (result == PinSetResult.ALREADY_SET) {
             // A PIN exists that these entries did not create (set on another server, or by an earlier session that
             // left before hearing back). Two matching entries prove nothing about it, so the freeze stays and the

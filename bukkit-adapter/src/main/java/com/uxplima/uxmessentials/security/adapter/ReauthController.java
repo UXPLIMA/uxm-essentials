@@ -219,17 +219,16 @@ public final class ReauthController implements KeypadActions {
         }
     }
 
+    /**
+     * Bring the keypad back after the authenticator prompt: on its dismissal, or after a code it took was refused. That
+     * prompt is reached only through the keypad's authenticator button, which shows only for a player with an
+     * authenticator, so the button is shown again without reading the registration, which would block the player's
+     * thread on the database.
+     */
     private void reopenKeypad(Player player, PlayerRef viewer) {
         if (sessions.isPending(viewer.uuid())) {
-            keypad.open(player, viewer, hasTotp(viewer));
+            keypad.open(player, viewer, true);
         }
-    }
-
-    private boolean hasTotp(PlayerRef viewer) {
-        return repository
-                .find(viewer.uuid())
-                .map(TwoFactorRegistration::totpEnabled)
-                .orElse(false);
     }
 
     /** Re-run the original command now that the window is open; performCommand does not re-fire the guard listener. */
