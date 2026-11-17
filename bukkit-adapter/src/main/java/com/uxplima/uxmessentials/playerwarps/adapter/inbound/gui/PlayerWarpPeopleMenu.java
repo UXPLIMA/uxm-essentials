@@ -29,8 +29,10 @@ import com.uxplima.uxmessentials.playerwarps.domain.PlayerWarpName;
 import com.uxplima.uxmessentials.playerwarps.domain.PlayerwarpsMessageKey;
 import com.uxplima.uxmessentials.playerwarps.domain.WarpMember;
 import com.uxplima.uxmessentials.playerwarps.domain.WarpRole;
+import com.uxplima.uxmessentials.shared.adapter.inbound.gui.MenuText;
 import com.uxplima.uxmessentials.shared.adapter.outbound.BukkitRefs;
 import com.uxplima.uxmessentials.shared.adapter.outbound.EngineLog;
+import com.uxplima.uxmessentials.shared.adapter.outbound.style.StyledText;
 import com.uxplima.uxmessentials.shared.application.message.Notifier;
 import com.uxplima.uxmessentials.shared.application.port.Logger;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
@@ -123,10 +125,10 @@ public final class PlayerWarpPeopleMenu {
         Objects.requireNonNull(dataFolder, "dataFolder");
         Objects.requireNonNull(log, "log");
         bindings.list(PEOPLE_LIST, ctx -> subject(ctx).rows());
-        bindings.placeholder("pwarp_people_name", ctx -> row(ctx).name());
-        bindings.placeholder("pwarp_member_role", ctx -> row(ctx).role());
-        bindings.placeholder("pwarp_ban_reason", ctx -> row(ctx).reason());
-        bindings.placeholder("pwarp_ban_until", ctx -> row(ctx).until());
+        MenuText.text(bindings, "pwarp_people_name", ctx -> row(ctx).name());
+        MenuText.text(bindings, "pwarp_member_role", ctx -> row(ctx).role());
+        MenuText.markup(bindings, "pwarp_ban_reason", ctx -> row(ctx).reason());
+        MenuText.markup(bindings, "pwarp_ban_until", ctx -> row(ctx).until());
         bindings.action("playerwarps:members-remove", ctx -> remove(ctx, Kind.MEMBERS, manageMembers::removeMember));
         bindings.action(
                 "playerwarps:whitelist-remove", ctx -> remove(ctx, Kind.WHITELIST, manageWhitelist::unwhitelist));
@@ -218,6 +220,7 @@ public final class PlayerWarpPeopleMenu {
     private String reason(PlayerRef viewer, BanRecord record) {
         return record.reason()
                 .filter(text -> !text.isBlank())
+                .map(StyledText::escape)
                 .orElseGet(() -> messages.resolve(viewer, PlayerwarpsMessageKey.PWARP_GUI_BANS_NO_REASON, Map.of()));
     }
 

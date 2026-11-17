@@ -12,6 +12,7 @@ import com.uxplima.uxmessentials.messaging.application.Unignore;
 import com.uxplima.uxmessentials.messaging.application.port.IgnoreStore;
 import com.uxplima.uxmessentials.messaging.domain.IgnoreEntry;
 import com.uxplima.uxmessentials.messaging.domain.MessagingMessageKey;
+import com.uxplima.uxmessentials.shared.adapter.inbound.gui.MenuText;
 import com.uxplima.uxmessentials.shared.adapter.outbound.BukkitRefs;
 import com.uxplima.uxmessentials.shared.adapter.outbound.EngineLog;
 import com.uxplima.uxmessentials.shared.application.port.Logger;
@@ -82,7 +83,7 @@ public final class IgnoreListMenu {
         Objects.requireNonNull(dataFolder, "dataFolder");
         Objects.requireNonNull(log, "log");
         bindings.list("messaging:ignores", this::ignored);
-        bindings.placeholder("ignore_target", this::target);
+        MenuText.text(bindings, "ignore_target", this::target);
         bindings.action("messaging:unignore", this::unignore);
         bindings.action("messaging:ignore-add", this::promptAdd);
         menus.registerSpec(SPEC_ID, MenuSpecs.loadOrBundled(SPEC_RESOURCE, dataFolder, 6, EngineLog.of(log)));

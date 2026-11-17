@@ -17,6 +17,7 @@ import com.uxplima.uxmessentials.economy.domain.BankError;
 import com.uxplima.uxmessentials.economy.domain.EconomyMessageKey;
 import com.uxplima.uxmessentials.economy.domain.Money;
 import com.uxplima.uxmessentials.economy.domain.SharedBank;
+import com.uxplima.uxmessentials.shared.adapter.inbound.gui.MenuText;
 import com.uxplima.uxmessentials.shared.adapter.outbound.BukkitRefs;
 import com.uxplima.uxmessentials.shared.adapter.outbound.EngineLog;
 import com.uxplima.uxmessentials.shared.adapter.outbound.style.StyledText;
@@ -86,9 +87,7 @@ public final class BankActionsMenu {
         Objects.requireNonNull(bindings, "bindings");
         Objects.requireNonNull(dataFolder, "dataFolder");
         Objects.requireNonNull(log, "log");
-        bindings.placeholder(
-                "bank_actions_name",
-                ctx -> StyledText.escape(subject(ctx).bank().name()));
+        MenuText.text(bindings, "bank_actions_name", ctx -> subject(ctx).bank().name());
         bindings.action("economy:bank-deposit", ctx -> promptTransfer(ctx, true));
         bindings.action("economy:bank-deposit-withdraw", ctx -> promptTransfer(ctx, false));
         bindings.action("economy:bank-members", this::openMembers);

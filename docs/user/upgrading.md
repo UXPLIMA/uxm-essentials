@@ -56,7 +56,8 @@ The same now holds for every value filled into a `{token}` of a message file: a 
 or staff member typed reads as typed, with no backslash left over. A sanction reason staff type, a bank, vault or
 player warp name and the brand a client reports no longer take styling. A rank's `display-name`, a kit or warp
 category's name, a private message body sent with `uxmessentials.msg.color` and the plugin's own lines used inside
-another line keep their styling. Values in the `@key` lines of menus are unchanged for now.
+another line keep their styling. Menus do the same, in the lines a menu file writes and in its `@key` lines alike;
+a `papi_` placeholder, a custom placeholder from `placeholders.conf` and a LuckPerms group's prefix keep theirs.
 
 ## Placeholders typed by players stay as typed
 

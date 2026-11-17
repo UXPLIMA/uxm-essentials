@@ -19,6 +19,7 @@ import com.uxplima.uxmessentials.itemworld.domain.PurgeSelection;
 import com.uxplima.uxmessentials.itemworld.domain.TimeSpec;
 import com.uxplima.uxmessentials.itemworld.domain.WeatherSpec;
 import com.uxplima.uxmessentials.itemworld.domain.event.EntitiesPurged;
+import com.uxplima.uxmessentials.shared.adapter.inbound.gui.MenuText;
 import com.uxplima.uxmessentials.shared.adapter.outbound.BukkitRefs;
 import com.uxplima.uxmessentials.shared.adapter.outbound.EngineLog;
 import com.uxplima.uxmessentials.shared.application.port.Logger;
@@ -82,7 +83,7 @@ public final class ItemworldHubMenu {
         Objects.requireNonNull(dataFolder, "dataFolder");
         Objects.requireNonNull(log, "log");
         for (Workstation station : Workstation.values()) {
-            bindings.placeholder("iw_station_" + station.literal(), ctx -> stationLabel(ctx, station));
+            MenuText.markup(bindings, "iw_station_" + station.literal(), ctx -> stationLabel(ctx, station));
             bindings.action("itemworld:open-" + station.literal(), ctx -> openStation(ctx, station));
         }
         bindings.action("itemworld:time-day", ctx -> setTime(ctx, TimeSpec.day()));

@@ -111,17 +111,20 @@ public final class PlayerPickerView {
         Objects.requireNonNull(dataFolder, "dataFolder");
         Objects.requireNonNull(log, "log");
         bindings.list("picker:players", ctx -> ctx.subject(Session.class).roster());
-        bindings.placeholder("picker_title_key", ctx -> requestOf(ctx).title().key());
+        MenuText.text(
+                bindings, "picker_title_key", ctx -> requestOf(ctx).title().key());
         // The whole material token expands from one placeholder, so the skull prefix rides along with the uuid.
-        bindings.placeholder(
-                "picker_head_icon", ctx -> "skull:" + candidateOf(ctx).uuid());
-        bindings.placeholder(
+        MenuText.text(
+                bindings, "picker_head_icon", ctx -> "skull:" + candidateOf(ctx).uuid());
+        MenuText.markup(
+                bindings,
                 "picker_head_name",
                 ctx -> text(
                         ctx,
                         GuiMessageKey.PLAYER_PICKER_HEAD_NAME,
                         Map.of("player", candidateOf(ctx).name())));
-        bindings.placeholder("picker_head_lore", ctx -> text(ctx, GuiMessageKey.PLAYER_PICKER_HEAD_LORE, Map.of()));
+        MenuText.markup(
+                bindings, "picker_head_lore", ctx -> text(ctx, GuiMessageKey.PLAYER_PICKER_HEAD_LORE, Map.of()));
         registerFooter(bindings, "one", 0);
         registerFooter(bindings, "two", 1);
         bindings.action("picker:pick", ctx -> requestOf(ctx).onPick().accept(ctx.entry(PlayerRef.class)));
@@ -137,15 +140,18 @@ public final class PlayerPickerView {
     private void registerFooter(MenuBindings bindings, String name, int index) {
         bindings.condition(
                 "picker:has-footer-" + name, (ctx, args) -> footer(ctx, index).isPresent());
-        bindings.placeholder(
+        MenuText.text(
+                bindings,
                 "picker_footer_" + name + "_icon",
                 ctx -> footer(ctx, index).map(button -> button.icon().name()).orElse(Material.AIR.name()));
-        bindings.placeholder(
+        MenuText.markup(
+                bindings,
                 "picker_footer_" + name + "_name",
                 ctx -> footer(ctx, index)
                         .map(button -> text(ctx, button.label(), Map.of()))
                         .orElse(""));
-        bindings.placeholder(
+        MenuText.markup(
+                bindings,
                 "picker_footer_" + name + "_lore",
                 ctx -> footer(ctx, index)
                         .map(button -> text(ctx, button.lore(), Map.of()))

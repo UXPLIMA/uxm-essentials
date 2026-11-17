@@ -15,6 +15,7 @@ import com.uxplima.uxmessentials.api.bukkit.menu.MenuApi;
 import com.uxplima.uxmessentials.api.bukkit.menu.MenuClick;
 import com.uxplima.uxmessentials.api.bukkit.menu.MenuIconProvider;
 import com.uxplima.uxmessentials.api.bukkit.menu.MenuView;
+import com.uxplima.uxmessentials.shared.adapter.inbound.gui.MenuText;
 import com.uxplima.uxmlib.menu.binding.MenuBindings;
 import com.uxplima.uxmlib.menu.providers.IconProviderRegistry;
 import com.uxplima.uxmlib.menu.render.ItemRenderer;
@@ -75,7 +76,7 @@ public final class EngineMenuApi implements MenuApi {
     public void registerPlaceholder(String id, Function<MenuView, String> handler) {
         Objects.requireNonNull(id, "id");
         Objects.requireNonNull(handler, "handler");
-        bindings.placeholder(id, ctx -> handler.apply(MenuViews.of(ctx)));
+        MenuText.markup(bindings, id, ctx -> handler.apply(MenuViews.of(ctx)));
     }
 
     @Override

@@ -18,6 +18,7 @@ import com.uxplima.uxmessentials.economy.domain.Currency;
 import com.uxplima.uxmessentials.economy.domain.CurrencyRegistry;
 import com.uxplima.uxmessentials.economy.domain.EconomyMessageKey;
 import com.uxplima.uxmessentials.economy.domain.SharedBank;
+import com.uxplima.uxmessentials.shared.adapter.inbound.gui.MenuText;
 import com.uxplima.uxmessentials.shared.adapter.outbound.EngineLog;
 import com.uxplima.uxmessentials.shared.adapter.outbound.style.StyledText;
 import com.uxplima.uxmessentials.shared.application.port.Logger;
@@ -90,12 +91,14 @@ public final class BankListMenu {
         Objects.requireNonNull(dataFolder, "dataFolder");
         Objects.requireNonNull(log, "log");
         bindings.list("economy:banks", ctx -> subject(ctx).banks());
-        bindings.placeholder("bank_name", ctx -> StyledText.escape(entry(ctx).name()));
-        bindings.placeholder("bank_id", ctx -> entry(ctx).id());
-        bindings.placeholder("bank_balance", ctx -> balanceText(entry(ctx)));
-        bindings.placeholder("bank_creator", ctx -> entry(ctx).creator().name());
-        bindings.placeholder(
-                "bank_members", ctx -> Integer.toString(entry(ctx).members().size()));
+        MenuText.text(bindings, "bank_name", ctx -> entry(ctx).name());
+        MenuText.text(bindings, "bank_id", ctx -> entry(ctx).id());
+        MenuText.text(bindings, "bank_balance", ctx -> balanceText(entry(ctx)));
+        MenuText.text(bindings, "bank_creator", ctx -> entry(ctx).creator().name());
+        MenuText.text(
+                bindings,
+                "bank_members",
+                ctx -> Integer.toString(entry(ctx).members().size()));
         bindings.action("economy:open-bank", this::openBank);
         bindings.action("economy:create-bank", this::createBank);
         menus.registerSpec(SPEC_ID, MenuSpecs.loadOrBundled(SPEC_RESOURCE, dataFolder, 6, EngineLog.of(log)));

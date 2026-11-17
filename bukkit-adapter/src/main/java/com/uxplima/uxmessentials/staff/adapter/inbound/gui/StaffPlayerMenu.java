@@ -9,6 +9,7 @@ import java.util.UUID;
 import org.bukkit.Server;
 import org.bukkit.entity.Player;
 
+import com.uxplima.uxmessentials.shared.adapter.inbound.gui.MenuText;
 import com.uxplima.uxmessentials.shared.adapter.outbound.BukkitRefs;
 import com.uxplima.uxmessentials.shared.adapter.outbound.EngineLog;
 import com.uxplima.uxmessentials.shared.application.port.Logger;
@@ -71,8 +72,8 @@ public final class StaffPlayerMenu {
         Objects.requireNonNull(dataFolder, "dataFolder");
         Objects.requireNonNull(log, "log");
         bindings.list("staff:players", ctx -> ctx.subject(PlayerHeads.class).players());
-        bindings.placeholder(
-                "staff_player_name", ctx -> ctx.entry(PlayerRef.class).name());
+        MenuText.text(
+                bindings, "staff_player_name", ctx -> ctx.entry(PlayerRef.class).name());
         bindings.action("staff:teleport-to", this::teleportTo);
         menus.registerSpec(
                 NAVIGATOR_SPEC_ID, MenuSpecs.loadOrBundled(NAVIGATOR_RESOURCE, dataFolder, 6, EngineLog.of(log)));

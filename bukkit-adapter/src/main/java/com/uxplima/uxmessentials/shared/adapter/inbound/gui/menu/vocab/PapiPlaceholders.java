@@ -5,6 +5,7 @@ import java.util.Objects;
 import org.bukkit.Bukkit;
 import org.bukkit.entity.Player;
 
+import com.uxplima.uxmessentials.shared.adapter.inbound.gui.MenuText;
 import com.uxplima.uxmessentials.shared.adapter.outbound.papi.PlaceholderApiSupport;
 import com.uxplima.uxmlib.menu.binding.MenuBindings;
 import com.uxplima.uxmlib.menu.runtime.MenuContext;
@@ -36,7 +37,8 @@ public final class PapiPlaceholders {
      */
     public static void registerInto(MenuBindings bindings) {
         Objects.requireNonNull(bindings, "bindings");
-        bindings.placeholders().fallback(id -> id.startsWith(PREFIX), PapiPlaceholders::resolve);
+        // What PlaceholderAPI answers is the operator's chosen expansion, styled as it comes, as in any other line.
+        MenuText.markupFallback(bindings, PREFIX, PapiPlaceholders::resolve);
     }
 
     /**

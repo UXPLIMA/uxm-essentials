@@ -17,6 +17,7 @@ import com.uxplima.uxmessentials.economy.application.EconomyNotifier;
 import com.uxplima.uxmessentials.economy.application.port.EconomyProvider;
 import com.uxplima.uxmessentials.economy.domain.Currency;
 import com.uxplima.uxmessentials.economy.domain.Money;
+import com.uxplima.uxmessentials.shared.adapter.inbound.gui.MenuText;
 import com.uxplima.uxmessentials.shared.adapter.outbound.EngineLog;
 import com.uxplima.uxmessentials.shared.adapter.outbound.PlayerThread;
 import com.uxplima.uxmessentials.shared.application.port.Logger;
@@ -83,10 +84,12 @@ public final class WalletPanelMenu {
         Objects.requireNonNull(bindings, "bindings");
         Objects.requireNonNull(dataFolder, "dataFolder");
         Objects.requireNonNull(log, "log");
-        bindings.placeholder(
-                "wallet_balance", ctx -> notifier.amount(subject(ctx).balance()));
-        bindings.placeholder(
-                "wallet_banknotes", ctx -> notifier.amount(subject(ctx).banknotes()));
+        MenuText.text(
+                bindings, "wallet_balance", ctx -> notifier.amount(subject(ctx).balance()));
+        MenuText.text(
+                bindings,
+                "wallet_banknotes",
+                ctx -> notifier.amount(subject(ctx).banknotes()));
         bindings.action("economy:open-history", this::openHistory);
         menus.registerSpec(SPEC_ID, MenuSpecs.loadOrBundled(SPEC_RESOURCE, dataFolder, 3, EngineLog.of(log)));
     }

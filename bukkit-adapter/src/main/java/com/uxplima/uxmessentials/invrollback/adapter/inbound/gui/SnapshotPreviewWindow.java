@@ -4,6 +4,7 @@ import java.nio.file.Path;
 import java.util.List;
 import java.util.Objects;
 
+import com.uxplima.uxmessentials.shared.adapter.inbound.gui.MenuText;
 import com.uxplima.uxmessentials.shared.adapter.outbound.BukkitRefs;
 import com.uxplima.uxmessentials.shared.adapter.outbound.EngineLog;
 import com.uxplima.uxmessentials.shared.adapter.outbound.LivePlayers;
@@ -58,10 +59,12 @@ public final class SnapshotPreviewWindow {
     void register(MenuBindings bindings, SnapshotPreviewView view) {
         Objects.requireNonNull(bindings, "bindings");
         Objects.requireNonNull(view, "view");
-        bindings.placeholder(
+        MenuText.markup(
+                bindings,
                 "invrollback_preview_title",
                 ctx -> view.previewTitle(ctx.subject(SnapshotPreview.class), BukkitRefs.toRef(ctx.viewer())));
-        bindings.placeholder(
+        MenuText.markup(
+                bindings,
                 "invrollback_info_lore",
                 ctx -> view.infoLore(ctx.subject(SnapshotPreview.class), BukkitRefs.toRef(ctx.viewer())));
         bindings.action(

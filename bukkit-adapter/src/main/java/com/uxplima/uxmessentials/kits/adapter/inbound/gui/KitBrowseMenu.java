@@ -20,6 +20,7 @@ import com.uxplima.uxmessentials.kits.domain.KitCategory;
 import com.uxplima.uxmessentials.kits.domain.KitDefinition;
 import com.uxplima.uxmessentials.kits.domain.KitsMessageKey;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.GuiLayout;
+import com.uxplima.uxmessentials.shared.adapter.inbound.gui.MenuText;
 import com.uxplima.uxmessentials.shared.adapter.outbound.BukkitRefs;
 import com.uxplima.uxmessentials.shared.adapter.outbound.EngineLog;
 import com.uxplima.uxmessentials.shared.application.message.Notifier;
@@ -117,9 +118,9 @@ public final class KitBrowseMenu {
         Objects.requireNonNull(dataFolder, "dataFolder");
         Objects.requireNonNull(log, "log");
         bindings.list("kits:browse", ctx -> ctx.subject(BrowseLevel.class).entries());
-        bindings.placeholder("kit_browse_icon", ctx -> rowOf(ctx).icon());
-        bindings.placeholder("kit_browse_name", ctx -> rowOf(ctx).name());
-        bindings.placeholder("kit_browse_lore", ctx -> rowOf(ctx).lore());
+        MenuText.text(bindings, "kit_browse_icon", ctx -> rowOf(ctx).icon());
+        MenuText.markup(bindings, "kit_browse_name", ctx -> rowOf(ctx).name());
+        MenuText.markup(bindings, "kit_browse_lore", ctx -> rowOf(ctx).lore());
         bindings.action("kits:browse-click", this::click);
         bindings.action("kits:browse-back", this::back);
         // The back button shows only below the root: at the root there is nothing to go back to.

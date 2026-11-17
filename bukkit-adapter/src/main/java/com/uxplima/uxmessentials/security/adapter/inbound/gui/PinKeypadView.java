@@ -19,6 +19,7 @@ import com.uxplima.uxmessentials.security.adapter.PinEntryPrompt;
 import com.uxplima.uxmessentials.security.adapter.SecureEntryInput;
 import com.uxplima.uxmessentials.security.adapter.VerificationFeedback;
 import com.uxplima.uxmessentials.security.domain.SecurityMessageKey;
+import com.uxplima.uxmessentials.shared.adapter.inbound.gui.MenuText;
 import com.uxplima.uxmessentials.shared.adapter.outbound.BukkitRefs;
 import com.uxplima.uxmessentials.shared.adapter.outbound.EngineLog;
 import com.uxplima.uxmessentials.shared.adapter.outbound.LivePlayers;
@@ -173,10 +174,10 @@ public final class PinKeypadView {
         Objects.requireNonNull(dataFolder, "dataFolder");
         Objects.requireNonNull(log, "log");
         this.actions = actions;
-        bindings.placeholder("security_keypad_entry", this::entryDisplay);
+        MenuText.markup(bindings, "security_keypad_entry", this::entryDisplay);
         for (int value = 0; value <= 9; value++) {
             int digit = value;
-            bindings.placeholder("security_keypad_digit_" + digit, ctx -> digitLabel(ctx, digit));
+            MenuText.markup(bindings, "security_keypad_digit_" + digit, ctx -> digitLabel(ctx, digit));
             bindings.action("security:pin-" + digit, ctx -> pressDigit(ctx, digit));
         }
         bindings.action("security:pin-clear", this::pressClear);

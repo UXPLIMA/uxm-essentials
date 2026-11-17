@@ -18,6 +18,7 @@ import com.uxplima.uxmessentials.economy.domain.SharedBank;
 import com.uxplima.uxmessentials.economy.domain.SharedBank.BankAction;
 import com.uxplima.uxmessentials.economy.domain.SharedBank.BankMember;
 import com.uxplima.uxmessentials.economy.domain.SharedBank.BankRole;
+import com.uxplima.uxmessentials.shared.adapter.inbound.gui.MenuText;
 import com.uxplima.uxmessentials.shared.adapter.outbound.BukkitRefs;
 import com.uxplima.uxmessentials.shared.adapter.outbound.EngineLog;
 import com.uxplima.uxmessentials.shared.adapter.outbound.style.StyledText;
@@ -96,10 +97,9 @@ public final class BankMembersMenu {
         Objects.requireNonNull(dataFolder, "dataFolder");
         Objects.requireNonNull(log, "log");
         bindings.list("economy:bank-members", ctx -> subject(ctx).members());
-        bindings.placeholder(
-                "bank_members_title", ctx -> StyledText.escape(subject(ctx).name()));
-        bindings.placeholder("bank_member", ctx -> member(ctx).player().name());
-        bindings.placeholder("bank_member_role", ctx -> member(ctx).role().name());
+        MenuText.text(bindings, "bank_members_title", ctx -> subject(ctx).name());
+        MenuText.text(bindings, "bank_member", ctx -> member(ctx).player().name());
+        MenuText.text(bindings, "bank_member_role", ctx -> member(ctx).role().name());
         bindings.condition(
                 "economy:can-add-member",
                 (ctx, args) -> subject(ctx).hasPermission(BukkitRefs.toRef(ctx.viewer()), BankAction.ADD_MEMBER));

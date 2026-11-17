@@ -13,8 +13,10 @@ import org.bukkit.entity.Player;
 import com.uxplima.uxmessentials.moderation.application.SanctionReasons;
 import com.uxplima.uxmessentials.moderation.application.port.SanctionHistory;
 import com.uxplima.uxmessentials.moderation.domain.SanctionHistoryEntry;
+import com.uxplima.uxmessentials.shared.adapter.inbound.gui.MenuText;
 import com.uxplima.uxmessentials.shared.adapter.outbound.BukkitRefs;
 import com.uxplima.uxmessentials.shared.adapter.outbound.EngineLog;
+import com.uxplima.uxmessentials.shared.adapter.outbound.style.StyledText;
 import com.uxplima.uxmessentials.shared.application.port.Logger;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
 import com.uxplima.uxmessentials.shared.application.port.Scheduler;
@@ -75,13 +77,14 @@ public final class ModerationHistoryMenu {
         // the tile is gated on this and gives the slot back the moment there is a row to put there.
         bindings.condition(
                 "moderation:no-history", (ctx, args) -> subject(ctx).entries().isEmpty());
-        bindings.placeholder("mod_history_icon", ctx -> iconMaterial(entry(ctx)));
-        bindings.placeholder("mod_history_action", ctx -> entry(ctx).action().name());
-        bindings.placeholder("mod_history_issuer", ctx -> entry(ctx).actor().name());
-        bindings.placeholder(
+        MenuText.text(bindings, "mod_history_icon", ctx -> iconMaterial(entry(ctx)));
+        MenuText.text(bindings, "mod_history_action", ctx -> entry(ctx).action().name());
+        MenuText.text(bindings, "mod_history_issuer", ctx -> entry(ctx).actor().name());
+        MenuText.markup(
+                bindings,
                 "mod_history_reason",
                 ctx -> reason(ctx).filter(r -> !r.isBlank()).orElse(""));
-        bindings.placeholder("mod_history_at", ctx -> STAMP.format(entry(ctx).at()));
+        MenuText.text(bindings, "mod_history_at", ctx -> STAMP.format(entry(ctx).at()));
         menus.registerSpec(SPEC_ID, MenuSpecs.loadOrBundled(SPEC_RESOURCE, dataFolder, 6, EngineLog.of(log)));
     }
 
@@ -106,7 +109,9 @@ public final class ModerationHistoryMenu {
     /** The entry's reason as the viewer reads it, in their language when the server wrote it. */
     private Optional<String> reason(MenuContext ctx) {
         SanctionHistoryEntry entry = entry(ctx);
-        return SanctionReasons.read(messages, BukkitRefs.toRef(ctx.viewer()), entry.reason(), entry.drawnReason());
+        // A drawn reason is a catalogue line; one staff typed is escaped here, as the row shows it as markup.
+        return SanctionReasons.read(
+                messages, BukkitRefs.toRef(ctx.viewer()), entry.reason().map(StyledText::escape), entry.drawnReason());
     }
 
     /** The per-action icon material name, mirroring the deleted view's switch so the grid renders identically. */

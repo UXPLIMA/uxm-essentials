@@ -23,6 +23,7 @@ import com.uxplima.uxmessentials.homes.application.port.HomeRepository;
 import com.uxplima.uxmessentials.homes.domain.Home;
 import com.uxplima.uxmessentials.homes.domain.HomeLabel;
 import com.uxplima.uxmessentials.homes.domain.HomesMessageKey;
+import com.uxplima.uxmessentials.shared.adapter.inbound.gui.MenuText;
 import com.uxplima.uxmessentials.shared.adapter.outbound.BukkitRefs;
 import com.uxplima.uxmessentials.shared.adapter.outbound.EngineLog;
 import com.uxplima.uxmessentials.shared.adapter.outbound.style.StyledText;
@@ -124,16 +125,18 @@ public final class HomeActionMenu {
         Objects.requireNonNull(bindings, "bindings");
         Objects.requireNonNull(dataFolder, "dataFolder");
         Objects.requireNonNull(log, "log");
-        bindings.placeholder("home_name", ctx -> label(home(ctx)));
-        bindings.placeholder("home_world", ctx -> home(ctx).location().world().name());
-        bindings.placeholder("home_server", ctx -> home(ctx).knownServer().orElse(hops.localServer()));
-        bindings.placeholder(
-                "home_x", ctx -> Integer.toString(home(ctx).location().blockX()));
-        bindings.placeholder(
-                "home_y", ctx -> Integer.toString(home(ctx).location().blockY()));
-        bindings.placeholder(
-                "home_z", ctx -> Integer.toString(home(ctx).location().blockZ()));
-        bindings.placeholder("home_created", ctx -> dateFormat.format(home(ctx).createdAt()));
+        MenuText.text(bindings, "home_name", ctx -> label(home(ctx)));
+        MenuText.text(
+                bindings, "home_world", ctx -> home(ctx).location().world().name());
+        MenuText.text(bindings, "home_server", ctx -> home(ctx).knownServer().orElse(hops.localServer()));
+        MenuText.text(
+                bindings, "home_x", ctx -> Integer.toString(home(ctx).location().blockX()));
+        MenuText.text(
+                bindings, "home_y", ctx -> Integer.toString(home(ctx).location().blockY()));
+        MenuText.text(
+                bindings, "home_z", ctx -> Integer.toString(home(ctx).location().blockZ()));
+        MenuText.text(
+                bindings, "home_created", ctx -> dateFormat.format(home(ctx).createdAt()));
         bindings.condition("homes:home-public", (ctx, args) -> home(ctx).isPublic());
         bindings.condition("homes:home-private", (ctx, args) -> !home(ctx).isPublic());
         bindings.action("homes:teleport", this::handleTeleport);

@@ -12,6 +12,7 @@ import com.uxplima.uxmessentials.kits.application.port.KitCategoryRepository;
 import com.uxplima.uxmessentials.kits.domain.KitCategory;
 import com.uxplima.uxmessentials.kits.domain.KitsMessageKey;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.GuiText;
+import com.uxplima.uxmessentials.shared.adapter.inbound.gui.MenuText;
 import com.uxplima.uxmessentials.shared.adapter.outbound.BukkitRefs;
 import com.uxplima.uxmessentials.shared.adapter.outbound.EngineLog;
 import com.uxplima.uxmessentials.shared.application.port.Logger;
@@ -88,16 +89,19 @@ public final class KitCategorySettingsView {
         Objects.requireNonNull(bindings, "bindings");
         Objects.requireNonNull(dataFolder, "dataFolder");
         Objects.requireNonNull(log, "log");
-        bindings.placeholder("cat_set_id", ctx -> subject(ctx).id());
-        bindings.placeholder("cat_set_name", ctx -> subject(ctx).displayName());
-        bindings.placeholder(
-                "cat_set_material", ctx -> subject(ctx).displayMaterial().orElse("BOOK"));
-        bindings.placeholder(
+        MenuText.text(bindings, "cat_set_id", ctx -> subject(ctx).id());
+        MenuText.markup(bindings, "cat_set_name", ctx -> subject(ctx).displayName());
+        MenuText.text(
+                bindings,
+                "cat_set_material",
+                ctx -> subject(ctx).displayMaterial().orElse("BOOK"));
+        MenuText.text(
+                bindings,
                 "cat_set_lore_count",
                 ctx -> Integer.toString(subject(ctx).displayLore().size()));
-        bindings.placeholder(
-                "cat_set_slot", ctx -> Integer.toString(subject(ctx).slot()));
-        bindings.placeholder("cat_set_parent", this::parentName);
+        MenuText.text(
+                bindings, "cat_set_slot", ctx -> Integer.toString(subject(ctx).slot()));
+        MenuText.markup(bindings, "cat_set_parent", this::parentName);
         bindings.action("kits:cat-set-name", this::promptName);
         bindings.action("kits:cat-set-material", this::setMaterial);
         bindings.action("kits:cat-set-lore", this::promptLore);

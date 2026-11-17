@@ -7,6 +7,7 @@ import java.util.Optional;
 import org.bukkit.entity.Player;
 
 import com.uxplima.uxmessentials.moderation.domain.ModerationMessageKey;
+import com.uxplima.uxmessentials.shared.adapter.inbound.gui.MenuText;
 import com.uxplima.uxmessentials.shared.adapter.outbound.BukkitRefs;
 import com.uxplima.uxmessentials.shared.adapter.outbound.EngineLog;
 import com.uxplima.uxmessentials.shared.application.port.Logger;
@@ -68,23 +69,31 @@ public final class PunishmentConfirmView {
         Objects.requireNonNull(bindings, "bindings");
         Objects.requireNonNull(dataFolder, "dataFolder");
         Objects.requireNonNull(log, "log");
-        bindings.placeholder(
+        MenuText.text(
+                bindings,
                 "mod_confirm_title_key",
                 ctx -> subject(ctx).action().confirmTitle().key());
-        bindings.placeholder("mod_confirm_player", ctx -> subject(ctx).target().name());
-        bindings.placeholder(
+        MenuText.text(
+                bindings, "mod_confirm_player", ctx -> subject(ctx).target().name());
+        MenuText.text(
+                bindings,
                 "mod_confirm_apply_label_key",
                 ctx -> subject(ctx).action().applyLabel().key());
-        bindings.placeholder(
+        MenuText.text(
+                bindings,
                 "mod_confirm_apply_lore_key",
                 ctx -> subject(ctx).action().applyLore().key());
-        bindings.placeholder(
+        MenuText.text(
+                bindings,
                 "mod_confirm_silent_label_key",
                 ctx -> silentLabelKey(subject(ctx).action()));
-        bindings.placeholder(
-                "mod_confirm_silent_lore_key", ctx -> silentLoreKey(subject(ctx).action()));
-        bindings.placeholder("mod_confirm_reason", ctx -> subject(ctx).reason().orElse(""));
-        bindings.placeholder("mod_confirm_reason_lore_key", ctx -> reasonLoreKey(subject(ctx)));
+        MenuText.text(
+                bindings,
+                "mod_confirm_silent_lore_key",
+                ctx -> silentLoreKey(subject(ctx).action()));
+        MenuText.text(
+                bindings, "mod_confirm_reason", ctx -> subject(ctx).reason().orElse(""));
+        MenuText.text(bindings, "mod_confirm_reason_lore_key", ctx -> reasonLoreKey(subject(ctx)));
         bindings.condition(
                 "moderation:confirm-silent-offered",
                 (ctx, args) -> subject(ctx).action().silentSupported());

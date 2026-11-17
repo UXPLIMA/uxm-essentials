@@ -21,6 +21,7 @@ import com.uxplima.uxmessentials.economy.domain.CurrencyRegistry;
 import com.uxplima.uxmessentials.economy.domain.EconomyMessageKey;
 import com.uxplima.uxmessentials.economy.domain.Money;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.GuiText;
+import com.uxplima.uxmessentials.shared.adapter.inbound.gui.MenuText;
 import com.uxplima.uxmessentials.shared.adapter.outbound.BukkitRefs;
 import com.uxplima.uxmessentials.shared.adapter.outbound.EngineLog;
 import com.uxplima.uxmessentials.shared.application.port.Logger;
@@ -110,11 +111,12 @@ public final class EconomyTargetMenu {
         Objects.requireNonNull(bindings, "bindings");
         Objects.requireNonNull(dataFolder, "dataFolder");
         Objects.requireNonNull(log, "log");
-        bindings.placeholder("eco_target", ctx -> subject(ctx).target().name());
-        bindings.placeholder(
+        MenuText.text(bindings, "eco_target", ctx -> subject(ctx).target().name());
+        MenuText.text(
+                bindings,
                 "eco_currency",
                 ctx -> ctx.subject(EcoCurrencySubject.class).active().plural());
-        bindings.placeholder("eco_target_balances", this::balancesLore);
+        MenuText.markup(bindings, "eco_target_balances", this::balancesLore);
         bindings.condition(
                 "economy:multi-currency", (ctx, args) -> currencies.all().size() > 1);
         bindings.action("economy:target-give", ctx -> prompt(ctx, EcoAdminOps.Verb.GIVE));

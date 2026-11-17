@@ -104,7 +104,7 @@ public final class WarpSoundSelectorView {
                             text(
                                     viewer,
                                     WarpsMessageKey.WARP_EDITOR_SOUND_SELECTOR_ENTRY_NAME,
-                                    Map.of("sound", nameOf(opt, viewer))),
+                                    Map.of("sound", TrustedMarkup.of(nameOf(opt, viewer)))),
                             List.of(text(
                                     viewer,
                                     WarpsMessageKey.WARP_EDITOR_SOUND_SELECTOR_ENTRY_LORE,
@@ -196,15 +196,17 @@ public final class WarpSoundSelectorView {
         return presets.sounds().stream().map(SoundOption::new).toList();
     }
 
-    /** The name {@code viewer} reads for {@code option}, in the language their catalogue is written in. */
+    /**
+     * The name {@code viewer} reads for {@code option}, in the language their catalogue is written in. It is markup: a
+     * catalogue line, or a name the operator gave the preset.
+     */
     public String nameOf(SoundOption option, PlayerRef viewer) {
         Objects.requireNonNull(option, "option");
         Objects.requireNonNull(viewer, "viewer");
         WarpPresets.Preset preset = option.preset();
         if (preset.namedByLine()) {
             String line = preset.line();
-            return TrustedMarkup.of(
-                    messages.resolve(viewer, () -> line, Map.of()).strip());
+            return messages.resolve(viewer, () -> line, Map.of()).strip();
         }
         return preset.nameIn(
                 messages.resolve(viewer, SharedMessageKey.LANG_CODE, Map.of()).strip());

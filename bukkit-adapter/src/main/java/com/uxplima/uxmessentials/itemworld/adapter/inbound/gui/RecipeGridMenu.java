@@ -10,6 +10,7 @@ import org.bukkit.Material;
 import org.bukkit.entity.Player;
 
 import com.uxplima.uxmessentials.itemworld.domain.ItemworldMessageKey;
+import com.uxplima.uxmessentials.shared.adapter.inbound.gui.MenuText;
 import com.uxplima.uxmessentials.shared.adapter.outbound.BukkitRefs;
 import com.uxplima.uxmessentials.shared.adapter.outbound.EngineLog;
 import com.uxplima.uxmessentials.shared.application.port.Logger;
@@ -66,14 +67,15 @@ public final class RecipeGridMenu {
         Objects.requireNonNull(log, "log");
         for (int cell = 0; cell < GRID_CELLS; cell++) {
             int index = cell;
-            bindings.placeholder("recipe_slot" + index + "_material", ctx -> cellMaterial(ctx, index));
-            bindings.placeholder("recipe_slot" + index + "_name", ctx -> cellName(ctx, index));
-            bindings.placeholder("recipe_slot" + index + "_lore", ctx -> cellLore(ctx, index));
+            MenuText.text(bindings, "recipe_slot" + index + "_material", ctx -> cellMaterial(ctx, index));
+            MenuText.markup(bindings, "recipe_slot" + index + "_name", ctx -> cellName(ctx, index));
+            MenuText.markup(bindings, "recipe_slot" + index + "_lore", ctx -> cellLore(ctx, index));
         }
-        bindings.placeholder(
-                "recipe_result_material", ctx -> subject(ctx).result().name());
-        bindings.placeholder("recipe_result_name", this::resultName);
-        bindings.placeholder("recipe_result_lore", ctx -> resolve(ctx, ItemworldMessageKey.RECIPE_GUI_RESULT_LORE));
+        MenuText.text(
+                bindings, "recipe_result_material", ctx -> subject(ctx).result().name());
+        MenuText.markup(bindings, "recipe_result_name", this::resultName);
+        MenuText.markup(
+                bindings, "recipe_result_lore", ctx -> resolve(ctx, ItemworldMessageKey.RECIPE_GUI_RESULT_LORE));
         menus.registerSpec(GRID_SPEC_ID, MenuSpecs.loadOrBundled(GRID_RESOURCE, dataFolder, 3, EngineLog.of(log)));
         menus.registerSpec(EMPTY_SPEC_ID, MenuSpecs.loadOrBundled(EMPTY_RESOURCE, dataFolder, 3, EngineLog.of(log)));
     }

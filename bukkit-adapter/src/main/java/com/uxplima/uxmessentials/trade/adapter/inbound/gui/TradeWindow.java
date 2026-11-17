@@ -12,6 +12,7 @@ import org.bukkit.Material;
 import org.bukkit.inventory.Inventory;
 import org.bukkit.inventory.ItemStack;
 
+import com.uxplima.uxmessentials.shared.adapter.inbound.gui.MenuText;
 import com.uxplima.uxmessentials.shared.adapter.outbound.BukkitRefs;
 import com.uxplima.uxmessentials.shared.adapter.outbound.EngineLog;
 import com.uxplima.uxmessentials.shared.adapter.outbound.LivePlayers;
@@ -122,22 +123,28 @@ public final class TradeWindow {
     }
 
     private void registerText(MenuBindings bindings, TradeView view) {
-        bindings.placeholder(
+        MenuText.markup(
+                bindings,
                 "trade_title",
                 ctx -> text(
                         ctx,
                         TradeMessageKey.TRADE_WINDOW_TITLE,
                         Map.of("player", holder(ctx).counterpart().name())));
-        bindings.placeholder(
+        MenuText.markup(
+                bindings,
                 "trade_money_name",
                 ctx -> text(
                         ctx, TradeMessageKey.TRADE_WINDOW_MONEY, Map.of("currency", selectedCurrency(holder(ctx)))));
-        bindings.placeholder("trade_money_lore", ctx -> ownMoneyLore(ctx, view));
-        bindings.placeholder(
-                "trade_experience_lore", ctx -> experienceLine(ctx, view.experienceStaked(holder(ctx), true)));
-        bindings.placeholder("trade_partner_money_lore", ctx -> partnerMoneyLore(ctx, view));
-        bindings.placeholder(
-                "trade_partner_experience_lore", ctx -> experienceLine(ctx, view.experienceStaked(holder(ctx), false)));
+        MenuText.markup(bindings, "trade_money_lore", ctx -> ownMoneyLore(ctx, view));
+        MenuText.markup(
+                bindings,
+                "trade_experience_lore",
+                ctx -> experienceLine(ctx, view.experienceStaked(holder(ctx), true)));
+        MenuText.markup(bindings, "trade_partner_money_lore", ctx -> partnerMoneyLore(ctx, view));
+        MenuText.markup(
+                bindings,
+                "trade_partner_experience_lore",
+                ctx -> experienceLine(ctx, view.experienceStaked(holder(ctx), false)));
     }
 
     private void registerState(MenuBindings bindings, TradeView view) {

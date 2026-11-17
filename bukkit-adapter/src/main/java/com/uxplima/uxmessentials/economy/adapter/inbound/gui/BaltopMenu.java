@@ -11,6 +11,7 @@ import com.uxplima.uxmessentials.economy.adapter.outbound.BaltopSnapshots;
 import com.uxplima.uxmessentials.economy.application.EconomyNotifier;
 import com.uxplima.uxmessentials.economy.application.port.BaltopRow;
 import com.uxplima.uxmessentials.economy.domain.Currency;
+import com.uxplima.uxmessentials.shared.adapter.inbound.gui.MenuText;
 import com.uxplima.uxmessentials.shared.adapter.outbound.EngineLog;
 import com.uxplima.uxmessentials.shared.application.port.Logger;
 import com.uxplima.uxmlib.menu.Menus;
@@ -60,11 +61,14 @@ public final class BaltopMenu {
         Objects.requireNonNull(dataFolder, "dataFolder");
         Objects.requireNonNull(log, "log");
         bindings.list("economy:baltop", this::rows);
-        bindings.placeholder("baltop_currency", ctx -> subject(ctx).plural());
-        bindings.placeholder("baltop_rank", ctx -> Integer.toString(entry(ctx).rank()));
-        bindings.placeholder("baltop_player", ctx -> entry(ctx).row().owner().name());
-        bindings.placeholder(
-                "baltop_amount", ctx -> notifier.amount(entry(ctx).row().balance()));
+        MenuText.text(bindings, "baltop_currency", ctx -> subject(ctx).plural());
+        MenuText.text(
+                bindings, "baltop_rank", ctx -> Integer.toString(entry(ctx).rank()));
+        MenuText.text(bindings, "baltop_player", ctx -> entry(ctx).row().owner().name());
+        MenuText.text(
+                bindings,
+                "baltop_amount",
+                ctx -> notifier.amount(entry(ctx).row().balance()));
         menus.registerSpec(SPEC_ID, MenuSpecs.loadOrBundled(SPEC_RESOURCE, dataFolder, 6, EngineLog.of(log)));
     }
 

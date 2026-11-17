@@ -30,6 +30,7 @@ import com.uxplima.uxmessentials.playerwarps.domain.WarpAccess;
 import com.uxplima.uxmessentials.playerwarps.domain.WarpCapability;
 import com.uxplima.uxmessentials.playerwarps.domain.WarpDescription;
 import com.uxplima.uxmessentials.playerwarps.domain.WarpRole;
+import com.uxplima.uxmessentials.shared.adapter.inbound.gui.MenuText;
 import com.uxplima.uxmessentials.shared.adapter.outbound.BukkitRefs;
 import com.uxplima.uxmessentials.shared.adapter.outbound.EngineLog;
 import com.uxplima.uxmessentials.shared.application.message.Notifier;
@@ -145,8 +146,8 @@ public final class PlayerWarpManageMenu {
         Objects.requireNonNull(bindings, "bindings");
         Objects.requireNonNull(dataFolder, "dataFolder");
         Objects.requireNonNull(log, "log");
-        bindings.placeholder("pwarp_manage_name", this::name);
-        bindings.placeholder("pwarp_manage_lore", this::lore);
+        MenuText.markup(bindings, "pwarp_manage_name", this::name);
+        MenuText.markup(bindings, "pwarp_manage_lore", this::lore);
         // The capability gate: pwarp-viewer-can:<CAP> reads the role off the subject and answers role.can(CAP). It is a
         // single-segment id because the engine splits the :CAP value on the first colon. A namespaced head would keep
         // the whole feature:action:value token and never resolve. The sponsor button is drawn only when the sponsor

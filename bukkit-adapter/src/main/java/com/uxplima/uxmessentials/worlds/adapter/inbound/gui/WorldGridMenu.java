@@ -7,6 +7,7 @@ import java.util.Objects;
 
 import org.bukkit.entity.Player;
 
+import com.uxplima.uxmessentials.shared.adapter.inbound.gui.MenuText;
 import com.uxplima.uxmessentials.shared.adapter.outbound.BukkitRefs;
 import com.uxplima.uxmessentials.shared.application.port.Logger;
 import com.uxplima.uxmessentials.shared.application.port.Scheduler;
@@ -99,12 +100,12 @@ public final class WorldGridMenu {
         Objects.requireNonNull(dataFolder, "dataFolder");
         Objects.requireNonNull(log, "log");
         bindings.list("worlds:grid", ctx -> subject(ctx).rows());
-        bindings.placeholder("world_grid_world", ctx -> subject(ctx).world().value());
-        bindings.placeholder(
-                "world_grid_title_key", ctx -> titleKey(subject(ctx).rules()));
-        bindings.placeholder("world_grid_material", ctx -> row(ctx).material());
-        bindings.placeholder("world_grid_label_key", ctx -> row(ctx).labelKey());
-        bindings.placeholder("world_grid_value", ctx -> row(ctx).value());
+        MenuText.text(bindings, "world_grid_world", ctx -> subject(ctx).world().value());
+        MenuText.text(
+                bindings, "world_grid_title_key", ctx -> titleKey(subject(ctx).rules()));
+        MenuText.text(bindings, "world_grid_material", ctx -> row(ctx).material());
+        MenuText.text(bindings, "world_grid_label_key", ctx -> row(ctx).labelKey());
+        MenuText.text(bindings, "world_grid_value", ctx -> row(ctx).value());
         bindings.action("worlds:grid-cycle-next", ctx -> cycle(ctx, CycleAction.FORWARD));
         bindings.action("worlds:grid-cycle-prev", ctx -> cycle(ctx, CycleAction.BACKWARD));
         bindings.action("worlds:grid-cycle-clear", ctx -> cycle(ctx, CycleAction.CLEAR));

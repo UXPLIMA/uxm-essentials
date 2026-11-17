@@ -17,8 +17,10 @@ import com.uxplima.uxmessentials.moderation.domain.JailEntry;
 import com.uxplima.uxmessentials.moderation.domain.ModerationMessageKey;
 import com.uxplima.uxmessentials.moderation.domain.MuteEntry;
 import com.uxplima.uxmessentials.moderation.domain.SanctionDuration;
+import com.uxplima.uxmessentials.shared.adapter.inbound.gui.MenuText;
 import com.uxplima.uxmessentials.shared.adapter.outbound.BukkitRefs;
 import com.uxplima.uxmessentials.shared.adapter.outbound.EngineLog;
+import com.uxplima.uxmessentials.shared.adapter.outbound.style.StyledText;
 import com.uxplima.uxmessentials.shared.application.port.Logger;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
 import com.uxplima.uxmessentials.shared.application.port.PlayerLookup;
@@ -98,12 +100,12 @@ public final class ModerationActiveMenu {
         // put there.
         bindings.condition(
                 "moderation:none-active", (ctx, args) -> subject(ctx).rows().isEmpty());
-        bindings.placeholder("mod_active_icon", ctx -> row(ctx).icon());
-        bindings.placeholder("mod_active_player", ctx -> row(ctx).player());
-        bindings.placeholder("mod_active_type", ctx -> row(ctx).type());
-        bindings.placeholder("mod_active_issuer", ctx -> row(ctx).issuer());
-        bindings.placeholder("mod_active_reason", ctx -> row(ctx).reason());
-        bindings.placeholder("mod_active_remaining", ctx -> row(ctx).remaining());
+        MenuText.text(bindings, "mod_active_icon", ctx -> row(ctx).icon());
+        MenuText.text(bindings, "mod_active_player", ctx -> row(ctx).player());
+        MenuText.markup(bindings, "mod_active_type", ctx -> row(ctx).type());
+        MenuText.text(bindings, "mod_active_issuer", ctx -> row(ctx).issuer());
+        MenuText.markup(bindings, "mod_active_reason", ctx -> row(ctx).reason());
+        MenuText.markup(bindings, "mod_active_remaining", ctx -> row(ctx).remaining());
         bindings.action("moderation:open-detail", this::openDetail);
         menus.registerSpec(SPEC_ID, MenuSpecs.loadOrBundled(SPEC_RESOURCE, dataFolder, 6, EngineLog.of(log)));
     }
@@ -139,7 +141,12 @@ public final class ModerationActiveMenu {
                 punishment.targetName(),
                 catalog(viewer, punishment.kind().label()),
                 punishment.issuer().name(),
-                punishment.reason().filter(r -> !r.isBlank()).orElse(""),
+                // A drawn reason reads as the catalogue line it was drawn from; one staff typed reads as typed.
+                punishment
+                        .reason()
+                        .filter(r -> !r.isBlank())
+                        .map(r -> stored.drawnReason().isPresent() ? r : StyledText.escape(r))
+                        .orElse(""),
                 remaining(viewer, punishment));
     }
 

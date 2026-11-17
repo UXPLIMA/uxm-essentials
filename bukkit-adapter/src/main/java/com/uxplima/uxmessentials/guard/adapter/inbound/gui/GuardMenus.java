@@ -37,6 +37,7 @@ import com.uxplima.uxmessentials.guard.domain.Target;
 import com.uxplima.uxmessentials.guard.domain.Template;
 import com.uxplima.uxmessentials.guard.domain.engine.RegionSet;
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandFeedback;
+import com.uxplima.uxmessentials.shared.adapter.inbound.gui.MenuText;
 import com.uxplima.uxmessentials.shared.adapter.outbound.BukkitRefs;
 import com.uxplima.uxmessentials.shared.adapter.outbound.EngineLog;
 import com.uxplima.uxmessentials.shared.adapter.outbound.style.StyledText;
@@ -139,25 +140,33 @@ public final class GuardMenus {
     /** Register list sources, placeholders, actions and the window files; once at wiring. */
     public void register(MenuBindings bindings, Path dataFolder, Logger log) {
         bindings.list("guard:regions", this::regionRows);
-        bindings.placeholder(
-                "guard_region_id", ctx -> ctx.entry(Region.class).id().value());
-        bindings.placeholder(
-                "guard_region_world", ctx -> ctx.entry(Region.class).world());
-        bindings.placeholder(
-                "guard_region_shape", ctx -> ctx.entry(Region.class).shape().kind());
-        bindings.placeholder(
+        MenuText.text(
+                bindings, "guard_region_id", ctx -> ctx.entry(Region.class).id().value());
+        MenuText.text(
+                bindings, "guard_region_world", ctx -> ctx.entry(Region.class).world());
+        MenuText.text(
+                bindings,
+                "guard_region_shape",
+                ctx -> ctx.entry(Region.class).shape().kind());
+        MenuText.text(
+                bindings,
                 "guard_region_priority",
                 ctx -> String.valueOf(ctx.entry(Region.class).priority()));
-        bindings.placeholder(
+        MenuText.text(
+                bindings,
                 "guard_region_rules",
                 ctx -> String.valueOf(ctx.entry(Region.class).rules().size()));
-        bindings.placeholder(
+        MenuText.text(
+                bindings,
                 "guard_region_roles",
                 ctx -> String.valueOf(ctx.entry(Region.class).roles().size()));
-        bindings.placeholder("guard_region_icon", ctx -> regionIcon(ctx.entry(Region.class)));
-        bindings.placeholder(
-                "guard_list_world", ctx -> ctx.subject(RegionsView.class).world());
-        bindings.placeholder(
+        MenuText.text(bindings, "guard_region_icon", ctx -> regionIcon(ctx.entry(Region.class)));
+        MenuText.text(
+                bindings,
+                "guard_list_world",
+                ctx -> ctx.subject(RegionsView.class).world());
+        MenuText.text(
+                bindings,
                 "guard_list_parent",
                 ctx -> Optional.ofNullable(ctx.subject(RegionsView.class).parent())
                         .map(RegionId::value)
@@ -199,36 +208,47 @@ public final class GuardMenus {
     }
 
     private void hub(MenuBindings bindings) {
-        bindings.placeholder(
-                "guard_hub_id", ctx -> ctx.subject(RegionView.class).key().id().value());
-        bindings.placeholder(
-                "guard_hub_world", ctx -> ctx.subject(RegionView.class).key().world());
-        bindings.placeholder("guard_hub_priority", ctx -> hubValue(ctx, r -> String.valueOf(r.priority())));
-        bindings.placeholder(
-                "guard_hub_shape", ctx -> hubValue(ctx, r -> r.shape().kind()));
-        bindings.placeholder(
-                "guard_hub_scope", ctx -> hubValue(ctx, r -> r.scope().value()));
-        bindings.placeholder(
+        MenuText.text(
+                bindings,
+                "guard_hub_id",
+                ctx -> ctx.subject(RegionView.class).key().id().value());
+        MenuText.text(
+                bindings,
+                "guard_hub_world",
+                ctx -> ctx.subject(RegionView.class).key().world());
+        MenuText.text(bindings, "guard_hub_priority", ctx -> hubValue(ctx, r -> String.valueOf(r.priority())));
+        MenuText.text(
+                bindings, "guard_hub_shape", ctx -> hubValue(ctx, r -> r.shape().kind()));
+        MenuText.text(
+                bindings, "guard_hub_scope", ctx -> hubValue(ctx, r -> r.scope().value()));
+        MenuText.text(
+                bindings,
                 "guard_hub_parent",
                 ctx -> hubValue(ctx, r -> r.parent() == null ? "-" : r.parent().value()));
-        bindings.placeholder("guard_hub_family", ctx -> hubValue(ctx, r -> r.family() == null ? "-" : r.family()));
-        bindings.placeholder(
-                "guard_hub_template", ctx -> hubValue(ctx, r -> r.template() == null ? "-" : r.template()));
-        bindings.placeholder(
-                "guard_hub_tags", ctx -> hubValue(ctx, r -> r.tags().isEmpty() ? "-" : String.join(", ", r.tags())));
-        bindings.placeholder(
+        MenuText.text(bindings, "guard_hub_family", ctx -> hubValue(ctx, r -> r.family() == null ? "-" : r.family()));
+        MenuText.text(
+                bindings, "guard_hub_template", ctx -> hubValue(ctx, r -> r.template() == null ? "-" : r.template()));
+        MenuText.text(
+                bindings,
+                "guard_hub_tags",
+                ctx -> hubValue(ctx, r -> r.tags().isEmpty() ? "-" : String.join(", ", r.tags())));
+        MenuText.text(
+                bindings,
                 "guard_hub_rules",
                 ctx -> hubValue(ctx, r -> String.valueOf(r.rules().size())));
-        bindings.placeholder(
+        MenuText.text(
+                bindings,
                 "guard_hub_roles",
                 ctx -> hubValue(ctx, r -> String.valueOf(r.roles().size())));
-        bindings.placeholder(
+        MenuText.text(
+                bindings,
                 "guard_hub_behaviours",
                 ctx -> hubValue(ctx, r -> String.valueOf(r.behaviours().asMap().size())));
-        bindings.placeholder(
+        MenuText.text(
+                bindings,
                 "guard_hub_children",
                 ctx -> hubValue(ctx, r -> String.valueOf(children(r).size())));
-        bindings.placeholder("guard_hub_locked", ctx -> hubValue(ctx, r -> r.locked() ? "IRON_BARS" : "OAK_FENCE"));
+        MenuText.text(bindings, "guard_hub_locked", ctx -> hubValue(ctx, r -> r.locked() ? "IRON_BARS" : "OAK_FENCE"));
 
         bindings.action("guard:hub-rules", ctx -> {
             if (allowed(ctx, ContentPermissions.GUARD_RULE)) {
@@ -355,28 +375,34 @@ public final class GuardMenus {
 
     private void rules(MenuBindings bindings) {
         bindings.list("guard:actions", this::actionRows);
-        bindings.placeholder(
-                "guard_action_id", ctx -> ctx.entry(ActionRow.class).id().value());
-        bindings.placeholder("guard_action_state", ctx -> {
+        MenuText.text(
+                bindings,
+                "guard_action_id",
+                ctx -> ctx.entry(ActionRow.class).id().value());
+        MenuText.text(bindings, "guard_action_state", ctx -> {
             Effect effect = ctx.entry(ActionRow.class).effect();
             return effect == null ? "-" : effect.name().toLowerCase(Locale.ROOT);
         });
-        bindings.placeholder("guard_action_icon", ctx -> {
+        MenuText.text(bindings, "guard_action_icon", ctx -> {
             Effect effect = ctx.entry(ActionRow.class).effect();
             return effect == null ? "GRAY_DYE" : effect == Effect.ALLOW ? "LIME_DYE" : "RED_DYE";
         });
-        bindings.placeholder(
+        MenuText.text(
+                bindings,
                 "guard_action_children",
                 ctx -> String.valueOf(ctx.entry(ActionRow.class).children()));
-        bindings.placeholder(
+        MenuText.text(
+                bindings,
                 "guard_rules_target",
                 ctx -> ctx.subject(RulesView.class).target().text());
-        bindings.placeholder(
+        MenuText.text(
+                bindings,
                 "guard_rules_node",
                 ctx -> Optional.ofNullable(ctx.subject(RulesView.class).node())
                         .map(ActionId::value)
                         .orElse("*"));
-        bindings.placeholder(
+        MenuText.text(
+                bindings,
                 "guard_rules_region",
                 ctx -> ctx.subject(RulesView.class).key().id().value());
 
@@ -453,11 +479,14 @@ public final class GuardMenus {
     private void roles(MenuBindings bindings) {
         bindings.list(
                 "guard:roles", ctx -> List.copyOf(ctx.subject(RolesView.class).rows()));
-        bindings.placeholder(
-                "guard_role_player", ctx -> ctx.entry(RoleRow.class).name());
-        bindings.placeholder(
-                "guard_role_name", ctx -> ctx.entry(RoleRow.class).role().value());
-        bindings.placeholder(
+        MenuText.text(
+                bindings, "guard_role_player", ctx -> ctx.entry(RoleRow.class).name());
+        MenuText.text(
+                bindings,
+                "guard_role_name",
+                ctx -> ctx.entry(RoleRow.class).role().value());
+        MenuText.text(
+                bindings,
                 "guard_roles_region",
                 ctx -> ctx.subject(RolesView.class).key().id().value());
         bindings.action("guard:role-next", ctx -> {
@@ -514,16 +543,20 @@ public final class GuardMenus {
             }
             return rows;
         });
-        bindings.placeholder(
+        MenuText.text(
+                bindings,
                 "guard_behaviour_key",
                 ctx -> ctx.entry(BehaviourRow.class).key().key());
-        bindings.placeholder("guard_behaviour_value", ctx -> {
+        MenuText.text(bindings, "guard_behaviour_value", ctx -> {
             String value = ctx.entry(BehaviourRow.class).value();
-            return value == null ? "-" : StyledText.escape(value);
+            return value == null ? "-" : value;
         });
-        bindings.placeholder(
-                "guard_behaviour_icon", ctx -> ctx.entry(BehaviourRow.class).value() == null ? "GRAY_DYE" : "NAME_TAG");
-        bindings.placeholder(
+        MenuText.text(
+                bindings,
+                "guard_behaviour_icon",
+                ctx -> ctx.entry(BehaviourRow.class).value() == null ? "GRAY_DYE" : "NAME_TAG");
+        MenuText.text(
+                bindings,
                 "guard_behaviours_region",
                 ctx -> ctx.subject(BehavioursView.class).key().id().value());
         bindings.action("guard-behaviour-set", ctx -> {
@@ -581,23 +614,29 @@ public final class GuardMenus {
                     .forEach(t -> rows.add(new TemplateRow(t, t.name().equals(linked))));
             return rows;
         });
-        bindings.placeholder(
+        MenuText.text(
+                bindings,
                 "guard_template_name",
                 ctx -> ctx.entry(TemplateRow.class).template().name());
-        bindings.placeholder(
+        MenuText.text(
+                bindings,
                 "guard_template_rules",
                 ctx -> String.valueOf(
                         ctx.entry(TemplateRow.class).template().rules().size()));
-        bindings.placeholder(
+        MenuText.text(
+                bindings,
                 "guard_template_behaviours",
                 ctx -> String.valueOf(ctx.entry(TemplateRow.class)
                         .template()
                         .behaviours()
                         .asMap()
                         .size()));
-        bindings.placeholder(
-                "guard_template_icon", ctx -> ctx.entry(TemplateRow.class).linked() ? "ENCHANTED_BOOK" : "BOOK");
-        bindings.placeholder(
+        MenuText.text(
+                bindings,
+                "guard_template_icon",
+                ctx -> ctx.entry(TemplateRow.class).linked() ? "ENCHANTED_BOOK" : "BOOK");
+        MenuText.text(
+                bindings,
                 "guard_templates_region",
                 ctx -> ctx.subject(TemplatesView.class).key().id().value());
         bindings.action("guard:template-apply", ctx -> {
@@ -638,17 +677,24 @@ public final class GuardMenus {
         bindings.list(
                 "guard:history",
                 ctx -> List.copyOf(ctx.subject(HistoryView.class).rows()));
-        bindings.placeholder(
+        MenuText.text(
+                bindings,
                 "guard_history_id",
                 ctx -> String.valueOf(ctx.entry(HistoryEntry.class).id()));
-        bindings.placeholder(
+        MenuText.text(
+                bindings,
                 "guard_history_time",
                 ctx -> TIME.format(ctx.entry(HistoryEntry.class).at()));
-        bindings.placeholder(
-                "guard_history_actor", ctx -> ctx.entry(HistoryEntry.class).actor());
-        bindings.placeholder(
-                "guard_history_change", ctx -> ctx.entry(HistoryEntry.class).change());
-        bindings.placeholder(
+        MenuText.text(
+                bindings,
+                "guard_history_actor",
+                ctx -> ctx.entry(HistoryEntry.class).actor());
+        MenuText.text(
+                bindings,
+                "guard_history_change",
+                ctx -> ctx.entry(HistoryEntry.class).change());
+        MenuText.text(
+                bindings,
                 "guard_history_region",
                 ctx -> ctx.subject(HistoryView.class).key().id().value());
         bindings.action("guard:history-undo", ctx -> {

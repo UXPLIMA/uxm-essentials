@@ -11,6 +11,7 @@ import java.util.function.Function;
 
 import org.bukkit.Server;
 
+import com.uxplima.uxmessentials.shared.adapter.inbound.gui.MenuText;
 import com.uxplima.uxmessentials.shared.adapter.outbound.permission.LuckPermsAccess;
 import com.uxplima.uxmessentials.shared.application.port.Logger;
 import com.uxplima.uxmlib.menu.binding.MenuBindings;
@@ -72,11 +73,11 @@ public final class LuckPermsGroupSource {
 
     /** The {@code %lp_group_*%} placeholders, each reading one field off the bound group entry. */
     private static void registerPlaceholders(MenuBindings bindings) {
-        bindings.placeholder("lp_group_name", ctx -> field(ctx, GroupEntry::name));
-        bindings.placeholder("lp_group_display", ctx -> field(ctx, GroupEntry::displayName));
-        bindings.placeholder("lp_group_weight", ctx -> field(ctx, entry -> String.valueOf(entry.weight())));
-        bindings.placeholder("lp_group_prefix", ctx -> field(ctx, GroupEntry::prefix));
-        bindings.placeholder("lp_group_suffix", ctx -> field(ctx, GroupEntry::suffix));
+        MenuText.text(bindings, "lp_group_name", ctx -> field(ctx, GroupEntry::name));
+        MenuText.markup(bindings, "lp_group_display", ctx -> field(ctx, GroupEntry::displayName));
+        MenuText.text(bindings, "lp_group_weight", ctx -> field(ctx, entry -> String.valueOf(entry.weight())));
+        MenuText.markup(bindings, "lp_group_prefix", ctx -> field(ctx, GroupEntry::prefix));
+        MenuText.markup(bindings, "lp_group_suffix", ctx -> field(ctx, GroupEntry::suffix));
     }
 
     /** Read one field off the bound group entry, or empty when the placeholder is used off such a list. */

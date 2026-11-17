@@ -9,6 +9,7 @@ import java.util.Optional;
 
 import org.bukkit.entity.Player;
 
+import com.uxplima.uxmessentials.shared.adapter.inbound.gui.MenuText;
 import com.uxplima.uxmessentials.shared.adapter.outbound.BukkitRefs;
 import com.uxplima.uxmessentials.shared.adapter.outbound.EngineLog;
 import com.uxplima.uxmessentials.shared.application.message.Notifier;
@@ -96,11 +97,12 @@ public final class WorldListMenu {
         Objects.requireNonNull(dataFolder, "dataFolder");
         Objects.requireNonNull(log, "log");
         bindings.list("worlds:list", ctx -> ctx.subject(WorldGrid.class).rows());
-        bindings.placeholder("world_icon", ctx -> envMaterial(rowOf(ctx).world()));
-        bindings.placeholder("world_name", ctx -> rowOf(ctx).world().name().value());
-        bindings.placeholder("world_environment", ctx -> environment(rowOf(ctx)).name());
-        bindings.placeholder("world_loaded", ctx -> String.valueOf(rowOf(ctx).loaded()));
-        bindings.placeholder("world_server", ctx -> rowOf(ctx).server());
+        MenuText.text(bindings, "world_icon", ctx -> envMaterial(rowOf(ctx).world()));
+        MenuText.text(bindings, "world_name", ctx -> rowOf(ctx).world().name().value());
+        MenuText.text(
+                bindings, "world_environment", ctx -> environment(rowOf(ctx)).name());
+        MenuText.text(bindings, "world_loaded", ctx -> String.valueOf(rowOf(ctx).loaded()));
+        MenuText.text(bindings, "world_server", ctx -> rowOf(ctx).server());
         bindings.action("worlds:edit", this::edit);
         bindings.action("worlds:teleport", this::teleport);
         bindings.action("worlds:create", this::create);

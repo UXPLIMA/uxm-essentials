@@ -24,6 +24,7 @@ import com.uxplima.uxmessentials.playerwarps.domain.PlayerWarpId;
 import com.uxplima.uxmessentials.playerwarps.domain.PlayerWarpName;
 import com.uxplima.uxmessentials.playerwarps.domain.PlayerwarpsMessageKey;
 import com.uxplima.uxmessentials.playerwarps.domain.WarpAccess;
+import com.uxplima.uxmessentials.shared.adapter.inbound.gui.MenuText;
 import com.uxplima.uxmessentials.shared.adapter.outbound.BukkitRefs;
 import com.uxplima.uxmessentials.shared.adapter.outbound.EngineLog;
 import com.uxplima.uxmessentials.shared.application.message.Notifier;
@@ -113,8 +114,8 @@ public final class PlayerWarpViewMenu {
         Objects.requireNonNull(bindings, "bindings");
         Objects.requireNonNull(dataFolder, "dataFolder");
         Objects.requireNonNull(log, "log");
-        bindings.placeholder("pwarp_view_name", this::name);
-        bindings.placeholder("pwarp_view_lore", this::lore);
+        MenuText.markup(bindings, "pwarp_view_name", this::name);
+        MenuText.markup(bindings, "pwarp_view_lore", this::lore);
         bindings.condition(
                 "playerwarps:no-password", (ctx, args) -> !subject(ctx).passwordNeeded());
         bindings.condition(

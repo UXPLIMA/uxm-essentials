@@ -21,6 +21,7 @@ import com.uxplima.uxmessentials.economy.domain.EconomyMessageKey;
 import com.uxplima.uxmessentials.economy.domain.Loan;
 import com.uxplima.uxmessentials.economy.domain.LoanError;
 import com.uxplima.uxmessentials.economy.domain.Money;
+import com.uxplima.uxmessentials.shared.adapter.inbound.gui.MenuText;
 import com.uxplima.uxmessentials.shared.adapter.outbound.BukkitRefs;
 import com.uxplima.uxmessentials.shared.adapter.outbound.EngineLog;
 import com.uxplima.uxmessentials.shared.application.port.Logger;
@@ -101,20 +102,22 @@ public final class LoanDashboardMenu {
         Objects.requireNonNull(bindings, "bindings");
         Objects.requireNonNull(dataFolder, "dataFolder");
         Objects.requireNonNull(log, "log");
-        bindings.placeholder("loan_profile_name", ctx -> resolve(ctx, EconomyMessageKey.LOAN_GUI_PROFILE_NAME));
-        bindings.placeholder("loan_profile_lore", this::profileLore);
-        bindings.placeholder("loan_entry_icon", ctx -> "BOOK");
-        bindings.placeholder("loan_entry_name", this::entryName);
-        bindings.placeholder("loan_entry_lore", this::entryLore);
-        bindings.placeholder("loan_custom_icon", ctx -> subject(ctx).customNext() ? "GOLD_BLOCK" : "GOLD_NUGGET");
-        bindings.placeholder(
+        MenuText.markup(bindings, "loan_profile_name", ctx -> resolve(ctx, EconomyMessageKey.LOAN_GUI_PROFILE_NAME));
+        MenuText.markup(bindings, "loan_profile_lore", this::profileLore);
+        MenuText.text(bindings, "loan_entry_icon", ctx -> "BOOK");
+        MenuText.markup(bindings, "loan_entry_name", this::entryName);
+        MenuText.markup(bindings, "loan_entry_lore", this::entryLore);
+        MenuText.text(bindings, "loan_custom_icon", ctx -> subject(ctx).customNext() ? "GOLD_BLOCK" : "GOLD_NUGGET");
+        MenuText.markup(
+                bindings,
                 "loan_custom_name",
                 ctx -> resolve(
                         ctx,
                         subject(ctx).customNext()
                                 ? EconomyMessageKey.LOAN_GUI_CUSTOM_ARMED_NAME
                                 : EconomyMessageKey.LOAN_GUI_CUSTOM_NAME));
-        bindings.placeholder(
+        MenuText.markup(
+                bindings,
                 "loan_custom_lore",
                 ctx -> resolve(
                         ctx,

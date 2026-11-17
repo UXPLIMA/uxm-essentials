@@ -14,6 +14,7 @@ import org.bukkit.entity.Player;
 import com.uxplima.uxmessentials.kits.application.port.KitCategoryRepository;
 import com.uxplima.uxmessentials.kits.domain.KitCategory;
 import com.uxplima.uxmessentials.kits.domain.KitsMessageKey;
+import com.uxplima.uxmessentials.shared.adapter.inbound.gui.MenuText;
 import com.uxplima.uxmessentials.shared.adapter.outbound.BukkitRefs;
 import com.uxplima.uxmessentials.shared.adapter.outbound.EngineLog;
 import com.uxplima.uxmessentials.shared.adapter.outbound.style.StyledText;
@@ -90,11 +91,13 @@ public final class KitCategoryManagerMenu {
         Objects.requireNonNull(dataFolder, "dataFolder");
         Objects.requireNonNull(log, "log");
         bindings.list("kits:category-manager", ctx -> ctx.subject(Listing.class).categories());
-        bindings.placeholder(
+        MenuText.text(
+                bindings,
                 "kit_manager_category_icon",
                 ctx -> KitCategoryIcons.material(categoryOf(ctx)).name());
-        bindings.placeholder("kit_manager_category_name", ctx -> categoryOf(ctx).displayName());
-        bindings.placeholder("kit_manager_category_lore", this::lore);
+        MenuText.markup(
+                bindings, "kit_manager_category_name", ctx -> categoryOf(ctx).displayName());
+        MenuText.markup(bindings, "kit_manager_category_lore", this::lore);
         bindings.action("kits:category-manager-open", this::openClicked);
         bindings.action("kits:category-manager-create", this::createClicked);
         bindings.action("kits:category-manager-back", this::backClicked);

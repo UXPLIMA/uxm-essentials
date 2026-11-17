@@ -17,6 +17,7 @@ import com.uxplima.uxmessentials.communication.domain.Announcement;
 import com.uxplima.uxmessentials.communication.domain.AnnouncerConfig;
 import com.uxplima.uxmessentials.communication.domain.CommunicationMessageKey;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.GuiText;
+import com.uxplima.uxmessentials.shared.adapter.inbound.gui.MenuText;
 import com.uxplima.uxmessentials.shared.adapter.outbound.BukkitRefs;
 import com.uxplima.uxmessentials.shared.adapter.outbound.EngineLog;
 import com.uxplima.uxmessentials.shared.application.message.Notifier;
@@ -104,17 +105,19 @@ public final class CommunicationAdminMenu {
         Objects.requireNonNull(bindings, "bindings");
         Objects.requireNonNull(dataFolder, "dataFolder");
         Objects.requireNonNull(log, "log");
-        bindings.placeholder("communication_lock_state", this::lockStateLore);
+        MenuText.markup(bindings, "communication_lock_state", this::lockStateLore);
         bindings.action("communication:chat-lock", this::toggleChatLock);
         bindings.action("communication:clearchat", this::confirmClearChat);
         bindings.action("communication:broadcast", this::promptBroadcast);
         bindings.action("communication:open-announcer", this::openAnnouncer);
         bindings.action("communication:close", ctx -> ctx.player().closeInventory());
         bindings.list("communication:announcements", this::announcements);
-        bindings.placeholder(
-                "announcement_id", ctx -> ctx.entry(Announcement.class).id());
-        bindings.placeholder("announcement_lines", this::announcementLines);
-        bindings.placeholder("announcement_channels", this::announcementChannels);
+        MenuText.text(
+                bindings,
+                "announcement_id",
+                ctx -> ctx.entry(Announcement.class).id());
+        MenuText.text(bindings, "announcement_lines", this::announcementLines);
+        MenuText.text(bindings, "announcement_channels", this::announcementChannels);
         menus.registerSpec(PANEL_SPEC_ID, MenuSpecs.loadOrBundled(PANEL_RESOURCE, dataFolder, 3, EngineLog.of(log)));
         menus.registerSpec(
                 ANNOUNCER_SPEC_ID, MenuSpecs.loadOrBundled(ANNOUNCER_RESOURCE, dataFolder, 3, EngineLog.of(log)));
