@@ -3,6 +3,15 @@
 What an operator edits when a release renames something an operator's own files or permission grants depend on, or
 needs a setting it did not need before.
 
+## Our placeholders show players' text as words in our lines
+
+In the plugin's own lines (chat format, tab list, nametags, scoreboard, boss bar, holograms, menus and messages) a
+value from a `%uxm_essentials_...%` placeholder now shows as the words it holds: a display name, a nickname, a renamed
+item's name or lore, an AFK reason or a home name with a tag or a `&` colour code in it stays text. The operator's own
+markup still styles a line: `rank`, `rank_next`, `prefix`, `suffix`, `communication_prefix`, `communication_suffix`
+and `server_tps_colored`, marked `markup` in [placeholders.md](placeholders.md). Another plugin that reads our
+placeholders gets every value as it is, with no backslashes, and so does a requirement that compares a value.
+
 ## Console and operator actions answer to their own module
 
 A custom command's `console`, `console-random`, `command-as-op` and `command-op` steps now follow only

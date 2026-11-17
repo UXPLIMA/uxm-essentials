@@ -147,13 +147,15 @@ final class EconomyPlaceholderKeys {
 
     private static List<PlaceholderSpec> ranks() {
         return List.of(
-                PlaceholderSpec.of("rank", "The player's current rank.", "knight", PlaceholderScope.PLAYER, RANKS),
+                PlaceholderSpec.of("rank", "The player's current rank.", "knight", PlaceholderScope.PLAYER, RANKS)
+                        .operatorMarkup(),
                 PlaceholderSpec.of(
-                        "rank_next",
-                        "The rank above the player's, or max when they are at the top of the ladder.",
-                        "lord",
-                        PlaceholderScope.PLAYER,
-                        RANKS),
+                                "rank_next",
+                                "The rank above the player's, or max when they are at the top of the ladder.",
+                                "lord",
+                                PlaceholderScope.PLAYER,
+                                RANKS)
+                        .operatorMarkup(),
                 PlaceholderSpec.of(
                         "rank_next_cost",
                         "What the next rankup charges, or the dash at the top of the ladder.",

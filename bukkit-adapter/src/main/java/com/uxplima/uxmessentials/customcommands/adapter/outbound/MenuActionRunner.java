@@ -25,6 +25,7 @@ import com.uxplima.uxmessentials.shared.adapter.outbound.style.StyledText;
 import com.uxplima.uxmessentials.shared.application.port.Logger;
 import com.uxplima.uxmessentials.shared.application.port.Scheduler;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
+import com.uxplima.uxmessentials.shared.domain.message.TypedText;
 import com.uxplima.uxmlib.menu.Menus;
 import com.uxplima.uxmlib.menu.runtime.ActionArguments;
 import com.uxplima.uxmlib.menu.spec.Ref;
@@ -90,9 +91,6 @@ public final class MenuActionRunner implements ActionRunner {
 
     /** The key a step's value is resolved under when the engine's argument tokens are filled here. */
     private static final String VALUE = "value";
-
-    /** The characters that follow an {@code &} or {@code §} in a legacy colour, format or hex code. */
-    private static final String LEGACY_CODES = "0123456789abcdefklmnorx#";
 
     private final Menus menus;
     private final ClickCommandRunner commands;
@@ -338,25 +336,9 @@ public final class MenuActionRunner implements ActionRunner {
             return jsonStringContent(value);
         }
         if (LEGACY_HEAD.equals(head)) {
-            return withoutColourCodes(value);
+            return TypedText.withoutLegacyCodes(value);
         }
         return value;
-    }
-
-    /**
-     * {@code value} with no colour or format code a legacy line would read: an {@code &} or {@code §} followed by a
-     * code character is written as a full-width ampersand, which reads the same and is no code.
-     */
-    private static String withoutColourCodes(String value) {
-        StringBuilder kept = new StringBuilder(value.length());
-        for (int i = 0; i < value.length(); i++) {
-            char character = value.charAt(i);
-            boolean code = (character == '&' || character == '\u00a7')
-                    && i + 1 < value.length()
-                    && LEGACY_CODES.indexOf(Character.toLowerCase(value.charAt(i + 1))) >= 0;
-            kept.append(code ? '\uff06' : character);
-        }
-        return kept.toString();
     }
 
     /** {@code value} as the inside of a JSON string, so it cannot close the string and add keys of its own. */

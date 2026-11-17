@@ -41,7 +41,7 @@ public final class PapiRequirementEvaluator implements RequirementEvaluator {
     public boolean passes(PlayerRef who, KitRequirement requirement) {
         Objects.requireNonNull(who, "who");
         Objects.requireNonNull(requirement, "requirement");
-        UnaryOperator<String> resolve = PlaceholderApiSupport.messageBridge(who.uuid());
+        UnaryOperator<String> resolve = PlaceholderApiSupport.valueBridge(who.uuid());
         String left = resolve.apply(requirement.left()).strip();
         String right = resolve.apply(requirement.right()).strip();
         if (left.isBlank() || right.isBlank()) {

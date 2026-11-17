@@ -17,6 +17,9 @@ import java.util.stream.Stream;
  */
 public final class PlaceholderCatalog {
 
+    /** The family that answers any other key about a named player. */
+    private static final String OTHER_PLAYER = "p_";
+
     private static final List<PlaceholderSpec> ALL = Stream.of(
                     SharedPlaceholderKeys.all(),
                     DestinationPlaceholderKeys.all(),
@@ -72,5 +75,25 @@ public final class PlaceholderCatalog {
         return ALL.stream()
                 .filter(spec -> spec.shape() == PlaceholderShape.FAMILY && spec.covers(wanted))
                 .max(Comparator.comparingInt(spec -> spec.head().length()));
+    }
+
+    /**
+     * Whether the value of {@code key} is markup the operator wrote, parsed in our own lines rather than shown as words.
+     * {@code p_<name>_<key>} answers for the key it reads about another player. An unknown key is not markup.
+     */
+    public static boolean markup(String key) {
+        Objects.requireNonNull(key, "key");
+        String wanted = key.toLowerCase(Locale.ROOT);
+        if (wanted.startsWith(OTHER_PLAYER)) {
+            String tail = wanted.substring(OTHER_PLAYER.length());
+            for (int split = tail.indexOf('_'); split > 0; split = tail.indexOf('_', split + 1)) {
+                Optional<PlaceholderSpec> read = find(tail.substring(split + 1));
+                if (read.isPresent()) {
+                    return read.get().markup();
+                }
+            }
+            return false;
+        }
+        return find(wanted).map(PlaceholderSpec::markup).orElse(false);
     }
 }

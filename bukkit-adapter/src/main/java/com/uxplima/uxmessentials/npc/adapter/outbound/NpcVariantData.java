@@ -878,7 +878,7 @@ final class NpcVariantData {
         }
         try {
             String resolved =
-                    PlaceholderApiSupport.messageBridge(viewer.getUniqueId()).apply(value);
+                    PlaceholderApiSupport.markupBridge(viewer.getUniqueId()).apply(value);
             packets.send(
                     viewer,
                     packets.textDisplayText(

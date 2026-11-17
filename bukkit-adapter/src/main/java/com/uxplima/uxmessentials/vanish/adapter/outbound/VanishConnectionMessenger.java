@@ -118,7 +118,7 @@ public final class VanishConnectionMessenger {
                     () -> {
                         Player subject = Bukkit.getPlayer(who.uuid());
                         Component display = subject != null ? subject.teamDisplayName() : Component.text(who.name());
-                        deliver(recipients, who, display, PlaceholderApiSupport.messageBridge(who.uuid()));
+                        deliver(recipients, who, display, PlaceholderApiSupport.markupBridge(who.uuid()));
                     },
                     () -> deliver(recipients, who, Component.text(who.name()), UnaryOperator.identity()));
         });
@@ -136,7 +136,7 @@ public final class VanishConnectionMessenger {
             Pending pending = recipient.pending();
             subjectLine(pending.line(), who.name(), once)
                     .ifPresent(line -> scheduler.onEntity(recipient.ref(), () -> {
-                        String prefix = PlaceholderApiSupport.messageBridge(
+                        String prefix = PlaceholderApiSupport.markupBridge(
                                         recipient.ref().uuid())
                                 .apply(pending.prefix());
                         recipient.player().sendMessage(draw(line, display, prefix));

@@ -426,7 +426,7 @@ public final class TablistRenderer {
                 node -> CatalogPermissionCheck.has(player, node),
                 player.getWorld().getName(),
                 player.getGameMode().name(),
-                PlaceholderApiSupport.messageBridge(player.getUniqueId()));
+                PlaceholderApiSupport.markupBridge(player.getUniqueId()));
     }
 
     private Component joinLines(Player player, List<String> sources, long tick) {

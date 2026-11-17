@@ -240,7 +240,7 @@ public final class ScoreboardRenderer {
     private String expand(Player player, String source, long tick) {
         String animated = animations.resolve(HudText.lineFor(player.getUniqueId(), source), tick);
         String builtins = BuiltinTokens.apply(player, animated);
-        return PlaceholderApiSupport.messageBridge(player.getUniqueId()).apply(builtins);
+        return PlaceholderApiSupport.markupBridge(player.getUniqueId()).apply(builtins);
     }
 
     private static Component component(String expanded) {
@@ -283,7 +283,7 @@ public final class ScoreboardRenderer {
                 node -> CatalogPermissionCheck.has(player, node),
                 player.getWorld().getName(),
                 player.getGameMode().name(),
-                PlaceholderApiSupport.messageBridge(player.getUniqueId()));
+                PlaceholderApiSupport.markupBridge(player.getUniqueId()));
     }
 
     static List<String> visibleLines(List<String> sources, ConditionContext context) {

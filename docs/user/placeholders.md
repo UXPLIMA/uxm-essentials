@@ -2,7 +2,7 @@
 
 <!-- Generated from the code catalogues by ./gradlew :core:generateReference. Edit the catalogue, not this page. -->
 
-Registered when PlaceholderAPI is installed, as `%uxm_essentials_<key>%`. A `player` key reads the player it is asked about, offline too; a `session` key reads live state and answers the dash while the player is away; a `global` one is the same for everybody; a `relational` one is typed `%rel_uxm_essentials_<key>%` and answers about the player a line is drawn for, as the viewer sees them. `<n>` and other angle brackets are filled in by you, for example `%uxm_essentials_homes_1_world%`. The example shows the shape of an answer. The facts every server has, about a player, the item in their hand or the server itself, are in [placeholders-facts.md](placeholders-facts.md). The leaderboard keys are in [reference.md](reference.md#boards). The earlier `%uxmessentials_<key>%` form still answers in this release and logs a warning the first time it is read; [upgrading-renames.md](upgrading-renames.md) says what to change. `/uxmess placeholders export` writes the same catalogue from the running build to a file in the plugin folder.
+Registered when PlaceholderAPI is installed, as `%uxm_essentials_<key>%`. A `player` key reads the player it is asked about, offline too; a `session` key reads live state and answers the dash while the player is away; a `global` one is the same for everybody; a `relational` one is typed `%rel_uxm_essentials_<key>%` and answers about the player a line is drawn for, as the viewer sees them. `<n>` and other angle brackets are filled in by you, for example `%uxm_essentials_homes_1_world%`. The example shows the shape of an answer. In the plugin's own lines (chat, tab list, nametags, boards, messages) a value shows as the words it holds, so a tag or a `&` colour code in a name a player chose stays text; a key whose scope says `markup`, such as a rank or a chat prefix, is the operator's own markup and is parsed. Other plugins get every value as it is. The facts every server has, about a player, the item in their hand or the server itself, are in [placeholders-facts.md](placeholders-facts.md). The leaderboard keys are in [reference.md](reference.md#boards). The earlier `%uxmessentials_<key>%` form still answers in this release and logs a warning the first time it is read; [upgrading-renames.md](upgrading-renames.md) says what to change. `/uxmess placeholders export` writes the same catalogue from the running build to a file in the plugin folder.
 
 | Key | Module | Value | Example | Scope |
 |---|---|---|---|---|
@@ -13,10 +13,10 @@ Registered when PlaceholderAPI is installed, as `%uxm_essentials_<key>%`. A `pla
 | `commandcontrol_allowed_<command>` | commandcontrol | Whether the player may run that command where they stand (yes/no), answered from the rules the gate uses. | `"yes"` | session |
 | `communication_broadcasts` | communication | Whether the player receives the rotating announcements (yes/no). | `"yes"` | session |
 | `communication_chat_enabled` | communication | Whether public chat is open rather than locked by /togglechat (yes/no). | `"yes"` | global |
-| `communication_prefix` | communication | The player's chat prefix, a catalogue-line prefix read in the player's own language. | `"[VIP] "` | session |
-| `communication_suffix` | communication | The player's chat suffix, read the same way. | `" *"` | session |
-| `prefix` | communication | The chat prefix of the player the line is about, a catalogue-line prefix read in the viewer's language. | `"[VIP] "` | relational |
-| `suffix` | communication | The chat suffix of the player the line is about, read the same way. | `" *"` | relational |
+| `communication_prefix` | communication | The player's chat prefix, a catalogue-line prefix read in the player's own language. | `"[VIP] "` | session, markup |
+| `communication_suffix` | communication | The player's chat suffix, read the same way. | `" *"` | session, markup |
+| `prefix` | communication | The chat prefix of the player the line is about, a catalogue-line prefix read in the viewer's language. | `"[VIP] "` | relational, markup |
+| `suffix` | communication | The chat suffix of the player the line is about, read the same way. | `" *"` | relational, markup |
 | `menu_argument_<name>` | custommenus | The value of one named argument the open menu was called with. | `"diamond"` | session |
 | `menu_is_in_menu` | custommenus | Whether the player has a plugin menu open (yes/no). | `"yes"` | session |
 | `menu_last` | custommenus | The id of the last menu the player opened, which survives the menu closing. | `"shop"` | session |
@@ -158,8 +158,8 @@ Registered when PlaceholderAPI is installed, as `%uxm_essentials_<key>%`. A `pla
 | `presence_vanished` | presence | Whether the player is vanished (yes/no). | `"no"` | session |
 | `vanished` | presence | Whether the player is vanished (yes/no). | `"no"` | session |
 | `prestige` | ranks | How many times the player has prestiged. | `"1"` | player |
-| `rank` | ranks | The player's current rank. | `"knight"` | player |
-| `rank_next` | ranks | The rank above the player's, or max when they are at the top of the ladder. | `"lord"` | player |
+| `rank` | ranks | The player's current rank. | `"knight"` | player, markup |
+| `rank_next` | ranks | The rank above the player's, or max when they are at the top of the ladder. | `"lord"` | player, markup |
 | `rank_next_cost` | ranks | What the next rankup charges, or the dash at the top of the ladder. | `"$5,000.00"` | player |
 | `rank_position` | ranks | Which rung of the ladder the player stands on, counting from one. | `"3"` | player |
 | `rank_progress` | ranks | How far up the ladder the player stands, as a whole percentage. | `"37"` | player |

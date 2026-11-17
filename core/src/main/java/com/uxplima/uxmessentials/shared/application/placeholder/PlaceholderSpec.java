@@ -22,6 +22,8 @@ import org.jspecify.annotations.Nullable;
  * @param shape whether this is one key or the head of an open family
  * @param scope who the key answers about, which decides how it behaves for an offline player
  * @param owner the feature module that answers it, or empty when the kernel does
+ * @param markup whether the value is markup the operator wrote, such as a rank's display name or a chat prefix, and is
+ *     parsed in our own lines; every other value is shown there as the words it holds
  */
 public record PlaceholderSpec(
         String key,
@@ -29,7 +31,8 @@ public record PlaceholderSpec(
         String example,
         PlaceholderShape shape,
         PlaceholderScope scope,
-        Optional<ModuleId> owner) {
+        Optional<ModuleId> owner,
+        boolean markup) {
 
     /**
      * What an operator types before every key, following the shared {@code %uxm_<plugin>_<path>%} form so the
@@ -59,6 +62,22 @@ public record PlaceholderSpec(
         if ((shape == PlaceholderShape.FAMILY) != key.contains("<")) {
             throw new IllegalArgumentException("key " + key + " and shape " + shape + " disagree about its segment");
         }
+    }
+
+    /** A key whose value is shown as words in our own lines, the default for every key. */
+    public PlaceholderSpec(
+            String key,
+            String description,
+            String example,
+            PlaceholderShape shape,
+            PlaceholderScope scope,
+            Optional<ModuleId> owner) {
+        this(key, description, example, shape, scope, owner, false);
+    }
+
+    /** This key, with a value that is markup the operator wrote and is parsed in our own lines. */
+    public PlaceholderSpec operatorMarkup() {
+        return new PlaceholderSpec(key, description, example, shape, scope, owner, true);
     }
 
     /** A key one feature module answers. */

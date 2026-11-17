@@ -103,7 +103,7 @@ final class ClickActionGates {
             log.warn("event=click_action_bad_condition value={}", value);
             return Verdict.PASS; // malformed: skip the gate, keep running
         }
-        UnaryOperator<String> bridge = PlaceholderApiSupport.messageBridge(viewer.getUniqueId());
+        UnaryOperator<String> bridge = PlaceholderApiSupport.valueBridge(viewer.getUniqueId());
         boolean satisfied = parsed.comparison().test(bridge.apply(parsed.left()), bridge.apply(parsed.right()));
         return satisfied ? Verdict.PASS : Verdict.DENY;
     }

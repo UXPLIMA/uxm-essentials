@@ -327,7 +327,7 @@ final class KernelWiring {
         if (!PlaceholderApiSupport.isPresent()) {
             return BukkitMessageSink.NO_PRE_PARSE;
         }
-        return PlaceholderApiSupport::messageBridge;
+        return PlaceholderApiSupport::markupBridge;
     }
 
     private static MetaSource metaSource(Logger log) {

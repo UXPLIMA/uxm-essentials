@@ -195,7 +195,7 @@ public final class HologramsWiring {
         // both the shared base render and each viewer's override; the identity transform when none are configured.
         HologramSymbols symbols = HologramSymbols.fromConfig(ctx.config());
         Function<UUID, UnaryOperator<String>> perViewerBridge =
-                viewer -> symbols.wrap(PlaceholderApiSupport.messageBridge(viewer));
+                viewer -> symbols.wrap(PlaceholderApiSupport.markupBridge(viewer));
         HologramViewerText viewerText = new HologramViewerText(
                 perViewerBridge, MiniMessage.miniMessage(), MiniPlaceholdersSupport::globalResolver, pageState);
         HologramViewers viewers =
@@ -246,7 +246,7 @@ public final class HologramsWiring {
                 kernel.scheduler(),
                 kernel.log(),
                 viewerText,
-                symbols.wrap(PlaceholderApiSupport.globalBridge()),
+                symbols.wrap(PlaceholderApiSupport.globalMarkupBridge()),
                 viewers,
                 npcLocator,
                 leaderboards,

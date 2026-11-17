@@ -2,7 +2,7 @@
 
 <!-- Generated from the code catalogues by ./gradlew :core:generateReference. Edit the catalogue, not this page. -->
 
-Registered when PlaceholderAPI is installed, as `%uxm_essentials_<key>%`. A `player` key reads the player it is asked about, offline too; a `session` key reads live state and answers the dash while the player is away; a `global` one is the same for everybody; a `relational` one is typed `%rel_uxm_essentials_<key>%` and answers about the player a line is drawn for, as the viewer sees them. `<n>` and other angle brackets are filled in by you, for example `%uxm_essentials_homes_1_world%`. The example shows the shape of an answer. The keys each module answers are in [placeholders.md](placeholders.md). The leaderboard keys are in [reference.md](reference.md#boards). The earlier `%uxmessentials_<key>%` form still answers in this release and logs a warning the first time it is read; [upgrading-renames.md](upgrading-renames.md) says what to change. `/uxmess placeholders export` writes the same catalogue from the running build to a file in the plugin folder.
+Registered when PlaceholderAPI is installed, as `%uxm_essentials_<key>%`. A `player` key reads the player it is asked about, offline too; a `session` key reads live state and answers the dash while the player is away; a `global` one is the same for everybody; a `relational` one is typed `%rel_uxm_essentials_<key>%` and answers about the player a line is drawn for, as the viewer sees them. `<n>` and other angle brackets are filled in by you, for example `%uxm_essentials_homes_1_world%`. The example shows the shape of an answer. In the plugin's own lines (chat, tab list, nametags, boards, messages) a value shows as the words it holds, so a tag or a `&` colour code in a name a player chose stays text; a key whose scope says `markup`, such as a rank or a chat prefix, is the operator's own markup and is parsed. Other plugins get every value as it is. The keys each module answers are in [placeholders.md](placeholders.md). The leaderboard keys are in [reference.md](reference.md#boards). The earlier `%uxmessentials_<key>%` form still answers in this release and logs a warning the first time it is read; [upgrading-renames.md](upgrading-renames.md) says what to change. `/uxmess placeholders export` writes the same catalogue from the running build to a file in the plugin folder.
 
 | Key | Module | Value | Example | Scope |
 |---|---|---|---|---|
@@ -116,7 +116,7 @@ Registered when PlaceholderAPI is installed, as `%uxm_essentials_<key>%`. A `pla
 | `server_tps` | shared | Ticks per second over the last minute. | `"19.98"` | global |
 | `server_tps_15m` | shared | Ticks per second over the last fifteen minutes. | `"19.97"` | global |
 | `server_tps_5m` | shared | Ticks per second over the last five minutes. | `"19.95"` | global |
-| `server_tps_colored` | shared | Ticks per second over the last minute, wrapped in a green, yellow or red MiniMessage colour. | `"<green>19.98</green>"` | global |
+| `server_tps_colored` | shared | Ticks per second over the last minute, wrapped in a green, yellow or red MiniMessage colour. | `"<green>19.98</green>"` | global, markup |
 | `server_uptime` | shared | How long the server has been up, in whole minutes. | `"1440"` | global |
 | `server_uptime_formatted` | shared | How long the server has been up, in the compact 1h30m form. | `"1d"` | global |
 | `server_version` | shared | The Minecraft version the server runs. | `"26.2"` | global |

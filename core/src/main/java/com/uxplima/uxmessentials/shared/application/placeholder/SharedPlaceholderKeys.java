@@ -570,10 +570,11 @@ final class SharedPlaceholderKeys {
                         "19.97",
                         PlaceholderScope.GLOBAL),
                 PlaceholderSpec.shared(
-                        "server_tps_colored",
-                        "Ticks per second over the last minute, wrapped in a green, yellow or red MiniMessage colour.",
-                        "<green>19.98</green>",
-                        PlaceholderScope.GLOBAL),
+                                "server_tps_colored",
+                                "Ticks per second over the last minute, wrapped in a green, yellow or red MiniMessage colour.",
+                                "<green>19.98</green>",
+                                PlaceholderScope.GLOBAL)
+                        .operatorMarkup(),
                 PlaceholderSpec.shared(
                         "server_ram_used", "Heap in use, in whole megabytes.", "3072", PlaceholderScope.GLOBAL),
                 PlaceholderSpec.shared(

@@ -501,7 +501,7 @@ public final class PlayerTracks {
     /** A region message with {@code {player}} filled in, and PlaceholderAPI's placeholders when it is installed. */
     private static String expand(Player player, String text) {
         String named = text.replace("{player}", PlaceholderShield.shield(player.getName()));
-        return PlaceholderApiSupport.messageBridge(player.getUniqueId()).apply(named);
+        return PlaceholderApiSupport.markupBridge(player.getUniqueId()).apply(named);
     }
 
     private @Nullable Location pushBack(Track track, Location from, @Nullable RegionSet set, boolean teleport) {

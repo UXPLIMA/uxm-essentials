@@ -271,7 +271,7 @@ public final class CommunicationWiring {
                 node -> CatalogPermissionCheck.has(player, node),
                 player.getWorld().getName(),
                 player.getGameMode().name(),
-                PlaceholderApiSupport.messageBridge(player.getUniqueId()));
+                PlaceholderApiSupport.markupBridge(player.getUniqueId()));
     }
 
     private static CommunicationServices assemble(

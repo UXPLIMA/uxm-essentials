@@ -170,7 +170,7 @@ public final class BossBarRenderer {
         UUID reader = player.getUniqueId();
         String animated = HudText.lineFor(reader, animations.resolve(HudText.lineFor(reader, source), tick));
         String builtins = BuiltinTokens.apply(player, animated).replace(REMAINING, left);
-        return PlaceholderApiSupport.messageBridge(reader).apply(builtins);
+        return PlaceholderApiSupport.markupBridge(reader).apply(builtins);
     }
 
     private static BossBar.Color color(String name) {
@@ -208,7 +208,7 @@ public final class BossBarRenderer {
                 node -> CatalogPermissionCheck.has(player, node),
                 player.getWorld().getName(),
                 player.getGameMode().name(),
-                PlaceholderApiSupport.messageBridge(player.getUniqueId()));
+                PlaceholderApiSupport.markupBridge(player.getUniqueId()));
     }
 
     private record Drawn(String id, BossBar bar) {}

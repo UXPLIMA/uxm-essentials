@@ -175,7 +175,7 @@ final class KitIconRenderer {
             processed = processed.replace("%cooldown%", formatDuration(remainingCooldown(viewer, kit)));
         }
         if (PlaceholderApiSupport.isPresent()) {
-            processed = PlaceholderApiSupport.messageBridge(viewer.uuid()).apply(processed);
+            processed = PlaceholderApiSupport.markupBridge(viewer.uuid()).apply(processed);
         }
         return processed;
     }

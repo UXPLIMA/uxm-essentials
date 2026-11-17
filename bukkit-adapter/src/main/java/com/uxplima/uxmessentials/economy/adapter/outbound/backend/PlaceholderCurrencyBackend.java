@@ -129,7 +129,7 @@ public final class PlaceholderCurrencyBackend implements CurrencyBackend {
                 server,
                 log,
                 scheduler,
-                (uuid, placeholder) -> PlaceholderApiSupport.messageBridge(uuid).apply(placeholder));
+                (uuid, placeholder) -> PlaceholderApiSupport.valueBridge(uuid).apply(placeholder));
     }
 
     /**

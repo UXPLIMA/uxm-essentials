@@ -245,7 +245,11 @@ final class ReferencePages {
                 + " while the player is away; a `global` one is the same for everybody; a `relational` one is typed"
                 + " `%rel_uxm_essentials_<key>%` and answers about the player a line is drawn for, as the viewer sees"
                 + " them. `<n>` and other angle brackets are filled in by you, for example"
-                + " `%uxm_essentials_homes_1_world%`. The example shows the shape of an answer.");
+                + " `%uxm_essentials_homes_1_world%`. The example shows the shape of an answer. In the plugin's own"
+                + " lines (chat, tab list, nametags, boards, messages) a value shows as the words it holds, so a tag or"
+                + " a `&` colour code in a name a player chose stays text; a key whose scope says `markup`, such as a"
+                + " rank or a chat prefix, is the operator's own markup and is parsed. Other plugins get every value as"
+                + " it is.");
         out.append(elsewhere);
         out.append(" The leaderboard keys are in [reference.md](reference.md#boards). The earlier"
                 + " `%uxmessentials_<key>%` form still answers in this release and logs a warning the first time it is"
@@ -265,6 +269,7 @@ final class ReferencePages {
                         .append(spec.example().replace("|", "\\|"))
                         .append("\"` | ")
                         .append(spec.scope().name().toLowerCase(Locale.ROOT))
+                        .append(spec.markup() ? ", markup" : "")
                         .append(" |\n");
             }
         }
