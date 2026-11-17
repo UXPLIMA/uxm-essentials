@@ -27,6 +27,7 @@ import com.uxplima.uxmessentials.rest.route.ModerationRoutes;
 import com.uxplima.uxmessentials.rest.route.NpcRoutes;
 import com.uxplima.uxmessentials.rest.route.PlayerStateRoutes;
 import com.uxplima.uxmessentials.rest.route.PlayerWarpsRoutes;
+import com.uxplima.uxmessentials.rest.route.PlayersRoutes;
 import com.uxplima.uxmessentials.rest.route.PresenceRoutes;
 import com.uxplima.uxmessentials.rest.route.RanksRoutes;
 import com.uxplima.uxmessentials.rest.route.RegionsRoutes;
@@ -50,8 +51,9 @@ import com.uxplima.uxmessentials.rest.route.WorldsRoutes;
  * without the diff saying so.
  *
  * <p>Each context contributes its own list. The order they are added in is the order a path is matched in, which
- * matters only where a literal segment and a parameter could both take it; no two contexts share a prefix, so
- * within this file the order is alphabetical rather than significant.
+ * matters only where a literal segment and a parameter could both take it. The one such place is
+ * {@code /players/by-name/{name}}, added first so no {@code /players/{uuid}/...} route reads {@code by-name} as a
+ * uuid; past it the order is alphabetical rather than significant.
  */
 public final class Routes {
 
@@ -80,6 +82,8 @@ public final class Routes {
         return new Router()
                 .add(Route.of("GET", PREFIX + "/status", Scopes.READ, request -> status(api)))
                 .add(Route.of("GET", EVENTS, Scopes.EVENTS, request -> upgradeRequired()))
+                // Ahead of every /players/{uuid}/... route, which would otherwise take by-name as a uuid.
+                .addAll(PlayersRoutes.of(api))
                 .addAll(CommandControlRoutes.of(api))
                 .addAll(DisplayRoutes.of(actions))
                 .addAll(EconomyRoutes.of(api, actions))

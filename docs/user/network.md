@@ -158,12 +158,11 @@ the party is not paid on that backend. Use `both` only while moving from one car
 
 ## The proxy plugin
 
-`uxmEssentials-velocity` relays bus frames, and, with `command-control.enabled = true` in its `config.conf`, hides
-and gates the proxy's own commands (`/server`, `/glist`, `/send` and proxy plugins' commands) by LuckPerms group. With
-`bus.secret` in its `config.conf` set to the backends' `network.bus.secret`, it also tells each backend a player
-reaches whether they switched servers or logged in (see [second factor](#second-factor)). It stores no data: each
-backend announces its own players.
-Backend commands are gated by the `commandcontrol` module on each backend.
+`uxmEssentials-velocity` relays bus frames, and, with `command-control.enabled = true` in its `config.conf`, hides and
+gates the proxy's own commands (`/server`, `/glist`, `/send` and proxy plugins' commands) by LuckPerms group. With
+`bus.secret` in its `config.conf` set to the backends' `network.bus.secret`, it also tells each backend a player reaches
+whether they switched servers or logged in (see [second factor](#second-factor)). It stores no data: each backend
+announces its own players. Backend commands are gated by the `commandcontrol` module on each backend.
 
 ## Checking a network
 
@@ -198,7 +197,8 @@ shared: each backend reads its own `config.conf` and module files, so keep them 
 | Moderation | Bans, mutes, warnings, IP bans, jails, history | A ban or IP ban kicks everywhere; a jail sends the player to the jail's server; a freeze holds everywhere | none |
 | Messaging | Mail, ignore lists, message and reply toggles, social spy, the `/reply` partner | `/msg`, `/reply`, `/helpop`, social spy, new-mail notices; staff chat in the staff module | none |
 | Vanish | Vanish state | Hidden on every server | `vanish` `cross-server` |
-| Kits | One-time claims and cooldowns | none | none |
+| Kits | One-time claims and cooldowns | First-join kits only on a player's first join to the network | none |
+| Communication | none | `/broadcast` reaches every server; no join or quit line or MOTD for a move between servers; first-join welcome once per network | `server-switch` in `communication` `join-quit.conf` |
 | Ranks | Each player's rank and prestige | none | none |
 | Vaults | Vault contents | none | none |
 | Security | Wrong PINs and codes, lockouts, proofs to carry | A lockout holds everywhere; a proof carries across a switch | `security` `join-verification.switch-grace-seconds` |
@@ -267,16 +267,18 @@ used on whichever server holds the player, when that server has its world. Detai
 
 ### Messages, presence and vanish
 
-Every backend knows which server each online player is on, from what the others announce with their heartbeats.
-With the network on, `/msg` and `/reply` reach a player on another server; that server applies the recipient's own
-message toggle, reply setting, ignore list and vanish. A spy holding `uxmessentials.msg.socialspy` sees every private
-message once, on any server; message switches and the `/reply` partner follow the player. `/helpop` and staff chat
-reach the staff of every server with the sender's server in the line. `/seen` reports a player elsewhere as online.
+Every backend knows which server each online player is on, from what the others announce with their heartbeats. With the
+network on, `/msg` and `/reply` reach a player on another server; that server applies the recipient's own message
+toggle, reply setting, ignore list and vanish. A spy holding `uxmessentials.msg.socialspy` sees every private message
+once, on any server; message switches and the `/reply` partner follow the player. `/helpop` and staff chat reach the
+staff of every server with the sender's server in the line. `/seen` reports a player elsewhere as online. Tab
+completion, `/list`, `/staff`, `/stafflist` (a click teleports with teleport's `cross-server` on), `staff_online`,
+pickers, `/realname`, `/whois` and `/mail sendall` take in every server's players.
 
-A vanished player is hidden on every server only with `cross-server = true` in `modules/vanish/config.conf` on
-every backend; a backend with it off shows them. Vanish is kept in the database, so a player switching servers stays
-hidden while the switch takes less than `hop-window-seconds` (default 30). A vanished player the sender may not see
-reads as offline to `/msg` and `/seen`.
+A vanished player is hidden on every server only with `cross-server = true` in `modules/vanish/config.conf` on every
+backend. The lists above hide them either way from a viewer whose see level is lower, and a player listed by a server on
+an older release from all but viewers who see every level. Vanish is kept in the database, so a switch shorter than
+`hop-window-seconds` (default 30) keeps a player hidden; `/msg` and `/seen` read one hidden from the sender as offline.
 
 ### Moderation
 
@@ -325,12 +327,11 @@ A player's rank pointer is shared and a rankup is seen on the other servers at o
 and the commands a rankup runs are per server: keep the file the same everywhere, and give a rankup's permission
 commands a permission plugin that shares its storage.
 
-Vault contents are shared and each save tells the other servers to reload that vault. One window per vault is
-enforced on each server only: the owner on one server and a staff member auditing the same vault on another can both
-open it. The first window to close is saved. The later one is not written over it: the log shows
-`event=vault_write_conflict` and `event=vault_items_unwritten` with that window's items, which stay in that server's
-memory (a reopen there takes them over) and are lost when it stops. Compare them with the vault and give back what is
-missing by hand.
+Vault contents are shared and each save tells the other servers to reload that vault. One window per vault is enforced
+on each server only: the owner on one server and a staff member auditing the same vault on another can both open it. The
+first window to close is saved. The later one is not written over it: the log shows `event=vault_write_conflict` and
+`event=vault_items_unwritten` with that window's items, which stay in that server's memory (a reopen there takes them
+over) and are lost when it stops. Compare them with the vault and give back what is missing by hand.
 
 ### Holograms, NPCs and spawns
 
@@ -357,10 +358,9 @@ same everywhere so transaction times agree.
 
 ## What does not cross servers
 
-- Public chat, broadcasts, join and quit lines, the tab list, scoreboards and `/list`: each server shows its own.
-  Use a proxy chat plugin for network chat.
+- Public chat, the tab list, scoreboards, and join and quit lines apart from moves: each server shows its own.
 - AFK state, `/back`, `/rtp`, `/spawn` and respawns: they stay on the server the player is on.
-- `/kick` and `/freeze` of a player on another server, and `/invsee` or `/endersee` of one.
+- `/kick` and `/freeze` of a player on another server. `/invsee`, `/getpos` and the like name that server instead.
 - Warps, homes, player warps, worlds and teleports to another server while their `cross-server` switch is off.
 - Settings files, message files and menus. Copy them to every backend that should behave the same.
 - Command control: configure the `commandcontrol` module on each backend; the proxy jar gates only proxy commands.

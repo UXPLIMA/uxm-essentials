@@ -27,6 +27,7 @@ import com.uxplima.uxmessentials.api.query.UxmModerationQuery;
 import com.uxplima.uxmessentials.api.query.UxmNpcQuery;
 import com.uxplima.uxmessentials.api.query.UxmPlayerStateQuery;
 import com.uxplima.uxmessentials.api.query.UxmPlayerWarpsQuery;
+import com.uxplima.uxmessentials.api.query.UxmPlayersQuery;
 import com.uxplima.uxmessentials.api.query.UxmPlaytimeQuery;
 import com.uxplima.uxmessentials.api.query.UxmPresenceQuery;
 import com.uxplima.uxmessentials.api.query.UxmRanksQuery;
@@ -67,6 +68,7 @@ public final class UxmEssentialsApiImpl implements UxmEssentialsApi {
     private final QueryContexts queries;
     private final ActionContexts actions;
     private final CommandFeedback lines;
+    private final UxmPlayersQuery players;
 
     public UxmEssentialsApiImpl(
             String version,
@@ -75,7 +77,8 @@ public final class UxmEssentialsApiImpl implements UxmEssentialsApi {
             MenuApi menus,
             QueryContexts queries,
             ActionContexts actions,
-            CommandFeedback lines) {
+            CommandFeedback lines,
+            UxmPlayersQuery players) {
         this.version = Objects.requireNonNull(version, "version");
         this.modules = Objects.requireNonNull(modules, "modules");
         this.config = Objects.requireNonNull(config, "config");
@@ -83,6 +86,7 @@ public final class UxmEssentialsApiImpl implements UxmEssentialsApi {
         this.queries = Objects.requireNonNull(queries, "queries");
         this.actions = Objects.requireNonNull(actions, "actions");
         this.lines = Objects.requireNonNull(lines, "lines");
+        this.players = Objects.requireNonNull(players, "players");
     }
 
     @Override
@@ -130,6 +134,11 @@ public final class UxmEssentialsApiImpl implements UxmEssentialsApi {
             throw new IllegalArgumentException("actingFor must not be blank");
         }
         return new UxmActionsImpl(plugin.getName() + "/" + behalf, actions);
+    }
+
+    @Override
+    public UxmPlayersQuery players() {
+        return players;
     }
 
     @Override

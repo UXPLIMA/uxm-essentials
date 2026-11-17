@@ -40,6 +40,7 @@ import com.uxplima.uxmessentials.communication.application.ResolveConnectionMess
 import com.uxplima.uxmessentials.communication.application.ResolveDeathMessage;
 import com.uxplima.uxmessentials.communication.application.ResolveJoinMessage;
 import com.uxplima.uxmessentials.communication.application.ResolveQuitMessage;
+import com.uxplima.uxmessentials.communication.application.ServerSwitches;
 import com.uxplima.uxmessentials.communication.application.SharedBroadcastOptOut;
 import com.uxplima.uxmessentials.communication.application.port.AnnouncementStore;
 import com.uxplima.uxmessentials.communication.application.port.AnnouncerSettingsStore;
@@ -51,6 +52,7 @@ import com.uxplima.uxmessentials.shared.adapter.inbound.gui.GuiLayouts;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.GuiText;
 import com.uxplima.uxmessentials.shared.adapter.inbound.settings.HeldSettingsListener;
 import com.uxplima.uxmessentials.shared.adapter.inbound.settings.LegacySwitches;
+import com.uxplima.uxmessentials.shared.adapter.outbound.bus.BroadcastSync;
 import com.uxplima.uxmessentials.shared.adapter.outbound.bus.Bus;
 import com.uxplima.uxmessentials.shared.adapter.outbound.bus.PlayerSettingsSync;
 import com.uxplima.uxmessentials.shared.adapter.outbound.chat.UxmChatStepBack;
@@ -58,9 +60,11 @@ import com.uxplima.uxmessentials.shared.adapter.outbound.hud.ChannelBroadcaster;
 import com.uxplima.uxmessentials.shared.adapter.outbound.hud.HudText;
 import com.uxplima.uxmessentials.shared.adapter.outbound.papi.PlaceholderApiSupport;
 import com.uxplima.uxmessentials.shared.adapter.outbound.permission.CatalogPermissionCheck;
+import com.uxplima.uxmessentials.shared.application.FirstJoins;
 import com.uxplima.uxmessentials.shared.application.message.Notifier;
 import com.uxplima.uxmessentials.shared.application.module.KernelPorts;
 import com.uxplima.uxmessentials.shared.application.module.ModuleContext;
+import com.uxplima.uxmessentials.shared.application.port.NetworkPresence;
 import com.uxplima.uxmessentials.shared.application.port.PlayerSwitchStore;
 import com.uxplima.uxmessentials.shared.application.port.Scheduler;
 import com.uxplima.uxmessentials.shared.application.settings.PlayerSwitches;
@@ -105,6 +109,7 @@ public final class CommunicationWiring {
             AnnouncerSettingsStore announcerSettingsStore,
             PlayerSwitchStore switchStore,
             Bus bus,
+            Network network,
             Supplier<Theme> theme,
             GuiLayouts guiLayouts,
             TextInput textInput,
@@ -116,6 +121,7 @@ public final class CommunicationWiring {
         Objects.requireNonNull(announcerSettingsStore, "announcerSettingsStore");
         Objects.requireNonNull(switchStore, "switchStore");
         Objects.requireNonNull(bus, "bus");
+        Objects.requireNonNull(network, "network");
         Objects.requireNonNull(theme, "theme");
         Objects.requireNonNull(guiLayouts, "guiLayouts");
         Objects.requireNonNull(textInput, "textInput");
@@ -160,7 +166,10 @@ public final class CommunicationWiring {
                 optOutStore,
                 channelBroadcaster,
                 CommunicationWiring::conditionContext,
-                kernel.scheduler());
+                kernel.scheduler(),
+                BroadcastSync.publisher(bus.publisher()));
+        // A /broadcast sent on another backend reaches the players here as one sent here would.
+        BroadcastSync.register(bus.registry(), broadcaster::broadcastHere);
         // uxmChat, when it runs, takes over the chat format, the announcer and the join, quit, death and advancement
         // lines it has turned on; each is checked when it would act, so a reload on either side is followed.
         UxmChatStepBack chat = new UxmChatStepBack(plugin.getServer());
@@ -234,7 +243,9 @@ public final class CommunicationWiring {
                 kernel.scheduler(),
                 chatMeta,
                 chatPlaceholders,
-                chat));
+                chat,
+                new ServerSwitches(network.presence(), settings::serverSwitches, network::networked),
+                network.firstJoins()));
         listeners.add(heldSwitches);
         // An earlier version kept the opt-out in the player's data on each server; it moves to the shared switch as
         // each player next joins.
@@ -296,11 +307,22 @@ public final class CommunicationWiring {
             Scheduler scheduler,
             ChatMetaSource chatMeta,
             ChatPlaceholderExpander chatPlaceholders,
-            UxmChatStepBack chat) {
+            UxmChatStepBack chat,
+            ServerSwitches switches,
+            FirstJoins firstJoins) {
         BooleanSupplier lines = () -> chat.covers(UxmChatStepBack.JOIN_QUIT);
         return List.of(
                 new ConnectionMessageListener(
-                        services.resolveJoin(), services.resolveQuit(), settings, infoSender, chatMeta, lines),
+                        services.resolveJoin(),
+                        services.resolveQuit(),
+                        settings,
+                        infoSender,
+                        chatMeta,
+                        lines,
+                        switches,
+                        firstJoins,
+                        scheduler,
+                        CommunicationWiring::probeVanished),
                 new DeathMessageListener(services.resolveDeath(), registry, infoSender, settings, lines),
                 // English-only project (a founding decision): vanilla advancement titles are translatable components,
                 // so the listener renders them through the GlobalTranslator in this locale before flattening to text.
@@ -344,6 +366,21 @@ public final class CommunicationWiring {
             }
         }
         return false;
+    }
+
+    /**
+     * What the connection lines need to know about the network.
+     *
+     * @param presence which server each player of the network is on
+     * @param networked whether this server is part of a network ({@code network.enabled})
+     * @param firstJoins whether a joining player is new to the network
+     */
+    public record Network(NetworkPresence presence, boolean networked, FirstJoins firstJoins) {
+
+        public Network {
+            Objects.requireNonNull(presence, "presence");
+            Objects.requireNonNull(firstJoins, "firstJoins");
+        }
     }
 
     /**

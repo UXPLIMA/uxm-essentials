@@ -80,8 +80,9 @@ import org.jspecify.annotations.Nullable;
  * {@code VAULT_OVERFLOW_RETURNED} notice. When overflow is rescued the truncated (live-size) contents are
  * persisted immediately, not just on close, so a crash before the window closes cannot leave the overflow in
  * the DB row for the next open to rescue and hand out a second time. The overflow is gone from the vault and
- * safely with the player, no loss, no dupe. When staff open another player's vault the overflow returns to the
- * staff opener, consistent with the blacklist's admin semantics.
+ * safely with the player, no loss, no dupe. A staff window is never shorter than the vault was saved, since the
+ * quota of an owner who is not online here cannot be read; what overflow is left then returns to the staff opener,
+ * consistent with the blacklist's admin semantics.
  *
  * <p>Closing a window hands its items to {@link VaultWindows}, which keeps them as the vault's pending state until
  * the write lands, so a reopen in the same tick is filled with them rather than with a cached copy from before the

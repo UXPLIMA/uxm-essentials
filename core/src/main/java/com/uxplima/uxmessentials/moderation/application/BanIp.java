@@ -41,6 +41,9 @@ import com.uxplima.uxmessentials.shared.domain.Result;
  * an explicit {@code /unbanip} first. A ban that ends later, or a second permanent one, replaces it. The write is
  * compare and set, so an IP ban landing on another server at the same moment is never overwritten blindly.
  *
+ * <p>A relay address (loopback, or one the operator listed as Geyser's or a proxy's) is refused with
+ * {@link ModerationError#SHARED_ADDRESS}: every player it carries would be banned with the one meant.
+ *
  * <p>A duration is optional: blank means a permanent IP ban, a parsed span a timed one. This use case takes
  * an already-resolved {@link Target} from the command adapter (which decides whether the argument was a
  * player name or a literal IP) so the domain never parses an address.
@@ -91,6 +94,11 @@ public final class BanIp {
         Objects.requireNonNull(target, "target");
         Objects.requireNonNull(rawDuration, "rawDuration");
         Objects.requireNonNull(reason, "reason");
+        if (ipAlts.isRelay(target.ip())) {
+            // Every player behind Geyser or a proxy arrives from a relay, so its ban would bar them all.
+            notifier.send(actor, ModerationMessageKey.BANIP_SHARED_ADDRESS, Map.of("ip", target.ip()));
+            return Result.err(ModerationError.SHARED_ADDRESS);
+        }
         Instant now = clock.instant();
         Optional<Duration> span = SanctionDuration.parse(rawDuration).duration();
         IpBan ban = new IpBan(target.ip(), span.map(now::plus), reason, target.uuid(), Issuer.of(actor), now);

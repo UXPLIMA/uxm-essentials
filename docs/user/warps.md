@@ -40,9 +40,10 @@ out of the box.
 Warp names are lowercase, up to 64 characters. A subcommand word always wins over a warp of the same name, so a
 warp called `list` or `info` is reached through the menu.
 
-With the trailing argument of `/warp <name> <x>`, a sender who holds `uxmessentials.warp.others` and names an online
-player sends that player; anything else is read as the password. A sent player must pass every check below
-themselves and pays the cost.
+With the trailing argument of `/warp <name> <x>`, a sender who holds `uxmessentials.warp.others` and names a player
+online on this server sends that player. A player online on another server is answered with that server. Anything
+else is read as the password when the warp has one; on a warp without a password the sender is told nobody has that
+name, and nobody is warped. A sent player must pass every check below themselves and pays the cost.
 
 ### The editor
 

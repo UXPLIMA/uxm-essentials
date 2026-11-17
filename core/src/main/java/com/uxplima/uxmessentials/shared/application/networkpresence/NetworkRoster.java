@@ -21,6 +21,7 @@ import com.uxplima.uxmessentials.shared.domain.NameCase;
 import com.uxplima.uxmessentials.shared.domain.NameMatch;
 import com.uxplima.uxmessentials.shared.domain.OnlinePlayer;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
+import com.uxplima.uxmessentials.shared.domain.PresenceTraits;
 import org.jspecify.annotations.Nullable;
 
 /**
@@ -75,6 +76,7 @@ public final class NetworkRoster implements NetworkPresence {
     private final Supplier<NameCase> names;
     private final Predicate<String> sharedName;
     private final ConcurrentHashMap<UUID, PlayerRef> local = new ConcurrentHashMap<>();
+    private final ConcurrentHashMap<UUID, PresenceTraits> localTraits = new ConcurrentHashMap<>();
     private final ConcurrentHashMap<String, Remote> remotes = new ConcurrentHashMap<>();
 
     /**
@@ -133,7 +135,12 @@ public final class NetworkRoster implements NetworkPresence {
         if (here != null) {
             return Optional.of(new OnlinePlayer(here, localServer));
         }
-        long now = clock.millis();
+        @Nullable Placed best = winner(player, clock.millis());
+        return best == null ? Optional.empty() : Optional.of(best.presence());
+    }
+
+    /** The remote entry that places {@code player}, across rosters that still count, or {@code null}. */
+    private @Nullable Placed winner(UUID player, long now) {
         @Nullable Placed best = null;
         for (Map.Entry<String, Remote> entry : remotes.entrySet()) {
             Remote remote = entry.getValue();
@@ -146,7 +153,40 @@ public final class NetworkRoster implements NetworkPresence {
                 best = candidate;
             }
         }
-        return best == null ? Optional.empty() : Optional.of(best.presence());
+        return best;
+    }
+
+    @Override
+    public Optional<PresenceTraits> traits(UUID player) {
+        Objects.requireNonNull(player, "player");
+        if (local.containsKey(player)) {
+            return Optional.of(localTraits.getOrDefault(player, PresenceTraits.PLAIN));
+        }
+        @Nullable Placed best = winner(player, clock.millis());
+        return best == null ? Optional.empty() : Optional.of(best.entry().traits());
+    }
+
+    @Override
+    public Optional<String> cameFrom(UUID player, Duration within) {
+        Objects.requireNonNull(player, "player");
+        Objects.requireNonNull(within, "within");
+        long now = clock.millis();
+        @Nullable String latest = null;
+        long latestSince = Long.MIN_VALUE;
+        for (Map.Entry<String, Remote> entry : remotes.entrySet()) {
+            Remote remote = entry.getValue();
+            Entry member = remote.entries().get(player);
+            if (member == null || expired(remote, now)) {
+                continue;
+            }
+            // A tombstone's time is when this server heard the player left there.
+            boolean counts = member.present() || now - member.sinceMillis() <= within.toMillis();
+            if (counts && member.sinceMillis() >= latestSince) {
+                latest = entry.getKey();
+                latestSince = member.sinceMillis();
+            }
+        }
+        return Optional.ofNullable(latest);
     }
 
     @Override
@@ -242,20 +282,38 @@ public final class NetworkRoster implements NetworkPresence {
     }
 
     /** {@code player} is connected to this backend. */
-    void addLocal(PlayerRef player) {
+    void addLocal(PlayerRef player, PresenceTraits traits) {
+        localTraits.put(player.uuid(), traits);
         local.put(player.uuid(), player);
     }
 
     /** {@code player} left this backend. */
     void removeLocal(UUID player) {
         local.remove(player);
+        localTraits.remove(player);
     }
 
-    /** The players connected to this backend, ordered by name. */
-    List<PlayerRef> localPlayers() {
-        List<PlayerRef> players = new ArrayList<>(local.values());
-        players.sort(Comparator.comparing(player -> player.name().toLowerCase(Locale.ROOT)));
-        return List.copyOf(players);
+    /** The player on this backend with this account, if any. */
+    @Nullable PlayerRef local(UUID player) {
+        return local.get(player);
+    }
+
+    /** Whether the traits of {@code player}, connected here, changed to {@code traits}; they are kept either way. */
+    boolean retraitLocal(UUID player, PresenceTraits traits) {
+        if (!local.containsKey(player)) {
+            return false;
+        }
+        return !traits.equals(localTraits.put(player, traits));
+    }
+
+    /** The players connected to this backend with their traits, ordered by name. */
+    List<RosterMember> localMembers() {
+        List<RosterMember> members = new ArrayList<>(local.size());
+        for (PlayerRef player : local.values()) {
+            members.add(new RosterMember(player, localTraits.getOrDefault(player.uuid(), PresenceTraits.PLAIN)));
+        }
+        members.sort(Comparator.comparing(member -> member.player().name().toLowerCase(Locale.ROOT)));
+        return List.copyOf(members);
     }
 
     /**
@@ -263,17 +321,21 @@ public final class NetworkRoster implements NetworkPresence {
      *
      * @return whether the player is newly online there, so the caller can learn the name once
      */
-    boolean applyJoin(String origin, RosterStamp stamp, PlayerRef player) {
+    boolean applyJoin(String origin, RosterStamp stamp, PlayerRef player, PresenceTraits traits) {
         return !apply(
                         origin,
                         stamp,
-                        (remote, now) -> delta(remote, stamp, new Entry(player, stamp.sequence(), true, now)))
+                        (remote, now) -> delta(remote, stamp, new Entry(player, stamp.sequence(), true, now, traits)))
                 .isEmpty();
     }
 
     /** {@code player} left {@code origin}. */
     void applyLeave(String origin, RosterStamp stamp, PlayerRef player) {
-        apply(origin, stamp, (remote, now) -> delta(remote, stamp, new Entry(player, stamp.sequence(), false, now)));
+        apply(
+                origin,
+                stamp,
+                (remote, now) ->
+                        delta(remote, stamp, new Entry(player, stamp.sequence(), false, now, PresenceTraits.PLAIN)));
     }
 
     /**
@@ -281,7 +343,7 @@ public final class NetworkRoster implements NetworkPresence {
      *
      * @return the players newly online there, so the caller can learn their names once
      */
-    List<PlayerRef> applyRoster(String origin, RosterStamp stamp, Collection<PlayerRef> players) {
+    List<PlayerRef> applyRoster(String origin, RosterStamp stamp, Collection<RosterMember> players) {
         return apply(origin, stamp, (remote, now) -> roster(remote, stamp, players, now));
     }
 
@@ -362,12 +424,16 @@ public final class NetworkRoster implements NetworkPresence {
             return null;
         }
         Map<UUID, Entry> entries = new HashMap<>(remote.entries());
-        entries.put(entry.player().uuid(), entry);
+        // New traits for a player already there are no new arrival: the time they arrived stands.
+        Entry placed =
+                current != null && current.present() && entry.present() ? entry.since(current.sinceMillis()) : entry;
+        entries.put(entry.player().uuid(), placed);
         return remote.with(remote.rosterSequence(), entries);
     }
 
     /** A whole roster applied to {@code remote}, or {@code null} when an equal or newer one was already applied. */
-    private static @Nullable Remote roster(Remote remote, RosterStamp stamp, Collection<PlayerRef> players, long now) {
+    private static @Nullable Remote roster(
+            Remote remote, RosterStamp stamp, Collection<RosterMember> players, long now) {
         if (stamp.sequence() <= remote.rosterSequence()) {
             return null;
         }
@@ -378,13 +444,14 @@ public final class NetworkRoster implements NetworkPresence {
                 entries.put(entry.player().uuid(), entry);
             }
         }
-        for (PlayerRef player : players) {
+        for (RosterMember member : players) {
+            PlayerRef player = member.player();
             if (entries.containsKey(player.uuid())) {
                 continue;
             }
             Entry kept = remote.entries().get(player.uuid());
             long since = kept != null && kept.present() ? kept.sinceMillis() : now;
-            entries.put(player.uuid(), new Entry(player, stamp.sequence(), true, since));
+            entries.put(player.uuid(), new Entry(player, stamp.sequence(), true, since, member.traits()));
         }
         return remote.with(stamp.sequence(), entries);
     }
@@ -453,8 +520,14 @@ public final class NetworkRoster implements NetworkPresence {
      * @param sequence the announcement that last set this entry
      * @param present {@code false} for a tombstone: the player left
      * @param sinceMillis when this backend saw the player arrive there, on this backend's clock
+     * @param traits what that backend announced about the player
      */
-    private record Entry(PlayerRef player, long sequence, boolean present, long sinceMillis) {}
+    private record Entry(PlayerRef player, long sequence, boolean present, long sinceMillis, PresenceTraits traits) {
+
+        Entry since(long arrivedMillis) {
+            return new Entry(player, sequence, present, arrivedMillis, traits);
+        }
+    }
 
     /**
      * A roster entry together with the backend whose roster holds it.

@@ -22,7 +22,9 @@ import com.uxplima.uxmessentials.moderation.domain.MuteState;
 import com.uxplima.uxmessentials.moderation.domain.SeenRecord;
 import com.uxplima.uxmessentials.moderation.domain.TempbanState;
 import com.uxplima.uxmessentials.shared.application.IpAlts;
+import com.uxplima.uxmessentials.shared.application.RelayAddresses;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
+import com.uxplima.uxmessentials.testing.QuietLog;
 import com.uxplima.uxmessentials.testing.RecordingNotifier;
 import org.junit.jupiter.api.Test;
 
@@ -261,6 +263,26 @@ class LoginEnforcementTest {
                         new SilentAudit(),
                         CLOCK)::carryOver,
                 refuseCaseVariants);
+    }
+
+    @Test
+    void anIpBanOnTheAddressEveryPlayerBehindGeyserSharesBarsNobody() {
+        String geyser = "192.0.2.10";
+        repository.saveIpBan(
+                new IpBan(geyser, Optional.empty(), Optional.empty(), Optional.empty(), Issuer.of(ALEX), NOW));
+        LoginEnforcement behindGeyser = new LoginEnforcement(
+                repository,
+                new IpAlts(
+                        new NoIpHistory(),
+                        address -> address,
+                        RelayAddresses.of(java.util.List.of(geyser), new QuietLog())),
+                notifier.notifier(),
+                new SilentAudit(),
+                CLOCK);
+
+        assertThat(Logins.check(behindGeyser, ALEX, geyser, false, false).allowed())
+                .isTrue();
+        assertThat(Logins.check(login, ALEX, geyser, false, false).allowed()).isFalse();
     }
 
     @Test

@@ -14,6 +14,7 @@ import org.bukkit.event.Listener;
 import org.bukkit.event.player.PlayerJoinEvent;
 
 import com.uxplima.uxmessentials.shared.adapter.outbound.BukkitRefs;
+import com.uxplima.uxmessentials.shared.application.RelayAddresses;
 import com.uxplima.uxmessentials.shared.application.port.IpHistoryStore;
 import com.uxplima.uxmessentials.shared.application.port.IpTokens;
 import com.uxplima.uxmessentials.shared.application.port.Scheduler;
@@ -32,6 +33,9 @@ import org.jspecify.annotations.Nullable;
  * server holds no raw addresses at all. The recorder itself is wired only when moderation or security is enabled,
  * so a server that runs neither records nothing.
  *
+ * <p>A {@linkplain RelayAddresses relay} address is not recorded: every player behind Geyser or a proxy arrives from it,
+ * so it would make them all alts of each other and count them all against one address's account cap.
+ *
  * <p>The address is read on the tick thread (a {@link Player} lookup) and everything after it happens on the
  * async task, so the handler adds no tick-thread I/O.
  */
@@ -43,15 +47,22 @@ public final class IpHistoryRecorder implements Listener {
     private final Scheduler scheduler;
     private final Clock clock;
     private final boolean retainAddress;
+    private final RelayAddresses relays;
     private final List<IpHistoryObserver> observers = new CopyOnWriteArrayList<>();
 
     public IpHistoryRecorder(
-            IpHistoryStore store, IpTokens tokens, Scheduler scheduler, Clock clock, boolean retainAddress) {
+            IpHistoryStore store,
+            IpTokens tokens,
+            Scheduler scheduler,
+            Clock clock,
+            boolean retainAddress,
+            RelayAddresses relays) {
         this.store = Objects.requireNonNull(store, "store");
         this.tokens = Objects.requireNonNull(tokens, "tokens");
         this.scheduler = Objects.requireNonNull(scheduler, "scheduler");
         this.clock = Objects.requireNonNull(clock, "clock");
         this.retainAddress = retainAddress;
+        this.relays = Objects.requireNonNull(relays, "relays");
     }
 
     /** Watch every recorded association. Registered at wiring time; the list is never mutated afterwards. */
@@ -63,7 +74,7 @@ public final class IpHistoryRecorder implements Listener {
     public void onJoin(PlayerJoinEvent event) {
         Player player = event.getPlayer();
         String address = addressOf(player);
-        if (address == null) {
+        if (address == null || relays.isRelay(address)) {
             return;
         }
         PlayerRef who = BukkitRefs.toRef(player);

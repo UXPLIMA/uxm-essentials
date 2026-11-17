@@ -67,6 +67,7 @@ import com.uxplima.uxmessentials.shared.application.port.NetworkPresence;
 import com.uxplima.uxmessentials.shared.application.settings.HeldSettings;
 import com.uxplima.uxmessentials.shared.application.settings.PlayerSwitches;
 import com.uxplima.uxmessentials.shared.application.settings.SettingsSessions;
+import com.uxplima.uxmessentials.shared.domain.OnlinePlayer;
 import com.uxplima.uxmlib.gui.input.TextInput;
 import com.uxplima.uxmlib.menu.Menus;
 import com.uxplima.uxmlib.menu.binding.MenuBindings;
@@ -158,7 +159,8 @@ public final class MessagingWiring {
                         new UnreadMailNotice(
                                 stores.mail(),
                                 new BukkitMessageDelivery(kernel.messages(), kernel.messageSink()),
-                                kernel.log()),
+                                kernel.log(),
+                                presence),
                         kernel.scheduler()));
         network.bind(services.relay(), services.helpOp(), services.sendMail());
         bus.registry().register(network::onFrame);
@@ -190,8 +192,15 @@ public final class MessagingWiring {
                 menuBindings,
                 plugin.getDataFolder().toPath(),
                 kernel.log());
-        List<CommandRegistration> commands =
-                MessagingCommands.all(services, kernel.messages(), kernel.messageSink(), views);
+        List<CommandRegistration> commands = MessagingCommands.all(
+                services,
+                kernel.messages(),
+                kernel.messageSink(),
+                views,
+                () -> presence.online().stream()
+                        .filter(online -> !online.server().equals(presence.localServer()))
+                        .map(OnlinePlayer::player)
+                        .toList());
         return new Wired(
                 commands,
                 listeners,

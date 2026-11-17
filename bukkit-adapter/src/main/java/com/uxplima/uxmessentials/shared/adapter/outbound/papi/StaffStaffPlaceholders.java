@@ -5,6 +5,7 @@ import java.util.Objects;
 import org.bukkit.Server;
 import org.bukkit.entity.Player;
 
+import com.uxplima.uxmessentials.shared.adapter.outbound.lookup.VisibleNetwork;
 import com.uxplima.uxmessentials.shared.application.permission.SocialPermissions;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmessentials.staff.application.port.StaffModeStore;
@@ -18,7 +19,8 @@ import org.jspecify.annotations.NullMarked;
  * <p>The online-staff count enumerates the connected players holding the {@code uxmessentials.staff.member}
  * marker, the same node {@code /stafflist} and the presence {@code /staff} roster agree on. The loop is over
  * the online set (bounded by the player cap) and is a plain permission read, so it is cheap on the placeholder
- * path; it counts every staff-marker holder regardless of who asks, since the roster size is server-wide.
+ * path; it counts every staff-marker holder regardless of who asks, since the roster size is server-wide. On a
+ * network the staff of the other backends count too, as each backend announced them with its players.
  */
 @NullMarked
 public final class StaffStaffPlaceholders implements StaffPlaceholders {
@@ -27,10 +29,12 @@ public final class StaffStaffPlaceholders implements StaffPlaceholders {
 
     private final StaffModeStore store;
     private final Server server;
+    private final VisibleNetwork network;
 
-    public StaffStaffPlaceholders(StaffModeStore store, Server server) {
+    public StaffStaffPlaceholders(StaffModeStore store, Server server, VisibleNetwork network) {
         this.store = Objects.requireNonNull(store, "store");
         this.server = Objects.requireNonNull(server, "server");
+        this.network = Objects.requireNonNull(network, "network");
     }
 
     @Override
@@ -45,7 +49,7 @@ public final class StaffStaffPlaceholders implements StaffPlaceholders {
         // a count of permission-marker holders, never any player's mutable entity state. A torn read across a
         // concurrent join/quit at worst reports a count off by one for a single refresh, which self-corrects on
         // the next HUD tick, acceptable for a cosmetic placeholder, and far cheaper than a blocking marshal.
-        int count = 0;
+        int count = network.staffElsewhereCount();
         for (Player player : server.getOnlinePlayers()) {
             if (player.hasPermission(STAFF_MEMBER_NODE)) {
                 count++;

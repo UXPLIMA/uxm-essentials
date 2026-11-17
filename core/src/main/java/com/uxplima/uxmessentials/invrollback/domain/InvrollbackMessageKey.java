@@ -21,6 +21,7 @@ public enum InvrollbackMessageKey implements MessageKey {
 
     // Confirmation that a target's inventory was restored from a chosen snapshot.
     INVROLLBACK_RESTORED("invrollback.restored"),
+    INVROLLBACK_RESTORE_KEPT("invrollback.restore-kept"),
 
     // The export-to-shulkers action: the confirmation, and the refusal when the snapshot holds nothing to export.
     INVROLLBACK_EXPORTED("invrollback.exported"),

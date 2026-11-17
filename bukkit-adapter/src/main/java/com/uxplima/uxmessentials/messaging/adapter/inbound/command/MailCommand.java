@@ -5,6 +5,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.function.Supplier;
 
 import org.bukkit.Bukkit;
 import org.bukkit.entity.Player;
@@ -55,10 +56,22 @@ public final class MailCommand extends MessagingCommandSupport implements Comman
     private static final String SENDALL_PERMISSION = SocialPermissions.MAIL_SENDALL;
 
     private final MessagingGuiViews views;
+    private final Supplier<List<PlayerRef>> elsewhere;
 
-    public MailCommand(MessagingServices services, Messages messages, MessageSink sink, MessagingGuiViews views) {
+    /**
+     * The mail command.
+     *
+     * @param elsewhere every player online on the other backends of the network, for {@code /mail sendall}
+     */
+    public MailCommand(
+            MessagingServices services,
+            Messages messages,
+            MessageSink sink,
+            MessagingGuiViews views,
+            Supplier<List<PlayerRef>> elsewhere) {
         super(services, messages, sink);
         this.views = Objects.requireNonNull(views, "views");
+        this.elsewhere = Objects.requireNonNull(elsewhere, "elsewhere");
     }
 
     @Override
@@ -153,11 +166,13 @@ public final class MailCommand extends MessagingCommandSupport implements Comman
         return Command.SINGLE_SUCCESS;
     }
 
-    private static List<PlayerRef> onlineRecipients() {
+    /** Every player online here and on the other backends of the network, each account once. */
+    private List<PlayerRef> onlineRecipients() {
         List<PlayerRef> recipients = new ArrayList<>();
         for (Player online : Bukkit.getOnlinePlayers()) {
             recipients.add(BukkitRefs.toRef(online));
         }
+        recipients.addAll(elsewhere.get());
         return List.copyOf(recipients);
     }
 }
