@@ -62,7 +62,7 @@ public final class JooqEconomyMaintenance implements EconomyMaintenance {
                         .map(row -> {
                             String owner = row.get(ECONOMY_OWNERS.OWNER);
                             String name = row.get(ECONOMY_OWNERS.NAME);
-                            return new PlayerRef(UUID.fromString(owner), name == null ? owner : name);
+                            return new PlayerRef(UUID.fromString(owner), name == null || name.isBlank() ? owner : name);
                         })
                         .collect(Collectors.toList()));
     }

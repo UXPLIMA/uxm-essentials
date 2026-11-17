@@ -27,7 +27,6 @@ import org.jspecify.annotations.Nullable;
 public record ImportedAccount(UUID uuid, String name, Instant lastSeen) {
 
     private static final Pattern ACCOUNT_NAME = Pattern.compile("[.*+!~#$-]?[A-Za-z0-9_]{1,16}");
-    private static final int MAX_LENGTH = 16;
 
     public ImportedAccount {
         Objects.requireNonNull(uuid, "uuid");
@@ -52,7 +51,7 @@ public record ImportedAccount(UUID uuid, String name, Instant lastSeen) {
     /** Whether {@code name} is one an account can play under, rather than a nickname or a uuid. */
     public static boolean isAccountName(String name) {
         Objects.requireNonNull(name, "name");
-        return name.length() <= MAX_LENGTH && ACCOUNT_NAME.matcher(name).matches();
+        return ACCOUNT_NAME.matcher(name).matches();
     }
 
     /** The row the name index keeps for this account. */

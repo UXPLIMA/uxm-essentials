@@ -60,12 +60,20 @@ abstract class ModerationCommandSupport {
     }
 
     /**
-     * The target by name, online or known offline, or empty after a feedback line: the name was never seen, or it
-     * could mean several case variants and none is spelled as typed.
+     * The target by name or uuid, online or known offline, or empty after a feedback line: the name was never seen, or
+     * it could mean several case variants and none is spelled as typed. A uuid typed out, or on an offline-mode server
+     * a name, that never joined names the account it will join as, and the sender is told it never joined.
      */
     final Optional<PlayerRef> targetByName(CommandContext<CommandSourceStack> ctx, String name) {
         NameMatch match = services.targets().resolve(name);
         Optional<PlayerRef> target = match.player();
+        if (target.isEmpty() && match instanceof NameMatch.Unknown) {
+            target = services.targets().neverJoined(name);
+            target.ifPresent(account -> notify(
+                    ctx,
+                    ModerationMessageKey.TARGET_NEVER_JOINED,
+                    Map.of("player", account.name(), "uuid", account.uuid().toString())));
+        }
         if (target.isEmpty()) {
             MessageLine miss = match.miss(UNKNOWN_PLAYER, Map.of("player", name));
             notify(ctx, miss.key(), miss.args());

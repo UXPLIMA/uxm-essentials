@@ -16,6 +16,7 @@ import com.uxplima.uxmessentials.moderation.domain.SanctionAction;
 import com.uxplima.uxmessentials.moderation.domain.SanctionHistoryEntry;
 import com.uxplima.uxmessentials.persistence.jooq.tables.ModerationSanctionHistory;
 import com.uxplima.uxmessentials.persistence.jooq.tables.records.ModerationSanctionHistoryRecord;
+import com.uxplima.uxmessentials.persistence.runtime.ColumnFit;
 import com.uxplima.uxmessentials.persistence.runtime.IntegrityViolation;
 import com.uxplima.uxmessentials.persistence.runtime.JooqRepository;
 import com.uxplima.uxmessentials.persistence.runtime.PersistenceException;
@@ -222,8 +223,8 @@ public final class JooqSanctionHistory extends JooqRepository implements Sanctio
         row.setReasonKey(ReasonLines.key(entry.drawnReason()));
         row.setReasonArgs(ReasonLines.args(entry.drawnReason()));
         row.setActor(actorUuid(entry));
-        row.setActorName(
-                fit(MODERATION_SANCTION_HISTORY.ACTOR_NAME, entry.actor().name()));
+        row.setActorName(ColumnFit.name(
+                MODERATION_SANCTION_HISTORY.ACTOR_NAME, entry.actor().name()));
         row.setIp(entry.ip().orElse(null));
         row.setExpiresAt(entry.expiry().map(Instant::toEpochMilli).orElse(null));
         row.setTs(entry.at().toEpochMilli());

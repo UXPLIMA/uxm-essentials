@@ -111,6 +111,9 @@ sourceSets {
 val bareMigrations =
     tasks.register<Sync>("bareMigrations") {
         from("src/main/resources/db/migration")
+        // A widening only PostgreSQL, MySQL and MariaDB run (SQLite stores any length) is part of the schema the
+        // writes are fitted to, so the generator reads the PostgreSQL copy too, in the syntax its parser knows.
+        from("src/main/resources/db/vendor/postgresql")
         include("*.sql")
         into(layout.buildDirectory.dir("ddl"))
         filter { line -> line.replace("\${prefix}", "") }

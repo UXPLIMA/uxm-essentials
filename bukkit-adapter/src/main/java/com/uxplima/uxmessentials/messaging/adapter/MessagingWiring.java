@@ -192,6 +192,7 @@ public final class MessagingWiring {
                 menuBindings,
                 plugin.getDataFolder().toPath(),
                 kernel.log());
+        PrivateMessageRoute route = new PrivateMessageRoute(services, kernel.messages(), kernel.messageSink());
         List<CommandRegistration> commands = MessagingCommands.all(
                 services,
                 kernel.messages(),
@@ -200,7 +201,8 @@ public final class MessagingWiring {
                 () -> presence.online().stream()
                         .filter(online -> !online.server().equals(presence.localServer()))
                         .map(OnlinePlayer::player)
-                        .toList());
+                        .toList(),
+                route);
         return new Wired(
                 commands,
                 listeners,
@@ -210,7 +212,8 @@ public final class MessagingWiring {
                 afkStatus,
                 running,
                 views,
-                MessagingApiWrites.of(services));
+                MessagingApiWrites.of(services),
+                route);
     }
 
     private static MessagingServices assemble(
@@ -360,6 +363,9 @@ public final class MessagingWiring {
      * @param afkStatus the rebindable AFK status the presence context fills in when it wires
      * @param running the flag flipped false on stop so the sweep exits
      * @param guiViews the player-facing GUIs (settings, ignore-list, mailbox), for the command and hub openers
+     * @param apiWrites the developer API's message writes
+     * @param privateMessages where a private message to a named player goes, for a menu's whisper action as for
+     *     {@code /msg}
      */
     public record Wired(
             List<CommandRegistration> commands,
@@ -370,7 +376,8 @@ public final class MessagingWiring {
             MutableAfkStatus afkStatus,
             AtomicBoolean running,
             MessagingGuiViews guiViews,
-            MessagingApiWrites apiWrites) {
+            MessagingApiWrites apiWrites,
+            PrivateMessageRoute privateMessages) {
 
         public Wired {
             commands = List.copyOf(commands);
@@ -382,6 +389,7 @@ public final class MessagingWiring {
             Objects.requireNonNull(running, "running");
             Objects.requireNonNull(guiViews, "guiViews");
             Objects.requireNonNull(apiWrites, "apiWrites");
+            Objects.requireNonNull(privateMessages, "privateMessages");
         }
 
         /** Arm the mail-expiry sweep. */

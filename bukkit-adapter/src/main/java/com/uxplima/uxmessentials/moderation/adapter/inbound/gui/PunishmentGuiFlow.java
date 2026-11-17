@@ -82,7 +82,7 @@ public final class PunishmentGuiFlow {
         return new PlayerPickerView.Request(
                 action.pickerTitle(),
                 target -> onTargetPicked(viewer, viewerRef, action, target),
-                name -> services.targets().resolve(name),
+                name -> services.targets().resolveOrNeverJoined(name),
                 ModerationMessageKey.UNKNOWN_TARGET);
     }
 

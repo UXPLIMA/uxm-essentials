@@ -139,7 +139,15 @@ public final class GuardWiring {
         };
         GuardService service = new GuardService(store, sync, worlds, kernel.scheduler(), config, warn);
         GuardRuntime runtime = new GuardRuntime(
-                plugin, kernel.scheduler(), service, store, kernel.messages(), kernel.messageSink(), clock, audit);
+                plugin,
+                kernel.scheduler(),
+                service,
+                store,
+                kernel.messages(),
+                kernel.messageSink(),
+                clock,
+                audit,
+                kernel.playerLookup());
         Selections selections = new Selections(plugin.getServer());
         RegionDisplay display = new RegionDisplay(plugin, kernel.scheduler());
         PlayerTracks tracks = new PlayerTracks(runtime, actions, heldGod);

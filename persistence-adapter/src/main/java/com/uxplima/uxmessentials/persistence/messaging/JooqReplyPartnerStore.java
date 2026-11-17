@@ -9,6 +9,7 @@ import java.util.UUID;
 
 import com.uxplima.uxmessentials.messaging.application.port.ReplyPartnerStore;
 import com.uxplima.uxmessentials.messaging.domain.LastConversation;
+import com.uxplima.uxmessentials.persistence.runtime.ColumnFit;
 import com.uxplima.uxmessentials.persistence.runtime.JooqRepository;
 import com.uxplima.uxmessentials.persistence.runtime.PersistenceException;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
@@ -57,7 +58,9 @@ public final class JooqReplyPartnerStore extends JooqRepository implements Reply
                             conversation.partner().uuid().toString())
                     .set(
                             MESSAGING_REPLY_PARTNERS.PARTNER_NAME,
-                            conversation.partner().name())
+                            ColumnFit.name(
+                                    MESSAGING_REPLY_PARTNERS.PARTNER_NAME,
+                                    conversation.partner().name()))
                     .set(
                             MESSAGING_REPLY_PARTNERS.TOUCHED_AT,
                             conversation.lastTouched().toEpochMilli())
@@ -76,7 +79,9 @@ public final class JooqReplyPartnerStore extends JooqRepository implements Reply
                         conversation.partner().uuid().toString())
                 .set(
                         MESSAGING_REPLY_PARTNERS.PARTNER_NAME,
-                        conversation.partner().name())
+                        ColumnFit.name(
+                                MESSAGING_REPLY_PARTNERS.PARTNER_NAME,
+                                conversation.partner().name()))
                 .set(MESSAGING_REPLY_PARTNERS.TOUCHED_AT, touched)
                 .where(MESSAGING_REPLY_PARTNERS.OWNER_UUID.eq(owner))
                 .and(MESSAGING_REPLY_PARTNERS.TOUCHED_AT.le(touched))

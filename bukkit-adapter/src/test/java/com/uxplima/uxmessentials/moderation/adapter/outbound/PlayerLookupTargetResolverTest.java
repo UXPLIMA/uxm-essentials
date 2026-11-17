@@ -2,6 +2,7 @@ package com.uxplima.uxmessentials.moderation.adapter.outbound;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import java.nio.charset.StandardCharsets;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -13,11 +14,15 @@ import com.uxplima.uxmessentials.shared.domain.OnlinePlayer;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import org.junit.jupiter.api.Test;
 
-/** A sanction names the account online on any backend before an offline owner of the same name. */
+/**
+ * A sanction names the account online on any backend before an offline owner of the same name, takes a uuid wherever
+ * it takes a name, and names an account that never joined by its uuid or, on an offline-mode server, by its name.
+ */
 class PlayerLookupTargetResolverTest {
 
     private static final PlayerRef ONLINE_ELSEWHERE = new PlayerRef(UUID.randomUUID(), "Steve");
     private static final PlayerRef CACHED_OWNER = new PlayerRef(UUID.randomUUID(), "steve");
+    private static final UUID NEVER_SEEN = UUID.fromString("069a79f4-44e9-4726-a5be-fca90e38aaf5");
 
     private NameCase nameCase = NameCase.INSENSITIVE;
 
@@ -39,7 +44,7 @@ class PlayerLookupTargetResolverTest {
 
         @Override
         public Optional<PlayerRef> findByUuid(UUID uuid) {
-            return Optional.empty();
+            return uuid.equals(CACHED_OWNER.uuid()) ? Optional.of(CACHED_OWNER) : Optional.empty();
         }
 
         @Override
@@ -72,6 +77,50 @@ class PlayerLookupTargetResolverTest {
         assertThat(resolver.resolve("Steve").player().map(PlayerRef::uuid)).contains(ONLINE_ELSEWHERE.uuid());
         // "steve" is another offline-mode account than the "Steve" online elsewhere.
         assertThat(resolver.resolve("steve").player().map(PlayerRef::uuid)).contains(CACHED_OWNER.uuid());
+    }
+
+    @Test
+    void aUuidNamesTheAccountOnlineElsewhereOrKnownOfflineWithOrWithoutDashes() {
+        PlayerLookupTargetResolver resolver = new PlayerLookupTargetResolver(
+                presence(List.of(new OnlinePlayer(ONLINE_ELSEWHERE, "lobby-1"))), offlineCache);
+
+        assertThat(resolver.resolve(ONLINE_ELSEWHERE.uuid().toString()).player())
+                .contains(ONLINE_ELSEWHERE);
+        assertThat(resolver.resolve(CACHED_OWNER.uuid().toString().replace("-", ""))
+                        .player())
+                .hasValueSatisfying(found -> assertThat(found.name()).isEqualTo("steve"));
+    }
+
+    @Test
+    void aUuidNobodyHasSeenNamesTheAccountItWillJoinAs() {
+        PlayerLookupTargetResolver resolver = new PlayerLookupTargetResolver(presence(List.of()), offlineCache);
+        String typed = NEVER_SEEN.toString().toUpperCase(java.util.Locale.ROOT);
+
+        assertThat(resolver.resolve(typed).player()).isEmpty();
+        assertThat(resolver.neverJoined(typed)).contains(new PlayerRef(NEVER_SEEN, NEVER_SEEN.toString()));
+        assertThat(resolver.resolveOrNeverJoined(typed).player().map(PlayerRef::uuid))
+                .contains(NEVER_SEEN);
+    }
+
+    @Test
+    void offlineModeANameNobodyHasUsedNamesTheAccountItsSpellingLogsInAs() {
+        nameCase = NameCase.SENSITIVE;
+        PlayerLookupTargetResolver resolver = new PlayerLookupTargetResolver(presence(List.of()), offlineCache);
+
+        assertThat(resolver.neverJoined("Griefer"))
+                .contains(new PlayerRef(
+                        UUID.nameUUIDFromBytes("OfflinePlayer:Griefer".getBytes(StandardCharsets.UTF_8)), "Griefer"));
+        assertThat(resolver.neverJoined(".BedrockGriefer"))
+                .as("Floodgate makes that account")
+                .isEmpty();
+    }
+
+    @Test
+    void withAuthenticatedLoginsANameNobodyHasUsedNamesNoAccount() {
+        PlayerLookupTargetResolver resolver = new PlayerLookupTargetResolver(presence(List.of()), offlineCache);
+
+        assertThat(resolver.neverJoined("Griefer")).isEmpty();
+        assertThat(resolver.resolveOrNeverJoined("Griefer").player()).isEmpty();
     }
 
     private static NetworkPresence presence(List<OnlinePlayer> online) {

@@ -12,6 +12,7 @@ import java.util.Optional;
 import java.util.UUID;
 
 import com.uxplima.uxmessentials.persistence.jooq.tables.records.TradeEscrowRecord;
+import com.uxplima.uxmessentials.persistence.runtime.ColumnFit;
 import com.uxplima.uxmessentials.persistence.runtime.JooqRepository;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmessentials.trade.application.TradeEscrow;
@@ -48,12 +49,19 @@ public final class JooqTradeEscrowStore extends JooqRepository implements TradeE
             dsl.insertInto(TRADE_ESCROW)
                     .set(TRADE_ESCROW.TRADE_ID, tradeId)
                     .set(TRADE_ESCROW.OWNER_UUID, owner)
-                    .set(TRADE_ESCROW.OWNER_NAME, escrow.owner().name())
+                    .set(
+                            TRADE_ESCROW.OWNER_NAME,
+                            ColumnFit.name(
+                                    TRADE_ESCROW.OWNER_NAME, escrow.owner().name()))
                     .set(TRADE_ESCROW.OWNER_SERVER, escrow.ownerServer())
                     .set(
                             TRADE_ESCROW.COUNTERPARTY_UUID,
                             escrow.counterparty().uuid().toString())
-                    .set(TRADE_ESCROW.COUNTERPARTY_NAME, escrow.counterparty().name())
+                    .set(
+                            TRADE_ESCROW.COUNTERPARTY_NAME,
+                            ColumnFit.name(
+                                    TRADE_ESCROW.COUNTERPARTY_NAME,
+                                    escrow.counterparty().name()))
                     .set(TRADE_ESCROW.COUNTERPARTY_SERVER, escrow.counterpartyServer())
                     .set(TRADE_ESCROW.ITEM_DATA, escrow.itemData())
                     .set(TRADE_ESCROW.ITEM_COUNT, escrow.itemCount())

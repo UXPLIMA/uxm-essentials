@@ -232,6 +232,7 @@ public enum ModerationMessageKey implements MessageKey {
     TARGET_ELSEWHERE("moderation.target-elsewhere"),
     BAD_DURATION("moderation.bad-duration"),
     UNKNOWN_TARGET("moderation.unknown-target"),
+    TARGET_NEVER_JOINED("moderation.target-never-joined"),
     MUTED_COMMAND_BLOCKED("moderation.muted-command-blocked"),
     MUTED_CHAT_BLOCKED("moderation.muted-chat-blocked"),
 
