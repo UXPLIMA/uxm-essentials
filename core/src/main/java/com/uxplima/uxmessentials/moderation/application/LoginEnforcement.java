@@ -175,8 +175,12 @@ public final class LoginEnforcement {
      */
     public void record(Standing standing, boolean refused) {
         Objects.requireNonNull(standing, "standing");
-        // The seen row, first seen included, is written by the join, not here: a refused login must leave no trace a
-        // sanction on another spelling of the name would count as an account that existed before it.
+        // The seen row is the join's to create, so a refused login leaves no trace a sanction on another spelling of
+        // the name would count as an account that existed before it. A refused login of an account seen before still
+        // moves its last address and last-seen on, which /banip <player> and /seenip read.
+        if (refused) {
+            repository.touchSeen(standing.who(), Optional.of(standing.ip()), clock.instant());
+        }
         // The address history itself is written by the kernel recorder on join. Alt detection here keys off the
         // connecting address: /alts walks a player's whole history, but a login is one address.
         if (refused || !standing.alts().isEmpty()) {

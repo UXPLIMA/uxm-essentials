@@ -6,6 +6,7 @@ import static com.uxplima.uxmessentials.testing.Fixtures.NOW;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import java.time.Duration;
+import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -18,6 +19,7 @@ import com.uxplima.uxmessentials.moderation.domain.Issuer;
 import com.uxplima.uxmessentials.moderation.domain.JailState;
 import com.uxplima.uxmessentials.moderation.domain.ModerationMessageKey;
 import com.uxplima.uxmessentials.moderation.domain.MuteState;
+import com.uxplima.uxmessentials.moderation.domain.SeenRecord;
 import com.uxplima.uxmessentials.moderation.domain.TempbanState;
 import com.uxplima.uxmessentials.shared.application.IpAlts;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
@@ -192,12 +194,21 @@ class LoginEnforcementTest {
         banSteve();
         playingSinceLastMonth(UPPER_STEVE);
         addresses.put(UPPER_STEVE.uuid(), java.util.Set.of(STEVE.uuid()));
+        NameHolders holders = name -> List.of(STEVE, UPPER_STEVE);
 
-        LoginEnforcement.Decision decision =
-                Logins.check(offlineMode(name -> List.of(STEVE, UPPER_STEVE), false), UPPER_STEVE, HOME, false, false);
+        LoginEnforcement.Decision decision = Logins.check(
+                offlineMode(holders, false, CaseVariantSanctions.Reach.NEWER_OR_ADDRESS),
+                UPPER_STEVE,
+                HOME,
+                false,
+                false);
 
         assertThat(decision.allowed()).isFalse();
         assertThat(decision.kickReason()).contains(ModerationMessageKey.TEMPBAN_KICK.key());
+        // Without the address reach an old account is somebody else.
+        assertThat(Logins.check(offlineMode(holders, false), UPPER_STEVE, HOME, false, false)
+                        .allowed())
+                .isTrue();
     }
 
     @Test
@@ -208,6 +219,21 @@ class LoginEnforcementTest {
         Logins.check(offline, UPPER_STEVE, HOME, false, false);
 
         assertThat(repository.seen(UPPER_STEVE)).isEmpty();
+    }
+
+    @Test
+    void aRefusedLoginOfAnAccountSeenBeforeMovesItsLastAddressButNotItsFirstSeen() {
+        Instant firstSeen = NOW.minus(Duration.ofDays(30));
+        repository.recordSeen(SeenRecord.firstJoin(STEVE, Optional.of(HOME), firstSeen));
+        banSteve();
+
+        Logins.check(offlineMode(name -> List.of(STEVE), false), STEVE, BANNED, false, false);
+
+        assertThat(repository.seen(STEVE)).hasValueSatisfying(seen -> {
+            assertThat(seen.lastIp()).contains(BANNED);
+            assertThat(seen.firstSeen()).isEqualTo(firstSeen);
+            assertThat(seen.lastSeen()).isEqualTo(NOW);
+        });
     }
 
     private LoginEnforcement offlineMode(NameHolders holders, boolean refuseCaseVariants) {

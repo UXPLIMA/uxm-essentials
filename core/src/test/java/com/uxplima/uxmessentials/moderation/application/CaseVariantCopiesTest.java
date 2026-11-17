@@ -105,6 +105,13 @@ class CaseVariantCopiesTest {
         assertThat(rows.getFirst().target()).isEqualTo(UPPER_STEVE.uuid());
         assertThat(rows.getFirst().drawnReason())
                 .hasValueSatisfying(drawn -> assertThat(drawn.args()).containsEntry("player", "Steve"));
+        // Not announced as a new mute: listeners that tell staff or other plugins about mutes never see it.
+        assertThat(delivered).noneMatch(event -> event instanceof PlayerMuted);
+        assertThat(delivered)
+                .singleElement()
+                .isInstanceOfSatisfying(
+                        com.uxplima.uxmessentials.moderation.domain.event.MuteInherited.class,
+                        inherited -> assertThat(inherited.from()).isEqualTo(STEVE));
     }
 
     @Test

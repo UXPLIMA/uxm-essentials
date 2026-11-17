@@ -54,6 +54,8 @@ public final class ModerationSettings {
     private final boolean censorIpAddresses;
     private final boolean refuseNameCaseVariants;
     private final CaseVariantSanctions.Reach caseVariantSanctions;
+    private final List<String> caseVariantAddressIgnore;
+    private final int caseVariantAddressBusyAfter;
     private final Map<String, PunishmentTemplate> templates;
     private final boolean discordNotify;
 
@@ -79,7 +81,9 @@ public final class ModerationSettings {
         this.censorIpAddresses = config.getBoolean("censor-ip-addresses", false);
         this.refuseNameCaseVariants = config.getBoolean("refuse-name-case-variants", false);
         this.caseVariantSanctions =
-                CaseVariantSanctions.Reach.parse(config.getString("case-variant-sanctions", "newer"), log);
+                CaseVariantSanctions.Reach.parse(config.getString("case-variant-sanctions", "newer-or-address"), log);
+        this.caseVariantAddressIgnore = List.copyOf(config.getStringList("case-variant-address.ignore", List.of()));
+        this.caseVariantAddressBusyAfter = Math.max(1, config.getInt("case-variant-address.busy-after", 3));
         this.templates = parseTemplates(config, log);
         this.discordNotify = config.getBoolean("discord-notify", false);
     }
@@ -136,10 +140,21 @@ public final class ModerationSettings {
 
     /**
      * Which accounts under another spelling of a sanctioned name the ban, mute or jail reaches on an offline-mode
-     * server: only those first seen after it was issued (the default), or all of them.
+     * server: those with no trace from before it, those plus the ones that shared an address with the sanctioned
+     * account (the default), or all of them.
      */
     public CaseVariantSanctions.Reach caseVariantSanctions() {
         return caseVariantSanctions;
+    }
+
+    /** Addresses and ranges that never link two spellings of a name: the proxy's own address, a known shared one. */
+    public List<String> caseVariantAddressIgnore() {
+        return caseVariantAddressIgnore;
+    }
+
+    /** The most accounts an address may have been used by and still link two spellings of a name. */
+    public int caseVariantAddressBusyAfter() {
+        return caseVariantAddressBusyAfter;
     }
 
     /** The configured {@code /punish} templates (name → preset reason + optional duration), parsed at wire time. */

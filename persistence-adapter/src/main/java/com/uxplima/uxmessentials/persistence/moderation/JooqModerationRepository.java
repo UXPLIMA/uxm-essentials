@@ -295,6 +295,14 @@ public final class JooqModerationRepository extends JooqRepository implements Mo
     }
 
     @Override
+    public void touchSeen(PlayerRef who, Optional<String> ip, Instant at) {
+        Objects.requireNonNull(who, "who");
+        Objects.requireNonNull(ip, "ip");
+        Objects.requireNonNull(at, "at");
+        write(dsl -> ModerationWrites.touchSeen(dsl, who, ip.orElse(null), at));
+    }
+
+    @Override
     public Optional<SeenRecord> seen(PlayerRef who) {
         Objects.requireNonNull(who, "who");
         return read(dsl -> Optional.ofNullable(dsl.selectFrom(MODERATION_SEEN)

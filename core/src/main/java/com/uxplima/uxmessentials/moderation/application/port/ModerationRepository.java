@@ -171,6 +171,18 @@ public interface ModerationRepository {
     void recordSeen(PlayerRef who, Optional<String> ip, Instant at);
 
     /**
+     * Advance the last-seen instant and last address of {@code who}'s seen row when there is one, and do nothing when
+     * there is none: never a new row, never the first-seen instant. For a login that was refused, which the address
+     * readers ({@code /banip <player>}, {@code /seenip}) should still see, but which must not make an account look
+     * older than it is. The default reads, then writes; a store that can do it in one statement overrides it.
+     */
+    default void touchSeen(PlayerRef who, Optional<String> ip, Instant at) {
+        if (seen(who).isPresent()) {
+            recordSeen(who, ip, at);
+        }
+    }
+
+    /**
      * {@code who}'s last-seen/last-IP record, if ever recorded. The address history behind {@code /alts} and the
      * STRICT ban fan-out is not here: it lives in the kernel
      * {@link com.uxplima.uxmessentials.shared.application.port.IpHistoryStore}, which security reads too, so one

@@ -1,17 +1,13 @@
 package com.uxplima.uxmessentials.shared.application;
 
 import java.util.Comparator;
-import java.util.HashSet;
 import java.util.List;
 import java.util.Objects;
-import java.util.Optional;
-import java.util.Set;
 import java.util.UUID;
 
 import com.uxplima.uxmessentials.shared.application.port.IpHistoryStore;
 import com.uxplima.uxmessentials.shared.application.port.IpTokens;
 import com.uxplima.uxmessentials.shared.domain.AltGroup;
-import com.uxplima.uxmessentials.shared.domain.IpAssociation;
 
 /**
  * The address-keyed half of alt detection: "which accounts have connected from this address". It tokenises the
@@ -40,21 +36,5 @@ public final class IpAlts {
                 .filter(account -> !account.equals(exclude))
                 .sorted(Comparator.comparing(UUID::toString))
                 .toList();
-    }
-
-    /**
-     * Every account that ever connected from an address {@code account} connected from, and from {@code current} when
-     * given, {@code account} itself left out.
-     */
-    public Set<UUID> sharingAnyAddress(UUID account, Optional<String> current) {
-        Objects.requireNonNull(account, "account");
-        Objects.requireNonNull(current, "current");
-        Set<UUID> sharing = new HashSet<>();
-        for (IpAssociation association : store.sharingTokenWith(account)) {
-            sharing.add(association.account());
-        }
-        current.ifPresent(address -> sharing.addAll(onAddress(address, account)));
-        sharing.remove(account);
-        return Set.copyOf(sharing);
     }
 }

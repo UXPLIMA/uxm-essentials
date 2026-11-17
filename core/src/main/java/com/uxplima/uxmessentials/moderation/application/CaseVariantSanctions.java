@@ -27,12 +27,14 @@ import org.jspecify.annotations.Nullable;
  * is derived from the exact spelling: a banned, muted or jailed {@code Steve} who logs in as {@code STEVE} arrives as
  * another account with no sanction of its own.
  *
- * <p>A sanction reaches another spelling according to {@link Reach}. By default it reaches an account that has no
- * trace from before the sanction was issued ({@link AccountTraces}: a completed join, a stored name, the server's own
- * player file), the look-alike made to get around it, and any account that ever shared an address with the sanctioned
- * one ({@link AddressLinks}), however old: a look-alike registered ahead of time from the same connection is the same
- * person. An account that was already playing under its own spelling from elsewhere is taken to be somebody else.
- * {@link Reach#ALL} lets it reach every spelling.
+ * <p>A sanction reaches another spelling according to {@link Reach}. {@link Reach#NEWER} reaches an account that has
+ * no trace from before the sanction was issued ({@link AccountTraces}: a completed join, a stored name, the server's
+ * own player file), the look-alike made to get around it. {@link Reach#NEWER_OR_ADDRESS}, the default, also reaches
+ * any account that shared an address with the sanctioned one ({@link AddressLinks}), however old: a look-alike
+ * registered ahead of time from the same connection is the same person. The links count only an address that tells
+ * people apart ({@link CaseVariantAddresses}), never a relay or one many accounts share. An account that was already
+ * playing under its own spelling from elsewhere is taken to be somebody else. {@link Reach#ALL} reaches every
+ * spelling.
  *
  * <p>Only an original follows a player. A mute or a jail an account holds as a copy ({@link CaseCopies}) is never a
  * source, so it is not copied on and never comes back to the account it came from, and a sanction already copied onto
@@ -45,23 +47,28 @@ public final class CaseVariantSanctions {
 
     /** Which accounts under another spelling a sanction reaches: the {@code case-variant-sanctions} setting. */
     public enum Reach {
-        /** An account first seen after the sanction was issued. */
+        /** An account with no trace from before the sanction was issued. */
         NEWER,
+        /** {@link #NEWER}, and any account that shared an address that tells people apart with the sanctioned one. */
+        NEWER_OR_ADDRESS,
         /** Every account under another spelling, however long it has played. */
         ALL;
 
-        /** The reach {@code raw} names, or {@link #NEWER} with a warning for anything else. */
+        /** The reach {@code raw} names, or {@link #NEWER_OR_ADDRESS} with a warning for anything else. */
         public static Reach parse(String raw, Logger log) {
             Objects.requireNonNull(raw, "raw");
             Objects.requireNonNull(log, "log");
-            String wanted = raw.strip().toUpperCase(Locale.ROOT);
+            String wanted = raw.strip().toUpperCase(Locale.ROOT).replace('-', '_');
             for (Reach reach : values()) {
                 if (reach.name().equals(wanted)) {
                     return reach;
                 }
             }
-            log.warn("event=case_variant_sanctions_unknown value={} using=newer expected=newer|all", raw);
-            return NEWER;
+            log.warn(
+                    "event=case_variant_sanctions_unknown value={} using=newer-or-address"
+                            + " expected=newer|newer-or-address|all",
+                    raw);
+            return NEWER_OR_ADDRESS;
         }
     }
 
@@ -205,7 +212,7 @@ public final class CaseVariantSanctions {
             return variants;
         }
         // The holders are capped and a ban is rare, so one trace read per spelling is a bounded cost.
-        Set<UUID> sharing = links.sharing(banned.uuid(), Optional.empty());
+        Set<UUID> sharing = reach == Reach.NEWER_OR_ADDRESS ? links.sharing(banned.uuid(), Optional.empty()) : Set.of();
         List<PlayerRef> reached = new ArrayList<>();
         for (PlayerRef variant : variants) {
             if (sharing.contains(variant.uuid()) || newerThan(traces.earliest(variant), issuedAt)) {
@@ -254,6 +261,9 @@ public final class CaseVariantSanctions {
             }
             if (newerThan(earliest, issuedAt)) {
                 return true;
+            }
+            if (reach != Reach.NEWER_OR_ADDRESS) {
+                return false;
             }
             Set<UUID> linked = sharing;
             if (linked == null) {

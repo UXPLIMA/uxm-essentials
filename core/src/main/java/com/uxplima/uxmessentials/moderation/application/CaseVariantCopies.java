@@ -18,6 +18,7 @@ import com.uxplima.uxmessentials.moderation.domain.JailState;
 import com.uxplima.uxmessentials.moderation.domain.MuteState;
 import com.uxplima.uxmessentials.moderation.domain.SeenRecord;
 import com.uxplima.uxmessentials.moderation.domain.event.ModerationEvent;
+import com.uxplima.uxmessentials.moderation.domain.event.MuteInherited;
 import com.uxplima.uxmessentials.moderation.domain.event.PlayerMuted;
 import com.uxplima.uxmessentials.moderation.domain.event.PlayerUnjailed;
 import com.uxplima.uxmessentials.moderation.domain.event.PlayerUnmuted;
@@ -83,8 +84,9 @@ public final class CaseVariantCopies {
     /**
      * Give {@code who} the mute and the jail of {@code inherited}, each unless the account already has an active one of
      * its own. Called once the login is allowed, on the player's storage lane ahead of the join's own work there, so
-     * the jail on join already finds the copy; the copied mute is published as an event, which the in-memory mute
-     * takes whether the join's read of it lands before or after. Writes to storage, so call it off the tick.
+     * the jail on join already finds the copy; the copied mute is published as {@link MuteInherited}, which the
+     * in-memory mute takes whether the join's read of it lands before or after, and which nothing announces as a new
+     * mute. Writes to storage, so call it off the tick.
      */
     public void carryOver(PlayerRef who, CaseVariantSanctions.Inherited inherited) {
         Objects.requireNonNull(who, "who");
@@ -100,7 +102,7 @@ public final class CaseVariantCopies {
         muteFrom.ifPresent(from -> {
             MuteState own = repository.loadMute(who);
             if (!own.isActiveAt(now) && giveMute(who, own, inherited.mute(), from)) {
-                events.publish(new PlayerMuted(who, repository.loadMute(who), now));
+                events.publish(new MuteInherited(who, from, repository.loadMute(who), now));
             }
         });
         if (jailFrom.isPresent()
@@ -201,7 +203,7 @@ public final class CaseVariantCopies {
             PlayerRef holder = named(copy.target());
             MuteState held = repository.loadMute(holder);
             if (isCopy(held, copy, now) && giveMute(holder, held, replacement, origin)) {
-                events.publish(new PlayerMuted(holder, repository.loadMute(holder), now));
+                events.publish(new MuteInherited(holder, origin, repository.loadMute(holder), now));
                 sync.muteChanged(holder);
             }
         }

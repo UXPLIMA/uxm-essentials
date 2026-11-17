@@ -41,9 +41,11 @@ import com.uxplima.uxmessentials.moderation.adapter.outbound.PlayerLookupTargetR
 import com.uxplima.uxmessentials.moderation.adapter.outbound.RecordedExemptions;
 import com.uxplima.uxmessentials.moderation.adapter.outbound.StoredNameHolders;
 import com.uxplima.uxmessentials.moderation.adapter.outbound.api.ModerationApiWrites;
+import com.uxplima.uxmessentials.moderation.application.AddressFilter;
 import com.uxplima.uxmessentials.moderation.application.ApplyRemoteJail;
 import com.uxplima.uxmessentials.moderation.application.Ban;
 import com.uxplima.uxmessentials.moderation.application.BanIp;
+import com.uxplima.uxmessentials.moderation.application.CaseVariantAddresses;
 import com.uxplima.uxmessentials.moderation.application.CaseVariantCopies;
 import com.uxplima.uxmessentials.moderation.application.CaseVariantSanctions;
 import com.uxplima.uxmessentials.moderation.application.CheckBan;
@@ -261,7 +263,11 @@ public final class ModerationWiring {
                 settings.caseVariantSanctions(),
                 caseCopies,
                 new KnownAccountTraces(repository, storedNames, plugin.getServer()),
-                new IpAlts(ipHistory, ipTokens)::sharingAnyAddress);
+                new CaseVariantAddresses(
+                        ipHistory,
+                        ipTokens,
+                        AddressFilter.of(settings.caseVariantAddressIgnore(), kernel.log()),
+                        settings.caseVariantAddressBusyAfter()));
         // Each backend records what it sees of a player's exemption, so another can read it once they are offline.
         ExemptionSightings sightings = ModerationStores.exemptionSightings(persistence);
         ExemptionWatch exemptionWatch =
