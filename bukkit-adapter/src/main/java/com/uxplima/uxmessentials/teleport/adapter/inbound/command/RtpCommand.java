@@ -19,6 +19,7 @@ import com.mojang.brigadier.suggestion.SuggestionsBuilder;
 import com.mojang.brigadier.tree.LiteralCommandNode;
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandRegistration;
 import com.uxplima.uxmessentials.shared.adapter.outbound.BukkitRefs;
+import com.uxplima.uxmessentials.shared.adapter.outbound.lookup.OnlineByName;
 import com.uxplima.uxmessentials.shared.application.permission.TeleportPermissions;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
@@ -151,7 +152,7 @@ public final class RtpCommand extends TeleportCommandSupport implements CommandR
      */
     void route(Player sender, String raw) {
         PlayerRef who = ref(sender);
-        Player targetPlayer = sender.getServer().getPlayerExact(raw);
+        Player targetPlayer = OnlineByName.player(services.players(), raw);
         if (targetPlayer != null && sender.hasPermission(OTHERS_PERMISSION)) {
             PlayerRef target = ref(targetPlayer);
             services.notifier().send(target, TeleportMessageKey.RTP_SEARCHING);

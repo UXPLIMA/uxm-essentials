@@ -21,7 +21,9 @@ import com.mojang.brigadier.context.CommandContext;
 import com.uxplima.uxmessentials.holograms.adapter.HologramServices;
 import com.uxplima.uxmessentials.holograms.domain.HologramName;
 import com.uxplima.uxmessentials.holograms.domain.HologramsMessageKey;
+import com.uxplima.uxmessentials.shared.adapter.outbound.lookup.OnlineByName;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
+import com.uxplima.uxmessentials.shared.application.port.PlayerLookup;
 import com.uxplima.uxmlib.command.Sender;
 import org.jspecify.annotations.NullMarked;
 
@@ -36,9 +38,15 @@ import org.jspecify.annotations.NullMarked;
 @NullMarked
 final class HologramModelCommand extends HologramCommandSupport {
 
+    private final PlayerLookup players;
+
     HologramModelCommand(
-            HologramServices services, Messages messages, Supplier<? extends Collection<String>> hologramNames) {
+            HologramServices services,
+            Messages messages,
+            Supplier<? extends Collection<String>> hologramNames,
+            PlayerLookup players) {
         super(services, messages, hologramNames);
+        this.players = java.util.Objects.requireNonNull(players, "players");
     }
 
     /** The {@code item}, {@code block} and {@code head} subcommand nodes the {@code /hologram} literal attaches. */
@@ -123,13 +131,14 @@ final class HologramModelCommand extends HologramCommandSupport {
      * Returns {@code null} when the source is unusable (blank texture, unknown/offline player, no skin property)
      * an offline-name Mojang lookup is a network call and is intentionally not done here.
      */
-    private static @org.jspecify.annotations.Nullable String resolveTexture(String raw, CommandSender sender) {
+    private @org.jspecify.annotations.Nullable String resolveTexture(String raw, CommandSender sender) {
         if (raw.toLowerCase(Locale.ROOT).startsWith("texture:")) {
             String base64 = raw.substring("texture:".length()).strip();
             return base64.isBlank() ? null : base64;
         }
-        Player target =
-                raw.equalsIgnoreCase("self") && sender instanceof Player player ? player : Bukkit.getPlayerExact(raw);
+        Player target = raw.equalsIgnoreCase("self") && sender instanceof Player player
+                ? player
+                : OnlineByName.player(players, raw);
         return target == null ? null : textureOf(target);
     }
 

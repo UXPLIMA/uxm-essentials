@@ -24,6 +24,15 @@ public interface PlayerNameIndex {
      */
     List<PlayerRef> byName(String name);
 
+    /**
+     * Like {@link #byName}, but complete: the memory holds only the most recently seen names, so this also reads the
+     * durable store when there is one. It reads storage, so it is called off the tick. The default answers from
+     * memory, for an index that has no store.
+     */
+    default List<PlayerRef> storedUnder(String name) {
+        return byName(name);
+    }
+
     /** Note that {@code uuid} is joining under {@code name}. */
     void record(UUID uuid, String name);
 

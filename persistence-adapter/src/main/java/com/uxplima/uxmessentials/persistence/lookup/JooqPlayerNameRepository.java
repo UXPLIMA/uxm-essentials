@@ -54,6 +54,21 @@ public final class JooqPlayerNameRepository extends JooqRepository implements Pl
     }
 
     @Override
+    public List<PlayerName> underName(String name, int limit) {
+        Objects.requireNonNull(name, "name");
+        String lower = name.strip().toLowerCase(Locale.ROOT);
+        if (lower.isEmpty() || limit <= 0) {
+            return List.of();
+        }
+        return read(dsl -> dsl.select(PLAYER_NAMES.UUID, PLAYER_NAMES.NAME, PLAYER_NAMES.LAST_SEEN)
+                .from(PLAYER_NAMES)
+                .where(PLAYER_NAMES.LOWER_NAME.eq(lower))
+                .orderBy(PLAYER_NAMES.LAST_SEEN.desc())
+                .limit(limit)
+                .fetch(row -> new PlayerName(UUID.fromString(row.value1()), row.value2(), row.value3())));
+    }
+
+    @Override
     public void upsert(PlayerName record) {
         Objects.requireNonNull(record, "record");
         String lower = record.name().toLowerCase(Locale.ROOT);

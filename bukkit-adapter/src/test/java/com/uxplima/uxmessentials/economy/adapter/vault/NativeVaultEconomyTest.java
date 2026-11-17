@@ -6,7 +6,10 @@ import java.math.BigDecimal;
 import java.time.Duration;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
+import java.util.Optional;
 import java.util.Set;
+import java.util.UUID;
 import java.util.concurrent.atomic.AtomicLong;
 
 import com.uxplima.uxmessentials.economy.application.port.BaltopRow;
@@ -17,6 +20,8 @@ import com.uxplima.uxmessentials.economy.domain.Money;
 import com.uxplima.uxmessentials.economy.domain.TransferError;
 import com.uxplima.uxmessentials.economy.domain.TransferResult;
 import com.uxplima.uxmessentials.shared.application.port.Logger;
+import com.uxplima.uxmessentials.shared.application.port.PlayerLookup;
+import com.uxplima.uxmessentials.shared.domain.NameMatch;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmessentials.shared.domain.Result;
 import com.uxplima.uxmessentials.shared.domain.Unit;
@@ -31,7 +36,8 @@ import org.mockbukkit.mockbukkit.entity.PlayerMock;
 
 /**
  * A plugin paying through Vault gets Vault's failure answer when the ledger cannot complete the change, never an
- * exception thrown into its own code on its own thread, and the console hears of it without being flooded.
+ * exception thrown into its own code on its own thread, and the console hears of it without being flooded. A
+ * name-keyed call pays the account the plugin's lookup names, never a case variant the server's cache would pick.
  */
 class NativeVaultEconomyTest {
 
@@ -43,6 +49,7 @@ class NativeVaultEconomyTest {
     private final List<String> errors = new ArrayList<>();
     private final AtomicLong nanos = new AtomicLong();
     private final Unreachable unreachable = new Unreachable();
+    private final Names names = new Names();
 
     @BeforeEach
     void start() {
@@ -103,6 +110,34 @@ class NativeVaultEconomyTest {
     }
 
     @Test
+    void aNameKeyedDepositPaysTheAccountTheLookupNames() {
+        PlayerRef steve = new PlayerRef(UUID.randomUUID(), "Steve");
+        names.matches.put("Steve", NameMatch.found(steve));
+        unreachable.writable = true;
+
+        EconomyResponse response = vault().depositPlayer("Steve", 5);
+
+        assertThat(response.type).isEqualTo(ResponseType.SUCCESS);
+        assertThat(unreachable.credited).extracting(PlayerRef::uuid).containsExactly(steve.uuid());
+    }
+
+    @Test
+    void aNameThatCouldMeanSeveralAccountsMovesNoMoney() {
+        PlayerRef steve = new PlayerRef(UUID.randomUUID(), "Steve");
+        PlayerRef lowerSteve = new PlayerRef(UUID.randomUUID(), "steve");
+        names.matches.put("STEVE", NameMatch.ambiguous("STEVE", List.of(steve, lowerSteve)));
+        unreachable.writable = true;
+        NativeVaultEconomy vault = vault();
+
+        assertThat(vault.depositPlayer("STEVE", 5).type).isEqualTo(ResponseType.FAILURE);
+        assertThat(vault.withdrawPlayer("STEVE", 5).type).isEqualTo(ResponseType.FAILURE);
+        assertThat(vault.has("STEVE", 1)).isFalse();
+        assertThat(vault.hasAccount("STEVE")).isFalse();
+        assertThat(vault.getBalance("STEVE")).isZero();
+        assertThat(unreachable.credited).isEmpty();
+    }
+
+    @Test
     void aFailedWriteDoesNotClaimNothingMoved() {
         EconomyResponse response = vault().depositPlayer(alex, 25);
 
@@ -110,7 +145,7 @@ class NativeVaultEconomyTest {
     }
 
     private NativeVaultEconomy vault() {
-        return new NativeVaultEconomy(unreachable, COINS, server, new Recording(errors), nanos::get);
+        return new NativeVaultEconomy(unreachable, COINS, server, names, new Recording(errors), nanos::get);
     }
 
     /** Keeps the error lines. */
@@ -131,10 +166,41 @@ class NativeVaultEconomyTest {
         public void debug(String message, Object... args) {}
     }
 
-    /** Reads still work; every write fails the way a ledger that lost its connection does. */
+    /** The plugin's lookup, answering the names a test sets and nobody else. */
+    private static final class Names implements PlayerLookup {
+
+        final Map<String, NameMatch> matches = new java.util.HashMap<>();
+
+        @Override
+        public Optional<PlayerRef> findOnlineByName(String name) {
+            return Optional.empty();
+        }
+
+        @Override
+        public NameMatch matchByName(String name) {
+            return matches.getOrDefault(name, NameMatch.unknown());
+        }
+
+        @Override
+        public Optional<PlayerRef> findByUuid(UUID uuid) {
+            return Optional.empty();
+        }
+
+        @Override
+        public boolean isOnline(UUID uuid) {
+            return false;
+        }
+    }
+
+    /**
+     * Reads still work; every write fails the way a ledger that lost its connection does, unless {@code writable}
+     * lets credits through, which are then kept.
+     */
     private static final class Unreachable implements EconomyProvider {
 
         boolean balancesFail;
+        boolean writable;
+        final List<PlayerRef> credited = new ArrayList<>();
 
         @Override
         public boolean hasAccount(PlayerRef owner, Currency currency) {
@@ -154,7 +220,11 @@ class NativeVaultEconomyTest {
 
         @Override
         public Result<Unit, TransferError> credit(PlayerRef owner, Money amount) {
-            throw new IllegalStateException("connection lost");
+            if (!writable) {
+                throw new IllegalStateException("connection lost");
+            }
+            credited.add(owner);
+            return Result.ok();
         }
 
         @Override

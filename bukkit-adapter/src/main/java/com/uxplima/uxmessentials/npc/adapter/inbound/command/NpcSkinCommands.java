@@ -6,7 +6,6 @@ import java.util.Objects;
 import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
 
-import org.bukkit.Bukkit;
 import org.bukkit.command.CommandSender;
 import org.bukkit.entity.Player;
 
@@ -23,7 +22,10 @@ import com.uxplima.uxmessentials.npc.adapter.NpcServices;
 import com.uxplima.uxmessentials.npc.adapter.outbound.BukkitNpcSkins;
 import com.uxplima.uxmessentials.npc.domain.NpcMessageKey;
 import com.uxplima.uxmessentials.npc.domain.NpcSkin;
+import com.uxplima.uxmessentials.shared.adapter.outbound.lookup.OnlineByName;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
+import com.uxplima.uxmessentials.shared.application.port.PlayerLookup;
+import com.uxplima.uxmessentials.shared.domain.NameMatch;
 import com.uxplima.uxmlib.command.Sender;
 import org.jspecify.annotations.NullMarked;
 import org.jspecify.annotations.Nullable;
@@ -54,14 +56,17 @@ final class NpcSkinCommands extends NpcCommandSupport {
             List.of(NAME_PREFIX, URL_PREFIX, PLAYER_PREFIX, TEXTURE_PREFIX, NONE_KEYWORD);
 
     private final NpcSkinByName skinByName;
+    private final PlayerLookup players;
 
     NpcSkinCommands(
             NpcServices services,
             java.util.function.Supplier<? extends java.util.Collection<String>> npcNames,
             NpcSkinByName skinByName,
-            Messages messages) {
+            Messages messages,
+            PlayerLookup players) {
         super(services, npcNames, messages);
         this.skinByName = Objects.requireNonNull(skinByName, "skinByName");
+        this.players = Objects.requireNonNull(players, "players");
     }
 
     /** The skin subcommand node the {@code /npc} literal attaches. */
@@ -126,9 +131,10 @@ final class NpcSkinCommands extends NpcCommandSupport {
     }
 
     private @Nullable NpcSkin skinFromPlayer(CommandSender sender, String targetName) {
-        Player target = Bukkit.getPlayerExact(targetName);
+        NameMatch match = players.matchOnlineByName(targetName);
+        Player target = OnlineByName.player(match);
         if (target == null) {
-            feedback.send(sender, NpcMessageKey.NPC_SKIN_PLAYER_OFFLINE, Map.of("player", targetName));
+            feedback.send(sender, match.miss(NpcMessageKey.NPC_SKIN_PLAYER_OFFLINE, Map.of("player", targetName)));
             return null;
         }
         Optional<NpcSkin> skin = BukkitNpcSkins.of(target);
