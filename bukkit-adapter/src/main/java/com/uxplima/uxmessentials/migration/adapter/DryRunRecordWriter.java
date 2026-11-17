@@ -7,6 +7,7 @@ import com.uxplima.uxmessentials.holograms.application.port.HologramRepository;
 import com.uxplima.uxmessentials.holograms.domain.HologramName;
 import com.uxplima.uxmessentials.kits.application.port.KitRepository;
 import com.uxplima.uxmessentials.kits.domain.KitId;
+import com.uxplima.uxmessentials.migration.AccountNames;
 import com.uxplima.uxmessentials.migration.ConflictPolicy;
 import com.uxplima.uxmessentials.migration.ImportOptions;
 import com.uxplima.uxmessentials.migration.ImportRecord;
@@ -47,6 +48,7 @@ public final class DryRunRecordWriter implements RecordWriter {
     private final HologramRepository holograms;
     private final WorldRepository worlds;
     private final PlayerWarpRecordWriter playerWarps;
+    private final AccountNames accounts;
     private final Clock clock;
 
     public DryRunRecordWriter(
@@ -57,6 +59,7 @@ public final class DryRunRecordWriter implements RecordWriter {
             HologramRepository holograms,
             WorldRepository worlds,
             PlayerWarpRecordWriter playerWarps,
+            AccountNames accounts,
             Clock clock) {
         this.users = Objects.requireNonNull(users, "users");
         this.warps = Objects.requireNonNull(warps, "warps");
@@ -65,6 +68,7 @@ public final class DryRunRecordWriter implements RecordWriter {
         this.holograms = Objects.requireNonNull(holograms, "holograms");
         this.worlds = Objects.requireNonNull(worlds, "worlds");
         this.playerWarps = Objects.requireNonNull(playerWarps, "playerWarps");
+        this.accounts = Objects.requireNonNull(accounts, "accounts");
         this.clock = Objects.requireNonNull(clock, "clock");
     }
 
@@ -73,6 +77,8 @@ public final class DryRunRecordWriter implements RecordWriter {
         Objects.requireNonNull(record, "record");
         Objects.requireNonNull(options, "options");
         return switch (record) {
+            case ImportRecord.AccountRecord account ->
+                RecordResult.of(accounts.holds(account.account()) ? RecordOutcome.SKIPPED : RecordOutcome.WRITTEN);
             case ImportRecord.UserRecord user -> users.preview(user.user(), options);
             case ImportRecord.WarpRecord warp ->
                 RecordResult.of(warpOutcome(warp.warp().warp().name(), options));

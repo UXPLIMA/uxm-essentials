@@ -61,19 +61,28 @@ class LiteBansImportTest {
                 .extracting(ImportRecord.BanRecord::target, ImportRecord.BanRecord::ban)
                 .contains(
                         tuple(
-                                new PlayerRef(GRIEFER, "LiteBans"),
+                                new PlayerRef(GRIEFER, "Griefer"),
                                 TempbanState.active(
                                         ISSUED.plus(Duration.ofDays(365_000L)),
                                         MODERATOR,
                                         Optional.of("griefing"),
                                         ISSUED)),
                         tuple(
-                                new PlayerRef(SPAMMER, "LiteBans"),
+                                new PlayerRef(SPAMMER, ".Spammer"),
                                 TempbanState.active(
                                         Instant.ofEpochMilli(1_800_000_000_000L),
                                         CONSOLE,
                                         Optional.of("spam"),
                                         ISSUED)));
+    }
+
+    @Test
+    void everyAccountTheLoginHistoryKnowsIsRecordedUnderItsLatestNameAndWhatIsNoNameIsLeftOut() {
+        assertThat(only(importFrom("/litebans/litebans.sql"), ImportRecord.AccountRecord.class))
+                .extracting(
+                        account -> account.account().uuid(),
+                        account -> account.account().name())
+                .containsExactlyInAnyOrder(tuple(GRIEFER, "Griefer"), tuple(SPAMMER, ".Spammer"));
     }
 
     @Test
