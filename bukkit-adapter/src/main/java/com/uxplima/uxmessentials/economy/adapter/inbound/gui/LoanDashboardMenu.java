@@ -46,7 +46,10 @@ import org.jspecify.annotations.NullMarked;
  *
  * <p>Each loan in the strip is multi-gesture: every click routes through the one {@code economy:loan-entry} action,
  * which branches on the gesture, left pays an installment, right pays the loan off, and a shift-click prompts for a
- * custom amount through the shared input seam, then runs the matching {@link LoanService} repayment. The request
+ * custom amount through the shared input seam, then runs the matching {@link LoanService} repayment. A client that
+ * cannot send a shift click (a Bedrock player in a chest menu) reaches the custom amount through the custom-repayment
+ * button instead: a click arms it, carried on the subject the panel reopens with, and the next click on a loan then
+ * prompts for the amount. The request
  * button hands off to {@link LoanRequestFlow}, which picks a currency through the shared engine picker and then
  * prompts for an amount and an installment count. The menu holds no new domain logic; every visible string resolves
  * from the economy catalog.
@@ -103,8 +106,24 @@ public final class LoanDashboardMenu {
         bindings.placeholder("loan_entry_icon", ctx -> "BOOK");
         bindings.placeholder("loan_entry_name", this::entryName);
         bindings.placeholder("loan_entry_lore", this::entryLore);
+        bindings.placeholder("loan_custom_icon", ctx -> subject(ctx).customNext() ? "GOLD_BLOCK" : "GOLD_NUGGET");
+        bindings.placeholder(
+                "loan_custom_name",
+                ctx -> resolve(
+                        ctx,
+                        subject(ctx).customNext()
+                                ? EconomyMessageKey.LOAN_GUI_CUSTOM_ARMED_NAME
+                                : EconomyMessageKey.LOAN_GUI_CUSTOM_NAME));
+        bindings.placeholder(
+                "loan_custom_lore",
+                ctx -> resolve(
+                        ctx,
+                        subject(ctx).customNext()
+                                ? EconomyMessageKey.LOAN_GUI_CUSTOM_ARMED_LORE
+                                : EconomyMessageKey.LOAN_GUI_CUSTOM_LORE));
         bindings.list("economy:loan-list", ctx -> subject(ctx).loans());
         bindings.action("economy:loan-entry", this::onEntryClick);
+        bindings.action("economy:loan-custom", this::toggleCustom);
         bindings.action("economy:loan-request", ctx -> requestFlow.start(ctx.player()));
         menus.registerSpec(SPEC_ID, MenuSpecs.loadOrBundled(SPEC_RESOURCE, dataFolder, ROWS, EngineLog.of(log)));
     }
@@ -121,7 +140,7 @@ public final class LoanDashboardMenu {
             Loan.CreditScore creditScore = loanService.getCreditScore(viewerRef);
             LoanService.LoanQuote quote = loanService.quote(creditScore.score());
             List<Loan> activeLoans = loanService.getActiveLoans(viewerRef);
-            menus.open(player, SPEC_ID, new LoanDashboardSubject(creditScore, quote, List.copyOf(activeLoans)));
+            menus.open(player, SPEC_ID, new LoanDashboardSubject(creditScore, quote, List.copyOf(activeLoans), false));
         });
     }
 
@@ -213,7 +232,9 @@ public final class LoanDashboardMenu {
         Player player = ctx.player();
         Loan loan = ctx.entry(Loan.class);
         ClickKind kind = ctx.clickKind();
-        if (kind == ClickKind.SHIFT_LEFT || kind == ClickKind.SHIFT_RIGHT) {
+        if (kind == ClickKind.SHIFT_LEFT
+                || kind == ClickKind.SHIFT_RIGHT
+                || ctx.subject(LoanDashboardSubject.class).customNext()) {
             promptCustomRepayment(player, loan);
             return;
         }
@@ -233,6 +254,12 @@ public final class LoanDashboardMenu {
                 viewerRef -> loanService.payInstallment(viewerRef, loan.id()),
                 EconomyMessageKey.LOAN_GUI_INSTALLMENT_PAID,
                 EconomyMessageKey.LOAN_GUI_INSTALLMENT_FAILED);
+    }
+
+    /** The custom-repayment button: arm it, or disarm it when it is armed, and show the panel again. */
+    private void toggleCustom(MenuActionContext ctx) {
+        LoanDashboardSubject subject = ctx.subject(LoanDashboardSubject.class);
+        menus.open(ctx.player(), SPEC_ID, subject.withCustomNext(!subject.customNext()));
     }
 
     /** Capture a custom repayment amount through the input seam, then repay; an abort or malformed amount reopens. */
@@ -338,13 +365,21 @@ public final class LoanDashboardMenu {
      * @param creditScore the viewer's credit score, read at open time
      * @param quote the loan terms that score qualifies for, computed from the policy at open time
      * @param loans the viewer's active loans, read at open time
+     * @param customNext whether the custom-repayment button is armed, so the next click on a loan prompts for the
+     *     amount
      */
-    public record LoanDashboardSubject(Loan.CreditScore creditScore, LoanService.LoanQuote quote, List<Loan> loans) {
+    public record LoanDashboardSubject(
+            Loan.CreditScore creditScore, LoanService.LoanQuote quote, List<Loan> loans, boolean customNext) {
 
         public LoanDashboardSubject {
             Objects.requireNonNull(creditScore, "creditScore");
             Objects.requireNonNull(quote, "quote");
             loans = List.copyOf(loans);
+        }
+
+        /** The same dashboard with the custom-repayment button armed or not. */
+        public LoanDashboardSubject withCustomNext(boolean armed) {
+            return new LoanDashboardSubject(creditScore, quote, loans, armed);
         }
     }
 }

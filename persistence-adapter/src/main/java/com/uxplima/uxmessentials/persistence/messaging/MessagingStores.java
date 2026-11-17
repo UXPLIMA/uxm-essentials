@@ -4,6 +4,8 @@ import java.util.Objects;
 
 import com.uxplima.uxmessentials.messaging.application.port.IgnoreStore;
 import com.uxplima.uxmessentials.messaging.application.port.MailRepository;
+import com.uxplima.uxmessentials.messaging.application.port.ReplyPartnerStore;
+import com.uxplima.uxmessentials.messaging.application.port.SpyTargetStore;
 import com.uxplima.uxmessentials.persistence.runtime.Persistence;
 import org.jspecify.annotations.NullMarked;
 
@@ -44,5 +46,17 @@ public final class MessagingStores {
     public static CachedIgnoreStore cachedIgnores(Persistence persistence) {
         Objects.requireNonNull(persistence, "persistence");
         return new CachedIgnoreStore(new JooqIgnoreStore(persistence.dsl()));
+    }
+
+    /** A jOOQ {@link SpyTargetStore} over the shared persistence DSL. */
+    public static SpyTargetStore spyTargets(Persistence persistence) {
+        Objects.requireNonNull(persistence, "persistence");
+        return new JooqSpyTargetStore(persistence.dsl());
+    }
+
+    /** A jOOQ {@link ReplyPartnerStore} over the shared persistence DSL. */
+    public static ReplyPartnerStore replyPartners(Persistence persistence) {
+        Objects.requireNonNull(persistence, "persistence");
+        return new JooqReplyPartnerStore(persistence.dsl());
     }
 }
