@@ -15,6 +15,7 @@ import com.uxplima.uxmessentials.economy.application.port.EconomyProvider;
 import com.uxplima.uxmessentials.economy.domain.CurrencyRegistry;
 import com.uxplima.uxmessentials.economy.domain.EconomyMessageKey;
 import com.uxplima.uxmessentials.shared.application.port.Logger;
+import com.uxplima.uxmessentials.shared.application.port.PlayerLookup;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import org.jspecify.annotations.NullMarked;
 
@@ -60,13 +61,14 @@ final class ForeignEconomyProviders {
             EconomyProvider provider,
             CurrencyRegistry currencies,
             ServicePriority priority,
+            PlayerLookup players,
             Logger log) {
         Objects.requireNonNull(plugin, "plugin");
         if (plugin.getServer().getPluginManager().getPlugin("Vault") == null) {
             log.info("event=vault_economy_not_published reason=vault_absent");
             return;
         }
-        VaultEconomyPublisher.publish(plugin, provider, currencies.defaultCurrency(), priority, log);
+        VaultEconomyPublisher.publish(plugin, provider, currencies.defaultCurrency(), priority, players, log);
     }
 
     /** Take that registration back on disable, so a reload publishes once rather than twice. */

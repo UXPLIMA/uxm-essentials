@@ -17,6 +17,7 @@ import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandRegistrat
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandSuggestions;
 import com.uxplima.uxmessentials.shared.application.permission.EconomyPermissions;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
+import com.uxplima.uxmessentials.shared.domain.NameMatch;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmlib.command.Args;
 import com.uxplima.uxmlib.command.Gate;
@@ -83,9 +84,10 @@ public final class PayCommand extends EconomyCommandSupport implements CommandRe
     }
 
     private void resolveAndPay(Player sender, PlayerRef from, String targetName, Money amount) {
-        Optional<PlayerRef> target = services.players().findOnlineByName(targetName);
+        NameMatch match = services.players().matchOnlineByName(targetName);
+        Optional<PlayerRef> target = match.player();
         if (target.isEmpty()) {
-            rejectUnknownTarget(from, targetName);
+            rejectUnknownTarget(from, targetName, match);
             return;
         }
         com.uxplima.uxmessentials.economy.application.PayOutcome outcome =

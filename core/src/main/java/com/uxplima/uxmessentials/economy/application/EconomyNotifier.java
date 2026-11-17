@@ -9,6 +9,7 @@ import com.uxplima.uxmessentials.shared.application.port.MessageSink;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmessentials.shared.domain.message.MessageKey;
+import com.uxplima.uxmessentials.shared.domain.message.MessageLine;
 
 /**
  * The shared {@link Notifier} plus the money formatting an economy message needs, so an economy use case
@@ -41,6 +42,11 @@ public final class EconomyNotifier {
     /** Resolve and deliver {@code key} with no placeholders. */
     public void send(PlayerRef viewer, MessageKey key) {
         notifier.send(viewer, key);
+    }
+
+    /** Resolve and deliver a line chosen elsewhere. */
+    public void send(PlayerRef viewer, MessageLine line) {
+        notifier.send(viewer, line);
     }
 
     /** Render {@code money} with its symbol in the configured {@link AmountFormat}, the {@code {amount}} value. */

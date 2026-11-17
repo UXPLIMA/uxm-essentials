@@ -1,8 +1,6 @@
 package com.uxplima.uxmessentials.moderation.application.port;
 
-import java.util.Optional;
-
-import com.uxplima.uxmessentials.shared.domain.PlayerRef;
+import com.uxplima.uxmessentials.shared.domain.NameMatch;
 
 /**
  * Resolves a sanction target by name, online <em>or</em> offline. The kernel {@link
@@ -12,11 +10,12 @@ import com.uxplima.uxmessentials.shared.domain.PlayerRef;
  * moderation context owns this wider resolution.
  *
  * <p>The adapter resolves a player online on any backend of the network first, then falls back to the server's
- * offline-player cache (the has-played-before profile), mapping each to a {@link PlayerRef}. A name that has never been seen resolves
- * to empty, which a command maps to {@code UNKNOWN_TARGET}.
+ * offline-player cache (the has-played-before profile). A name that has never been seen matches nobody, which a
+ * command maps to {@code UNKNOWN_TARGET}; on an offline-mode server a name several accounts hold only in different
+ * case matches none of them, and the command lists the spellings instead of sanctioning a guess.
  */
 public interface TargetResolver {
 
-    /** The player with this exact name, online or known offline; empty when never seen. */
-    Optional<PlayerRef> resolve(String name);
+    /** The player this name names, online or known offline. */
+    NameMatch resolve(String name);
 }

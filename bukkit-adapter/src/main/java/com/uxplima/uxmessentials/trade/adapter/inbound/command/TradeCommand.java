@@ -20,8 +20,10 @@ import com.mojang.brigadier.tree.LiteralCommandNode;
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandFeedback;
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandRegistration;
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandSuggestions;
+import com.uxplima.uxmessentials.shared.adapter.outbound.lookup.OnlineByName;
 import com.uxplima.uxmessentials.shared.application.permission.EconomyPermissions;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
+import com.uxplima.uxmessentials.shared.application.port.PlayerLookup;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmessentials.shared.domain.message.MessageKey;
 import com.uxplima.uxmessentials.shared.domain.message.SharedMessageKey;
@@ -65,6 +67,8 @@ public final class TradeCommand implements CommandRegistration {
     /** The cross-server view, present only when cross-server trading is wired; {@code null} means local-only. */
     private final @Nullable CrossServerTradeView crossServer;
 
+    private final PlayerLookup players;
+
     public TradeCommand(
             TradeRequests requests,
             TradeCooldown cooldown,
@@ -72,7 +76,8 @@ public final class TradeCommand implements CommandRegistration {
             TradeSessions sessions,
             BiConsumer<Player, Player> opener,
             Messages messages,
-            @Nullable CrossServerTradeView crossServer) {
+            @Nullable CrossServerTradeView crossServer,
+            PlayerLookup players) {
         this.requests = Objects.requireNonNull(requests, "requests");
         this.cooldown = Objects.requireNonNull(cooldown, "cooldown");
         this.config = Objects.requireNonNull(config, "config");
@@ -80,6 +85,7 @@ public final class TradeCommand implements CommandRegistration {
         this.opener = Objects.requireNonNull(opener, "opener");
         this.feedback = new CommandFeedback(Objects.requireNonNull(messages, "messages"));
         this.crossServer = crossServer;
+        this.players = Objects.requireNonNull(players, "players");
     }
 
     @Override
@@ -159,7 +165,7 @@ public final class TradeCommand implements CommandRegistration {
     public void request(Player sender, String name) {
         Objects.requireNonNull(sender, "sender");
         Objects.requireNonNull(name, "name");
-        Player local = Bukkit.getPlayerExact(name);
+        Player local = OnlineByName.player(players, name);
         if (local != null) {
             send(sender, local);
         } else {

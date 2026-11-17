@@ -13,6 +13,7 @@ import com.uxplima.uxmessentials.persistence.runtime.JooqRepository;
 import com.uxplima.uxmessentials.shared.application.port.PlayerNameRepository;
 import com.uxplima.uxmessentials.shared.domain.PlayerName;
 import org.jooq.DSLContext;
+import org.jooq.impl.DSL;
 import org.jspecify.annotations.NullMarked;
 
 /**
@@ -48,6 +49,21 @@ public final class JooqPlayerNameRepository extends JooqRepository implements Pl
         }
         return read(dsl -> dsl.select(PLAYER_NAMES.UUID, PLAYER_NAMES.NAME, PLAYER_NAMES.LAST_SEEN)
                 .from(PLAYER_NAMES)
+                .orderBy(PLAYER_NAMES.LAST_SEEN.desc())
+                .limit(limit)
+                .fetch(row -> new PlayerName(UUID.fromString(row.value1()), row.value2(), row.value3())));
+    }
+
+    @Override
+    public List<PlayerName> underName(String name, int limit) {
+        Objects.requireNonNull(name, "name");
+        String lower = name.strip().toLowerCase(Locale.ROOT);
+        if (lower.isEmpty() || limit <= 0) {
+            return List.of();
+        }
+        return read(dsl -> dsl.select(PLAYER_NAMES.UUID, PLAYER_NAMES.NAME, PLAYER_NAMES.LAST_SEEN)
+                .from(PLAYER_NAMES)
+                .where(PLAYER_NAMES.LOWER_NAME.eq(lower))
                 .orderBy(PLAYER_NAMES.LAST_SEEN.desc())
                 .limit(limit)
                 .fetch(row -> new PlayerName(UUID.fromString(row.value1()), row.value2(), row.value3())));
@@ -103,6 +119,15 @@ public final class JooqPlayerNameRepository extends JooqRepository implements Pl
             });
         }
         return added;
+    }
+
+    @Override
+    public Set<String> sharedNames() {
+        return read(dsl -> Set.copyOf(dsl.select(PLAYER_NAMES.LOWER_NAME)
+                .from(PLAYER_NAMES)
+                .groupBy(PLAYER_NAMES.LOWER_NAME)
+                .having(DSL.count().gt(1))
+                .fetch(PLAYER_NAMES.LOWER_NAME)));
     }
 
     /** Every player the list already holds, so a caller reads names only for the ones it lacks. */

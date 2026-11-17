@@ -41,7 +41,7 @@ public final class PickPlayerTile {
                 new PlayerPickerView.Request(
                         title,
                         target -> panel.open(player, viewer, target),
-                        lookup::findByName,
+                        lookup::matchByName,
                         SharedMessageKey.COMMAND_UNKNOWN_PLAYER));
     }
 

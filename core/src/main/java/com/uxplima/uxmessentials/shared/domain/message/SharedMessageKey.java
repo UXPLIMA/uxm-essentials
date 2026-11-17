@@ -23,6 +23,7 @@ public enum SharedMessageKey implements MessageKey {
     COMMAND_PLAYERS_ONLY("command.players-only"),
     COMMAND_UNAVAILABLE("command.unavailable"),
     COMMAND_UNKNOWN_PLAYER("command.unknown-player"),
+    COMMAND_AMBIGUOUS_PLAYER("command.ambiguous-player"),
     COMMAND_UNKNOWN_WORLD("command.unknown-world"),
     COMMAND_INVALID_POSITION("command.invalid-position"),
     COMMAND_USAGE("command.usage"),

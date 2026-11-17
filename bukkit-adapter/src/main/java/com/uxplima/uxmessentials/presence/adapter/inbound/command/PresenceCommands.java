@@ -6,6 +6,7 @@ import com.uxplima.uxmessentials.presence.adapter.PresenceServices;
 import com.uxplima.uxmessentials.presence.adapter.inbound.gui.OnlinePlayerListView;
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandRegistration;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
+import com.uxplima.uxmessentials.shared.application.port.PlayerLookup;
 import com.uxplima.uxmessentials.shared.application.port.Scheduler;
 import org.jspecify.annotations.NullMarked;
 import org.jspecify.annotations.Nullable;
@@ -29,12 +30,13 @@ public final class PresenceCommands {
             PresenceServices services,
             Messages messages,
             Scheduler scheduler,
-            @Nullable OnlinePlayerListView listView) {
+            @Nullable OnlinePlayerListView listView,
+            PlayerLookup players) {
         return List.of(
                 new AfkCommand(services, messages, scheduler),
                 new ListCommand(services, messages, scheduler, listView),
                 new RealnameCommand(services, messages, scheduler),
-                new NickCommand(services, messages, scheduler),
+                new NickCommand(services, messages, scheduler, players),
                 new WhoisCommand(services, messages, scheduler),
                 new GcCommand(services, messages, scheduler),
                 new StaffCommand(services, messages, scheduler));

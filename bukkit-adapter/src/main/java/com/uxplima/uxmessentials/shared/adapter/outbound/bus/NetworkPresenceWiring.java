@@ -3,6 +3,7 @@ package com.uxplima.uxmessentials.shared.adapter.outbound.bus;
 import java.time.Clock;
 import java.time.Duration;
 import java.util.Objects;
+import java.util.function.Supplier;
 
 import com.uxplima.uxmessentials.shared.application.networkpresence.NetworkRoster;
 import com.uxplima.uxmessentials.shared.application.networkpresence.TrackNetworkPresence;
@@ -10,6 +11,7 @@ import com.uxplima.uxmessentials.shared.application.port.Logger;
 import com.uxplima.uxmessentials.shared.application.port.NetworkPresence;
 import com.uxplima.uxmessentials.shared.application.port.PlayerNameIndex;
 import com.uxplima.uxmessentials.shared.application.port.Scheduler;
+import com.uxplima.uxmessentials.shared.domain.NameCase;
 import org.jspecify.annotations.NullMarked;
 
 /**
@@ -25,14 +27,21 @@ public final class NetworkPresenceWiring {
     private NetworkPresenceWiring() {}
 
     /** Build presence for this backend and register its listener with the bus. */
-    public static Wired wire(Bus bus, NetworkConfig network, PlayerNameIndex names, Scheduler scheduler, Logger log) {
+    public static Wired wire(
+            Bus bus,
+            NetworkConfig network,
+            PlayerNameIndex names,
+            Supplier<NameCase> nameCase,
+            Scheduler scheduler,
+            Logger log) {
         Objects.requireNonNull(bus, "bus");
         Objects.requireNonNull(network, "network");
         Objects.requireNonNull(names, "names");
         Objects.requireNonNull(scheduler, "scheduler");
         Objects.requireNonNull(log, "log");
         Clock clock = Clock.systemUTC();
-        NetworkRoster roster = new NetworkRoster(network.serverId(), clock, network.peerLivenessWindow());
+        NetworkRoster roster =
+                new NetworkRoster(network.serverId(), clock, network.peerLivenessWindow(), nameCase, names::shared);
         TrackNetworkPresence track =
                 new TrackNetworkPresence(roster, NetworkPresenceSync.publisher(bus.publisher()), names, clock);
         bus.registry().register(NetworkPresenceSync.listener(track));

@@ -17,6 +17,7 @@ import com.uxplima.uxmessentials.economy.application.port.EconomyProvider;
 import com.uxplima.uxmessentials.economy.domain.Currency;
 import com.uxplima.uxmessentials.economy.domain.Money;
 import com.uxplima.uxmessentials.shared.application.port.Logger;
+import com.uxplima.uxmessentials.shared.application.port.PlayerLookup;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import net.milkbowl.vault.economy.Economy;
 import net.milkbowl.vault.economy.EconomyResponse;
@@ -38,9 +39,12 @@ import org.jspecify.annotations.Nullable;
  * method answers {@link ResponseType#NOT_IMPLEMENTED} rather than mapping a personal account onto a shape
  * that does not fit it.
  *
- * <p>The name-keyed methods are Vault's deprecated half. They resolve only a player the server already has
- * cached, and refuse otherwise, because the alternative is a blocking profile lookup on whichever thread the
- * caller happens to hold. A UUID-keyed caller is never refused.
+ * <p>The name-keyed methods are Vault's deprecated half. They resolve a name through the plugin's lookup from memory
+ * only, and refuse otherwise, because the alternative is a blocking lookup on whichever thread the caller happens to
+ * hold. The server's own name cache is not asked first: it matches any case and keeps one profile per lower-cased
+ * name, so on an offline-mode server, where {@code Steve} and {@code steve} are two accounts, money would move to
+ * whichever joined last. A name that could mean several accounts is refused too. A UUID-keyed caller is never
+ * refused.
  *
  * <p>Every method is synchronous, because Vault's contract is: a caller wants a number back, so there is no
  * seam to hand the work to the scheduler through. The rule that every provider call runs off the tick thread
@@ -68,20 +72,29 @@ public final class NativeVaultEconomy implements Economy {
     private final EconomyProvider provider;
     private final Currency currency;
     private final Server server;
+    private final PlayerLookup players;
     private final Logger log;
     private final LongSupplier nanos;
     private final AtomicLong nextLogAt = new AtomicLong();
     private final AtomicBoolean loggedOnce = new AtomicBoolean();
     private final AtomicInteger suppressed = new AtomicInteger();
 
-    public NativeVaultEconomy(EconomyProvider provider, Currency currency, Server server, Logger log) {
-        this(provider, currency, server, log, System::nanoTime);
+    public NativeVaultEconomy(
+            EconomyProvider provider, Currency currency, Server server, PlayerLookup players, Logger log) {
+        this(provider, currency, server, players, log, System::nanoTime);
     }
 
-    NativeVaultEconomy(EconomyProvider provider, Currency currency, Server server, Logger log, LongSupplier nanos) {
+    NativeVaultEconomy(
+            EconomyProvider provider,
+            Currency currency,
+            Server server,
+            PlayerLookup players,
+            Logger log,
+            LongSupplier nanos) {
         this.provider = Objects.requireNonNull(provider, "provider");
         this.currency = Objects.requireNonNull(currency, "currency");
         this.server = Objects.requireNonNull(server, "server");
+        this.players = Objects.requireNonNull(players, "players");
         this.log = Objects.requireNonNull(log, "log");
         this.nanos = Objects.requireNonNull(nanos, "nanos");
     }
@@ -394,8 +407,12 @@ public final class NativeVaultEconomy implements Economy {
                 player.getUniqueId(), name == null ? player.getUniqueId().toString() : name);
     }
 
+    /** The account {@code name} names, from memory; null for a name nobody here used or several accounts share. */
     private @Nullable OfflinePlayer cached(String name) {
-        return server.getOfflinePlayerIfCached(Objects.requireNonNull(name, "name"));
+        return players.matchByNameFromMemory(Objects.requireNonNull(name, "name"))
+                .player()
+                .map(found -> server.getOfflinePlayer(found.uuid()))
+                .orElse(null);
     }
 
     private static EconomyResponse success(double amount, double balance) {

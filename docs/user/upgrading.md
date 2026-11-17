@@ -3,6 +3,15 @@
 What an operator edits when a release renames something an operator's own files or permission grants depend on, or
 needs a setting it did not need before.
 
+## Offline mode: names match as spelled
+
+On an offline-mode server, or a network whose proxy runs in offline mode, `Steve` and `steve` are now two players: a
+command, the console, a vote and the REST API find a name only as spelled when another account holds it in another
+case, and answer with the spellings to choose from (see [network.md](network.md) for `lookup.name-case`). Another
+plugin's name-based Vault calls follow the same rule: a deposit or a balance asked for a spelling no account has, when
+another case of it names more than one account, now fails instead of reaching one of them. Plugins that pay by uuid
+are not affected.
+
 ## A PIN is ASCII digits only
 
 A PIN is now made of the ten digits 0 to 9 and nothing else, because that is all the keypad can enter. An older
