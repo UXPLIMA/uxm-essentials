@@ -2,14 +2,17 @@ package com.uxplima.uxmessentials.moderation.application;
 
 import java.time.Clock;
 import java.time.Instant;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.TreeSet;
 import java.util.UUID;
 
 import com.uxplima.uxmessentials.moderation.application.port.ModerationAudit;
 import com.uxplima.uxmessentials.moderation.application.port.ModerationRepository;
+import com.uxplima.uxmessentials.moderation.application.port.NameHolders;
 import com.uxplima.uxmessentials.moderation.domain.IpBan;
 import com.uxplima.uxmessentials.moderation.domain.ModerationMessageKey;
 import com.uxplima.uxmessentials.moderation.domain.TempbanState;
@@ -21,7 +24,14 @@ import com.uxplima.uxmessentials.shared.domain.message.MessageKey;
 /**
  * The ban-on-login check, split along the threads it runs on. For the connecting UUID and address it weighs, in order:
  * a server-wide lockdown (the broadest gate, only bypass holders pass), then an active per-UUID tempban, then an
- * active IP ban on the connecting address. Any match refuses the login before player data loads.
+ * active ban on an account whose name differs from the login's only in case, then an active IP ban on the connecting
+ * address, then, when the server refuses them, a new account under a case variant of a known name. Any match refuses
+ * the login before player data loads.
+ *
+ * <p>The case variants matter on an offline-mode server only, where the uuid is derived from the exact spelling: a
+ * banned {@code Steve} who logs in as {@code STEVE} arrives as another account with no ban of its own. The
+ * {@link NameHolders} the server is built with answer nothing on an authenticated server, where a name has one owner
+ * and a case variant of a banned name is somebody else.
  *
  * <ul>
  *   <li>{@link #read} fetches everything the check needs from storage. It runs at pre-login, off the tick, where no
@@ -42,14 +52,35 @@ public final class LoginEnforcement {
     private final Notifier notifier;
     private final ModerationAudit audit;
     private final Clock clock;
+    private final NameHolders holders;
+    private final boolean refuseCaseVariants;
 
+    /** The check for a server whose logins are authenticated, where a name has one owner in any case. */
     public LoginEnforcement(
             ModerationRepository repository, IpAlts ipAlts, Notifier notifier, ModerationAudit audit, Clock clock) {
+        this(repository, ipAlts, notifier, audit, clock, NameHolders.NONE, false);
+    }
+
+    /**
+     * @param holders the accounts seen under a name in any case; {@link NameHolders#NONE} on an authenticated server
+     * @param refuseCaseVariants whether a new account under a case variant of a known name is refused even when no
+     *     ban is involved
+     */
+    public LoginEnforcement(
+            ModerationRepository repository,
+            IpAlts ipAlts,
+            Notifier notifier,
+            ModerationAudit audit,
+            Clock clock,
+            NameHolders holders,
+            boolean refuseCaseVariants) {
         this.repository = Objects.requireNonNull(repository, "repository");
         this.ipAlts = Objects.requireNonNull(ipAlts, "ipAlts");
         this.notifier = Objects.requireNonNull(notifier, "notifier");
         this.audit = Objects.requireNonNull(audit, "audit");
         this.clock = Objects.requireNonNull(clock, "clock");
+        this.holders = Objects.requireNonNull(holders, "holders");
+        this.refuseCaseVariants = refuseCaseVariants;
     }
 
     /**
@@ -63,13 +94,28 @@ public final class LoginEnforcement {
         Objects.requireNonNull(who, "who");
         Objects.requireNonNull(ip, "ip");
         Instant now = clock.instant();
+        List<PlayerRef> underName = holders.underName(who.name());
+        List<PlayerRef> variants = new ArrayList<>();
+        TempbanState variantBan = TempbanState.none();
+        for (PlayerRef holder : underName) {
+            if (holder.equals(who) || holder.name().equals(who.name())) {
+                continue;
+            }
+            variants.add(holder);
+            if (!variantBan.isActiveAt(now)) {
+                variantBan = repository.loadTempban(holder);
+            }
+        }
         return new Standing(
                 who,
                 ip,
                 repository.isLockedDown(),
                 repository.loadTempban(who),
                 repository.activeIpBan(ip, now),
-                ipAlts.onAddress(ip, who.uuid()));
+                ipAlts.onAddress(ip, who.uuid()),
+                variantBan,
+                variants,
+                underName.contains(who));
     }
 
     /**
@@ -88,6 +134,10 @@ public final class LoginEnforcement {
         if (standing.tempban() instanceof TempbanState.Active ban && ban.isActiveAt(now)) {
             return Decision.deny(BanScreen.of(ban, now).render(notifier, who));
         }
+        // The same person under another spelling: the ban follows them, exempt or not, as it does on their own uuid.
+        if (standing.variantBan() instanceof TempbanState.Active ban && ban.isActiveAt(now)) {
+            return Decision.deny(BanScreen.of(ban, now).render(notifier, who));
+        }
         Optional<IpBan> ipBan = standing.ipBan().filter(ban -> !exempt && ban.isActiveAt(now));
         if (ipBan.isPresent()) {
             IpBan ban = ipBan.get();
@@ -99,7 +149,23 @@ public final class LoginEnforcement {
                             SanctionReasons.read(notifier::render, who, ban.reason(), ban.drawnReason())
                                     .orElse(""))));
         }
+        // An account that already joined keeps joining: the option stops new look-alikes, it does not pick between
+        // accounts the server already has.
+        if (refuseCaseVariants && !standing.known() && !standing.variants().isEmpty()) {
+            return Decision.deny(render(
+                    who,
+                    ModerationMessageKey.MOD_LOGIN_NAME_VARIANT,
+                    Map.of("player", who.name(), "matches", spellings(standing.variants()))));
+        }
         return Decision.allow();
+    }
+
+    private static String spellings(List<PlayerRef> variants) {
+        TreeSet<String> names = new TreeSet<>();
+        for (PlayerRef variant : variants) {
+            names.add(variant.name());
+        }
+        return String.join(", ", names);
     }
 
     /**
@@ -122,7 +188,8 @@ public final class LoginEnforcement {
 
     /**
      * What storage said about one login: whether the server is locked down, the player's tempban, the IP ban on
-     * their address, and the other accounts seen on that address.
+     * their address, the other accounts seen on that address, and, on an offline-mode server, the accounts under a
+     * case variant of the name, the first active ban among them, and whether this account was seen before.
      */
     public record Standing(
             PlayerRef who,
@@ -130,7 +197,10 @@ public final class LoginEnforcement {
             boolean lockedDown,
             TempbanState tempban,
             Optional<IpBan> ipBan,
-            List<UUID> alts) {
+            List<UUID> alts,
+            TempbanState variantBan,
+            List<PlayerRef> variants,
+            boolean known) {
 
         public Standing {
             Objects.requireNonNull(who, "who");
@@ -138,6 +208,8 @@ public final class LoginEnforcement {
             Objects.requireNonNull(tempban, "tempban");
             Objects.requireNonNull(ipBan, "ipBan");
             alts = List.copyOf(alts);
+            Objects.requireNonNull(variantBan, "variantBan");
+            variants = List.copyOf(variants);
         }
     }
 

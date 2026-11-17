@@ -207,11 +207,10 @@ jail {
 `/jails` lists both kinds. When both have the same name, the one made with `/setjail` wins. A config jail is removed
 by editing the file.
 
-`/togglejail` without a jail name uses `default-jail`, which can name a config jail or one made with `/setjail`.
-With `default-jail` empty (the default) it is refused, and the staff member is shown the jails `/jail` accepts, so
-nobody is sent to a jail no one chose. A jailed player is released without naming a jail. A `default-jail` that
-names no jail is refused the same way, saying the configured default does not exist, and the log warns about it at
-startup.
+`/togglejail` without a jail name uses `default-jail`, which can name a config jail or one made with `/setjail`. With
+`default-jail` empty (the default) it is refused, and the staff member is shown the jails `/jail` accepts, so nobody
+is sent to a jail no one chose. A jailed player is released without naming a jail. A `default-jail` that names no jail
+is refused the same way, saying the configured default does not exist, and the log warns about it at startup.
 
 ```
 default-jail = "spawnjail"
@@ -362,6 +361,7 @@ connects, before the server thread is involved. The decision follows a moment la
 are known, so a login never makes the server wait on the database. A login is never let in unchecked: when the read
 fails, or the decision finds no read for that connection (or one more than 30 seconds old), the player is refused with
 `moderation.login.unchecked`, which asks them to join again, and a line is written to the log.
+On an offline-mode server (no online-mode proxy in front) each spelling of a name is its own account, so `Steve` and `STEVE` log in with two uuids. A ban on one also refuses a login under any other spelling of the name, with the banned account's ban screen. With `refuse-name-case-variants = true` a new account whose name only differs in case from one the server already knows is refused too, ban or not, with `moderation.login.name-variant`, which names the spelling to use; accounts that already joined keep joining. Mutes and jails stay on the account they were given to. With authenticated logins a name has one owner and neither check applies.
 
 ## Kick screens and appeals
 
@@ -397,3 +397,4 @@ mutes, warnings and jails over from EssentialsX and LiteBans.
 | `templates` | `{}` | The `/punish` templates. |
 | `discord-notify` | `false` | Sends punishment lines to the Discord bridge. |
 | `censor-ip-addresses` | `false` | Masks the address in `/seenip`. |
+| `refuse-name-case-variants` | `false` | Offline mode: refuses a new account named as a case variant of a known one. |

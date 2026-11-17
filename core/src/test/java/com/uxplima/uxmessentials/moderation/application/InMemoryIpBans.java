@@ -27,6 +27,7 @@ final class InMemoryIpBans implements ModerationRepository {
 
     private final Map<String, IpBan> ipBans = new HashMap<>();
     private final Map<java.util.UUID, SeenRecord> seen = new HashMap<>();
+    private final Map<java.util.UUID, TempbanState> tempbans = new HashMap<>();
 
     /** Keep {@code record} as the seen record of its player. */
     void recordSeen(SeenRecord record) {
@@ -79,7 +80,7 @@ final class InMemoryIpBans implements ModerationRepository {
 
     @Override
     public TempbanState loadTempban(PlayerRef target) {
-        return TempbanState.none();
+        return tempbans.getOrDefault(target.uuid(), TempbanState.none());
     }
 
     @Override
@@ -114,7 +115,7 @@ final class InMemoryIpBans implements ModerationRepository {
 
     @Override
     public void saveTempban(PlayerRef target, TempbanState tempban) {
-        throw new UnsupportedOperationException();
+        tempbans.put(target.uuid(), tempban);
     }
 
     @Override

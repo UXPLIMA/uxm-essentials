@@ -51,6 +51,7 @@ public final class ModerationSettings {
     private final boolean silentByDefault;
     private final AddressStrictness addressStrictness;
     private final boolean censorIpAddresses;
+    private final boolean refuseNameCaseVariants;
     private final Map<String, PunishmentTemplate> templates;
     private final boolean discordNotify;
 
@@ -74,6 +75,7 @@ public final class ModerationSettings {
         this.silentByDefault = config.getBoolean("broadcast.silent-by-default", false);
         this.addressStrictness = AddressStrictness.parse(config.getString("address-strictness", "NORMAL"));
         this.censorIpAddresses = config.getBoolean("censor-ip-addresses", false);
+        this.refuseNameCaseVariants = config.getBoolean("refuse-name-case-variants", false);
         this.templates = parseTemplates(config, log);
         this.discordNotify = config.getBoolean("discord-notify", false);
     }
@@ -118,6 +120,14 @@ public final class ModerationSettings {
     /** Whether {@code /alts} and {@code /seenip} mask the addresses they render (privacy; off by default). */
     public boolean censorIpAddresses() {
         return censorIpAddresses;
+    }
+
+    /**
+     * Whether a new account whose name is a case variant of a known one is refused at login. Read only on an
+     * offline-mode server, where each spelling is its own account.
+     */
+    public boolean refuseNameCaseVariants() {
+        return refuseNameCaseVariants;
     }
 
     /** The configured {@code /punish} templates (name → preset reason + optional duration), parsed at wire time. */

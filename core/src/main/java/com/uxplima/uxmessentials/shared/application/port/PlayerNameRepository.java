@@ -15,6 +15,12 @@ public interface PlayerNameRepository {
     /** The {@code limit} most recently seen rows, newest first. An empty list when {@code limit} is not positive. */
     List<PlayerName> loadRecent(int limit);
 
+    /**
+     * Every account whose name is {@code name} in any case, each with the name it last joined under. Two accounts
+     * share a name in different cases on an offline-mode server.
+     */
+    List<PlayerName> underName(String name);
+
     /** Insert or update the row for this account. */
     void upsert(PlayerName record);
 

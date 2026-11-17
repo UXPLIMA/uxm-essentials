@@ -11,7 +11,10 @@ import com.uxplima.uxmessentials.shared.domain.PlayerName;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
-/** A server's own list of players tops up the name index without overwriting what joins recorded. */
+/**
+ * A server's own list of players tops up the name index without overwriting what joins recorded, and the accounts
+ * under a name are found in any case, as offline mode gives each spelling its own account.
+ */
 @EveryBackend
 class JooqPlayerNameRepositoryTest {
 
@@ -41,5 +44,16 @@ class JooqPlayerNameRepositoryTest {
                 .extracting(PlayerName::name)
                 .containsExactlyInAnyOrder("Alex", ".BedrockGamer123");
         assertThat(names.knownUuids()).containsExactlyInAnyOrder(ALEX, BEDROCK);
+    }
+
+    @Test
+    void everyAccountUnderANameInAnyCaseIsFoundAndNoOtherName() {
+        UUID upper = new UUID(0L, 4L);
+        names.upsert(new PlayerName(ALEX, "Alex", 100L));
+        names.upsert(new PlayerName(upper, "ALEX", 200L));
+        names.upsert(new PlayerName(new UUID(0L, 5L), "Alexa", 300L));
+
+        assertThat(names.underName("aLeX"))
+                .containsExactly(new PlayerName(upper, "ALEX", 200L), new PlayerName(ALEX, "Alex", 100L));
     }
 }

@@ -35,6 +35,7 @@ import com.uxplima.uxmessentials.moderation.adapter.outbound.JailServerAdoption;
 import com.uxplima.uxmessentials.moderation.adapter.outbound.LoggingModerationAudit;
 import com.uxplima.uxmessentials.moderation.adapter.outbound.PermissionSanctionBroadcast;
 import com.uxplima.uxmessentials.moderation.adapter.outbound.PlayerLookupTargetResolver;
+import com.uxplima.uxmessentials.moderation.adapter.outbound.StoredNameHolders;
 import com.uxplima.uxmessentials.moderation.adapter.outbound.api.ModerationApiWrites;
 import com.uxplima.uxmessentials.moderation.application.ApplyRemoteJail;
 import com.uxplima.uxmessentials.moderation.application.Ban;
@@ -101,11 +102,13 @@ import com.uxplima.uxmessentials.moderation.application.port.JailLocationStore;
 import com.uxplima.uxmessentials.moderation.application.port.JailSync;
 import com.uxplima.uxmessentials.moderation.application.port.ModerationAudit;
 import com.uxplima.uxmessentials.moderation.application.port.ModerationRepository;
+import com.uxplima.uxmessentials.moderation.application.port.NameHolders;
 import com.uxplima.uxmessentials.moderation.application.port.SanctionBroadcast;
 import com.uxplima.uxmessentials.moderation.application.port.SanctionHistory;
 import com.uxplima.uxmessentials.moderation.application.port.SanctionSync;
 import com.uxplima.uxmessentials.moderation.application.port.Sanctions;
 import com.uxplima.uxmessentials.moderation.application.port.SeenVisibility;
+import com.uxplima.uxmessentials.persistence.lookup.JooqPlayerNameRepository;
 import com.uxplima.uxmessentials.persistence.moderation.ModerationStores;
 import com.uxplima.uxmessentials.persistence.runtime.Persistence;
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandRegistration;
@@ -131,6 +134,7 @@ import com.uxplima.uxmessentials.shared.application.port.MessageSink;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
 import com.uxplima.uxmessentials.shared.application.port.NetworkPresence;
 import com.uxplima.uxmessentials.shared.application.port.Permissions;
+import com.uxplima.uxmessentials.shared.domain.NameCase;
 import com.uxplima.uxmlib.gui.input.TextInput;
 import com.uxplima.uxmlib.menu.Menus;
 import com.uxplima.uxmlib.menu.binding.MenuBindings;
@@ -237,6 +241,11 @@ public final class ModerationWiring {
         }
         JailNetwork jailNetwork = jailNetwork(
                 plugin, kernel, bus, repository, jailLocations, sanctions, hops, networked, presence, clock);
+        // On an offline-mode server a ban follows its player into the other spellings of their name; with
+        // authenticated logins a case variant of a name is somebody else and nothing is read.
+        NameHolders holders = ServerNameCase.of(plugin.getServer()) == NameCase.SENSITIVE
+                ? new StoredNameHolders(new JooqPlayerNameRepository(persistence.dsl()))
+                : NameHolders.NONE;
         ModerationServices services = assemble(
                 plugin,
                 auditChannel,
@@ -256,6 +265,7 @@ public final class ModerationWiring {
                 ipTokens,
                 presence,
                 seenVisibility,
+                holders,
                 clock);
         // The live kick: on a remote ban frame, re-evaluate the now-authoritative ban here and kick an online
         // target. Self-origin frames are dropped by the bus client before dispatch, so the local /ban (which
@@ -495,6 +505,7 @@ public final class ModerationWiring {
             IpTokens ipTokens,
             NetworkPresence presence,
             SeenVisibility seenVisibility,
+            NameHolders holders,
             Clock clock) {
         // One alt lookup for every flow that asks "who else uses this address": the login audit, /banip,
         // /tempbanip and /seenip. It tokenises first, so all four match the same rows /alts groups over.
@@ -640,7 +651,8 @@ public final class ModerationWiring {
                 .staffRollback(staffRollback)
                 .jailCountdown(new JailCountdown(
                         repository, sanctionPort, jailNetwork.transfer(), audit, kernel.events(), clock))
-                .loginEnforcement(new LoginEnforcement(repository, ipAlts, notifier, audit, clock))
+                .loginEnforcement(new LoginEnforcement(
+                        repository, ipAlts, notifier, audit, clock, holders, settings.refuseNameCaseVariants()))
                 .lockdown(new Lockdown(repository, notifier, broadcast, audit))
                 .repository(repository)
                 .players(kernel.playerLookup())
