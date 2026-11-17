@@ -43,6 +43,7 @@ public final class SetSkin {
 
     private final SkinRepository repository;
     private final SkinTextures textures;
+    private final NamedSkins names;
     private final SkinUploads uploads;
     private final SkinView view;
     private final Permissions permissions;
@@ -54,6 +55,7 @@ public final class SetSkin {
     public SetSkin(
             SkinRepository repository,
             SkinTextures textures,
+            NamedSkins names,
             SkinUploads uploads,
             SkinView view,
             Permissions permissions,
@@ -63,6 +65,7 @@ public final class SetSkin {
             Clock clock) {
         this.repository = Objects.requireNonNull(repository, "repository");
         this.textures = Objects.requireNonNull(textures, "textures");
+        this.names = Objects.requireNonNull(names, "names");
         this.uploads = Objects.requireNonNull(uploads, "uploads");
         this.view = Objects.requireNonNull(view, "view");
         this.permissions = Objects.requireNonNull(permissions, "permissions");
@@ -143,7 +146,7 @@ public final class SetSkin {
     /** The texture behind {@code source}, or empty when nothing could be resolved. */
     private Optional<SkinTexture> resolve(SkinSource source, SkinModel model) {
         return switch (source) {
-            case SkinSource.ByName name -> textures.fetchNow(name.username());
+            case SkinSource.ByName name -> names.byName(name.username());
             case SkinSource.ByUrl url -> uploads.fromUrl(url.url(), model);
             case SkinSource.ByFile file -> uploads.fromFile(file.fileName(), model);
             case SkinSource.Bedrock ignored -> Optional.empty();

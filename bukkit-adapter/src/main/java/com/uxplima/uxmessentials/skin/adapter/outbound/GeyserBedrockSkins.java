@@ -75,6 +75,11 @@ public final class GeyserBedrockSkins implements BedrockSkins {
         return available.getAsBoolean();
     }
 
+    @Override
+    public boolean isBedrock(UUID player) {
+        return xuids.xuidOf(Objects.requireNonNull(player, "player")).isPresent();
+    }
+
     /** The signed texture Geyser holds for {@code xuid}, retried a bounded number of times. */
     private Optional<SkinTexture> fetch(String xuid) {
         URI uri = URI.create(SKIN_ENDPOINT + xuid);

@@ -26,6 +26,7 @@ import com.uxplima.uxmessentials.skin.application.ClearSkin;
 import com.uxplima.uxmessentials.skin.application.DescribeSkin;
 import com.uxplima.uxmessentials.skin.application.DressLogin;
 import com.uxplima.uxmessentials.skin.application.DropSkin;
+import com.uxplima.uxmessentials.skin.application.NamedSkins;
 import com.uxplima.uxmessentials.skin.application.PurgeSkinCache;
 import com.uxplima.uxmessentials.skin.application.SetSkin;
 import com.uxplima.uxmessentials.skin.application.SkinConfig;
@@ -86,9 +87,11 @@ public final class SkinWiring {
                 () -> config.bedrockSource() && !"none".equals(bedrock.backend()));
 
         DressLogin dressLogin = new DressLogin(repository, kernel.skins(), bedrockSkins, config, kernel.log());
+        NamedSkins names = new NamedSkins(kernel.playerLookup(), dressLogin, kernel.skins());
         SetSkin setSkin = new SetSkin(
                 repository,
                 kernel.skins(),
+                names,
                 uploads,
                 view,
                 kernel.permissions(),
@@ -99,7 +102,7 @@ public final class SkinWiring {
         SkinCommand command = new SkinCommand(
                 setSkin,
                 new ClearSkin(repository, dressLogin, view, kernel.events(), clock),
-                new UpdateSkin(repository, kernel.skins(), uploads, view, kernel.events(), clock),
+                new UpdateSkin(repository, kernel.skins(), names, bedrockSkins, uploads, view, kernel.events(), clock),
                 new DropSkin(repository),
                 new DescribeSkin(repository),
                 new PurgeSkinCache(kernel.skins()),
