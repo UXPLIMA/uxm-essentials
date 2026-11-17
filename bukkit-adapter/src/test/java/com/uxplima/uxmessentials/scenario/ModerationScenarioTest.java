@@ -70,6 +70,29 @@ class ModerationScenarioTest {
     }
 
     @Test
+    void anOfflineOperatorKeepsTheExemptionTheyHoldByDefaultAndCannotBeBanned() {
+        ScenarioPlayer admin = running.join("Olaf");
+        admin.setOp(true);
+        running.quit(admin);
+
+        running.run(moderator, "ban Olaf griefing");
+
+        assertThat(running.join("Olaf").isOnline()).as("not banned").isTrue();
+        assertThat(running.problems()).isEmpty();
+    }
+
+    @Test
+    void anOfflinePlayerWithoutTheExemptionIsBannedAndTurnedAwayWhenTheyComeBack() {
+        ScenarioPlayer player = running.join("Odin");
+        running.quit(player);
+
+        running.run(moderator, "ban Odin griefing");
+
+        assertThat(running.join("Odin").isOnline()).as("banned while offline").isFalse();
+        assertThat(running.problems()).isEmpty();
+    }
+
+    @Test
     void aLockdownTurnsAPlayerAwayAtLoginAndLetsAStaffMemberWithTheBypassIn() {
         running.run(moderator, "lockdown on");
         try {

@@ -118,6 +118,7 @@ import com.uxplima.uxmessentials.shared.adapter.outbound.bus.ModerationSync;
 import com.uxplima.uxmessentials.shared.adapter.outbound.bus.NetworkConfig;
 import com.uxplima.uxmessentials.shared.adapter.outbound.hop.CrossServerHops;
 import com.uxplima.uxmessentials.shared.adapter.outbound.log.AuditChannel;
+import com.uxplima.uxmessentials.shared.adapter.outbound.permission.ServerStoredPermissions;
 import com.uxplima.uxmessentials.shared.application.IpAlts;
 import com.uxplima.uxmessentials.shared.application.hop.HopDepartures;
 import com.uxplima.uxmessentials.shared.application.hop.port.HopGate;
@@ -645,7 +646,12 @@ public final class ModerationWiring {
                 .players(kernel.playerLookup())
                 .targets(new PlayerLookupTargetResolver(presence, kernel.playerLookup()))
                 .lane(new StorageLane(
-                        kernel.scheduler(), notifier, kernel.permissions(), kernel.playerLookup(), kernel.log()))
+                        kernel.scheduler(),
+                        notifier,
+                        kernel.permissions(),
+                        ServerStoredPermissions.of(plugin.getServer(), kernel.scheduler(), presence, kernel.log()),
+                        kernel.playerLookup(),
+                        kernel.log()))
                 .build();
     }
 
