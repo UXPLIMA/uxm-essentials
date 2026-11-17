@@ -165,6 +165,26 @@ class NativeVaultEconomyTest {
     }
 
     @Test
+    void aLookupThatCannotReadIsAFailedResponseAndNeverAnException() {
+        names.unreadable = true;
+        unreachable.writable = true;
+        NativeVaultEconomy vault = vault();
+
+        EconomyResponse deposit = vault.depositPlayer("Steve", 5);
+        EconomyResponse withdrawal = vault.withdrawPlayer("Steve", 5);
+
+        assertThat(deposit.type).isEqualTo(ResponseType.FAILURE);
+        assertThat(deposit.errorMessage).contains("nothing moved");
+        assertThat(withdrawal.type).isEqualTo(ResponseType.FAILURE);
+        assertThat(vault.has("Steve", 1)).isFalse();
+        assertThat(vault.getBalance("Steve")).isZero();
+        assertThat(vault.hasAccount("Steve")).isFalse();
+        assertThat(vault.createPlayerAccount("Steve")).isFalse();
+        assertThat(unreachable.credited).isEmpty();
+        assertThat(errors).singleElement().asString().contains("event=vault_lookup_failed", "op=deposit");
+    }
+
+    @Test
     void aFailedWriteDoesNotClaimNothingMoved() {
         EconomyResponse response = vault().depositPlayer(alex, 25);
 
@@ -201,6 +221,7 @@ class NativeVaultEconomyTest {
 
         final Map<String, NameMatch> matches = new java.util.HashMap<>();
         final java.util.Set<String> forgotten = new java.util.HashSet<>();
+        boolean unreadable;
 
         @Override
         public Optional<PlayerRef> findOnlineByName(String name) {
@@ -209,6 +230,9 @@ class NativeVaultEconomyTest {
 
         @Override
         public NameMatch matchByName(String name) {
+            if (unreadable) {
+                throw new IllegalStateException("the name index is unreachable");
+            }
             return matches.getOrDefault(name, NameMatch.unknown());
         }
 
