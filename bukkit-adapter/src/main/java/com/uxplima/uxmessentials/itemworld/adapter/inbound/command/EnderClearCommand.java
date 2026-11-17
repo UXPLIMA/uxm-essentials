@@ -4,6 +4,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 
+import org.bukkit.Bukkit;
 import org.bukkit.entity.Player;
 
 import io.papermc.paper.command.brigadier.CommandSourceStack;
@@ -14,26 +15,24 @@ import com.mojang.brigadier.arguments.StringArgumentType;
 import com.mojang.brigadier.context.CommandContext;
 import com.mojang.brigadier.tree.LiteralCommandNode;
 import com.uxplima.uxmessentials.itemworld.adapter.ItemworldServices;
+import com.uxplima.uxmessentials.itemworld.adapter.outbound.OfflineContainers;
 import com.uxplima.uxmessentials.itemworld.domain.ItemworldMessageKey;
 import com.uxplima.uxmessentials.itemworld.domain.SubFeatureGroup;
+import com.uxplima.uxmessentials.playerstate.adapter.outbound.playerdata.ContainerLayout;
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandRegistration;
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandSuggestions;
-import com.uxplima.uxmessentials.shared.adapter.outbound.BukkitRefs;
-import com.uxplima.uxmessentials.shared.adapter.outbound.lookup.OnlineByName;
 import com.uxplima.uxmessentials.shared.application.permission.ItemworldPermissions;
-import com.uxplima.uxmessentials.shared.domain.NameMatch;
-import com.uxplima.uxmessentials.shared.domain.message.MessageLine;
 import com.uxplima.uxmlib.command.Gate;
 import org.jspecify.annotations.NullMarked;
 
 /**
- * {@code /enderclear [player]} (alias {@code /clearec}): empty an ender chest, your own, or another online
- * player's when a name is given. A cleanup verb that mirrors {@code /clearinventory} but targets
- * {@code Player#getEnderChest()}; a named target must resolve online (else
+ * {@code /enderclear [player]} (alias {@code /clearec}): empty an ender chest, your own, or another player's when a
+ * name is given. A cleanup verb that mirrors {@code /clearinventory} but targets {@code Player#getEnderChest()}. A named
+ * target may be online here, offline, or on another server, which the command names (else
  * {@link ItemworldMessageKey#UNKNOWN_TARGET}).
  *
- * <p>Clearing the ender chest is entity-bound, so it runs on the subject's region thread through the kernel
- * {@code Scheduler}; the actor is told {@link ItemworldMessageKey#ENDERCLEAR_DONE} (self) or
+ * <p>Clearing a live ender chest is entity-bound, so it runs on the subject's region thread through the kernel
+ * {@code Scheduler}; an offline one is cleared in the data this server stored for the player, off the tick; the actor is told {@link ItemworldMessageKey#ENDERCLEAR_DONE} (self) or
  * {@link ItemworldMessageKey#ENDERCLEAR_DONE_OTHER} (target).
  */
 @NullMarked
@@ -73,16 +72,24 @@ public final class EnderClearCommand extends ItemworldCommandSupport implements 
         if (self == null) {
             return Command.SINGLE_SUCCESS;
         }
-        NameMatch match = name.map(n -> services.kernel().playerLookup().matchOnlineByName(n))
-                .orElse(NameMatch.found(BukkitRefs.toRef(self)));
-        Player subject = name.isEmpty() ? self : OnlineByName.player(match);
-        if (subject == null) {
-            MessageLine miss =
-                    match.miss(ItemworldMessageKey.UNKNOWN_TARGET, Map.of("player", name.orElse(self.getName())));
-            reply(ctx, miss.key(), miss.args());
+        if (name.isEmpty()) {
+            clear(ctx, self, self);
             return Command.SINGLE_SUCCESS;
         }
-        clear(ctx, self, subject);
+        services.targets().resolveHere(ctx.getSource(), name.get(), ItemworldMessageKey.UNKNOWN_TARGET, subject -> {
+            Player online = Bukkit.getPlayer(subject.uuid());
+            if (online != null) {
+                clear(ctx, self, online);
+                return;
+            }
+            services.kernel().scheduler().async(() -> {
+                OfflineContainers.Outcome outcome = services.offline().clear(subject.uuid(), ContainerLayout.ENDER);
+                reply(
+                        ctx,
+                        outcome.problem().orElse(ItemworldMessageKey.ENDERCLEAR_DONE_OTHER),
+                        Map.of("player", subject.name()));
+            });
+        });
         return Command.SINGLE_SUCCESS;
     }
 

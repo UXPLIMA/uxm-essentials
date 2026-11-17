@@ -30,8 +30,8 @@ import org.jspecify.annotations.Nullable;
 /**
  * {@code /playtime [player]} ({@code uxmessentials.playtime.use}): show a player's playtime breakdown, active
  * (non-AFK) and AFK time across today / last 7 days / last 30 days / all time, read from the DB-backed
- * {@code ShowPlaytime} use case, plus a lifetime continuity line. The target is a plain online-player name (an
- * online-name-completing word, never an {@code @a}/{@code @p}/{@code @s} selector): showing one player's stats is
+ * {@code ShowPlaytime} use case, plus a lifetime continuity line. The target is a plain player name, online or not
+ * (an online-name-completing word, never an {@code @a}/{@code @p}/{@code @s} selector): showing one player's stats is
  * a single-target read where a fan-out to every player is nonsensical. The {@code .others} target is gated by the
  * shared {@code uxmessentials.playtime.others} (or the cross-cutting {@code uxmessentials.playerstate.others}) node.
  *
@@ -115,11 +115,12 @@ public final class PlaytimeCommand extends PlayerstateCommandSupport implements 
                 .requires(Gate.permission(SET_PERMISSION))
                 .then(CommandSuggestions.playerArgument("player")
                         .then(Commands.argument(TIME, StringArgumentType.word()).executes(ctx -> {
-                            Optional<PlayerRef> target = resolveStorageTarget(ctx, Sender.audience(ctx.getSource()));
-                            if (target.isEmpty()) {
-                                return 0;
-                            }
-                            action.apply(actor(ctx), target.get(), StringArgumentType.getString(ctx, TIME));
+                            PlayerRef actor = actor(ctx);
+                            String amount = StringArgumentType.getString(ctx, TIME);
+                            resolveStoredTarget(
+                                    ctx,
+                                    Sender.audience(ctx.getSource()),
+                                    target -> action.apply(actor, target, amount));
                             return Command.SINGLE_SUCCESS;
                         })));
     }
@@ -152,54 +153,49 @@ public final class PlaytimeCommand extends PlayerstateCommandSupport implements 
     /**
      * The bare-root chat fallback: render the viewer's own breakdown as the chat lines. Installed on the bare root
      * directly, so it runs only when the catalog {@code gui} flag is off (gui-on swaps in the {@link #guiRoot()}
-     * panel opener instead) or when no GUI is wired at all.
+     * panel opener instead) or when no GUI is wired at all. The breakdown is read from the database, off the tick.
      */
     private int showSelfChat(CommandContext<CommandSourceStack> ctx) {
         Player sender = player(ctx);
         if (sender == null) {
             return 0;
         }
-        services.showPlaytime().showFor(ref(sender), ref(sender));
+        PlayerRef self = ref(sender);
+        services.targets().async(() -> services.showPlaytime().show(self));
         return Command.SINGLE_SUCCESS;
     }
 
     /**
      * {@code /playtime <name>}: open the named player's panel when a GUI is wired (the richer view of the same
      * data), or render their chat breakdown otherwise. The named form is the staff inspection path, gated by the
-     * shared {@code .others} node inside {@link #resolveStorageTarget}. Playtime is kept in the database, so the name
-     * may be a player who has logged off: staff asking about one were told nobody by that name existed.
+     * shared {@code .others} node inside {@link #resolveStoredTarget}. Playtime is kept in the database, so the name
+     * may be a player who is offline, on another server, or known only to the database.
      */
     private int showNamed(CommandContext<CommandSourceStack> ctx) {
         CommandSender sender = Sender.audience(ctx.getSource());
-        Optional<PlayerRef> target = resolveStorageTarget(ctx, sender);
-        if (target.isEmpty()) {
-            return 0;
-        }
         PlayerRef viewer = actor(ctx);
-        if (view != null && sender instanceof Player player) {
-            view.open(player, viewer, target.get());
-        } else {
-            services.showPlaytime().showFor(viewer, target.get());
-        }
+        resolveStoredTarget(ctx, sender, target -> {
+            if (view != null && sender instanceof Player player) {
+                view.open(player, viewer, target);
+            } else {
+                services.showPlaytime().showFor(viewer, target);
+            }
+        });
         return Command.SINGLE_SUCCESS;
     }
 
     private int reset(CommandContext<CommandSourceStack> ctx) {
-        CommandSender sender = Sender.audience(ctx.getSource());
-        Optional<PlayerRef> target = resolveStorageTarget(ctx, sender);
-        if (target.isEmpty()) {
-            return 0;
-        }
-        services.resetPlaytime().resetFor(actor(ctx), target.get());
+        PlayerRef actor = actor(ctx);
+        resolveStoredTarget(
+                ctx,
+                Sender.audience(ctx.getSource()),
+                target -> services.resetPlaytime().resetFor(actor, target));
         return Command.SINGLE_SUCCESS;
     }
 
     private int importOne(CommandContext<CommandSourceStack> ctx) {
-        Optional<PlayerRef> target = resolveStorageTarget(ctx, Sender.audience(ctx.getSource()));
-        if (target.isEmpty()) {
-            return 0;
-        }
-        admin.importOne(actor(ctx), target.get());
+        PlayerRef actor = actor(ctx);
+        resolveStoredTarget(ctx, Sender.audience(ctx.getSource()), target -> admin.importOne(actor, target));
         return Command.SINGLE_SUCCESS;
     }
 
@@ -209,7 +205,8 @@ public final class PlaytimeCommand extends PlayerstateCommandSupport implements 
     }
 
     private int resetAll(CommandContext<CommandSourceStack> ctx) {
-        services.resetPlaytime().resetAll(actor(ctx));
+        PlayerRef actor = actor(ctx);
+        services.targets().async(() -> services.resetPlaytime().resetAll(actor));
         return Command.SINGLE_SUCCESS;
     }
 }

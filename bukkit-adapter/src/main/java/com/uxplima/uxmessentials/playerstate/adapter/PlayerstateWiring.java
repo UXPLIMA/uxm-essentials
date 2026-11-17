@@ -76,7 +76,10 @@ import com.uxplima.uxmessentials.playerstate.application.port.PlayerInfo;
 import com.uxplima.uxmessentials.playerstate.application.port.PlayerStateStore;
 import com.uxplima.uxmessentials.playerstate.application.port.PlaytimeRepository;
 import com.uxplima.uxmessentials.playerstate.application.port.StateReconciler;
+import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandFeedback;
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandRegistration;
+import com.uxplima.uxmessentials.shared.adapter.inbound.command.NetworkTargets;
+import com.uxplima.uxmessentials.shared.adapter.inbound.command.PlayerArgument;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.GuiLayouts;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.GuiText;
 import com.uxplima.uxmessentials.shared.adapter.outbound.team.PlayerTeamCoordinator;
@@ -85,6 +88,7 @@ import com.uxplima.uxmessentials.shared.application.module.KernelPorts;
 import com.uxplima.uxmessentials.shared.application.module.ModuleContext;
 import com.uxplima.uxmessentials.shared.application.port.ConfigStore;
 import com.uxplima.uxmessentials.shared.application.port.Logger;
+import com.uxplima.uxmessentials.shared.application.port.NetworkPresence;
 import com.uxplima.uxmlib.menu.Menus;
 import org.jspecify.annotations.NullMarked;
 import org.jspecify.annotations.Nullable;
@@ -113,7 +117,9 @@ public final class PlayerstateWiring {
             Menus menus,
             MirrorWindow mirrorWindow,
             PlayerTeamCoordinator teams,
-            RegionBehaviourGate regions) {
+            RegionBehaviourGate regions,
+            NetworkPresence presence,
+            PlayerArgument.Visibility visibility) {
         Objects.requireNonNull(plugin, "plugin");
         Objects.requireNonNull(ctx, "ctx");
         Objects.requireNonNull(playtimeRepository, "playtimeRepository");
@@ -122,6 +128,8 @@ public final class PlayerstateWiring {
         Objects.requireNonNull(mirrorWindow, "mirrorWindow");
         Objects.requireNonNull(teams, "teams");
         Objects.requireNonNull(regions, "regions");
+        Objects.requireNonNull(presence, "presence");
+        Objects.requireNonNull(visibility, "visibility");
         KernelPorts kernel = ctx.kernel();
         ConfigStore config = ctx.config();
         Clock clock = Clock.systemUTC();
@@ -141,8 +149,23 @@ public final class PlayerstateWiring {
         PlayerInfo info = new BukkitPlayerInfo();
         ClearInventoryPreferences clearPrefs = new PdcClearInventoryPreferences();
 
+        NetworkTargets targets = new NetworkTargets(
+                kernel.playerLookup(),
+                kernel.scheduler(),
+                presence,
+                visibility,
+                new CommandFeedback(kernel.messages()));
         Ports ports = new Ports(
-                store, reconciler, effects, inventoryViewer, nearby, info, notifier, clearPrefs, playtimeRepository);
+                store,
+                reconciler,
+                effects,
+                inventoryViewer,
+                nearby,
+                info,
+                notifier,
+                clearPrefs,
+                playtimeRepository,
+                targets);
         PlayerStateServices services = assemble(kernel, config, clock, ports);
         PlayerstateSettings settings = new PlayerstateSettings(config);
         NoFlyWorldPolicy noFlyWorlds = new NoFlyWorldPolicy(settings.noFlyWorlds());
@@ -187,7 +210,16 @@ public final class PlayerstateWiring {
             listeners.add(logins);
         }
         return new Wired(
-                commands, List.copyOf(listeners), mirrors, services, store, info, sampler, afkStatus, playtimeView);
+                commands,
+                List.copyOf(listeners),
+                mirrors,
+                services,
+                store,
+                info,
+                sampler,
+                afkStatus,
+                playtimeView,
+                offlineStorage);
     }
 
     /**
@@ -254,7 +286,8 @@ public final class PlayerstateWiring {
                 new ShowPlaytime(ports.playtimeRepository(), ports.info(), notifier, clock),
                 new ResetPlaytime(ports.playtimeRepository(), notifier),
                 new ResetRest(effects, notifier, restEnabled),
-                kernel.playerLookup());
+                kernel.playerLookup(),
+                ports.targets());
     }
 
     /** The context's constructed outbound ports, bundled so {@link #assemble} stays within its argument budget. */
@@ -267,7 +300,8 @@ public final class PlayerstateWiring {
             PlayerInfo info,
             Notifier notifier,
             ClearInventoryPreferences clearPreferences,
-            PlaytimeRepository playtimeRepository) {}
+            PlaytimeRepository playtimeRepository,
+            NetworkTargets targets) {}
 
     /**
      * Everything the playerstate module contributes once wired: the Brigadier commands and the listeners (the
@@ -285,6 +319,8 @@ public final class PlayerstateWiring {
      * @param sampler the AFK-aware playtime sampler, armed by {@code startBackgroundWork} and stopped by {@code stop}
      * @param afkStatus the rebindable AFK seam presence rebinds to its store when it wires
      * @param playtimeView the {@code /playtime} panel, which the {@code /uxmess gui} hub opens for the viewer too
+     * @param offlineStorage the stored inventories and ender chests of players not on this server, which the item
+     *     commands that copy or clear a container reach too
      */
     public record Wired(
             List<CommandRegistration> commands,
@@ -295,7 +331,8 @@ public final class PlayerstateWiring {
             PlayerInfo info,
             PlaytimeSampler sampler,
             MutablePlaytimeAfkStatus afkStatus,
-            PlaytimeView playtimeView) {
+            PlaytimeView playtimeView,
+            OfflinePlayerStorage offlineStorage) {
 
         public Wired {
             commands = List.copyOf(commands);
@@ -307,6 +344,7 @@ public final class PlayerstateWiring {
             Objects.requireNonNull(sampler, "sampler");
             Objects.requireNonNull(afkStatus, "afkStatus");
             Objects.requireNonNull(playtimeView, "playtimeView");
+            Objects.requireNonNull(offlineStorage, "offlineStorage");
         }
 
         /** Arm the playtime sampler. Called once after registration, like the presence sweep. */

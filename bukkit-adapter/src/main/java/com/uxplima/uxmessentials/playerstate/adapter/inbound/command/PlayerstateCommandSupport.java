@@ -5,6 +5,7 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.function.Consumer;
 
 import org.bukkit.Bukkit;
 import org.bukkit.command.CommandSender;
@@ -144,12 +145,13 @@ abstract class PlayerstateCommandSupport {
 
     /**
      * Resolve the optional {@code player} string argument to a single online target, for the read/report verbs
-     * that name one player ({@code /playtime}, {@code /getpos}, {@code /ping}). An absent argument is the sender;
-     * a present one resolves only when the sender holds {@link #OTHERS_PERMISSION}, matching exactly one online
-     * name: anything else is the unknown-player rejection. The argument is a plain {@link CommandSuggestions#playerArgument}
+     * that name one player ({@code /getpos}, {@code /ping}). An absent argument is the sender; a present one
+     * resolves only when the sender holds {@link #OTHERS_PERMISSION}, matching exactly one online name. A player
+     * online on another server is answered with that server, unless the sender may not see them; anything else is
+     * the unknown-player rejection. The argument is a plain {@link CommandSuggestions#playerArgument}
      * word completing against the online roster, so these reads never expose the {@code @a}/{@code @p}/{@code @s}
      * selector syntax: showing one player's stats is a single-target read where fanning out to every player is
-     * nonsensical. Empty means the rejection (no-permission or unknown-player) was already sent.
+     * nonsensical. Empty means the rejection was already sent.
      */
     final Optional<PlayerRef> resolveNamedTarget(CommandContext<CommandSourceStack> ctx, CommandSender sender) {
         String typed = typedPlayerArg(ctx);
@@ -169,38 +171,65 @@ abstract class PlayerstateCommandSupport {
         NameMatch match = services.players().matchOnlineByName(typed);
         if (match.player().isEmpty()) {
             MessageLine miss = match.miss(UNKNOWN_PLAYER, Map.of("player", typed));
-            reply(sender, miss.key(), miss.args());
+            if (match instanceof NameMatch.Unknown) {
+                miss = services.targets().elsewhere(ctx.getSource(), typed).orElse(miss);
+            }
+            feedback.send(sender, miss);
         }
         return match.player();
     }
 
     /**
-     * Resolve the optional {@code player} string argument to a target that may be <em>offline</em>, for the
-     * storage-viewing verbs ({@code /invsee}, {@code /endersee}). An absent argument is the sender; a present one
-     * resolves only when the sender holds {@link #OTHERS_PERMISSION}. A connected player first, then an account the
-     * server has seen (non-blocking, from memory and the server's user cache); anything else is the unknown-player
-     * rejection, or the ambiguity line when several case variants of the name exist. Unlike {@link #resolveTarget}, the argument is a plain word so an offline name can be typed (an
-     * online-player selector resolves online names only).
+     * Resolve the optional {@code player} string argument to an account that may be <em>offline</em> or on another
+     * server, for a verb whose data is in the database ({@code /playtime}), and run {@code then} with it on the async
+     * lane. An absent argument is the sender; a present one resolves only when the sender holds
+     * {@link #OTHERS_PERMISSION}. The name is settled off the tick, so a player only the database knows is found;
+     * anything else is the unknown-player rejection, or the ambiguity line when several case variants of the name
+     * exist.
      */
-    final Optional<PlayerRef> resolveStorageTarget(CommandContext<CommandSourceStack> ctx, CommandSender sender) {
+    final void resolveStoredTarget(
+            CommandContext<CommandSourceStack> ctx, CommandSender sender, Consumer<PlayerRef> then) {
         String typed = typedPlayerArg(ctx);
         if (typed.isEmpty()) {
             if (sender instanceof Player player) {
-                return Optional.of(BukkitRefs.toRef(player));
+                PlayerRef self = BukkitRefs.toRef(player);
+                services.targets().async(() -> then.accept(self));
+            } else {
+                reply(sender, PLAYERS_ONLY, Map.of());
             }
-            reply(sender, PLAYERS_ONLY, Map.of());
-            return Optional.empty();
+            return;
         }
         if (!mayTargetOthers(sender)) {
             reply(sender, NO_PERMISSION, Map.of());
-            return Optional.empty();
+            return;
         }
-        NameMatch match = services.players().matchByName(typed);
-        if (match.player().isEmpty()) {
-            MessageLine miss = match.miss(UNKNOWN_PLAYER, Map.of("player", typed));
-            reply(sender, miss.key(), miss.args());
+        services.targets().resolve(sender, typed, UNKNOWN_PLAYER, then);
+    }
+
+    /**
+     * Resolve the optional {@code player} string argument to a player whose items this server holds, online here or
+     * offline, for the storage-viewing verbs ({@code /invsee}, {@code /endersee}), and run {@code here} with it on the
+     * sender's own thread. As {@link #resolveStoredTarget}, except that a player online on another server is answered
+     * with that server: what this server stored of them is not what they carry now. A player the sender may not see
+     * is not located, and opens as an offline player would. Unlike {@link #resolveTarget}, the argument is a plain
+     * word so an offline name can be typed (an online-player selector resolves online names only).
+     */
+    final void resolveStorageTarget(
+            CommandContext<CommandSourceStack> ctx, CommandSender sender, Consumer<PlayerRef> here) {
+        String typed = typedPlayerArg(ctx);
+        if (typed.isEmpty()) {
+            if (sender instanceof Player player) {
+                here.accept(BukkitRefs.toRef(player));
+            } else {
+                reply(sender, PLAYERS_ONLY, Map.of());
+            }
+            return;
         }
-        return match.player();
+        if (!mayTargetOthers(sender)) {
+            reply(sender, NO_PERMISSION, Map.of());
+            return;
+        }
+        services.targets().resolveHere(ctx.getSource(), typed, UNKNOWN_PLAYER, here);
     }
 
     /** Tab-completion of online player names for the storage verbs' {@code player} argument. */
