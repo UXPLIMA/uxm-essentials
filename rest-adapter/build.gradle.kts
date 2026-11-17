@@ -14,11 +14,12 @@ dependencies {
     compileOnly(project(":api"))
     compileOnly(libs.gson)
     compileOnly(uxm.configurate.hocon)
-    // The server supplies these at run time; the tests render the English fallback replies and look the developer
-    // API's methods up without one.
+    // The server supplies these at run time; the tests render the English fallback replies, look the developer
+    // API's methods up and write route answers without one.
     testImplementation(libs.bundles.adventure)
     testImplementation(project(":bukkit-api"))
     testImplementation(uxm.paper.api)
+    testImplementation(libs.gson)
 }
 
 tasks.shadowJar {
