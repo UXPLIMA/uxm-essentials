@@ -15,7 +15,9 @@ import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.atomic.AtomicReference;
+import java.util.function.BiConsumer;
 
 import com.uxplima.uxmessentials.shared.application.port.Logger;
 import com.uxplima.uxmessentials.shared.application.port.PlayerNameIndex;
@@ -75,6 +77,9 @@ public final class CachingPlayerNameIndex implements PlayerNameIndex {
     private volatile int limit = Integer.MAX_VALUE;
 
     private final AtomicReference<@Nullable PlayerNameRepository> repository = new AtomicReference<>();
+    /** Told each name a join here wrote to the store, once it is written. */
+    private final List<BiConsumer<UUID, String>> stored = new CopyOnWriteArrayList<>();
+
     private final Scheduler scheduler;
     private final Logger log;
 
@@ -99,6 +104,16 @@ public final class CachingPlayerNameIndex implements PlayerNameIndex {
         }
         warmed = true;
         log.info("event=name_index_warmed rows={}", String.valueOf(recent.size()));
+    }
+
+    /**
+     * Tell {@code listener}, off the tick, each name a join here wrote to the store, once it is written, so what a name
+     * decides in the store, such as who may wear it, is settled after the name is there. Returns what stops it.
+     */
+    public Runnable afterStored(BiConsumer<UUID, String> listener) {
+        Objects.requireNonNull(listener, "listener");
+        stored.add(listener);
+        return () -> stored.remove(listener);
     }
 
     /**
@@ -259,6 +274,16 @@ public final class CachingPlayerNameIndex implements PlayerNameIndex {
         scheduler.async(() -> {
             store.upsert(row);
             noteIfShared(store, uuid, trimmed);
+            for (BiConsumer<UUID, String> listener : stored) {
+                try {
+                    listener.accept(uuid, trimmed);
+                } catch (RuntimeException failure) {
+                    log.warn(
+                            "event=name_stored_listener_failed player={} reason={}",
+                            uuid,
+                            String.valueOf(failure.getMessage()));
+                }
+            }
         });
     }
 

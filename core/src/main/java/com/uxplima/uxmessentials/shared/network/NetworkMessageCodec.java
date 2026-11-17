@@ -343,6 +343,8 @@ public final class NetworkMessageCodec {
                 writeUuid(out, queued.voteId());
                 writeUuid(out, queued.player());
                 out.writeUTF(queued.service());
+                out.writeLong(queued.sentAt().toEpochMilli());
+                out.writeBoolean(queued.bothCarriers());
             }
             case StaffActionFrame action -> {
                 writeUuid(out, action.frameId());
@@ -473,7 +475,7 @@ public final class NetworkMessageCodec {
             case RANK_ACTIONS_KEPT -> new RankActionsKept(origin, readUuid(in));
             case INVENTORY_RESTORE_KEPT -> new InventoryRestoreKept(origin, readUuid(in));
             case BROADCAST -> new BroadcastFrame(origin, readUuid(in), in.readUTF());
-            case VOTE_REWARDS_QUEUED -> new VoteRewardsQueued(origin, readUuid(in), readUuid(in), in.readUTF());
+            case VOTE_REWARDS_QUEUED -> readQueuedVote(in, origin);
             case STAFF_ACTION -> readStaffAction(in, origin);
         };
     }
@@ -555,6 +557,19 @@ public final class NetworkMessageCodec {
         }
         Instant firedAt = Instant.ofEpochMilli(in.readLong());
         return new VotePartyFired(origin, partyId, threshold, reach, voters, firedAt, in.readBoolean());
+    }
+
+    /** The send time follows the vote, so an older decoder still reads the vote it knew. */
+    private static VoteRewardsQueued readQueuedVote(DataInputStream in, String origin) throws IOException {
+        UUID voteId = readUuid(in);
+        UUID player = readUuid(in);
+        String service = in.readUTF();
+        if (in.available() < Long.BYTES + 1) {
+            // A sender that predates the send time: the vote is never taken for a late copy.
+            return new VoteRewardsQueued(origin, voteId, player, service);
+        }
+        Instant sentAt = Instant.ofEpochMilli(in.readLong());
+        return new VoteRewardsQueued(origin, voteId, player, service, sentAt, in.readBoolean());
     }
 
     private static Set<UUID> readVoters(DataInputStream in) throws IOException {
