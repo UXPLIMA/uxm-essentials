@@ -39,6 +39,13 @@ class StaffActionFrameTest {
     }
 
     @Test
+    void anActionThatNamesNoBackendIsForNone() {
+        StaffActionFrame kick = new StaffActionFrame("survival", FRAME, "KICK", "", STEVE, "Steve", "", "", Map.of());
+
+        assertThat(kick.isFor("lobby")).isFalse();
+    }
+
+    @Test
     void anActionANewerBackendAddedIsKnownToNoOne() {
         assertThat(StaffActionFrame.Action.named("KICK")).contains(StaffActionFrame.Action.KICK);
         assertThat(StaffActionFrame.Action.named("SOMETHING_NEWER")).isEqualTo(Optional.empty());

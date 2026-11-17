@@ -278,7 +278,8 @@ public final class SecurityWiring {
         ForceReverification forceReverification = new ForceReverification(repository, trustStore, verifiedSessions);
         ResetFactors resetFactors = new ResetFactors(repository, trustStore, verifiedSessions);
         // Their live half reaches a target on another backend: the backend holding the player carries it out.
-        NetworkVerification networkVerification = new NetworkVerification(controller, network.presence(), staffActions);
+        NetworkVerification networkVerification =
+                new NetworkVerification(controller, kernel.playerLookup(), network.presence(), staffActions);
         for (RemoteSyncListener listener : networkVerification.listeners()) {
             network.bus().registry().register(listener);
         }

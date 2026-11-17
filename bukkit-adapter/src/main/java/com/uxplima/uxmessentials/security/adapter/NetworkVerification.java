@@ -3,10 +3,12 @@ package com.uxplima.uxmessentials.security.adapter;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.UUID;
 
 import com.uxplima.uxmessentials.shared.adapter.outbound.bus.RemoteSyncListener;
 import com.uxplima.uxmessentials.shared.adapter.outbound.bus.StaffActions;
 import com.uxplima.uxmessentials.shared.application.port.NetworkPresence;
+import com.uxplima.uxmessentials.shared.application.port.PlayerLookup;
 import com.uxplima.uxmessentials.shared.domain.OnlinePlayer;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmessentials.shared.network.StaffActionFrame.Action;
@@ -26,11 +28,18 @@ import org.jspecify.annotations.NullMarked;
 public final class NetworkVerification {
 
     private final VerificationController local;
+    private final PlayerLookup here;
     private final NetworkPresence presence;
     private final StaffActions actions;
 
-    public NetworkVerification(VerificationController local, NetworkPresence presence, StaffActions actions) {
+    /**
+     * @param here the players connected to this backend, asked first: right after a switch the network view can
+     *     still place a player who is here on the backend they left
+     */
+    public NetworkVerification(
+            VerificationController local, PlayerLookup here, NetworkPresence presence, StaffActions actions) {
         this.local = Objects.requireNonNull(local, "local");
+        this.here = Objects.requireNonNull(here, "here");
         this.presence = Objects.requireNonNull(presence, "presence");
         this.actions = Objects.requireNonNull(actions, "actions");
     }
@@ -57,29 +66,29 @@ public final class NetworkVerification {
 
     /** The listeners that carry out, on this backend, what staff on another asked of a player connected here. */
     public RemoteSyncListener[] listeners() {
-        String here = actions.serverId();
+        String server = actions.serverId();
         return new RemoteSyncListener[] {
             StaffActions.listener(
-                    here,
+                    server,
                     Action.SECURITY_FORCE,
                     frame -> onlyHere(frame.target()).ifPresent(local::forceReverify)),
             StaffActions.listener(
-                    here,
+                    server,
                     Action.SECURITY_REVOKED,
                     frame -> onlyHere(frame.target()).ifPresent(local::onAccessRevoked))
         };
     }
 
     private Optional<String> elsewhere(PlayerRef target) {
-        String here = presence.localServer();
-        return presence.find(target.uuid()).map(OnlinePlayer::server).filter(server -> !server.equals(here));
+        if (here.isOnline(target.uuid())) {
+            return Optional.empty();
+        }
+        String local = presence.localServer();
+        return presence.find(target.uuid()).map(OnlinePlayer::server).filter(server -> !server.equals(local));
     }
 
     /** The player {@code uuid} names when they are connected to this backend. */
-    private Optional<PlayerRef> onlyHere(java.util.UUID uuid) {
-        String here = presence.localServer();
-        return presence.find(uuid)
-                .filter(online -> online.server().equals(here))
-                .map(OnlinePlayer::player);
+    private Optional<PlayerRef> onlyHere(UUID uuid) {
+        return here.isOnline(uuid) ? here.findByUuid(uuid) : Optional.empty();
     }
 }

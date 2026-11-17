@@ -12,7 +12,7 @@ import java.util.UUID;
  * backend can carry out, since only it holds the player's connection.
  *
  * <p>A frame names the backend it is for in {@code toServer}; every other backend ignores it. A notice is for every
- * backend and names none. The values are the line's placeholders or the action's arguments, never more than
+ * backend and names none; any other action that names none is for no backend. The values are the line's placeholders or the action's arguments, never more than
  * {@link #MAX_VALUES} of them.
  *
  * @param originServer the backend the staff member is on
@@ -84,9 +84,12 @@ public record StaffActionFrame(
         values = java.util.Collections.unmodifiableMap(new LinkedHashMap<>(values));
     }
 
-    /** Whether this frame is for {@code server}: it names that backend, or names none. */
+    /**
+     * Whether this frame is for {@code server}: it names that backend, or it is a notice, which is for every backend.
+     * An action that names no backend is for none, so a frame cannot act on a player everywhere at once.
+     */
     public boolean isFor(String server) {
-        return toServer.isEmpty() || toServer.equals(server);
+        return toServer.isEmpty() ? Action.STAFF_NOTICE.name().equals(action) : toServer.equals(server);
     }
 
     @Override
