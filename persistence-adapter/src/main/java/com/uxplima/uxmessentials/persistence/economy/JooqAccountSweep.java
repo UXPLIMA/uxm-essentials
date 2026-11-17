@@ -185,7 +185,9 @@ public final class JooqAccountSweep implements AccountSweep {
         for (int attempt = 1; ; attempt++) {
             Sweep sweep = new Sweep(UUID.randomUUID().toString(), kind, scope, mode, amount, reason, actor, at);
             try {
-                Transactions.inTransaction(dsl, tx -> insert(tx, sweep));
+                // Two servers inserting the same currency at once can deadlock on MySQL's unique-key locks; the
+                // one rolled back tries again and then meets the other's row as the duplicate it is.
+                Transactions.inTransactionRetrying(dsl, ATTEMPTS, tx -> insert(tx, sweep));
                 return new Opened(sweep);
             } catch (RuntimeException refused) {
                 if (!IntegrityViolation.causedBy(refused)) {

@@ -8,6 +8,7 @@ import java.time.Duration;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
+import java.util.Set;
 import java.util.UUID;
 
 import com.uxplima.uxmessentials.economy.application.port.BaltopRow;
@@ -204,7 +205,7 @@ class PhysicalWalletRepositoryDecoratorTest {
         }
 
         @Override
-        public List<PendingTransaction> getAndClearPending(UUID playerUuid) {
+        public List<PendingTransaction> getAndClearPending(UUID playerUuid, Set<String> leave) {
             return List.of();
         }
     }

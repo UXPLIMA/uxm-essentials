@@ -144,7 +144,15 @@ public final class NativeVaultEconomy implements Economy {
 
     @Override
     public double getBalance(OfflinePlayer player) {
-        return provider.balance(ref(player), currency).amount().doubleValue();
+        PlayerRef owner = ref(player);
+        try {
+            return provider.balance(owner, currency).amount().doubleValue();
+        } catch (RuntimeException unreachable) {
+            // Vault's balance has no failure shape; an exception would land in the calling plugin's code. Nothing
+            // is reported as held, so a has() check on it refuses rather than lets a payment through.
+            logFailure("balance", owner, Money.zero(currency), unreachable);
+            return 0d;
+        }
     }
 
     @Override
@@ -191,7 +199,14 @@ public final class NativeVaultEconomy implements Economy {
         }
         PlayerRef owner = ref(player);
         Money moved = Money.of(currency, BigDecimal.valueOf(amount));
-        Money before = provider.balance(owner, currency);
+        Money before;
+        try {
+            before = provider.balance(owner, currency);
+        } catch (RuntimeException unreachable) {
+            // The balance did not answer, so nothing was taken yet: Vault's failure answer, not an exception.
+            logFailure("withdraw", owner, moved, unreachable);
+            return failure(amount, 0d, UNREACHABLE);
+        }
         try {
             if (provider.debit(owner, moved).isErr()) {
                 return failure(amount, before.amount().doubleValue(), "insufficient funds");
@@ -229,7 +244,13 @@ public final class NativeVaultEconomy implements Economy {
         }
         PlayerRef owner = ref(player);
         Money moved = Money.of(currency, BigDecimal.valueOf(amount));
-        Money before = provider.balance(owner, currency);
+        Money before;
+        try {
+            before = provider.balance(owner, currency);
+        } catch (RuntimeException unreachable) {
+            logFailure("deposit", owner, moved, unreachable);
+            return failure(amount, 0d, UNREACHABLE);
+        }
         // No ensureAccount here: a native credit opens the account itself, and against a foreign backend the
         // call does nothing at all. Asking for it separately is a database write per reward paid, on whichever
         // thread the caller holds.

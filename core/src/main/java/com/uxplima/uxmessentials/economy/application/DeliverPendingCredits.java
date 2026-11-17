@@ -6,7 +6,8 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
-import java.util.function.BiPredicate;
+import java.util.Set;
+import java.util.function.Function;
 
 import com.uxplima.uxmessentials.economy.application.port.EconomyProvider;
 import com.uxplima.uxmessentials.economy.application.port.PendingTransactionRepository;
@@ -40,7 +41,7 @@ public final class DeliverPendingCredits {
     private final EconomyNotifier notifier;
     private final PlayerLookup players;
     private final Logger log;
-    private final BiPredicate<PlayerRef, String> held;
+    private final Function<PlayerRef, Set<String>> held;
 
     public DeliverPendingCredits(
             EconomyProvider economy,
@@ -48,17 +49,20 @@ public final class DeliverPendingCredits {
             EconomyNotifier notifier,
             PlayerLookup players,
             Logger log) {
-        this(economy, pending, notifier, players, log, (player, currency) -> false);
+        this(economy, pending, notifier, players, log, player -> Set.of());
     }
 
-    /** @param held whether a player's credits of a currency must stay queued for now */
+    /**
+     * @param held the currencies, lower case, whose credits a player must not be paid yet; it may throw, which leaves
+     *     every credit queued
+     */
     public DeliverPendingCredits(
             EconomyProvider economy,
             PendingTransactionRepository pending,
             EconomyNotifier notifier,
             PlayerLookup players,
             Logger log,
-            BiPredicate<PlayerRef, String> held) {
+            Function<PlayerRef, Set<String>> held) {
         this.held = Objects.requireNonNull(held, "held");
         this.economy = Objects.requireNonNull(economy, "economy");
         this.pending = Objects.requireNonNull(pending, "pending");
@@ -75,7 +79,9 @@ public final class DeliverPendingCredits {
         }
         List<PendingTransaction> queued;
         try {
-            queued = pending.getAndClearPending(player.uuid());
+            // The held currencies are left on the queue, not taken and put back, so a put-back that fails cannot
+            // lose them.
+            queued = pending.getAndClearPending(player.uuid(), held.apply(player));
         } catch (RuntimeException failure) {
             // Only rows this take deleted are handed over, so a failed take leaves them queued for the next join.
             log.error("event=pending_credit_read_failed player=" + player.uuid(), failure);
@@ -86,13 +92,7 @@ public final class DeliverPendingCredits {
         for (PendingTransaction row : queued) {
             totals.merge(row.currencyId(), row.amount(), BigDecimal::add);
         }
-        totals.forEach((currencyId, amount) -> {
-            if (held.test(player, currencyId)) {
-                requeue(player, currencyId, amount);
-            } else {
-                apply(player, currencyId, amount);
-            }
-        });
+        totals.forEach((currencyId, amount) -> apply(player, currencyId, amount));
     }
 
     /**

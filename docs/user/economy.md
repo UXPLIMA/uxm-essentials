@@ -95,7 +95,8 @@ reaches players only.
 `/eco giveall <amount> [currency] --online` gives the amount only to the players online on the server that runs it,
 one by one, the way a scheduled reward for being online wants, whatever kind of currency it is. It replies with the
 number of players and fires the usual credit event for each of them. For an item currency, or experience, it is a
-delivery per player handed over at once, so what does not fit an inventory waits for the next join, as below.
+delivery per player handed over at once, so what does not fit an inventory waits for the next join, as below; the
+reply then also says how many players had no room for all of it.
 
 How the change reaches the players depends on where the currency's money is kept:
 
@@ -127,6 +128,12 @@ How the change reaches the players depends on where the currency's money is kept
   how far it got. It carries on by itself every minute, or when any server of the database starts again, and no
   account is changed twice. A player who joins for the first time while it runs is reached only if they sort after
   the players already done, so they may or may not get the change.
+- A delivery handed over while the database cannot record it is remembered by that server and recorded once the
+  database is back. If that server restarts before then, the delivery is handed over again after ten minutes, so the
+  player gets it twice; the console says so (`event=swept_items_finish_failed`).
+- A reset that cannot be applied (the player's balance does not answer) holds that currency's gives and offline
+  credits for the player and is named once in the console (`event=swept_items_reset_stuck`); it is tried again on
+  every pass and join.
 - If the database refuses a step for good, for example a balance too large for its column, the change stops there
   and says how many accounts it changed; those keep the change. So does a change whose currency is removed from the
   configuration before it finishes.

@@ -97,6 +97,7 @@ public enum EconomyMessageKey implements MessageKey {
     ECO_ADMIN_GIVEALL("eco.admin.giveall"),
     ECO_ADMIN_GIVEALL_CAPPED("eco.admin.giveall-capped"),
     ECO_ADMIN_GIVEALL_ONLINE("eco.admin.giveall-online"),
+    ECO_ADMIN_GIVEALL_ONLINE_HELD("eco.admin.giveall-online-held"),
     ECO_ADMIN_GIVEALL_ITEMS("eco.admin.giveall-items"),
     ECO_ADMIN_RESETALL_ITEMS("eco.admin.resetall-items"),
     ECO_ADMIN_BULK_UNCERTAIN("eco.admin.bulk-uncertain"),

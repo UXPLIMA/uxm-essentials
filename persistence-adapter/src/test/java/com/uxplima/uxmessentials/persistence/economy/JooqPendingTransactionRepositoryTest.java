@@ -5,6 +5,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import java.math.BigDecimal;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CountDownLatch;
@@ -45,6 +46,16 @@ class JooqPendingTransactionRepositoryTest {
 
         assertThat(amounts(repository.getAndClearPending(ALEX))).containsExactlyInAnyOrder("coins:5", "gems:2");
         assertThat(repository.getAndClearPending(ALEX)).isEmpty();
+    }
+
+    @Test
+    void aTakeLeavesTheCurrenciesItIsToldToLeaveOnTheQueue() {
+        repository.queueCredit(ALEX_REF, "Coins", new BigDecimal("5"));
+        repository.queueCredit(ALEX_REF, "gems", new BigDecimal("2"));
+
+        assertThat(amounts(repository.getAndClearPending(ALEX, Set.of("coins"))))
+                .containsExactly("gems:2");
+        assertThat(amounts(repository.getAndClearPending(ALEX))).containsExactly("Coins:5");
     }
 
     @Test

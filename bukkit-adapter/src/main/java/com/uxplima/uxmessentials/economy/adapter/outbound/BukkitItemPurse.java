@@ -50,8 +50,12 @@ public final class BukkitItemPurse implements ItemPurse {
     }
 
     @Override
-    public Optional<BigDecimal> give(PlayerRef owner, Money amount) {
-        return onPlayer(owner, player -> calculations.creditFitting(player, amount));
+    public Optional<Change> give(PlayerRef owner, Money amount) {
+        return onPlayer(owner, player -> {
+            BigDecimal before = calculations.getBalance(player, amount.currency());
+            BigDecimal fit = calculations.creditFitting(player, amount);
+            return new Change(before, before.add(fit));
+        });
     }
 
     @Override

@@ -33,9 +33,10 @@ it). The update adds two tables, `economy_sweeps`, where the progress of each ru
   offline players too, when they next join.
 - **Another plugin's economy.** Payments through a Vault or Treasury economy are made at most once; a player whose
   payment was under way when the server stopped is named in the console as uncertain rather than paid twice.
-- **Events.** A plugin that listened to `UxmWalletCreditEvent` for each account `giveall` paid now hears one
-  `UxmBalanceSweepEvent` when the run finishes, on the ledger and for item currencies and experience. Through
-  another plugin's economy, and with `giveall --online` on the ledger, each payment still fires the credit event.
+- **Events.** A plugin that listened to `UxmWalletCreditEvent` for each account `giveall` paid on the ledger now
+  hears one `UxmBalanceSweepEvent` when the run finishes. Through another plugin's economy, with `giveall --online`,
+  and for item currencies and experience each time a delivery is handed over, every payment still fires the credit
+  event, and a reset that takes fires the debit event.
 - **New permission.** `/eco sweeps` and `/eco sweeps cancel <id>` need `uxmessentials.economy.admin.sweeps`.
 
 ## Transaction history ids come from the database

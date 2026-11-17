@@ -10,7 +10,9 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
 import java.util.UUID;
+import java.util.stream.Collectors;
 
 import com.uxplima.uxmessentials.economy.application.port.HistoryRecord;
 import com.uxplima.uxmessentials.economy.application.port.ItemDeliveryQueue;
@@ -23,11 +25,14 @@ import com.uxplima.uxmessentials.economy.domain.Denomination;
 import com.uxplima.uxmessentials.economy.domain.EconomyMessageKey;
 import com.uxplima.uxmessentials.economy.domain.EconomyReason;
 import com.uxplima.uxmessentials.economy.domain.Money;
+import com.uxplima.uxmessentials.economy.domain.event.WalletCredited;
+import com.uxplima.uxmessentials.economy.domain.event.WalletDebited;
 import com.uxplima.uxmessentials.shared.application.port.PlayerLookup;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmessentials.shared.domain.message.MessageKey;
 import com.uxplima.uxmessentials.testing.QueuedScheduler;
-import com.uxplima.uxmessentials.testing.QuietLog;
+import com.uxplima.uxmessentials.testing.RecordingEvents;
+import com.uxplima.uxmessentials.testing.RecordingLogger;
 import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.Test;
 
@@ -52,6 +57,9 @@ class DeliverSweptItemsTest {
     private final Map<UUID, Boolean> online = new HashMap<>(Map.of(ALEX.uuid(), true));
     private final QueuedScheduler timers = new QueuedScheduler();
     private boolean deferred = true;
+    private final RecordingEvents events = new RecordingEvents();
+    private final RecordingLogger log = new RecordingLogger();
+    private final List<PlayerRef> creditsPaid = new ArrayList<>();
     private final DeliverSweptItems deliver = new DeliverSweptItems(
             queue,
             currency -> deferred ? Optional.<ItemPurse>of(purse) : Optional.empty(),
@@ -63,9 +71,11 @@ class DeliverSweptItemsTest {
                         return key.key();
                     },
                     (viewer, text) -> {}),
+            events,
+            creditsPaid::add,
             new Online(online),
             timers,
-            new QuietLog(),
+            log,
             CLOCK);
 
     @Test
@@ -146,13 +156,51 @@ class DeliverSweptItemsTest {
         assertThat(ledger).isEmpty();
         assertThat(queue.rows.values())
                 .allSatisfy(row -> assertThat(row.claimant).isNull());
-        assertThat(deliver.holdsCredits(ALEX, "gold")).isTrue();
+        assertThat(deliver.heldCurrencies(ALEX)).containsExactly("gold");
+        assertThat(creditsPaid).isEmpty();
 
         purse.resetAnswers = true;
-        deliver.onJoin(ALEX);
+        deliver.toOnline(List.of(ALEX));
 
         assertThat(purse.held).isEqualByComparingTo("15");
-        assertThat(deliver.holdsCredits(ALEX, "gold")).isFalse();
+        assertThat(deliver.heldCurrencies(ALEX)).isEmpty();
+        // The credits that waited for the reset are paid at once, not on the next join.
+        assertThat(creditsPaid).containsExactly(ALEX);
+    }
+
+    @Test
+    void aResetThatKeepsFailingIsReportedOnceAsAnError() {
+        purse.resetAnswers = false;
+        queue.add("reset", ItemDeliveryQueue.Kind.RESET, "10");
+
+        deliver.onJoin(ALEX);
+        deliver.onJoin(ALEX);
+        deliver.toOnline(List.of(ALEX));
+
+        assertThat(log.errors())
+                .filteredOn(line -> line.contains("swept_items_reset_stuck"))
+                .hasSize(1);
+    }
+
+    @Test
+    void eachHandOverRaisesTheWalletEventOfWhatMoved() {
+        purse.held = new BigDecimal("40");
+        queue.add("reset", ItemDeliveryQueue.Kind.RESET, "10");
+        queue.add("give", ItemDeliveryQueue.Kind.GIVE, "5");
+
+        deliver.onJoin(ALEX);
+
+        assertThat(events.published()).hasSize(2);
+        assertThat(events.published().get(0)).isInstanceOfSatisfying(WalletDebited.class, debit -> {
+            assertThat(debit.owner()).isEqualTo(ALEX);
+            assertThat(debit.amount().amount()).isEqualByComparingTo("30");
+            assertThat(debit.resulting().amount()).isEqualByComparingTo("10");
+            assertThat(debit.counted()).isFalse();
+        });
+        assertThat(events.published().get(1)).isInstanceOfSatisfying(WalletCredited.class, credit -> {
+            assertThat(credit.amount().amount()).isEqualByComparingTo("5");
+            assertThat(credit.resulting().amount()).isEqualByComparingTo("15");
+        });
     }
 
     @Test
@@ -181,9 +229,10 @@ class DeliverSweptItemsTest {
     void aGiveToThePlayersOnlineKeepsWhatDoesNotFitForTheNextJoin() {
         purse.room = new BigDecimal("15");
 
-        int queued = deliver.giveNow(List.of(ALEX), Money.of(GOLD, new BigDecimal("25")), EconomyReason.ADMIN_GIVEALL);
+        DeliverSweptItems.OnlineGive given =
+                deliver.giveNow(List.of(ALEX), Money.of(GOLD, new BigDecimal("25")), EconomyReason.ADMIN_GIVEALL);
 
-        assertThat(queued).isEqualTo(1);
+        assertThat(given).isEqualTo(new DeliverSweptItems.OnlineGive(1, 1));
         assertThat(purse.held).isEqualByComparingTo("15");
         assertThat(queue.rows.values()).singleElement().satisfies(row -> {
             assertThat(row.delivery.amount()).isEqualByComparingTo("10");
@@ -258,11 +307,12 @@ class DeliverSweptItemsTest {
         }
 
         @Override
-        public boolean resetWaiting(UUID owner, String currency) {
+        public Set<String> resetsWaiting(UUID owner) {
             return rows.values().stream()
-                    .anyMatch(row -> row.delivery.kind() == Kind.RESET
-                            && row.delivery.owner().equals(owner)
-                            && row.delivery.currency().equals(currency));
+                    .filter(row -> row.delivery.kind() == Kind.RESET
+                            && row.delivery.owner().equals(owner))
+                    .map(row -> row.delivery.currency())
+                    .collect(Collectors.toSet());
         }
 
         @Override
@@ -349,14 +399,15 @@ class DeliverSweptItemsTest {
         boolean resetAnswers = true;
 
         @Override
-        public Optional<BigDecimal> give(PlayerRef owner, Money amount) {
+        public Optional<Change> give(PlayerRef owner, Money amount) {
             if (!reachable) {
                 return Optional.empty();
             }
+            BigDecimal before = held;
             BigDecimal fit = amount.amount().min(room);
             held = held.add(fit);
             room = room.subtract(fit);
-            return Optional.of(fit);
+            return Optional.of(new Change(before, held));
         }
 
         @Override

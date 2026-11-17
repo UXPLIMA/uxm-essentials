@@ -201,17 +201,40 @@ public final class EconomyWiring {
                         resolved,
                         new com.uxplima.uxmessentials.economy.adapter.outbound.BukkitItemPurse(
                                 kernel.scheduler(), calculations, kernel.log()));
+        EconomyNotifier deliveryNotifier =
+                new EconomyNotifier(kernel.messages(), kernel.messageSink(), settings.amountFormat());
+        // The swept deliveries pay the credits a reset held back as soon as it lands, and the credits ask the
+        // deliveries which currencies a reset still holds: each needs the other, so one is reached through this.
+        java.util.concurrent.atomic.AtomicReference<com.uxplima.uxmessentials.economy.application.DeliverPendingCredits>
+                creditsAfterReset = new java.util.concurrent.atomic.AtomicReference<>();
         com.uxplima.uxmessentials.economy.application.DeliverSweptItems sweptItems =
                 new com.uxplima.uxmessentials.economy.application.DeliverSweptItems(
                         WalletRepositories.itemDeliveries(persistence, clock),
                         purses,
                         currencies,
                         ledger.telemetry(),
-                        new EconomyNotifier(kernel.messages(), kernel.messageSink(), settings.amountFormat()),
+                        deliveryNotifier,
+                        kernel.events(),
+                        player -> {
+                            com.uxplima.uxmessentials.economy.application.DeliverPendingCredits credits =
+                                    creditsAfterReset.get();
+                            if (credits != null) {
+                                credits.deliver(player);
+                            }
+                        },
                         kernel.playerLookup(),
                         kernel.scheduler(),
                         kernel.log(),
                         clock);
+        com.uxplima.uxmessentials.economy.application.DeliverPendingCredits pendingCredits =
+                new com.uxplima.uxmessentials.economy.application.DeliverPendingCredits(
+                        resolved.provider(),
+                        pendingRepo,
+                        deliveryNotifier,
+                        kernel.playerLookup(),
+                        kernel.log(),
+                        sweptItems::heldCurrencies);
+        creditsAfterReset.set(pendingCredits);
         Runnable handOver = new com.uxplima.uxmessentials.economy.adapter.outbound.OnlineItemHandover(
                 kernel.scheduler(), sweptItems, kernel.log());
         // Another server's sweep over an item currency queued deliveries for players who may be online here.
@@ -225,6 +248,7 @@ public final class EconomyWiring {
                 sweepModes(resolved.ledgerInPlay(), purses),
                 sweepLanes(resolved.vaultForeign(), kernel.scheduler()),
                 sweptItems,
+                pendingCredits,
                 handOver,
                 new com.uxplima.uxmessentials.economy.adapter.outbound.ServerKnownPlayers(
                         plugin.getServer(),
@@ -244,7 +268,6 @@ public final class EconomyWiring {
                 resolved.backends(),
                 decoratedRepository,
                 sweep,
-                pendingRepo,
                 textInput,
                 picker,
                 menus,
@@ -343,7 +366,8 @@ public final class EconomyWiring {
      *
      * @param modes where each currency's money is kept, as a sweep reaches it
      * @param lanes where the calls to the plugin that keeps a currency run
-     * @param items hands over the item deliveries a sweep queued, on join
+     * @param items hands over the deliveries a sweep queued, on join
+     * @param credits pays the offline credits on join, holding a currency whose reset still waits
      * @param handOver one pass handing the players online here what was queued for them
      * @param knownPlayers tops up the list of players a sweep reaches
      */
@@ -353,6 +377,7 @@ public final class EconomyWiring {
             java.util.function.Function<Currency, com.uxplima.uxmessentials.economy.application.port.ProviderLane>
                     lanes,
             com.uxplima.uxmessentials.economy.application.DeliverSweptItems items,
+            com.uxplima.uxmessentials.economy.application.DeliverPendingCredits credits,
             Runnable handOver,
             com.uxplima.uxmessentials.economy.application.port.KnownPlayers knownPlayers) {}
 
@@ -428,7 +453,6 @@ public final class EconomyWiring {
             CurrencyBackendRegistry backends,
             WalletRepository repository,
             SweepParts sweep,
-            PendingTransactionRepository pendingRepo,
             com.uxplima.uxmlib.gui.input.@org.jspecify.annotations.Nullable TextInput textInput,
             com.uxplima.uxmessentials.shared.adapter.inbound.gui.@org.jspecify.annotations.Nullable PlayerPickerView
                     picker,
@@ -511,15 +535,7 @@ public final class EconomyWiring {
 
         java.util.List<org.bukkit.event.Listener> listenersList = new java.util.ArrayList<>();
         listenersList.add(new com.uxplima.uxmessentials.economy.adapter.inbound.listener.PendingTransactionListener(
-                new com.uxplima.uxmessentials.economy.application.DeliverPendingCredits(
-                        resolved,
-                        pendingRepo,
-                        services.notifier(),
-                        kernel.playerLookup(),
-                        kernel.log(),
-                        sweep.items()::holdsCredits),
-                sweep.items(),
-                kernel.scheduler()));
+                sweep.credits(), sweep.items(), kernel.scheduler()));
         // Always on, like the pending credits above: items kept for a seller who left must reach them even after the
         // operator turned selling off.
         listenersList.add(new ItemReturnListener(services.returnUnsoldItems(), kernel.scheduler()));

@@ -59,12 +59,12 @@ class JooqItemDeliveriesTest {
     void whatDidNotFitWaitsForTheNextJoinUnderTheReasonOfWhatQueuedIt() {
         queue("d1", BEDROCK, Kind.RESET, "10");
         assertThat(deliveries.waiting(List.of(ALEX, BEDROCK))).containsExactly(BEDROCK);
-        assertThat(deliveries.resetWaiting(BEDROCK, "gold")).isTrue();
+        assertThat(deliveries.resetsWaiting(BEDROCK)).containsExactly("gold");
         deliveries.claim("d1", "survival");
 
         deliveries.finish("d1", "survival", new BigDecimal("4"));
 
-        assertThat(deliveries.resetWaiting(BEDROCK, "gold")).isFalse();
+        assertThat(deliveries.resetsWaiting(BEDROCK)).isEmpty();
         assertThat(deliveries.waiting(List.of(BEDROCK))).isEmpty();
         assertThat(deliveries.claimable(BEDROCK, false)).isEmpty();
         assertThat(deliveries.claimable(BEDROCK, true)).singleElement().satisfies(rest -> {

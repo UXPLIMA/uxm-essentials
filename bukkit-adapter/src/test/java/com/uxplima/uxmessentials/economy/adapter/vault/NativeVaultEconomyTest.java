@@ -42,6 +42,7 @@ class NativeVaultEconomyTest {
     private PlayerMock alex;
     private final List<String> errors = new ArrayList<>();
     private final AtomicLong nanos = new AtomicLong();
+    private final Unreachable unreachable = new Unreachable();
 
     @BeforeEach
     void start() {
@@ -90,6 +91,18 @@ class NativeVaultEconomyTest {
     }
 
     @Test
+    void aBalanceThatDidNotAnswerIsAFailedResponseAndNeverAnException() {
+        unreachable.balancesFail = true;
+        NativeVaultEconomy vault = vault();
+
+        assertThat(vault.getBalance(alex)).isZero();
+        assertThat(vault.has(alex, 1)).isFalse();
+        assertThat(vault.withdrawPlayer(alex, 5).type).isEqualTo(ResponseType.FAILURE);
+        assertThat(vault.depositPlayer(alex, 5).type).isEqualTo(ResponseType.FAILURE);
+        assertThat(errors).singleElement().asString().contains("op=balance");
+    }
+
+    @Test
     void aFailedWriteDoesNotClaimNothingMoved() {
         EconomyResponse response = vault().depositPlayer(alex, 25);
 
@@ -97,7 +110,7 @@ class NativeVaultEconomyTest {
     }
 
     private NativeVaultEconomy vault() {
-        return new NativeVaultEconomy(new Unreachable(), COINS, server, new Recording(errors), nanos::get);
+        return new NativeVaultEconomy(unreachable, COINS, server, new Recording(errors), nanos::get);
     }
 
     /** Keeps the error lines. */
@@ -121,6 +134,8 @@ class NativeVaultEconomyTest {
     /** Reads still work; every write fails the way a ledger that lost its connection does. */
     private static final class Unreachable implements EconomyProvider {
 
+        boolean balancesFail;
+
         @Override
         public boolean hasAccount(PlayerRef owner, Currency currency) {
             return true;
@@ -131,6 +146,9 @@ class NativeVaultEconomyTest {
 
         @Override
         public Money balance(PlayerRef owner, Currency currency) {
+            if (balancesFail) {
+                throw new IllegalStateException("balance did not answer");
+            }
             return Money.of(currency, BigDecimal.TEN);
         }
 

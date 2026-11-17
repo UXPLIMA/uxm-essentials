@@ -141,8 +141,8 @@ public final class SweepRunner {
     @FunctionalInterface
     public interface DeferredGive {
 
-        /** Returns how many players a give was queued for. */
-        int giveNow(List<PlayerRef> online, Money amount, EconomyReason reason);
+        /** Returns how many players a give was queued for, and how many of them kept a rest for their next join. */
+        DeliverSweptItems.OnlineGive giveNow(List<PlayerRef> online, Money amount, EconomyReason reason);
     }
 
     /** Whether {@code currency}'s balances change only while their player is online, so a give is queued first. */
@@ -150,8 +150,8 @@ public final class SweepRunner {
         return paths.modes().apply(currency) == SweepMode.DEFERRED;
     }
 
-    /** {@code /eco giveall --online} for a deferred currency; returns how many players a give was queued for. */
-    int giveOnline(List<PlayerRef> online, Money amount, EconomyReason reason) {
+    /** {@code /eco giveall --online} for a deferred currency. */
+    DeliverSweptItems.OnlineGive giveOnline(List<PlayerRef> online, Money amount, EconomyReason reason) {
         return paths.giveNow().giveNow(online, amount, reason);
     }
 

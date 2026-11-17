@@ -46,7 +46,7 @@ class DeliverPendingCreditsTest {
                     (viewer, text) -> {}),
             new Online(),
             log,
-            (player, currency) -> this.heldCurrencies.contains(currency));
+            player -> Set.copyOf(this.heldCurrencies));
     private final Set<UUID> online = new HashSet<>(Set.of(ALEX.uuid()));
     private final Set<String> heldCurrencies = new HashSet<>();
 
@@ -61,6 +61,8 @@ class DeliverPendingCreditsTest {
         assertThat(bank.balance(ALEX, COINS).amount()).isEqualByComparingTo("0");
         assertThat(bank.balance(ALEX, GEMS).amount()).isEqualByComparingTo("2");
         assertThat(queue.rows).containsExactly("coins=10");
+        // Left on the queue, never taken and put back.
+        assertThat(queue.taken).doesNotContain("coins");
     }
 
     @Test
@@ -161,6 +163,7 @@ class DeliverPendingCreditsTest {
     private static final class Queue implements PendingTransactionRepository {
 
         final List<String> rows = new ArrayList<>();
+        final List<String> taken = new ArrayList<>();
         boolean readsFail;
 
         @Override
@@ -169,21 +172,26 @@ class DeliverPendingCreditsTest {
         }
 
         @Override
-        public List<PendingTransaction> getAndClearPending(UUID playerUuid) {
+        public List<PendingTransaction> getAndClearPending(UUID playerUuid, Set<String> leave) {
             if (readsFail) {
                 throw new IllegalStateException("database unavailable");
             }
-            List<PendingTransaction> taken = new ArrayList<>();
+            List<PendingTransaction> took = new ArrayList<>();
+            List<String> left = new ArrayList<>();
             for (String row : rows) {
                 int cut = row.indexOf('=');
-                taken.add(new PendingTransaction(
-                        Integer.toString(taken.size()),
-                        playerUuid,
-                        row.substring(0, cut),
-                        new BigDecimal(row.substring(cut + 1))));
+                String currency = row.substring(0, cut);
+                if (leave.contains(currency)) {
+                    left.add(row);
+                    continue;
+                }
+                taken.add(currency);
+                took.add(new PendingTransaction(
+                        Integer.toString(took.size()), playerUuid, currency, new BigDecimal(row.substring(cut + 1))));
             }
             rows.clear();
-            return taken;
+            rows.addAll(left);
+            return took;
         }
     }
 }

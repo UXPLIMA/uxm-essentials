@@ -4,6 +4,7 @@ import java.math.BigDecimal;
 import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.Set;
 import java.util.UUID;
 
 import com.uxplima.uxmessentials.economy.domain.EconomyReason;
@@ -35,8 +36,8 @@ public interface ItemDeliveryQueue {
     /** Of {@code owners}, the ones with an open delivery that is not held back. */
     List<UUID> waiting(List<UUID> owners);
 
-    /** Whether {@code owner} has a reset of {@code currency} waiting, which credits of that currency must wait for. */
-    boolean resetWaiting(UUID owner, String currency);
+    /** The currencies {@code owner} has a reset waiting in, lower case; credits of those must wait for it. */
+    Set<String> resetsWaiting(UUID owner);
 
     /**
      * Queue a give of {@code amount} for each of {@code owners}, under the id of what queued it, merged into a waiting

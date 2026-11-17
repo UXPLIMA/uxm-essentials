@@ -25,19 +25,23 @@ public final class BackendPurse implements ItemPurse {
     }
 
     @Override
-    public Optional<BigDecimal> give(PlayerRef owner, Money amount) {
-        return backend.credit(owner, amount).isOk() ? Optional.of(amount.amount()) : Optional.empty();
+    public Optional<Change> give(PlayerRef owner, Money amount) {
+        Optional<BigDecimal> before = balance(owner, amount);
+        if (before.isEmpty()) {
+            return Optional.empty();
+        }
+        return backend.credit(owner, amount).isOk()
+                ? Optional.of(new Change(before.get(), before.get().add(amount.amount())))
+                : Optional.empty();
     }
 
     @Override
     public Optional<Change> setTo(PlayerRef owner, Money target) {
-        BigDecimal before;
-        try {
-            before = backend.balance(owner, target.currency()).amount();
-        } catch (RuntimeException unknown) {
-            // A balance that could not be read is not zero; the reset waits for a read that answers.
+        Optional<BigDecimal> read = balance(owner, target);
+        if (read.isEmpty()) {
             return Optional.empty();
         }
+        BigDecimal before = read.get();
         BigDecimal diff = target.amount().subtract(before);
         if (diff.signum() == 0) {
             return Optional.of(new Change(before, before));
@@ -47,5 +51,14 @@ public final class BackendPurse implements ItemPurse {
                 ? backend.credit(owner, delta).isOk()
                 : backend.debit(owner, delta).isOk();
         return done ? Optional.of(new Change(before, target.amount())) : Optional.empty();
+    }
+
+    /** The balance before a change; empty when it did not answer, which is not zero, so nothing is changed. */
+    private Optional<BigDecimal> balance(PlayerRef owner, Money of) {
+        try {
+            return Optional.of(backend.balance(owner, of.currency()).amount());
+        } catch (RuntimeException unknown) {
+            return Optional.empty();
+        }
     }
 }

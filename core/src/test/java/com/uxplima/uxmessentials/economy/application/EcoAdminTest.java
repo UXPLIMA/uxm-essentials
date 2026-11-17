@@ -76,7 +76,7 @@ class EcoAdminTest {
                             history,
                             currency -> ProviderLane.inPlace(),
                             () -> {},
-                            (online, amount, reason) -> 0,
+                            (online, amount, reason) -> new DeliverSweptItems.OnlineGive(0, 0),
                             KnownPlayers.none()),
                     new ManualScheduler(),
                     audit,

@@ -7,10 +7,13 @@ import java.time.Clock;
 import java.time.Duration;
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.Set;
 import java.util.UUID;
 
 import com.uxplima.uxmessentials.economy.application.port.ItemDeliveryQueue;
@@ -93,15 +96,19 @@ public final class JooqItemDeliveries extends JooqRepository implements ItemDeli
     }
 
     @Override
-    public boolean resetWaiting(UUID owner, String currency) {
+    public Set<String> resetsWaiting(UUID owner) {
         Objects.requireNonNull(owner, "owner");
-        Objects.requireNonNull(currency, "currency");
         // Claimed ones count too: a reset being applied right now still decides what the balance becomes.
-        return read(dsl -> dsl.fetchExists(dsl.selectOne()
+        List<String> waiting = read(dsl -> dsl.selectDistinct(ECONOMY_ITEM_DELIVERIES.CURRENCY)
                 .from(ECONOMY_ITEM_DELIVERIES)
                 .where(ECONOMY_ITEM_DELIVERIES.OWNER.eq(owner.toString()))
-                .and(ECONOMY_ITEM_DELIVERIES.CURRENCY.eq(currency))
-                .and(ECONOMY_ITEM_DELIVERIES.KIND.eq(Kind.RESET.name()))));
+                .and(ECONOMY_ITEM_DELIVERIES.KIND.eq(Kind.RESET.name()))
+                .fetch(ECONOMY_ITEM_DELIVERIES.CURRENCY));
+        Set<String> currencies = new HashSet<>();
+        for (String currency : waiting) {
+            currencies.add(currency.toLowerCase(Locale.ROOT));
+        }
+        return Set.copyOf(currencies);
     }
 
     @Override

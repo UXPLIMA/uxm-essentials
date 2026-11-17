@@ -15,8 +15,11 @@ import com.uxplima.uxmessentials.shared.domain.PlayerRef;
  */
 public interface ItemPurse {
 
-    /** Put up to {@code amount} into {@code owner}'s inventory; how much fit, or empty when they are not online here. */
-    Optional<BigDecimal> give(PlayerRef owner, Money amount);
+    /**
+     * Put up to {@code amount} into {@code owner}'s balance; the balance before and after (their difference is what
+     * fit), or empty when they are not online here.
+     */
+    Optional<Change> give(PlayerRef owner, Money amount);
 
     /**
      * Bring {@code owner}'s held amount to {@code target}, taking items (with change) or adding what fits; the amount

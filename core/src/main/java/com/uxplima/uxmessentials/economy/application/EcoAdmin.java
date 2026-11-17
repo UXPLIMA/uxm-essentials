@@ -127,14 +127,21 @@ public final class EcoAdmin {
      */
     public int giveOnline(PlayerRef actor, List<PlayerRef> online, Money amount) {
         validateBulk(actor, amount);
-        int affected = sweeps.deferred(amount.currency())
+        DeliverSweptItems.OnlineGive given = sweeps.deferred(amount.currency())
                 ? sweeps.giveOnline(List.copyOf(online), amount, EconomyReason.ADMIN_GIVEALL)
-                : creditEach(online, amount);
+                : new DeliverSweptItems.OnlineGive(creditEach(online, amount), 0);
+        int affected = given.players();
         audit.bulkMutation(actor, amount, affected, EconomyReason.ADMIN_GIVEALL);
         notifier.send(
                 actor,
                 EconomyMessageKey.ECO_ADMIN_GIVEALL_ONLINE,
                 Map.of("count", Integer.toString(affected), "amount", notifier.amount(amount)));
+        if (given.heldBack() > 0) {
+            notifier.send(
+                    actor,
+                    EconomyMessageKey.ECO_ADMIN_GIVEALL_ONLINE_HELD,
+                    Map.of("count", Integer.toString(given.heldBack())));
+        }
         return affected;
     }
 

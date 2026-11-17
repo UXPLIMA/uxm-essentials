@@ -5,7 +5,9 @@ import static com.uxplima.uxmessentials.persistence.jooq.tables.EconomyPendingPh
 import java.math.BigDecimal;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Locale;
 import java.util.Objects;
+import java.util.Set;
 import java.util.UUID;
 import java.util.function.ToIntFunction;
 
@@ -59,18 +61,24 @@ public final class JooqPendingTransactionRepository extends JooqRepository imple
     }
 
     @Override
-    public List<PendingTransaction> getAndClearPending(UUID playerUuid) {
+    public List<PendingTransaction> getAndClearPending(UUID playerUuid, Set<String> leave) {
         Objects.requireNonNull(playerUuid, "playerUuid");
+        Objects.requireNonNull(leave, "leave");
         List<PendingTransaction> read = read(dsl -> dsl.select(
-                        ECONOMY_PENDING_PHYSICAL_TRANSACTIONS.ID,
-                        ECONOMY_PENDING_PHYSICAL_TRANSACTIONS.PLAYER_UUID,
-                        ECONOMY_PENDING_PHYSICAL_TRANSACTIONS.CURRENCY,
-                        ECONOMY_PENDING_PHYSICAL_TRANSACTIONS.AMOUNT)
-                .from(ECONOMY_PENDING_PHYSICAL_TRANSACTIONS)
-                .where(ECONOMY_PENDING_PHYSICAL_TRANSACTIONS.PLAYER_UUID.eq(playerUuid.toString()))
-                .orderBy(ECONOMY_PENDING_PHYSICAL_TRANSACTIONS.CREATED_AT, ECONOMY_PENDING_PHYSICAL_TRANSACTIONS.ID)
-                .fetch(row -> new PendingTransaction(
-                        row.value1(), UUID.fromString(row.value2()), row.value3(), row.value4())));
+                                ECONOMY_PENDING_PHYSICAL_TRANSACTIONS.ID,
+                                ECONOMY_PENDING_PHYSICAL_TRANSACTIONS.PLAYER_UUID,
+                                ECONOMY_PENDING_PHYSICAL_TRANSACTIONS.CURRENCY,
+                                ECONOMY_PENDING_PHYSICAL_TRANSACTIONS.AMOUNT)
+                        .from(ECONOMY_PENDING_PHYSICAL_TRANSACTIONS)
+                        .where(ECONOMY_PENDING_PHYSICAL_TRANSACTIONS.PLAYER_UUID.eq(playerUuid.toString()))
+                        .orderBy(
+                                ECONOMY_PENDING_PHYSICAL_TRANSACTIONS.CREATED_AT,
+                                ECONOMY_PENDING_PHYSICAL_TRANSACTIONS.ID)
+                        .fetch(row -> new PendingTransaction(
+                                row.value1(), UUID.fromString(row.value2()), row.value3(), row.value4())))
+                .stream()
+                .filter(row -> !leave.contains(row.currencyId().toLowerCase(Locale.ROOT)))
+                .toList();
         if (read.isEmpty()) {
             return List.of();
         }

@@ -2,6 +2,7 @@ package com.uxplima.uxmessentials.economy.application.port;
 
 import java.math.BigDecimal;
 import java.util.List;
+import java.util.Set;
 import java.util.UUID;
 
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
@@ -23,7 +24,15 @@ public interface PendingTransactionRepository {
      * take: two takes running at once never both return the same row, and a credit queued while a take runs is
      * either returned by it or left for the next one, never cleared unseen.
      */
-    List<PendingTransaction> getAndClearPending(UUID playerUuid);
+    default List<PendingTransaction> getAndClearPending(UUID playerUuid) {
+        return getAndClearPending(playerUuid, Set.of());
+    }
+
+    /**
+     * {@link #getAndClearPending(UUID)}, leaving the rows of the currencies in {@code leave} (lower case) on the queue
+     * untouched.
+     */
+    List<PendingTransaction> getAndClearPending(UUID playerUuid, Set<String> leave);
 
     record PendingTransaction(String id, UUID playerUuid, String currencyId, BigDecimal amount) {}
 }

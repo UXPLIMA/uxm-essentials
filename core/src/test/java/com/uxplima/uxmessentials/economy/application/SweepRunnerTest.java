@@ -78,6 +78,7 @@ class SweepRunnerTest {
     private ProviderLane lane = ProviderLane.inPlace();
     private int handOvers;
     private final List<String> givenNow = new ArrayList<>();
+    private int heldBackNow;
     private final SweepRunner runner = new SweepRunner(
             journal,
             new SweepRunner.Paths(
@@ -96,7 +97,7 @@ class SweepRunnerTest {
                             givenNow.add(player.name() + ":"
                                     + amount.amount().stripTrailingZeros().toPlainString() + ":" + reason);
                         }
-                        return online.size();
+                        return new DeliverSweptItems.OnlineGive(online.size(), heldBackNow);
                     },
                     KnownPlayers.none()),
             scheduler,
@@ -394,6 +395,7 @@ class SweepRunnerTest {
         mode = SweepMode.DEFERRED;
         PlayerRef alex = new PlayerRef(UUID.fromString("00000000-0000-0000-0000-000000000001"), "Alex");
         PlayerRef sam = new PlayerRef(UUID.fromString("00000000-0000-0000-0000-000000000002"), "Sam");
+        heldBackNow = 1;
 
         int affected = admin.giveOnline(ADMIN, List.of(alex, sam), coins("25"));
 
@@ -402,7 +404,11 @@ class SweepRunnerTest {
         assertThat(bank.balance(alex, COINS)).isEqualTo(coins("0"));
         assertThat(history.rows).isEmpty();
         assertThat(audit.lines).containsExactly("bulk:2:ADMIN_GIVEALL");
-        assertThat(lines).containsExactly(EconomyMessageKey.ECO_ADMIN_GIVEALL_ONLINE.key());
+        assertThat(lines)
+                .containsExactly(
+                        EconomyMessageKey.ECO_ADMIN_GIVEALL_ONLINE.key(),
+                        EconomyMessageKey.ECO_ADMIN_GIVEALL_ONLINE_HELD.key());
+        assertThat(placeholders.get(1)).containsEntry("count", "1");
     }
 
     @Test
