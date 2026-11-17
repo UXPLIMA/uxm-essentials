@@ -313,7 +313,7 @@ proved their factor keeps the proof when they switch servers, so they are not as
   the same address (a shared home or NAT) who can log in to the account: the trade-off of having no proxy to tell a
   switch from a new login. Install the proxy plugin where that matters.
 - `switch-grace-seconds = 0` asks on every server. `/2fa force`, a factor reset and a lockout drop a carried proof.
-  A proof that cannot be checked (the database is down) costs no attempt; the player is told to try again.
+  A proof that cannot be read (the database is down) costs no attempt, up to three times per lockout window.
 
 ### Kits, ranks and vaults
 

@@ -7,7 +7,6 @@ import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
-import java.util.function.BooleanSupplier;
 import java.util.function.Consumer;
 
 import com.uxplima.uxmessentials.security.application.port.AttemptStore;
@@ -46,6 +45,12 @@ public final class AttemptLimiter {
 
     /** The players with a proof being checked on this server right now. */
     private final Set<UUID> checking = ConcurrentHashMap.newKeySet();
+
+    /** How many reserved attempts one player may be given back within one lockout window; past it they count. */
+    static final int REFUNDS_PER_WINDOW = 3;
+
+    /** Per player, when their current refund window began and how many attempts it gave back. */
+    private final ConcurrentHashMap<UUID, Refunds> refunds = new ConcurrentHashMap<>();
 
     /**
      * A limiter over {@code store}. {@code revokeSession} drops the proof a player could carry to another backend; it is
@@ -93,12 +98,16 @@ public final class AttemptLimiter {
     }
 
     /**
-     * Check one proof of {@code playerId} against the budget: reserve the attempt, run {@code proof} (true when the
-     * proof is right), and count the answer. A player has one proof in flight on this server at a time; another is
-     * {@link Verdict#BUSY} and not checked. When {@code proof} throws, the reserved attempt is given back, since nothing
-     * was proved either way, and the failure is passed on. Does I/O: run it off the tick.
+     * Check one proof of {@code playerId} against the budget: reserve the attempt, read what the proof is checked
+     * against ({@code proof}), compare, and count the answer. A player has one proof in flight on this server at a time;
+     * another is {@link Verdict#BUSY} and not checked.
+     *
+     * <p>Reading may fail (the database, the key file) and that failure is passed on; since nothing was compared yet,
+     * the reserved attempt is given back, a few times per lockout window at most. Comparing reads nothing: a comparison
+     * that fails anyway counts as a wrong proof, so no answer ever tells a right proof from a wrong one. Does I/O: run
+     * it off the tick.
      */
-    public Checked check(UUID playerId, Instant now, BooleanSupplier proof) {
+    public Checked check(UUID playerId, Instant now, Proof proof) {
         Objects.requireNonNull(playerId, "playerId");
         Objects.requireNonNull(now, "now");
         Objects.requireNonNull(proof, "proof");
@@ -108,33 +117,72 @@ public final class AttemptLimiter {
         try {
             Attempt attempt = begin(playerId, now);
             if (attempt.refused()) {
-                return Checked.LOCKED_OUT;
+                return attempt.lockedNow() ? Checked.LOCKED_NOW : Checked.ALREADY_LOCKED;
+            }
+            Comparison comparison;
+            try {
+                comparison = proof.read();
+            } catch (RuntimeException failure) {
+                giveBack(playerId, now, failure);
+                throw failure;
             }
             boolean right;
             try {
-                right = proof.getAsBoolean();
+                right = comparison.matches();
             } catch (RuntimeException failure) {
-                giveBack(playerId, failure);
-                throw failure;
+                right = false;
             }
             if (!right) {
-                Outcome outcome = failed(playerId, attempt, now);
-                return outcome.lockedOut() ? Checked.LOCKED_OUT : new Checked(Verdict.WRONG, outcome.remaining());
+                if (policy.evaluate(attempt.count()) == LockoutPolicy.AttemptOutcome.LOCKED_OUT) {
+                    lock(playerId, now);
+                    return Checked.LOCKED_NOW;
+                }
+                if (lockedNow(playerId, now)) {
+                    return Checked.ALREADY_LOCKED;
+                }
+                return new Checked(Verdict.WRONG, policy.remaining(attempt.count()));
             }
-            return succeeded(playerId, now) ? Checked.PASSED : Checked.LOCKED_OUT;
+            return succeeded(playerId, now) ? Checked.PASSED : Checked.ALREADY_LOCKED;
         } finally {
             checking.remove(playerId);
         }
     }
 
-    /** Give back the attempt reserved for a proof that could not be checked; a failure here rides on {@code cause}. */
-    private void giveBack(UUID playerId, RuntimeException cause) {
+    /**
+     * Give back the attempt reserved for a proof that could not be read, unless this player had their share of refunds
+     * in the current window; a failure here rides on {@code cause}.
+     */
+    private void giveBack(UUID playerId, Instant now, RuntimeException cause) {
+        Refunds window = refunds.compute(
+                playerId,
+                (id, held) -> held == null || !now.isBefore(held.start().plus(lockout))
+                        ? new Refunds(now, 1)
+                        : new Refunds(held.start(), held.count() + 1));
+        if (window.count() > REFUNDS_PER_WINDOW) {
+            return;
+        }
         try {
             store.refundFailure(playerId);
         } catch (RuntimeException refundFailed) {
             cause.addSuppressed(refundFailed);
         }
     }
+
+    /** What a proof is checked against, read before any comparison; reading may fail. */
+    @FunctionalInterface
+    public interface Proof {
+
+        Comparison read();
+    }
+
+    /** The comparison of one proof, which reads nothing more: whether it is right. */
+    @FunctionalInterface
+    public interface Comparison {
+
+        boolean matches();
+    }
+
+    private record Refunds(Instant start, int count) {}
 
     /**
      * Reserve one attempt for {@code playerId} before their proof is checked. The attempt counts as a failure from
@@ -148,16 +196,22 @@ public final class AttemptLimiter {
             return Attempt.denied();
         }
         int count = store.addFailure(playerId);
-        if (count > policy.maxAttempts()) {
-            // Attempts in parallel spent the budget; the one that spent it locks, and this one is not checked.
-            lock(playerId, now);
-            return Attempt.denied();
+        try {
+            if (count > policy.maxAttempts()) {
+                // Attempts in parallel spent the budget; the one that spent it locks, and this one is not checked.
+                lock(playerId, now);
+                return new Attempt(true, 0, true);
+            }
+            if (lockedNow(playerId, now)) {
+                // A parallel attempt locked the account between the first look and this one's count.
+                return Attempt.denied();
+            }
+        } catch (RuntimeException failure) {
+            // Counted, but never checked: give it back.
+            giveBack(playerId, now, failure);
+            throw failure;
         }
-        if (lockedNow(playerId, now)) {
-            // A parallel attempt locked the account between the first look and this one's count.
-            return Attempt.denied();
-        }
-        return new Attempt(false, count);
+        return new Attempt(false, count, false);
     }
 
     /**
@@ -230,11 +284,12 @@ public final class AttemptLimiter {
      *
      * @param refused whether the account is locked out or the budget was spent, so the proof is not to be checked
      * @param count the failures counted with this one, zero when refused
+     * @param lockedNow whether this attempt's refusal locked the account, rather than finding it locked
      */
-    public record Attempt(boolean refused, int count) {
+    public record Attempt(boolean refused, int count, boolean lockedNow) {
 
         static Attempt denied() {
-            return new Attempt(true, 0);
+            return new Attempt(true, 0, false);
         }
     }
 
@@ -244,8 +299,10 @@ public final class AttemptLimiter {
         PASSED,
         /** The proof was wrong; attempts remain. */
         WRONG,
-        /** The account is locked out, now or already; the proof counts for nothing. */
-        LOCKED_OUT,
+        /** This proof locked the account out: it was the last one the budget allowed. */
+        LOCKED_NOW,
+        /** The account was already locked out, here or by a parallel attempt; the proof counts for nothing. */
+        ALREADY_LOCKED,
         /** Another proof of this player is being checked here; this one was not. */
         BUSY
     }
@@ -259,7 +316,8 @@ public final class AttemptLimiter {
     public record Checked(Verdict verdict, int remaining) {
 
         public static final Checked PASSED = new Checked(Verdict.PASSED, 0);
-        public static final Checked LOCKED_OUT = new Checked(Verdict.LOCKED_OUT, 0);
+        public static final Checked LOCKED_NOW = new Checked(Verdict.LOCKED_NOW, 0);
+        public static final Checked ALREADY_LOCKED = new Checked(Verdict.ALREADY_LOCKED, 0);
         public static final Checked BUSY = new Checked(Verdict.BUSY, 0);
 
         public Checked {

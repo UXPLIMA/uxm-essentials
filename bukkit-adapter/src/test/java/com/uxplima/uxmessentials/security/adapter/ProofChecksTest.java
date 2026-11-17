@@ -48,7 +48,7 @@ class ProofChecksTest {
         CountDownLatch inside = new CountDownLatch(1);
         CountDownLatch finish = new CountDownLatch(1);
         ProofChecks checks = checks(
-                (player, candidate, now) -> {
+                player -> (candidate, now) -> {
                     inside.countDown();
                     await(finish);
                     return VerifyResult.INVALID;
@@ -96,7 +96,7 @@ class ProofChecksTest {
         }
 
         assertThat(checked.get()).isLessThanOrEqualTo(3);
-        assertThat(lobby.check(ADA, RIGHT)).as("the budget is spent").isEqualTo(ProofChecks.Checked.LOCKED_OUT);
+        assertThat(lobby.check(ADA, RIGHT)).as("the budget is spent").isEqualTo(ProofChecks.Checked.ALREADY_LOCKED);
         assertThat(checked.get()).as("a locked-out account has nothing checked").isLessThanOrEqualTo(3);
     }
 
@@ -104,7 +104,7 @@ class ProofChecksTest {
     void aRightProofCheckedWhileAnotherBackendLockedTheAccountIsTheLockout() {
         AttemptLimiter lobby = limiter();
         ProofChecks survival = checks(
-                (player, candidate, now) -> {
+                player -> (candidate, now) -> {
                     for (int i = 0; i < 3; i++) {
                         lobby.failed(ADA, lobby.begin(ADA, now), now);
                     }
@@ -112,7 +112,26 @@ class ProofChecksTest {
                 },
                 limiter());
 
-        assertThat(survival.check(ADA, RIGHT)).isEqualTo(ProofChecks.Checked.LOCKED_OUT);
+        assertThat(survival.check(ADA, RIGHT)).isEqualTo(ProofChecks.Checked.ALREADY_LOCKED);
+    }
+
+    @Test
+    void aRightCodeThatCannotBeSpentReadsExactlyAsAWrongOne() {
+        ProofChecks survival = checks(
+                player -> (candidate, now) -> {
+                    if (candidate.equals(RIGHT)) {
+                        throw new IllegalStateException("the spent step could not be written");
+                    }
+                    return VerifyResult.INVALID;
+                },
+                limiter());
+
+        ProofChecks.Checked right = survival.check(ADA, RIGHT);
+        ProofChecks.Checked wrong = survival.check(ADA, "0000");
+
+        assertThat(right).isEqualTo(new ProofChecks.Checked(ProofChecks.Status.WRONG, VerifyResult.INVALID, 2));
+        assertThat(wrong).isEqualTo(new ProofChecks.Checked(ProofChecks.Status.WRONG, VerifyResult.INVALID, 1));
+        assertThat(errors).containsExactly("event=security_proof_unrecorded player=" + ADA);
     }
 
     @Test
@@ -129,18 +148,18 @@ class ProofChecksTest {
     @Test
     void aProofThatCannotBeCheckedGivesItsAttemptBackAndSaysSo() {
         ProofChecks outage = checks(
-                (player, candidate, now) -> {
+                player -> {
                     throw new IllegalStateException("database down");
                 },
                 limiter());
         ProofChecks survival = counting(limiter());
         survival.check(ADA, "0000");
 
-        for (int i = 0; i < 5; i++) {
+        for (int i = 0; i < 3; i++) {
             assertThat(outage.check(ADA, RIGHT)).isEqualTo(ProofChecks.Checked.UNAVAILABLE);
         }
 
-        assertThat(errors).hasSize(5).allMatch(line -> line.startsWith("event=security_proof_unchecked"));
+        assertThat(errors).hasSize(3).allMatch(line -> line.startsWith("event=security_proof_unchecked"));
         assertThat(survival.check(ADA, "0000"))
                 .as("the outage spent nothing: one wrong proof before it, this is the second")
                 .isEqualTo(new ProofChecks.Checked(ProofChecks.Status.WRONG, VerifyResult.INVALID, 1));
@@ -148,7 +167,7 @@ class ProofChecksTest {
 
     private ProofChecks counting(AttemptLimiter limiter) {
         return checks(
-                (player, candidate, now) -> {
+                player -> (candidate, now) -> {
                     checked.incrementAndGet();
                     return candidate.equals(RIGHT) ? VerifyResult.SUCCESS : VerifyResult.INVALID;
                 },

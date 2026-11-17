@@ -155,7 +155,8 @@ public final class ReauthController implements KeypadActions {
             // The prompt this proof was for is over: they left, or ran another protected command meanwhile.
             return;
         }
-        if (checked.status() == ProofChecks.Status.LOCKED_OUT
+        if (checked.status() == ProofChecks.Status.LOCKED_NOW
+                || checked.status() == ProofChecks.Status.ALREADY_LOCKED
                 || limiter.knownLockedOut(viewer.uuid(), clock.instant())) {
             fail(player, viewer, new AttemptLimiter.Outcome(true, 0), reopenOnFailure);
             return;
@@ -169,7 +170,7 @@ public final class ReauthController implements KeypadActions {
                     reopenKeypad(player, viewer);
                 }
             }
-            case BUSY, LOCKED_OUT -> {
+            case BUSY, LOCKED_NOW, ALREADY_LOCKED -> {
                 // Busy: the check already running answers. Locked out: handled above.
             }
         }

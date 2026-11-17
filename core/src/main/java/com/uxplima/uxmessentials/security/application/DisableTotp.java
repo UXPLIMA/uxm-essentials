@@ -49,7 +49,7 @@ public final class DisableTotp {
             return limiter.isLockedOut(playerId, now) ? DisableResult.LOCKED_OUT : DisableResult.NOT_ENROLLED;
         }
         AttemptLimiter.Checked checked =
-                limiter.check(playerId, now, () -> TotpCode.verify(secret, code, now, codeWindow));
+                limiter.check(playerId, now, () -> () -> TotpCode.verify(secret, code, now, codeWindow));
         switch (checked.verdict()) {
             case PASSED -> {
                 // Proven: go on below.
@@ -57,7 +57,7 @@ public final class DisableTotp {
             case WRONG -> {
                 return DisableResult.INVALID_CODE;
             }
-            case LOCKED_OUT -> {
+            case LOCKED_NOW, ALREADY_LOCKED -> {
                 return DisableResult.LOCKED_OUT;
             }
             case BUSY -> {

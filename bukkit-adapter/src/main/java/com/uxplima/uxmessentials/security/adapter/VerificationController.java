@@ -452,7 +452,7 @@ public final class VerificationController implements KeypadActions {
             scheduler.onEntity(
                     viewer, () -> applyResult(player, viewer, checked, token.getAsLong(), reopenOnFailure), () -> {
                         // They are gone before the answer reached them; a lockout is still put on record.
-                        if (checked.status() == ProofChecks.Status.LOCKED_OUT) {
+                        if (checked.status() == ProofChecks.Status.LOCKED_NOW) {
                             scheduler.onGlobal(() -> recordLockout(viewer));
                         }
                     });
@@ -462,12 +462,15 @@ public final class VerificationController implements KeypadActions {
     private void applyResult(
             Player player, PlayerRef viewer, ProofChecks.Checked checked, long token, boolean reopenOnFailure) {
         boolean pending = sessions.isPending(viewer.uuid(), token);
-        boolean lockedOut = checked.status() == ProofChecks.Status.LOCKED_OUT
-                || (pending && limiter.knownLockedOut(viewer.uuid(), clock.instant()));
+        boolean lockedNow = checked.status() == ProofChecks.Status.LOCKED_NOW;
+        boolean lockedOut = lockedNow
+                || (pending
+                        && (checked.status() == ProofChecks.Status.ALREADY_LOCKED
+                                || limiter.knownLockedOut(viewer.uuid(), clock.instant())));
         if (lockedOut) {
-            // Even when the freeze this proof was for is over, a lockout this proof met is put on record.
+            // A lockout this proof set is put on record even when its freeze is over; one set before is on record.
             sessions.clear(viewer.uuid());
-            lockOut(viewer);
+            lockOut(viewer, lockedNow);
             return;
         }
         if (!pending) {
@@ -483,7 +486,7 @@ public final class VerificationController implements KeypadActions {
                     reopenKeypad(player, viewer);
                 }
             }
-            case BUSY, LOCKED_OUT -> {
+            case BUSY, LOCKED_NOW, ALREADY_LOCKED -> {
                 // Busy: the check already running answers. Locked out: handled above.
             }
         }
@@ -512,7 +515,7 @@ public final class VerificationController implements KeypadActions {
     private void fail(Player player, PlayerRef viewer, AttemptLimiter.Outcome outcome, boolean reopenOnFailure) {
         if (outcome.lockedOut()) {
             sessions.clear(viewer.uuid());
-            lockOut(viewer);
+            lockOut(viewer, true);
             return;
         }
         events.publish(new VerificationFailed(viewer, outcome.remaining()));
@@ -532,9 +535,9 @@ public final class VerificationController implements KeypadActions {
      * history and is lifted with {@code /unban} like anything else, rather than this module keeping a private ban list
      * nobody can see. That path kicks the player itself; only the in-memory fallback has to kick here.
      */
-    private void lockOut(PlayerRef viewer) {
+    private void lockOut(PlayerRef viewer, boolean record) {
         keypad.closeFor(viewer);
-        if (recordLockout(viewer)) {
+        if (record && recordLockout(viewer)) {
             return;
         }
         kick(viewer, SecurityMessageKey.SECURITY_VERIFY_LOCKED_OUT);

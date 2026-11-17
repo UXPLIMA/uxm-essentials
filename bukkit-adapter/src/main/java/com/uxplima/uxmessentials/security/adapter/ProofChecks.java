@@ -27,7 +27,14 @@ final class ProofChecks {
     private final Clock clock;
 
     ProofChecks(VerifyTwoFactor verify, AttemptLimiter limiter, Logger log, Clock clock) {
-        this(Objects.requireNonNull(verify, "verify")::verify, limiter, log, clock);
+        this(
+                player -> {
+                    VerifyTwoFactor.Prepared prepared = verify.prepare(player);
+                    return prepared::verify;
+                },
+                limiter,
+                log,
+                clock);
     }
 
     ProofChecks(Prover verify, AttemptLimiter limiter, Logger log, Clock clock) {
@@ -44,9 +51,18 @@ final class ProofChecks {
         AttemptLimiter.Checked checked;
         try {
             checked = limiter.check(player, now, () -> {
-                VerifyResult result = verify.verify(player, candidate, now);
-                shown[0] = result;
-                return result != VerifyResult.INVALID;
+                Prover.Check check = verify.prepare(player);
+                return () -> {
+                    try {
+                        VerifyResult result = check.verify(candidate, now);
+                        shown[0] = result;
+                        return result != VerifyResult.INVALID;
+                    } catch (RuntimeException failure) {
+                        // After a comparison: counted as not proved, never told apart from a wrong proof.
+                        log.error("event=security_proof_unrecorded player=" + player, failure);
+                        throw failure;
+                    }
+                };
             });
         } catch (RuntimeException failure) {
             log.error("event=security_proof_unchecked player=" + player, failure);
@@ -55,16 +71,25 @@ final class ProofChecks {
         return switch (checked.verdict()) {
             case PASSED -> new Checked(Status.PASSED, shown[0], 0);
             case WRONG -> new Checked(Status.WRONG, VerifyResult.INVALID, checked.remaining());
-            case LOCKED_OUT -> Checked.LOCKED_OUT;
+            case LOCKED_NOW -> Checked.LOCKED_NOW;
+            case ALREADY_LOCKED -> Checked.ALREADY_LOCKED;
             case BUSY -> Checked.BUSY;
         };
     }
 
-    /** What checks a proof: the second factor itself. */
+    /** What checks a proof: the second factor itself, read first and then compared. */
     @FunctionalInterface
     interface Prover {
 
-        VerifyResult verify(UUID player, String candidate, Instant now);
+        /** Read the player's factors; may fail, before any candidate is looked at. */
+        Check prepare(UUID player);
+
+        /** The comparison of one candidate against the factors read. */
+        @FunctionalInterface
+        interface Check {
+
+            VerifyResult verify(String candidate, Instant now);
+        }
     }
 
     /** How one check ended. */
@@ -73,8 +98,10 @@ final class ProofChecks {
         PASSED,
         /** The proof was wrong; attempts remain. */
         WRONG,
-        /** The account is locked out. */
-        LOCKED_OUT,
+        /** This proof locked the account out. */
+        LOCKED_NOW,
+        /** The account was already locked out. */
+        ALREADY_LOCKED,
         /** Another proof of the player's was being checked; this one was not. */
         BUSY,
         /** The proof could not be checked; its attempt was given back. */
@@ -91,7 +118,8 @@ final class ProofChecks {
      */
     record Checked(Status status, VerifyResult result, int remaining) {
 
-        static final Checked LOCKED_OUT = new Checked(Status.LOCKED_OUT, VerifyResult.INVALID, 0);
+        static final Checked LOCKED_NOW = new Checked(Status.LOCKED_NOW, VerifyResult.INVALID, 0);
+        static final Checked ALREADY_LOCKED = new Checked(Status.ALREADY_LOCKED, VerifyResult.INVALID, 0);
         static final Checked BUSY = new Checked(Status.BUSY, VerifyResult.INVALID, 0);
         static final Checked UNAVAILABLE = new Checked(Status.UNAVAILABLE, VerifyResult.INVALID, 0);
 
