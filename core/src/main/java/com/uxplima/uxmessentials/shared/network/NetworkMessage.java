@@ -56,7 +56,8 @@ public sealed interface NetworkMessage
                 ProxyConnectionFrame,
                 PlayerSkinChanged,
                 PlayerSettingsChanged,
-                RankActionsKept {
+                RankActionsKept,
+                BroadcastFrame {
 
     /** The {@code server-id} of the backend that produced this frame; the loop sentinel keys on it. */
     String originServer();
@@ -107,7 +108,8 @@ public sealed interface NetworkMessage
         PROXY_CONNECTION(35),
         PLAYER_SKIN_CHANGED(36),
         PLAYER_SETTINGS_CHANGED(37),
-        RANK_ACTIONS_KEPT(39);
+        RANK_ACTIONS_KEPT(39),
+        BROADCAST(43);
 
         private final byte wireTag;
 

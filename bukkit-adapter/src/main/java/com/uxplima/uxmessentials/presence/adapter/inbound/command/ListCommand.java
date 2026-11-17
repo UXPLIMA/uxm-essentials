@@ -3,7 +3,9 @@ package com.uxplima.uxmessentials.presence.adapter.inbound.command;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Optional;
 import java.util.stream.Collectors;
 
@@ -22,9 +24,11 @@ import com.uxplima.uxmessentials.presence.adapter.inbound.gui.OnlinePlayerListVi
 import com.uxplima.uxmessentials.presence.domain.PresenceMessageKey;
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandRegistration;
 import com.uxplima.uxmessentials.shared.adapter.outbound.BukkitRefs;
+import com.uxplima.uxmessentials.shared.adapter.outbound.lookup.VisibleNetwork;
 import com.uxplima.uxmessentials.shared.application.permission.SocialPermissions;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
 import com.uxplima.uxmessentials.shared.application.port.Scheduler;
+import com.uxplima.uxmessentials.shared.domain.OnlinePlayer;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmessentials.shared.domain.message.MessageKey;
 import com.uxplima.uxmlib.command.Gate;
@@ -39,6 +43,9 @@ import org.jspecify.annotations.Nullable;
  * absent from both the line and the count. The
  * console has no {@code canSee} graph and sees everyone. This is a pure read: no use case, no state mutation, just
  * the online set, a name-sorted join, and one resolved line.
+ *
+ * <p>On a network the players on the other backends the sender may see are listed and counted too
+ * ({@link VisibleNetwork}); in the head grid each of them shows the server they are on in place of a world.
  *
  * <p>With its catalog {@code gui} flag on, the bare {@code /list} a player runs opens the
  * {@link OnlinePlayerListView} head grid instead: the same vanish-aware roster, rendered as one head per player.
@@ -55,19 +62,22 @@ public final class ListCommand extends PresenceCommandSupport implements Command
 
     private final Messages messages;
     private final @Nullable OnlinePlayerListView listView;
+    private final VisibleNetwork network;
 
     public ListCommand(PresenceServices services, Messages messages, Scheduler scheduler) {
-        this(services, messages, scheduler, null);
+        this(services, messages, scheduler, null, VisibleNetwork.NONE);
     }
 
     public ListCommand(
             PresenceServices services,
             Messages messages,
             Scheduler scheduler,
-            @Nullable OnlinePlayerListView listView) {
+            @Nullable OnlinePlayerListView listView,
+            VisibleNetwork network) {
         super(services, messages, scheduler);
         this.messages = messages;
         this.listView = listView;
+        this.network = Objects.requireNonNull(network, "network");
     }
 
     @Override
@@ -128,14 +138,19 @@ public final class ListCommand extends PresenceCommandSupport implements Command
         return Command.SINGLE_SUCCESS;
     }
 
-    /** Online names the sender may see, sorted; a player's {@code canSee} hides vanished targets, the console sees all. */
+    /**
+     * Online names the sender may see here and on the other backends, sorted; a player's {@code canSee} hides vanished
+     * targets here, their see level elsewhere, and the console sees all.
+     */
     private List<String> collectVisibleNames(CommandSender sender) {
         Player viewer = sender instanceof Player player ? player : null;
-        return Bukkit.getOnlinePlayers().stream()
+        List<String> names = Bukkit.getOnlinePlayers().stream()
                 .filter(target -> viewer == null || viewer.canSee(target))
                 .map(Player::getName)
-                .sorted(Comparator.naturalOrder())
-                .collect(Collectors.toList());
+                .collect(Collectors.toCollection(ArrayList::new));
+        names.addAll(network.namesElsewhere(sender));
+        names.sort(Comparator.naturalOrder());
+        return names;
     }
 
     /**
@@ -154,6 +169,11 @@ public final class ListCommand extends PresenceCommandSupport implements Command
             entries.add(new OnlinePlayerListView.Entry(
                     target.getUniqueId(), target.getName(), target.getWorld().getName(), online));
         }
+        for (OnlinePlayer elsewhere : network.elsewhere(viewer)) {
+            entries.add(new OnlinePlayerListView.Entry(
+                    elsewhere.player().uuid(), elsewhere.player().name(), elsewhere.server(), online));
+        }
+        entries.sort(Comparator.comparing(entry -> entry.name().toLowerCase(Locale.ROOT)));
         return entries;
     }
 }

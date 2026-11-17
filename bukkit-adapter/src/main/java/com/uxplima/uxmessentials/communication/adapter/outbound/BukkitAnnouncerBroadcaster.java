@@ -4,6 +4,7 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.UUID;
+import java.util.function.Consumer;
 import java.util.function.Function;
 
 import org.bukkit.Bukkit;
@@ -45,7 +46,9 @@ import org.jspecify.annotations.Nullable;
  *
  * <p>The one-off {@code /broadcast} path stays on the {@link MessageSink}: the operator's MiniMessage body, framed by
  * the {@code communication.broadcast.line} entry in each viewer's own language, delivered to every opted-in viewer
- * (optionally restricted to one world), with the sink performing the per-viewer region hop and parse.
+ * (optionally restricted to one world), with the sink performing the per-viewer region hop and parse. On a network
+ * a {@code /broadcast} also reaches the other backends, each of which frames and filters it the same way;
+ * {@code /broadcastworld} stays on this backend.
  *
  * <p><b>Centring</b>: with {@link Announcement#centered()} set, every line is drawn in the middle of the chat, and a
  * single line asks for it on its own by opening with {@code <center>} (see {@link ChatCentre}). A line is rendered and
@@ -61,6 +64,7 @@ public final class BukkitAnnouncerBroadcaster {
     private final ChannelBroadcaster channels;
     private final Function<Player, ConditionContext> conditionContext;
     private final Scheduler scheduler;
+    private final Consumer<String> elsewhere;
 
     public BukkitAnnouncerBroadcaster(
             MessageSink sink,
@@ -68,13 +72,15 @@ public final class BukkitAnnouncerBroadcaster {
             BroadcastOptOutStore optOut,
             ChannelBroadcaster channels,
             Function<Player, ConditionContext> conditionContext,
-            Scheduler scheduler) {
+            Scheduler scheduler,
+            Consumer<String> elsewhere) {
         this.sink = Objects.requireNonNull(sink, "sink");
         this.messages = Objects.requireNonNull(messages, "messages");
         this.optOut = Objects.requireNonNull(optOut, "optOut");
         this.channels = Objects.requireNonNull(channels, "channels");
         this.conditionContext = Objects.requireNonNull(conditionContext, "conditionContext");
         this.scheduler = Objects.requireNonNull(scheduler, "scheduler");
+        this.elsewhere = Objects.requireNonNull(elsewhere, "elsewhere");
     }
 
     /**
@@ -129,8 +135,18 @@ public final class BukkitAnnouncerBroadcaster {
         return centred || marked.isPresent() ? CenteredTextPadder.centred(drawn) : drawn;
     }
 
-    /** Send the operator's {@code body} to every online, opted-in player, framed in each one's language. */
+    /**
+     * Send the operator's {@code body} to every online, opted-in player of the network, framed in each one's language:
+     * here at once, and to the other backends, which show it to their own players.
+     */
     public void broadcast(String body) {
+        Objects.requireNonNull(body, "body");
+        broadcastHere(body);
+        elsewhere.accept(body);
+    }
+
+    /** Send the operator's {@code body} to every online, opted-in player on this backend, framed in their language. */
+    public void broadcastHere(String body) {
         Objects.requireNonNull(body, "body");
         scheduler.onGlobal(() -> {
             for (Player player : Bukkit.getOnlinePlayers()) {

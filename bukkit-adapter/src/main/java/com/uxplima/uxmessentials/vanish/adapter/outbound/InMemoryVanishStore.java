@@ -5,6 +5,7 @@ import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.function.Consumer;
 
 import com.uxplima.uxmessentials.vanish.application.port.VanishStore;
 import com.uxplima.uxmessentials.vanish.domain.VanishLevel;
@@ -25,6 +26,20 @@ import org.jspecify.annotations.NullMarked;
 public final class InMemoryVanishStore implements VanishStore {
 
     private final ConcurrentHashMap<UUID, VanishLevel> vanished = new ConcurrentHashMap<>();
+    private final Consumer<UUID> changed;
+
+    public InMemoryVanishStore() {
+        this(who -> {});
+    }
+
+    /**
+     * A store that tells {@code changed} of every change.
+     *
+     * @param changed told after a player vanished, changed level or reappeared, on the thread that changed them
+     */
+    public InMemoryVanishStore(Consumer<UUID> changed) {
+        this.changed = Objects.requireNonNull(changed, "changed");
+    }
 
     @Override
     public boolean isVanished(UUID who) {
@@ -37,12 +52,15 @@ public final class InMemoryVanishStore implements VanishStore {
         Objects.requireNonNull(who, "who");
         Objects.requireNonNull(level, "level");
         vanished.put(who, level);
+        changed.accept(who);
     }
 
     @Override
     public void reveal(UUID who) {
         Objects.requireNonNull(who, "who");
-        vanished.remove(who);
+        if (vanished.remove(who) != null) {
+            changed.accept(who);
+        }
     }
 
     @Override

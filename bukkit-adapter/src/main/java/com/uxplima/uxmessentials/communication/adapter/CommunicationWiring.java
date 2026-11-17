@@ -51,6 +51,7 @@ import com.uxplima.uxmessentials.shared.adapter.inbound.gui.GuiLayouts;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.GuiText;
 import com.uxplima.uxmessentials.shared.adapter.inbound.settings.HeldSettingsListener;
 import com.uxplima.uxmessentials.shared.adapter.inbound.settings.LegacySwitches;
+import com.uxplima.uxmessentials.shared.adapter.outbound.bus.BroadcastSync;
 import com.uxplima.uxmessentials.shared.adapter.outbound.bus.Bus;
 import com.uxplima.uxmessentials.shared.adapter.outbound.bus.PlayerSettingsSync;
 import com.uxplima.uxmessentials.shared.adapter.outbound.chat.UxmChatStepBack;
@@ -160,7 +161,10 @@ public final class CommunicationWiring {
                 optOutStore,
                 channelBroadcaster,
                 CommunicationWiring::conditionContext,
-                kernel.scheduler());
+                kernel.scheduler(),
+                BroadcastSync.publisher(bus.publisher()));
+        // A /broadcast sent on another backend reaches the players here as one sent here would.
+        BroadcastSync.register(bus.registry(), broadcaster::broadcastHere);
         // uxmChat, when it runs, takes over the chat format, the announcer and the join, quit, death and advancement
         // lines it has turned on; each is checked when it would act, so a reload on either side is followed.
         UxmChatStepBack chat = new UxmChatStepBack(plugin.getServer());

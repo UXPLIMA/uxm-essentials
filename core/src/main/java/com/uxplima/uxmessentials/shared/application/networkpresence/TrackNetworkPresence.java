@@ -6,11 +6,14 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.function.Function;
 
 import com.uxplima.uxmessentials.shared.application.port.NetworkPresenceBroadcast;
 import com.uxplima.uxmessentials.shared.application.port.PlayerNameIndex;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
+import com.uxplima.uxmessentials.shared.domain.PresenceTraits;
 import org.jspecify.annotations.Nullable;
 
 /**
@@ -40,6 +43,7 @@ public final class TrackNetworkPresence {
     private final long session;
     private final Object lock = new Object();
     private long sequence;
+    private volatile Function<PlayerRef, PresenceTraits> traitsOf = player -> PresenceTraits.PLAIN;
     private final ConcurrentHashMap<String, Parts> partsByOrigin = new ConcurrentHashMap<>();
     private final ConcurrentHashMap<String, RosterStamp> answeredByOrigin = new ConcurrentHashMap<>();
 
@@ -57,12 +61,44 @@ public final class TrackNetworkPresence {
         this.session = Objects.requireNonNull(clock, "clock").millis();
     }
 
+    /**
+     * Read the traits of the players on this backend with {@code traits} from now on, and announce the ones that
+     * changed. It reads memory and permissions only, and is asked on whatever thread a change shows on.
+     */
+    public void readTraitsWith(Function<PlayerRef, PresenceTraits> traits) {
+        this.traitsOf = Objects.requireNonNull(traits, "traits");
+        for (RosterMember member : roster.localMembers()) {
+            retrait(member.player().uuid());
+        }
+    }
+
     /** {@code player} joined this backend. */
     public void joined(PlayerRef player) {
         Objects.requireNonNull(player, "player");
+        PresenceTraits traits = traitsOf.apply(player);
         synchronized (lock) {
-            roster.addLocal(player);
-            broadcast.joined(nextStamp(), player);
+            roster.addLocal(player, traits);
+            broadcast.joined(nextStamp(), player, traits);
+        }
+    }
+
+    /**
+     * Read the traits of {@code player} again, and announce them when they changed: they vanished or reappeared, or
+     * gained or lost the staff node. Nothing for a player not on this backend.
+     */
+    public void retrait(UUID player) {
+        Objects.requireNonNull(player, "player");
+        PlayerRef here = roster.local(player);
+        if (here == null) {
+            return;
+        }
+        PresenceTraits traits = traitsOf.apply(here);
+        synchronized (lock) {
+            // Announced as a join with a new stamp: a peer replaces the entry, and one on an older release reads a
+            // repeated join, which changes nothing there.
+            if (roster.retraitLocal(player, traits)) {
+                broadcast.joined(nextStamp(), here, traits);
+            }
         }
     }
 
@@ -81,6 +117,12 @@ public final class TrackNetworkPresence {
      */
     public void announce(boolean replyRequested) {
         roster.expire();
+        // The heartbeat reads every trait again, so a change nothing reported (a permission plugin without events, a
+        // vanish another plugin keeps) is announced within one heartbeat.
+        for (RosterMember member : roster.localMembers()) {
+            PresenceTraits traits = traitsOf.apply(member.player());
+            roster.retraitLocal(member.player().uuid(), traits);
+        }
         // A backend that went away would otherwise keep its bookkeeping for as long as this one runs. A first roster
         // still being collected has no roster yet and can be dropped too; the next heartbeat announces it again.
         partsByOrigin.keySet().removeIf(origin -> !roster.hasRoster(origin));
@@ -88,10 +130,11 @@ public final class TrackNetworkPresence {
         sendRoster(replyRequested);
     }
 
-    /** {@code player} joined the backend {@code origin}. */
-    public void remoteJoined(String origin, RosterStamp stamp, PlayerRef player) {
+    /** {@code player} joined the backend {@code origin}, or their traits there changed. */
+    public void remoteJoined(String origin, RosterStamp stamp, PlayerRef player, PresenceTraits traits) {
         Objects.requireNonNull(player, "player");
-        if (roster.applyJoin(origin, stamp, player)) {
+        Objects.requireNonNull(traits, "traits");
+        if (roster.applyJoin(origin, stamp, player, traits)) {
             names.learn(player.uuid(), player.name());
         }
     }
@@ -108,14 +151,14 @@ public final class TrackNetworkPresence {
      * dropped. When the origin asks, ours is sent back once per request, however many parts or copies carry it.
      */
     public void remoteRoster(
-            String origin, RosterStamp stamp, boolean replyRequested, int part, int parts, List<PlayerRef> players) {
+            String origin, RosterStamp stamp, boolean replyRequested, int part, int parts, List<RosterMember> players) {
         Objects.requireNonNull(origin, "origin");
         Objects.requireNonNull(stamp, "stamp");
         Objects.requireNonNull(players, "players");
         if (parts < 1 || part < 0 || part >= parts) {
             throw new IllegalArgumentException("part " + part + " of " + parts + " is not a roster part");
         }
-        List<PlayerRef> complete = parts == 1 ? players : collect(origin, stamp, part, parts, players);
+        List<RosterMember> complete = parts == 1 ? players : collect(origin, stamp, part, parts, players);
         if (complete != null) {
             for (PlayerRef learned : roster.applyRoster(origin, stamp, complete)) {
                 names.learn(learned.uuid(), learned.name());
@@ -137,14 +180,14 @@ public final class TrackNetworkPresence {
 
     private void sendRoster(boolean replyRequested) {
         synchronized (lock) {
-            broadcast.roster(nextStamp(), replyRequested, roster.localPlayers());
+            broadcast.roster(nextStamp(), replyRequested, roster.localMembers());
         }
     }
 
     /** Add one part; the whole roster once its last part arrives, otherwise {@code null}. */
-    private @Nullable List<PlayerRef> collect(
-            String origin, RosterStamp stamp, int part, int parts, List<PlayerRef> players) {
-        List<List<PlayerRef>> done = new ArrayList<>(1);
+    private @Nullable List<RosterMember> collect(
+            String origin, RosterStamp stamp, int part, int parts, List<RosterMember> players) {
+        List<List<RosterMember>> done = new ArrayList<>(1);
         partsByOrigin.compute(origin, (key, pending) -> {
             Parts collecting = pending;
             if (collecting == null || newer(stamp, collecting.stamp())) {
@@ -152,12 +195,12 @@ public final class TrackNetworkPresence {
             } else if (!stamp.equals(collecting.stamp()) || parts != collecting.parts()) {
                 return collecting;
             }
-            Map<Integer, List<PlayerRef>> received = new HashMap<>(collecting.received());
+            Map<Integer, List<RosterMember>> received = new HashMap<>(collecting.received());
             received.put(part, List.copyOf(players));
             if (received.size() < parts) {
                 return new Parts(stamp, parts, Map.copyOf(received));
             }
-            List<PlayerRef> all = new ArrayList<>();
+            List<RosterMember> all = new ArrayList<>();
             for (int i = 0; i < parts; i++) {
                 all.addAll(Objects.requireNonNull(received.get(i), "part"));
             }
@@ -185,5 +228,5 @@ public final class TrackNetworkPresence {
      * @param parts how many parts it has
      * @param received the parts in, by index
      */
-    private record Parts(RosterStamp stamp, int parts, Map<Integer, List<PlayerRef>> received) {}
+    private record Parts(RosterStamp stamp, int parts, Map<Integer, List<RosterMember>> received) {}
 }
