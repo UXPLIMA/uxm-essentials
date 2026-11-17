@@ -298,6 +298,49 @@ class CrossServerMessagingTest {
     }
 
     @Test
+    void aTargetWhoLeftAndIgnoresTheSenderGetsNoMailWhileTheSenderReadsItAsMailed() {
+        Network mailing = new Network(true);
+        Backend from = mailing.backend("survival");
+        Backend to = mailing.backend("lobby");
+        from.join(ALEX);
+        to.join(BOB);
+        to.connected.remove(BOB.uuid());
+        mailing.ignores.put(BOB.uuid(), IgnoreList.empty(BOB).ignore(ALEX, IgnoreScope.ALL));
+
+        from.msg(ALEX, "Bob", "hi");
+
+        assertThat(from.lines()).containsExactly("Alex: msg.sent-to-mail{player=Bob}");
+        assertThat(mailing.mail).isEmpty();
+    }
+
+    @Test
+    void aMessageToAnOfflinePlayerBecomesMail() {
+        Network mailing = new Network(true);
+        Backend from = mailing.backend("survival");
+        from.join(ALEX);
+
+        from.msgOffline(ALEX, BOB, "hi");
+
+        assertThat(from.lines()).containsExactly("Alex: msg.sent-to-mail{player=Bob}");
+        assertThat(mailing.mail).extracting(item -> item.body().value()).containsExactly("hi");
+    }
+
+    @Test
+    void anOfflinePlayerWhoIgnoresTheSenderGetsNoMailWhileTheSenderReadsItAsMailed() {
+        for (IgnoreScope scope : IgnoreScope.values()) {
+            Network mailing = new Network(true);
+            Backend from = mailing.backend("survival");
+            from.join(ALEX);
+            mailing.ignores.put(BOB.uuid(), IgnoreList.empty(BOB).ignore(ALEX, scope));
+
+            from.msgOffline(ALEX, BOB, "hi");
+
+            assertThat(from.lines()).as(scope.name()).containsExactly("Alex: msg.sent-to-mail{player=Bob}");
+            assertThat(mailing.mail).as(scope.name()).isEmpty();
+        }
+    }
+
+    @Test
     void anUnansweredMessageNeverBecomesMail() {
         Network mailing = new Network(true);
         Backend from = mailing.backend("survival");
@@ -474,6 +517,7 @@ class CrossServerMessagingTest {
         final List<Runnable> waits = new ArrayList<>();
         final List<String> lines = new ArrayList<>();
         final RecordingEvents events = new RecordingEvents();
+        final SendMessage sendMessage;
         final RelayPrivateMessage relay;
         final Reply reply;
         final HelpOp helpOp;
@@ -491,15 +535,17 @@ class CrossServerMessagingTest {
             NetworkPresence presence = new Presence();
             VanishVisibility vanish = new Vanish();
             ReplyRoutingStore replyRouting = new Switch(repliesOff);
-            SendMessage sendMessage = new SendMessage(
+            IgnoreStore ignores = new SharedIgnores();
+            SendMail sendMail = new SendMail(new Mail(), ignores, delivery, network::mute, notifier, events, CLOCK);
+            this.sendMessage = new SendMessage(
                     delivery,
-                    new SharedIgnores(),
+                    ignores,
                     new Conversations(),
                     new Switch(toggledOff),
                     new Spies(),
                     network::mute,
                     (AfkStatus) who -> Optional.ofNullable(away.get(who.uuid())),
-                    new Mail(),
+                    sendMail,
                     network.offlineToMail,
                     notifier,
                     events,
@@ -547,6 +593,11 @@ class CrossServerMessagingTest {
         void msg(PlayerRef sender, String target, String text) {
             OnlinePlayer elsewhere = relay.elsewhere(target).orElseThrow();
             relay.send(sender, elsewhere, body(text));
+        }
+
+        /** {@code /msg} to a player who is on no backend at all. */
+        void msgOffline(PlayerRef sender, PlayerRef target, String text) {
+            sendMessage.send(sender, target, body(text), false);
         }
 
         /** Let every wait for an answer run out. */
@@ -757,7 +808,9 @@ class CrossServerMessagingTest {
 
             @Override
             public void notifyNewMail(PlayerRef recipient, MailItem item) {
-                lines.add(recipient.name() + ": new mail");
+                if (connected.contains(recipient.uuid())) {
+                    lines.add(recipient.name() + ": new mail");
+                }
             }
 
             @Override

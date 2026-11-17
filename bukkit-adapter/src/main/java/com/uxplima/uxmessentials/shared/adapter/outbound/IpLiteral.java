@@ -28,8 +28,22 @@ public final class IpLiteral {
         return Optional.of(InetAddresses.forString(typed).getHostAddress());
     }
 
-    /** True when {@code argument} was meant as an address rather than a player name. */
-    public static boolean looksLikeAddress(String argument) {
-        return argument.contains(".") || argument.contains(":");
+    /**
+     * True when {@code typed} is written only the way an address is (digits and dots from a digit, or hex digits and
+     * dots around a colon) without being one, so a miss reads as a mistyped address rather than an unknown player. A
+     * dot or colon alone says nothing: Floodgate names start with a prefix such as {@code .} that the operator picks.
+     */
+    public static boolean malformedAddress(String typed) {
+        if (typed.isEmpty() || canonical(typed).isPresent()) {
+            return false;
+        }
+        if (typed.indexOf(':') >= 0) {
+            return typed.chars().allMatch(c -> c == ':' || c == '.' || Character.digit(c, 16) >= 0);
+        }
+        return isAsciiDigit(typed.charAt(0)) && typed.chars().allMatch(c -> c == '.' || isAsciiDigit(c));
+    }
+
+    private static boolean isAsciiDigit(int c) {
+        return c >= '0' && c <= '9';
     }
 }
