@@ -6,6 +6,7 @@ import java.util.Objects;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
+import com.uxplima.uxmessentials.shared.adapter.outbound.papi.PlaceholderShield;
 import com.uxplima.uxmessentials.shared.application.port.LocaleCatalog;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
@@ -37,12 +38,19 @@ public final class CatalogMessages implements Messages {
 
     @Override
     public String resolve(PlayerRef viewer, MessageKey key, Map<String, String> placeholders) {
+        return fill(template(viewer, key), Objects.requireNonNull(placeholders, "placeholders"), true);
+    }
+
+    @Override
+    public String resolveAsWritten(PlayerRef viewer, MessageKey key, Map<String, String> arguments) {
+        return fill(template(viewer, key), Objects.requireNonNull(arguments, "arguments"), false);
+    }
+
+    private String template(PlayerRef viewer, MessageKey key) {
         Objects.requireNonNull(viewer, "viewer");
         Objects.requireNonNull(key, "key");
-        Objects.requireNonNull(placeholders, "placeholders");
         Locale locale = locales.resolve(viewer);
-        String template = catalog.template(locale, key);
-        return fill(template, placeholders);
+        return catalog.template(locale, key);
     }
 
     /** A {@code {token}} argument in a catalog template; {@code group(1)} is the bare token name. */
@@ -60,8 +68,17 @@ public final class CatalogMessages implements Messages {
      * <p>A token the map does not answer is left as written, so an operator still sees the token they typed rather
      * than a blank. A value is inserted literally: a value that itself contains a brace token is never substituted
      * again, so the result does not depend on map order and one value cannot rewrite another.
+     *
+     * <p>The line is handed to PlaceholderAPI for its reader after it is filled, so a value is shielded first (see
+     * {@link PlaceholderShield}): a placeholder the operator wrote in the template is filled, and one inside a value,
+     * which a player may have typed, reads as written. A value inside a click or insertion argument is left exact,
+     * since it is a command or an address rather than words on screen.
      */
     public static String fill(String template, Map<String, String> placeholders) {
+        return fill(template, placeholders, true);
+    }
+
+    private static String fill(String template, Map<String, String> placeholders, boolean shield) {
         if (template.indexOf('{') < 0) {
             return template;
         }
@@ -69,9 +86,26 @@ public final class CatalogMessages implements Messages {
         StringBuilder out = new StringBuilder();
         while (matcher.find()) {
             String value = placeholders.get(matcher.group(1));
-            matcher.appendReplacement(out, Matcher.quoteReplacement(value != null ? value : matcher.group()));
+            String inserted = value == null
+                    ? matcher.group()
+                    : shield && !exactText(template, matcher.start()) ? PlaceholderShield.shield(value) : value;
+            matcher.appendReplacement(out, Matcher.quoteReplacement(inserted));
         }
         matcher.appendTail(out);
         return out.toString();
+    }
+
+    /**
+     * Whether the token at {@code at} is inside a click or insertion tag's argument: a command, an address or text to
+     * copy, which has to stay byte for byte what it was (a setup link holds {@code %3A}), and which nobody reads on
+     * screen.
+     */
+    private static boolean exactText(String template, int at) {
+        int open = template.lastIndexOf('<', at);
+        if (open < 0 || template.indexOf('>', open) < at) {
+            return false;
+        }
+        String tag = template.substring(open + 1, at).toLowerCase(Locale.ROOT);
+        return tag.startsWith("click:") || tag.startsWith("insert:") || tag.startsWith("insertion:");
     }
 }

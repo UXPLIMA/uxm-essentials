@@ -82,7 +82,7 @@ public final class GuiText implements com.uxplima.uxmlib.gui.GuiText {
         // operator's own arguments are the operator's words, so their placeholders resolve. The engine's values go in
         // afterwards as they are: one may be text a player typed, and a %placeholder% in it would otherwise be
         // answered on somebody else's screen.
-        String template = messages.resolve(who, reference.key(), reference.arguments());
+        String template = messages.resolveAsWritten(who, reference.key(), reference.arguments());
         String expanded = PlaceholderApiSupport.hasPlaceholder(template)
                 ? PlaceholderApiSupport.messageBridge(viewer.getUniqueId()).apply(template)
                 : template;

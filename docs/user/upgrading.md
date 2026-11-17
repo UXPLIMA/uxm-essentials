@@ -3,6 +3,13 @@
 What an operator edits when a release renames something an operator's own files or permission grants depend on, or
 needs a setting it did not need before.
 
+## Placeholders typed by players stay as typed
+
+With PlaceholderAPI installed, a `%placeholder%` inside a value (a private message, mail, help request, staff chat
+line, nickname, item or sign name, or a line relayed from another server) is no longer filled in for the reader; it
+shows as typed. Placeholders you write into a message file, the `<prefix>`, an `@key` line's own arguments and a
+`/broadcast` line are still filled, and the `<prefix>` now fills its placeholders too.
+
 ## Nicks are kept in the database
 
 A `/nick` is kept in the new `player_nicks` table, so it survives a relog and follows the player to every server; it

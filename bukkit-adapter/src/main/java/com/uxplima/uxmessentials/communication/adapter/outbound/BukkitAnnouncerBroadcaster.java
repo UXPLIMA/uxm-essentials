@@ -179,9 +179,12 @@ public final class BukkitAnnouncerBroadcaster {
         });
     }
 
-    /** {@code body} inside the broadcast frame as {@code viewer} reads it. */
+    /**
+     * {@code body} inside the broadcast frame as {@code viewer} reads it. The body is the line of a sender trusted to
+     * write markup, so its placeholders are filled for each reader like the frame's own.
+     */
     private String framed(PlayerRef viewer, String body) {
-        return messages.resolve(viewer, CommunicationMessageKey.BROADCAST_LINE, Map.of("message", body));
+        return messages.resolveAsWritten(viewer, CommunicationMessageKey.BROADCAST_LINE, Map.of("message", body));
     }
 
     /**
