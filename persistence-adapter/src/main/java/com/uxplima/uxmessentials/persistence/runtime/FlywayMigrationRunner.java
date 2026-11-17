@@ -115,13 +115,19 @@ public final class FlywayMigrationRunner {
     }
 
     /**
-     * Scripts only one backend runs, numbered in the same sequence as the shared ones. MySQL and MariaDB cap a TEXT
-     * column at 64 KB, and widening one needs their own MODIFY, which SQLite cannot parse. The folder sits outside
-     * {@code db/migration} because Flyway reads a location's subfolders too, and the jOOQ classes are generated from
-     * {@code db/migration} alone, so the shared schema stays the one every backend agrees on.
+     * Scripts only one backend runs, numbered in the same sequence as the shared ones. A column is widened in each
+     * server's own syntax, which SQLite cannot parse and does not need, since it stores a value of any length: MySQL and
+     * MariaDB cap a TEXT column at 64 KB, and both they and PostgreSQL hold a VARCHAR to its declared length. The
+     * folders sit outside {@code db/migration} because Flyway reads a location's subfolders too. The jOOQ classes are
+     * generated from {@code db/migration} and the PostgreSQL folder, so the lengths a write is fitted to are the
+     * widened ones.
      */
     public static Optional<String> vendorLocation(DatabaseBackend backend) {
-        return backend == DatabaseBackend.MARIADB ? Optional.of("classpath:db/vendor/mariadb") : Optional.empty();
+        return switch (backend) {
+            case MARIADB -> Optional.of("classpath:db/vendor/mariadb");
+            case POSTGRES -> Optional.of("classpath:db/vendor/postgresql");
+            case SQLITE -> Optional.empty();
+        };
     }
 
     /**

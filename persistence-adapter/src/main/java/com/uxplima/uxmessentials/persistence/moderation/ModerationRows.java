@@ -139,8 +139,10 @@ final class ModerationRows {
         private SeenMapper() {}
 
         static SeenRecord toSeen(ModerationSeenRecord row) {
+            // A blank name is an account nobody had a name for when its row was made: it goes by its uuid.
+            String name = row.getName().isBlank() ? row.getUuid() : row.getName();
             return new SeenRecord(
-                    new PlayerRef(UUID.fromString(row.getUuid()), row.getName()),
+                    new PlayerRef(UUID.fromString(row.getUuid()), name),
                     Optional.ofNullable(row.getLastIp()),
                     Instant.ofEpochMilli(row.getFirstSeen()),
                     Instant.ofEpochMilli(row.getLastSeen()));
