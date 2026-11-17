@@ -14,6 +14,7 @@ import org.bukkit.entity.Player;
 
 import net.kyori.adventure.text.Component;
 
+import com.uxplima.uxmessentials.shared.adapter.inbound.gui.MenuText;
 import com.uxplima.uxmessentials.shared.adapter.outbound.BukkitRefs;
 import com.uxplima.uxmessentials.shared.adapter.outbound.EngineLog;
 import com.uxplima.uxmessentials.shared.adapter.outbound.style.StyledText;
@@ -91,16 +92,21 @@ public final class WarpCategorySettingsView {
         Objects.requireNonNull(bindings, "bindings");
         Objects.requireNonNull(dataFolder, "dataFolder");
         Objects.requireNonNull(log, "log");
-        bindings.placeholder("warp_cat_set_id", ctx -> subject(ctx).id());
-        bindings.placeholder("warp_cat_set_name", ctx -> subject(ctx).displayName());
-        bindings.placeholder(
-                "warp_cat_set_material", ctx -> subject(ctx).displayMaterial().orElse("BOOK"));
-        bindings.placeholder(
+        MenuText.text(bindings, "warp_cat_set_id", ctx -> subject(ctx).id());
+        MenuText.markup(bindings, "warp_cat_set_name", ctx -> subject(ctx).displayName());
+        MenuText.text(
+                bindings,
+                "warp_cat_set_material",
+                ctx -> subject(ctx).displayMaterial().orElse("BOOK"));
+        MenuText.text(
+                bindings,
                 "warp_cat_set_lore_count",
                 ctx -> Integer.toString(subject(ctx).displayLore().size()));
-        bindings.placeholder(
-                "warp_cat_set_slot", ctx -> Integer.toString(subject(ctx).slot()));
-        bindings.placeholder("warp_cat_set_parent", this::parentName);
+        MenuText.text(
+                bindings,
+                "warp_cat_set_slot",
+                ctx -> Integer.toString(subject(ctx).slot()));
+        MenuText.markup(bindings, "warp_cat_set_parent", this::parentName);
         bindings.action("warps:cat-set-name", this::promptName);
         bindings.action("warps:cat-set-material", this::setMaterial);
         bindings.action("warps:cat-set-lore", this::promptLore);

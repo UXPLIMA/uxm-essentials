@@ -9,6 +9,7 @@ import java.util.Optional;
 import org.bukkit.inventory.Inventory;
 import org.bukkit.inventory.ItemStack;
 
+import com.uxplima.uxmessentials.shared.adapter.inbound.gui.MenuText;
 import com.uxplima.uxmessentials.shared.adapter.outbound.BukkitRefs;
 import com.uxplima.uxmessentials.shared.adapter.outbound.EngineLog;
 import com.uxplima.uxmessentials.shared.adapter.outbound.LivePlayers;
@@ -68,7 +69,8 @@ public final class CrossTradeWindow {
     void register(MenuBindings bindings, CrossServerTradeView view) {
         Objects.requireNonNull(bindings, "bindings");
         Objects.requireNonNull(view, "view");
-        bindings.placeholder(
+        MenuText.markup(
+                bindings,
                 "trade_cross_title",
                 ctx -> messages.resolve(
                         BukkitRefs.toRef(ctx.viewer()),

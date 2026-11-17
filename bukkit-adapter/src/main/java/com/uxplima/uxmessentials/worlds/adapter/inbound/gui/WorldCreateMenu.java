@@ -11,6 +11,7 @@ import java.util.function.Supplier;
 
 import org.bukkit.entity.Player;
 
+import com.uxplima.uxmessentials.shared.adapter.inbound.gui.MenuText;
 import com.uxplima.uxmessentials.shared.adapter.outbound.BukkitRefs;
 import com.uxplima.uxmessentials.shared.application.message.Notifier;
 import com.uxplima.uxmessentials.shared.application.port.Logger;
@@ -94,14 +95,22 @@ public final class WorldCreateMenu {
         Objects.requireNonNull(bindings, "bindings");
         Objects.requireNonNull(dataFolder, "dataFolder");
         Objects.requireNonNull(log, "log");
-        bindings.placeholder(
-                "world_create_name", ctx -> draft(ctx).hasName() ? draft(ctx).name() : NAME_UNSET);
-        bindings.placeholder(
-                "world_create_environment", ctx -> draft(ctx).environment().name());
-        bindings.placeholder("world_create_type", ctx -> draft(ctx).worldType().name());
-        bindings.placeholder(
-                "world_create_generator", ctx -> draft(ctx).generatorId().orElse(GENERATOR_VANILLA));
-        bindings.placeholder(
+        MenuText.text(
+                bindings,
+                "world_create_name",
+                ctx -> draft(ctx).hasName() ? draft(ctx).name() : NAME_UNSET);
+        MenuText.text(
+                bindings,
+                "world_create_environment",
+                ctx -> draft(ctx).environment().name());
+        MenuText.text(
+                bindings, "world_create_type", ctx -> draft(ctx).worldType().name());
+        MenuText.text(
+                bindings,
+                "world_create_generator",
+                ctx -> draft(ctx).generatorId().orElse(GENERATOR_VANILLA));
+        MenuText.text(
+                bindings,
                 "world_create_seed",
                 ctx -> draft(ctx).seed().map(String::valueOf).orElse(SEED_RANDOM));
         bindings.action("worlds:create-name", this::promptName);

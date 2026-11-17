@@ -9,6 +9,7 @@ import java.util.Optional;
 
 import org.bukkit.entity.Player;
 
+import com.uxplima.uxmessentials.shared.adapter.inbound.gui.MenuText;
 import com.uxplima.uxmessentials.shared.adapter.outbound.BukkitRefs;
 import com.uxplima.uxmessentials.shared.adapter.outbound.EngineLog;
 import com.uxplima.uxmessentials.shared.application.port.Logger;
@@ -70,11 +71,12 @@ public final class WarpCategorySelectorMenu {
         Objects.requireNonNull(log, "log");
         bindings.list(
                 "warps:category-selector", ctx -> ctx.subject(Selection.class).categories());
-        bindings.placeholder(
+        MenuText.text(
+                bindings,
                 "warp_category_icon",
                 ctx -> WarpCategoryIcons.material(categoryOf(ctx)).name());
-        bindings.placeholder("warp_category_name", ctx -> categoryOf(ctx).displayName());
-        bindings.placeholder("warp_category_lore", this::lore);
+        MenuText.markup(bindings, "warp_category_name", ctx -> categoryOf(ctx).displayName());
+        MenuText.markup(bindings, "warp_category_lore", this::lore);
         bindings.action("warps:category-assign", this::assignClicked);
         bindings.action("warps:category-clear", this::clearClicked);
         bindings.action("warps:category-back", this::backClicked);

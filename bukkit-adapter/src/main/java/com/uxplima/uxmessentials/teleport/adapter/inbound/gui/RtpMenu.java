@@ -11,6 +11,7 @@ import org.bukkit.Server;
 import org.bukkit.World;
 import org.bukkit.entity.Player;
 
+import com.uxplima.uxmessentials.shared.adapter.inbound.gui.MenuText;
 import com.uxplima.uxmessentials.shared.adapter.outbound.BukkitRefs;
 import com.uxplima.uxmessentials.shared.adapter.outbound.EngineLog;
 import com.uxplima.uxmessentials.shared.application.port.Logger;
@@ -69,8 +70,8 @@ public final class RtpMenu {
         Objects.requireNonNull(log, "log");
         bindings.list(
                 "teleport:rtp-worlds", ctx -> ctx.subject(WorldLevel.class).rows());
-        bindings.placeholder("rtp_world_icon", ctx -> rowOf(ctx).icon());
-        bindings.placeholder("rtp_world_name", ctx -> rowOf(ctx).name());
+        MenuText.text(bindings, "rtp_world_icon", ctx -> rowOf(ctx).icon());
+        MenuText.text(bindings, "rtp_world_name", ctx -> rowOf(ctx).name());
         bindings.action("teleport:rtp-world", this::clickWorld);
         menus.registerSpec(SPEC_ID, MenuSpecs.loadOrBundled(SPEC_RESOURCE, dataFolder, 6, EngineLog.of(log)));
     }

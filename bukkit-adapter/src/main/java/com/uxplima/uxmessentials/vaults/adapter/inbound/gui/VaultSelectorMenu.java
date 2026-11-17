@@ -11,6 +11,7 @@ import org.bukkit.Material;
 import org.bukkit.entity.Player;
 
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.GuiLayout;
+import com.uxplima.uxmessentials.shared.adapter.inbound.gui.MenuText;
 import com.uxplima.uxmessentials.shared.adapter.outbound.BukkitRefs;
 import com.uxplima.uxmessentials.shared.adapter.outbound.EngineLog;
 import com.uxplima.uxmessentials.shared.application.port.Logger;
@@ -107,9 +108,9 @@ public final class VaultSelectorMenu {
         Objects.requireNonNull(dataFolder, "dataFolder");
         Objects.requireNonNull(log, "log");
         bindings.list("vault:slots", this::slots);
-        bindings.placeholder("vault_icon", this::icon);
-        bindings.placeholder("vault_name", this::name);
-        bindings.placeholder("vault_lore", this::lore);
+        MenuText.text(bindings, "vault_icon", this::icon);
+        MenuText.markup(bindings, "vault_name", this::name);
+        MenuText.markup(bindings, "vault_lore", this::lore);
         bindings.action("vault:open-slot", this::openSlot);
         menus.registerSpec(SPEC_ID, MenuSpecs.loadOrBundled(SPEC_RESOURCE, dataFolder, 3, EngineLog.of(log)));
     }

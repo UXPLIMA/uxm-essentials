@@ -66,6 +66,7 @@ public interface MenuApi {
     /**
      * Register a custom placeholder under {@code id}. The renderer expands {@code %id%} in a menu title, item name
      * or lore line to the string the handler returns for the current view. Return an empty string to render nothing.
+     * The string goes into the line as MiniMessage, so escape any text a player wrote before returning it.
      *
      * @throws IllegalStateException if a placeholder is already registered under {@code id}
      */

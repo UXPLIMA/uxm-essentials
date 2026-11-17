@@ -7,6 +7,7 @@ import java.util.function.BiConsumer;
 
 import org.bukkit.entity.Player;
 
+import com.uxplima.uxmessentials.shared.adapter.inbound.gui.MenuText;
 import com.uxplima.uxmessentials.shared.adapter.outbound.BukkitRefs;
 import com.uxplima.uxmessentials.shared.application.port.Logger;
 import com.uxplima.uxmessentials.shared.application.port.Scheduler;
@@ -99,17 +100,22 @@ public final class WorldMainMenu {
     }
 
     private void registerPlaceholders(MenuBindings bindings) {
-        bindings.placeholder("world_main_name", ctx -> subject(ctx).world().value());
-        bindings.placeholder("world_main_environment", ctx -> subject(ctx).environment());
-        bindings.placeholder("world_main_type", ctx -> subject(ctx).type());
-        bindings.placeholder(
-                "world_main_loaded", ctx -> String.valueOf(subject(ctx).loaded()));
-        bindings.placeholder(
-                "world_main_players", ctx -> String.valueOf(subject(ctx).players()));
-        bindings.placeholder("world_main_alias", ctx -> subject(ctx).alias());
-        bindings.placeholder("world_main_toggle_material", ctx -> subject(ctx).loaded() ? "LIME_DYE" : "GRAY_DYE");
-        bindings.placeholder(
-                "world_main_toggle_key", ctx -> toggleKey(subject(ctx).loaded()));
+        MenuText.text(bindings, "world_main_name", ctx -> subject(ctx).world().value());
+        MenuText.text(bindings, "world_main_environment", ctx -> subject(ctx).environment());
+        MenuText.text(bindings, "world_main_type", ctx -> subject(ctx).type());
+        MenuText.text(
+                bindings,
+                "world_main_loaded",
+                ctx -> String.valueOf(subject(ctx).loaded()));
+        MenuText.text(
+                bindings,
+                "world_main_players",
+                ctx -> String.valueOf(subject(ctx).players()));
+        MenuText.text(bindings, "world_main_alias", ctx -> subject(ctx).alias());
+        MenuText.text(
+                bindings, "world_main_toggle_material", ctx -> subject(ctx).loaded() ? "LIME_DYE" : "GRAY_DYE");
+        MenuText.text(
+                bindings, "world_main_toggle_key", ctx -> toggleKey(subject(ctx).loaded()));
     }
 
     /**

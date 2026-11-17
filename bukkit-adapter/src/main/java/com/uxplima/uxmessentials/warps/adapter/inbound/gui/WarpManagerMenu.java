@@ -9,6 +9,7 @@ import java.util.function.BiConsumer;
 import org.bukkit.Material;
 import org.bukkit.entity.Player;
 
+import com.uxplima.uxmessentials.shared.adapter.inbound.gui.MenuText;
 import com.uxplima.uxmessentials.shared.adapter.outbound.BukkitRefs;
 import com.uxplima.uxmessentials.shared.adapter.outbound.EngineLog;
 import com.uxplima.uxmessentials.shared.application.port.Logger;
@@ -86,17 +87,25 @@ public final class WarpManagerMenu {
         Objects.requireNonNull(dataFolder, "dataFolder");
         Objects.requireNonNull(log, "log");
         bindings.list("warps:manager", ctx -> ctx.subject(WarpGrid.class).rows());
-        bindings.placeholder("warp_manager_icon", ctx -> material(rowOf(ctx)).name());
-        bindings.placeholder("warp_manager_name", ctx -> name(BukkitRefs.toRef(ctx.viewer()), rowOf(ctx)));
-        bindings.placeholder("warp_manager_category", ctx -> category(BukkitRefs.toRef(ctx.viewer()), rowOf(ctx)));
-        bindings.placeholder(
-                "warp_manager_world", ctx -> rowOf(ctx).location().world().name());
-        bindings.placeholder(
-                "warp_manager_x", ctx -> Integer.toString(rowOf(ctx).location().blockX()));
-        bindings.placeholder(
-                "warp_manager_y", ctx -> Integer.toString(rowOf(ctx).location().blockY()));
-        bindings.placeholder(
-                "warp_manager_z", ctx -> Integer.toString(rowOf(ctx).location().blockZ()));
+        MenuText.text(bindings, "warp_manager_icon", ctx -> material(rowOf(ctx)).name());
+        MenuText.markup(bindings, "warp_manager_name", ctx -> name(BukkitRefs.toRef(ctx.viewer()), rowOf(ctx)));
+        MenuText.markup(bindings, "warp_manager_category", ctx -> category(BukkitRefs.toRef(ctx.viewer()), rowOf(ctx)));
+        MenuText.text(
+                bindings,
+                "warp_manager_world",
+                ctx -> rowOf(ctx).location().world().name());
+        MenuText.text(
+                bindings,
+                "warp_manager_x",
+                ctx -> Integer.toString(rowOf(ctx).location().blockX()));
+        MenuText.text(
+                bindings,
+                "warp_manager_y",
+                ctx -> Integer.toString(rowOf(ctx).location().blockY()));
+        MenuText.text(
+                bindings,
+                "warp_manager_z",
+                ctx -> Integer.toString(rowOf(ctx).location().blockZ()));
         bindings.action("warps:manager-edit", this::edit);
         bindings.action("warps:manager-create", this::create);
         bindings.action("warps:manager-categories", this::categories);

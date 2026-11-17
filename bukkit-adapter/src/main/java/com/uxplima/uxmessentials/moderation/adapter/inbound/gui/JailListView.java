@@ -17,9 +17,12 @@ import com.uxplima.uxmessentials.moderation.domain.ModerationMessageKey;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.EntityListLayout;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.EntityListView;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.GuiText;
+import com.uxplima.uxmessentials.shared.adapter.inbound.gui.MenuText;
 import com.uxplima.uxmessentials.shared.adapter.outbound.BukkitRefs;
 import com.uxplima.uxmessentials.shared.adapter.outbound.EngineLog;
+import com.uxplima.uxmessentials.shared.adapter.outbound.style.StyledText;
 import com.uxplima.uxmessentials.shared.adapter.outbound.style.Tiles;
+import com.uxplima.uxmessentials.shared.application.message.TrustedMarkup;
 import com.uxplima.uxmessentials.shared.application.port.Logger;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
 import com.uxplima.uxmessentials.shared.application.port.Scheduler;
@@ -116,8 +119,8 @@ public final class JailListView {
         Objects.requireNonNull(bindings, "bindings");
         Objects.requireNonNull(dataFolder, "dataFolder");
         Objects.requireNonNull(log, "log");
-        bindings.placeholder("mod_jail_edit_jail", ctx -> subject(ctx).name());
-        bindings.placeholder("mod_jail_edit_coords", ctx -> subject(ctx).coords());
+        MenuText.text(bindings, "mod_jail_edit_jail", ctx -> subject(ctx).name());
+        MenuText.markup(bindings, "mod_jail_edit_coords", ctx -> subject(ctx).coords());
         bindings.action("moderation:jail-reanchor", this::reAnchor);
         bindings.action("moderation:jail-goto", this::goTo);
         bindings.action("moderation:jail-delete", this::delete);
@@ -150,18 +153,19 @@ public final class JailListView {
      * The placeholder map every jail list item shares: the jail name and its location as a single
      * {@code world x, y, z} string. The coordinates are resolved store-first then config (the same precedence a
      * jailed player is sent to); a jail whose world cannot be resolved shows the localised "unknown" word so the
-     * lore line is never blank.
+     * lore line is never blank. The location is markup, the world name escaped in it, so the edit screen can show it as
+     * it is.
      */
     private Map<String, String> placeholders(PlayerRef viewer, String name) {
-        return Map.of("jail", name, "coords", coords(viewer, name));
+        return Map.of("jail", name, "coords", TrustedMarkup.of(coords(viewer, name)));
     }
 
     private String coords(PlayerRef viewer, String name) {
         return jailLocator
                 .locate(name)
-                .map(at -> at.world() + " " + at.x() + ", " + at.y() + ", " + at.z())
+                .map(at -> StyledText.escape(at.world()) + " " + at.x() + ", " + at.y() + ", " + at.z())
                 .orElseGet(
-                        () -> messages.fragment(viewer, ModerationMessageKey.MOD_GUI_JAIL_LOCATION_UNKNOWN, Map.of()));
+                        () -> messages.resolve(viewer, ModerationMessageKey.MOD_GUI_JAIL_LOCATION_UNKNOWN, Map.of()));
     }
 
     /** Open the engine edit screen: resolve the jail's coordinates off-thread, then hand them in as the subject. */

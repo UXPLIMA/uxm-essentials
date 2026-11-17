@@ -15,6 +15,7 @@ import com.uxplima.uxmessentials.playerwarps.domain.PlayerWarp;
 import com.uxplima.uxmessentials.playerwarps.domain.PlayerWarpName;
 import com.uxplima.uxmessentials.playerwarps.domain.PlayerwarpsMessageKey;
 import com.uxplima.uxmessentials.playerwarps.domain.WarpAccess;
+import com.uxplima.uxmessentials.shared.adapter.inbound.gui.MenuText;
 import com.uxplima.uxmessentials.shared.adapter.outbound.BukkitRefs;
 import com.uxplima.uxmessentials.shared.adapter.outbound.EngineLog;
 import com.uxplima.uxmessentials.shared.application.permission.DestinationPermissions;
@@ -104,21 +105,24 @@ public final class PlayerWarpListMenu {
         Objects.requireNonNull(dataFolder, "dataFolder");
         Objects.requireNonNull(log, "log");
         bindings.list("playerwarps:list", this::warps);
-        bindings.placeholder("pwarp_icon", ctx -> iconMaterial(warpOf(ctx)).name());
-        bindings.placeholder("pwarp_name", ctx -> warpOf(ctx).name().value());
-        bindings.placeholder("pwarp_owner", ctx -> ownedOf(ctx).owner().name());
-        bindings.placeholder(
-                "pwarp_world", ctx -> warpOf(ctx).location().world().name());
-        bindings.placeholder(
+        MenuText.text(bindings, "pwarp_icon", ctx -> iconMaterial(warpOf(ctx)).name());
+        MenuText.text(bindings, "pwarp_name", ctx -> warpOf(ctx).name().value());
+        MenuText.text(bindings, "pwarp_owner", ctx -> ownedOf(ctx).owner().name());
+        MenuText.text(
+                bindings, "pwarp_world", ctx -> warpOf(ctx).location().world().name());
+        MenuText.text(
+                bindings,
                 "pwarp_x",
                 ctx -> Long.toString(Math.round(warpOf(ctx).location().x())));
-        bindings.placeholder(
+        MenuText.text(
+                bindings,
                 "pwarp_y",
                 ctx -> Long.toString(Math.round(warpOf(ctx).location().y())));
-        bindings.placeholder(
+        MenuText.text(
+                bindings,
                 "pwarp_z",
                 ctx -> Long.toString(Math.round(warpOf(ctx).location().z())));
-        bindings.placeholder("pwarp_visibility", this::visibilityWord);
+        MenuText.markup(bindings, "pwarp_visibility", this::visibilityWord);
         bindings.action("playerwarps:edit", this::edit);
         bindings.action("playerwarps:create", this::create);
         menus.registerSpec(SPEC_ID, MenuSpecs.loadOrBundled(SPEC_RESOURCE, dataFolder, 6, EngineLog.of(log)));

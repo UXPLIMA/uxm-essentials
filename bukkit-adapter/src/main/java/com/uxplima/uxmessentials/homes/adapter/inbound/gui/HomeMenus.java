@@ -10,6 +10,7 @@ import org.bukkit.entity.Player;
 import com.uxplima.uxmessentials.homes.application.SetHomeIcon;
 import com.uxplima.uxmessentials.homes.domain.Home;
 import com.uxplima.uxmessentials.homes.domain.HomeIcon;
+import com.uxplima.uxmessentials.shared.adapter.inbound.gui.MenuText;
 import com.uxplima.uxmessentials.shared.adapter.outbound.BukkitRefs;
 import com.uxplima.uxmessentials.shared.adapter.outbound.EngineLog;
 import com.uxplima.uxmessentials.shared.application.port.Logger;
@@ -80,7 +81,7 @@ public final class HomeMenus {
         Objects.requireNonNull(dataFolder, "dataFolder");
         Objects.requireNonNull(log, "log");
         bindings.list("homes:icon-palette", ctx -> iconLayout.icons());
-        bindings.placeholder("home_icon_name", this::iconName);
+        MenuText.text(bindings, "home_icon_name", this::iconName);
         bindings.action("homes:set-icon", this::setIcon);
         bindings.action("homes:reset-icon", this::resetIcon);
         bindings.action("homes:icon-back", this::iconBack);

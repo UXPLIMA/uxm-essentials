@@ -19,6 +19,7 @@ import com.uxplima.uxmessentials.kits.domain.KitCost;
 import com.uxplima.uxmessentials.kits.domain.KitDefinition;
 import com.uxplima.uxmessentials.kits.domain.KitsMessageKey;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.GuiText;
+import com.uxplima.uxmessentials.shared.adapter.inbound.gui.MenuText;
 import com.uxplima.uxmessentials.shared.adapter.outbound.BukkitRefs;
 import com.uxplima.uxmessentials.shared.adapter.outbound.EngineLog;
 import com.uxplima.uxmessentials.shared.application.port.Logger;
@@ -111,30 +112,39 @@ public final class KitSettingsView {
     }
 
     private void registerPlaceholders(MenuBindings bindings) {
-        bindings.placeholder("kit_set_id", ctx -> subject(ctx).id().value());
-        bindings.placeholder("kit_set_perm_material", ctx -> subject(ctx).permission() ? "PAPER" : "BARRIER");
-        bindings.placeholder(
-                "kit_set_permission", ctx -> required(ctx, subject(ctx).permission()));
-        bindings.placeholder("kit_set_onetime", ctx -> yesNo(ctx, subject(ctx).oneTime()));
-        bindings.placeholder(
-                "kit_set_cooldown", ctx -> Long.toString(subject(ctx).cooldownSeconds()));
-        bindings.placeholder("kit_set_cost", this::cost);
-        bindings.placeholder("kit_set_display_name", this::displayName);
-        bindings.placeholder(
+        MenuText.text(bindings, "kit_set_id", ctx -> subject(ctx).id().value());
+        MenuText.text(bindings, "kit_set_perm_material", ctx -> subject(ctx).permission() ? "PAPER" : "BARRIER");
+        MenuText.markup(
+                bindings,
+                "kit_set_permission",
+                ctx -> required(ctx, subject(ctx).permission()));
+        MenuText.markup(
+                bindings, "kit_set_onetime", ctx -> yesNo(ctx, subject(ctx).oneTime()));
+        MenuText.text(
+                bindings, "kit_set_cooldown", ctx -> Long.toString(subject(ctx).cooldownSeconds()));
+        MenuText.markup(bindings, "kit_set_cost", this::cost);
+        MenuText.markup(bindings, "kit_set_display_name", this::displayName);
+        MenuText.text(
+                bindings,
                 "kit_set_display_material",
                 ctx -> displayMaterial(subject(ctx)).name().toLowerCase(Locale.ROOT));
-        bindings.placeholder(
+        MenuText.text(
+                bindings,
                 "kit_set_display_material_icon",
                 ctx -> displayMaterial(subject(ctx)).name());
-        bindings.placeholder(
+        MenuText.text(
+                bindings,
                 "kit_set_display_lore_count",
                 ctx -> Integer.toString(subject(ctx).display().lore().size()));
-        bindings.placeholder(
+        MenuText.text(
+                bindings,
                 "kit_set_commands_count",
                 ctx -> Integer.toString(subject(ctx).commands().size()));
-        bindings.placeholder("kit_set_firstjoin", ctx -> yesNo(ctx, subject(ctx).firstJoin()));
-        bindings.placeholder("kit_set_autoequip", ctx -> yesNo(ctx, subject(ctx).autoEquip()));
-        bindings.placeholder("kit_set_category", this::category);
+        MenuText.markup(
+                bindings, "kit_set_firstjoin", ctx -> yesNo(ctx, subject(ctx).firstJoin()));
+        MenuText.markup(
+                bindings, "kit_set_autoequip", ctx -> yesNo(ctx, subject(ctx).autoEquip()));
+        MenuText.markup(bindings, "kit_set_category", this::category);
     }
 
     private void registerActions(MenuBindings bindings) {

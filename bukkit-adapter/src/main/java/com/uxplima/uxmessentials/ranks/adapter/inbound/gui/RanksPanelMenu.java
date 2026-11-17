@@ -15,6 +15,7 @@ import com.uxplima.uxmessentials.ranks.domain.RankLadder;
 import com.uxplima.uxmessentials.ranks.domain.RankStanding;
 import com.uxplima.uxmessentials.ranks.domain.RanksMessageKey;
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandFeedback;
+import com.uxplima.uxmessentials.shared.adapter.inbound.gui.MenuText;
 import com.uxplima.uxmessentials.shared.adapter.outbound.BukkitRefs;
 import com.uxplima.uxmessentials.shared.adapter.outbound.EngineLog;
 import com.uxplima.uxmessentials.shared.application.port.Logger;
@@ -84,11 +85,11 @@ public final class RanksPanelMenu {
         Objects.requireNonNull(bindings, "bindings");
         Objects.requireNonNull(dataFolder, "dataFolder");
         Objects.requireNonNull(log, "log");
-        bindings.placeholder("ranks_current", ctx -> subject(ctx).current());
-        bindings.placeholder("ranks_prestige", ctx -> subject(ctx).prestige());
-        bindings.placeholder("ranks_next", ctx -> subject(ctx).next());
-        bindings.placeholder("ranks_next_cost", ctx -> subject(ctx).nextCost());
-        bindings.placeholder("ranks_next_requirements", ctx -> subject(ctx).nextRequirements());
+        MenuText.markup(bindings, "ranks_current", ctx -> subject(ctx).current());
+        MenuText.text(bindings, "ranks_prestige", ctx -> subject(ctx).prestige());
+        MenuText.markup(bindings, "ranks_next", ctx -> subject(ctx).next());
+        MenuText.text(bindings, "ranks_next_cost", ctx -> subject(ctx).nextCost());
+        MenuText.text(bindings, "ranks_next_requirements", ctx -> subject(ctx).nextRequirements());
         bindings.action("ranks:rankup", this::onRankup);
         menus.registerSpec(SPEC_ID, MenuSpecs.loadOrBundled(SPEC_RESOURCE, dataFolder, 3, EngineLog.of(log)));
     }

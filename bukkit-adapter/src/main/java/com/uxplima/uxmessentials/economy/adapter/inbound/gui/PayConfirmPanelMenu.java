@@ -7,6 +7,7 @@ import org.bukkit.entity.Player;
 
 import com.uxplima.uxmessentials.economy.application.Pay;
 import com.uxplima.uxmessentials.economy.domain.Money;
+import com.uxplima.uxmessentials.shared.adapter.inbound.gui.MenuText;
 import com.uxplima.uxmessentials.shared.adapter.outbound.BukkitRefs;
 import com.uxplima.uxmessentials.shared.adapter.outbound.EngineLog;
 import com.uxplima.uxmessentials.shared.application.port.Logger;
@@ -54,8 +55,10 @@ public final class PayConfirmPanelMenu {
         Objects.requireNonNull(bindings, "bindings");
         Objects.requireNonNull(dataFolder, "dataFolder");
         Objects.requireNonNull(log, "log");
-        bindings.placeholder("payconfirm_target", ctx -> subject(ctx).target().name());
-        bindings.placeholder("payconfirm_amount", ctx -> amountText(subject(ctx).amount()));
+        MenuText.text(
+                bindings, "payconfirm_target", ctx -> subject(ctx).target().name());
+        MenuText.text(
+                bindings, "payconfirm_amount", ctx -> amountText(subject(ctx).amount()));
         bindings.action("economy:pay-confirm", this::confirm);
         bindings.action("economy:pay-cancel", ctx -> ctx.player().closeInventory());
         menus.registerSpec(SPEC_ID, MenuSpecs.loadOrBundled(SPEC_RESOURCE, dataFolder, 1, EngineLog.of(log)));

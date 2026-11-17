@@ -26,6 +26,7 @@ import com.uxplima.uxmessentials.shared.adapter.inbound.gui.GuiLayouts;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.GuiText;
 import com.uxplima.uxmessentials.shared.adapter.outbound.BukkitRefs;
 import com.uxplima.uxmessentials.shared.adapter.outbound.style.Tiles;
+import com.uxplima.uxmessentials.shared.application.message.TrustedMarkup;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
 import com.uxplima.uxmessentials.shared.display.BroadcastChannel;
 import com.uxplima.uxmessentials.shared.display.ConditionTargets;
@@ -334,7 +335,7 @@ public final class AnnouncementEditorView {
     private ItemStack listIcon(PlayerRef viewer, StoredAnnouncement announcement) {
         Map<String, String> placeholders = Map.of(
                 "id", announcement.id(),
-                "state", enabledWord(viewer, announcement.enabled()),
+                "state", TrustedMarkup.of(enabledWord(viewer, announcement.enabled())),
                 "lines", Integer.toString(announcement.lines().size()),
                 "channels", channels(announcement));
         return ItemBuilder.of(announcement.enabled() ? Material.PAPER : Material.GRAY_DYE)
@@ -557,7 +558,7 @@ public final class AnnouncementEditorView {
     }
 
     private String enabledWord(PlayerRef viewer, boolean enabled) {
-        return messages.fragment(
+        return messages.resolve(
                 viewer,
                 enabled
                         ? CommunicationMessageKey.ANNOUNCE_EDITOR_VALUE_ON

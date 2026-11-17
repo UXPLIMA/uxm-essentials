@@ -16,6 +16,7 @@ import com.uxplima.uxmessentials.playerwarps.application.port.PlayerWarpBrowse;
 import com.uxplima.uxmessentials.playerwarps.domain.PlayerWarpName;
 import com.uxplima.uxmessentials.playerwarps.domain.PlayerwarpsMessageKey;
 import com.uxplima.uxmessentials.playerwarps.domain.WarpCard;
+import com.uxplima.uxmessentials.shared.adapter.inbound.gui.MenuText;
 import com.uxplima.uxmessentials.shared.adapter.outbound.BukkitRefs;
 import com.uxplima.uxmessentials.shared.adapter.outbound.EngineLog;
 import com.uxplima.uxmessentials.shared.application.port.Logger;
@@ -123,13 +124,17 @@ public final class PlayerWarpCategoriesMenu {
         Objects.requireNonNull(log, "log");
         bindings.list(CATEGORY_SOURCE, ctx -> ctx.subject(Subject.class).categories());
         bindings.list(SPONSOR_SOURCE, ctx -> ctx.subject(Subject.class).sponsors());
-        bindings.placeholder("pwarp_category_icon", this::icon);
-        bindings.placeholder(
-                "pwarp_category_name", ctx -> ctx.entry(WarpCategory.class).displayName());
-        bindings.placeholder("pwarp_sponsor_icon", this::sponsorIcon);
-        bindings.placeholder("pwarp_sponsor_name", ctx -> sponsorName(ctx.entry(WarpCard.class)));
-        bindings.placeholder(
-                "pwarp_sponsor_owner", ctx -> ctx.entry(WarpCard.class).ownerName());
+        MenuText.text(bindings, "pwarp_category_icon", this::icon);
+        MenuText.markup(
+                bindings,
+                "pwarp_category_name",
+                ctx -> ctx.entry(WarpCategory.class).displayName());
+        MenuText.text(bindings, "pwarp_sponsor_icon", this::sponsorIcon);
+        MenuText.text(bindings, "pwarp_sponsor_name", ctx -> sponsorName(ctx.entry(WarpCard.class)));
+        MenuText.text(
+                bindings,
+                "pwarp_sponsor_owner",
+                ctx -> ctx.entry(WarpCard.class).ownerName());
         bindings.action(
                 "playerwarps:browse-all",
                 ctx -> browseOpener.open(ctx.player(), BukkitRefs.toRef(ctx.viewer()), Map.of()));

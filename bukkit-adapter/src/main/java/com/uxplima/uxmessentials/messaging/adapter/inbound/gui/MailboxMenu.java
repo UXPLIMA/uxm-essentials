@@ -16,6 +16,7 @@ import com.uxplima.uxmessentials.messaging.domain.MailBox;
 import com.uxplima.uxmessentials.messaging.domain.MailItem;
 import com.uxplima.uxmessentials.messaging.domain.MessagingMessageKey;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.GuiText;
+import com.uxplima.uxmessentials.shared.adapter.inbound.gui.MenuText;
 import com.uxplima.uxmessentials.shared.adapter.outbound.BukkitRefs;
 import com.uxplima.uxmessentials.shared.adapter.outbound.EngineLog;
 import com.uxplima.uxmessentials.shared.application.port.Logger;
@@ -80,11 +81,12 @@ public final class MailboxMenu {
         Objects.requireNonNull(dataFolder, "dataFolder");
         Objects.requireNonNull(log, "log");
         bindings.list("messaging:mail", this::items);
-        bindings.placeholder("mail_icon", this::icon);
-        bindings.placeholder("mail_sender", ctx -> mailOf(ctx).sender().name());
-        bindings.placeholder("mail_time", ctx -> TIME.format(mailOf(ctx).sentAt()));
-        bindings.placeholder("mail_snippet", ctx -> snippet(mailOf(ctx).body().value()));
-        bindings.placeholder("mail_message", ctx -> mailOf(ctx).body().value());
+        MenuText.text(bindings, "mail_icon", this::icon);
+        MenuText.text(bindings, "mail_sender", ctx -> mailOf(ctx).sender().name());
+        MenuText.text(bindings, "mail_time", ctx -> TIME.format(mailOf(ctx).sentAt()));
+        MenuText.markup(
+                bindings, "mail_snippet", ctx -> snippet(mailOf(ctx).body().value()));
+        MenuText.markup(bindings, "mail_message", ctx -> mailOf(ctx).body().value());
         bindings.action("messaging:read-mail", this::openDetail);
         bindings.action("messaging:clear-mail", this::confirmClear);
         bindings.action("messaging:mail-back", ctx -> open(ctx.viewer()));

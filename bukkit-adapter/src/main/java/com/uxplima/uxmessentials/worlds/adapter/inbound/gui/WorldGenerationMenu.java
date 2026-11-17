@@ -5,6 +5,7 @@ import java.util.Objects;
 
 import org.bukkit.entity.Player;
 
+import com.uxplima.uxmessentials.shared.adapter.inbound.gui.MenuText;
 import com.uxplima.uxmessentials.shared.adapter.outbound.BukkitRefs;
 import com.uxplima.uxmessentials.shared.application.port.Logger;
 import com.uxplima.uxmessentials.shared.application.port.Scheduler;
@@ -66,11 +67,11 @@ public final class WorldGenerationMenu {
         Objects.requireNonNull(bindings, "bindings");
         Objects.requireNonNull(dataFolder, "dataFolder");
         Objects.requireNonNull(log, "log");
-        bindings.placeholder("world_gen_world", ctx -> subject(ctx).world().value());
-        bindings.placeholder("world_gen_environment", ctx -> subject(ctx).environment());
-        bindings.placeholder("world_gen_type", ctx -> subject(ctx).type());
-        bindings.placeholder("world_gen_seed", ctx -> subject(ctx).seed());
-        bindings.placeholder("world_gen_generator", ctx -> subject(ctx).generator());
+        MenuText.text(bindings, "world_gen_world", ctx -> subject(ctx).world().value());
+        MenuText.text(bindings, "world_gen_environment", ctx -> subject(ctx).environment());
+        MenuText.text(bindings, "world_gen_type", ctx -> subject(ctx).type());
+        MenuText.text(bindings, "world_gen_seed", ctx -> subject(ctx).seed());
+        MenuText.text(bindings, "world_gen_generator", ctx -> subject(ctx).generator());
         bindings.action("worlds:editor-generation-back", this::back);
         menus.registerSpec(SPEC_ID, WorldEditorSpecs.load(SPEC_RESOURCE, ROWS, dataFolder, log));
     }

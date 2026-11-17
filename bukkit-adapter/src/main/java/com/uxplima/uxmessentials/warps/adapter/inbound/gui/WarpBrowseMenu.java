@@ -11,6 +11,7 @@ import java.util.Optional;
 import org.bukkit.Material;
 import org.bukkit.entity.Player;
 
+import com.uxplima.uxmessentials.shared.adapter.inbound.gui.MenuText;
 import com.uxplima.uxmessentials.shared.adapter.outbound.BukkitRefs;
 import com.uxplima.uxmessentials.shared.adapter.outbound.EngineLog;
 import com.uxplima.uxmessentials.shared.application.message.TrustedMarkup;
@@ -93,9 +94,9 @@ public final class WarpBrowseMenu {
         Objects.requireNonNull(dataFolder, "dataFolder");
         Objects.requireNonNull(log, "log");
         bindings.list("warps:browse", ctx -> ctx.subject(BrowseLevel.class).entries());
-        bindings.placeholder("warp_browse_icon", ctx -> rowOf(ctx).icon());
-        bindings.placeholder("warp_browse_name", ctx -> rowOf(ctx).name());
-        bindings.placeholder("warp_browse_lore", ctx -> rowOf(ctx).lore());
+        MenuText.text(bindings, "warp_browse_icon", ctx -> rowOf(ctx).icon());
+        MenuText.markup(bindings, "warp_browse_name", ctx -> rowOf(ctx).name());
+        MenuText.markup(bindings, "warp_browse_lore", ctx -> rowOf(ctx).lore());
         bindings.action("warps:browse-click", this::click);
         bindings.action("warps:browse-back", this::back);
         // The back button shows only below the root: at the root there is nothing to go back to.

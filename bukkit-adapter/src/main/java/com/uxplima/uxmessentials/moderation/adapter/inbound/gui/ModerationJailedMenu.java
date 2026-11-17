@@ -14,6 +14,7 @@ import com.uxplima.uxmessentials.moderation.application.Unjail;
 import com.uxplima.uxmessentials.moderation.application.port.ModerationRepository;
 import com.uxplima.uxmessentials.moderation.domain.JailEntry;
 import com.uxplima.uxmessentials.moderation.domain.SanctionDuration;
+import com.uxplima.uxmessentials.shared.adapter.inbound.gui.MenuText;
 import com.uxplima.uxmessentials.shared.adapter.outbound.BukkitRefs;
 import com.uxplima.uxmessentials.shared.adapter.outbound.EngineLog;
 import com.uxplima.uxmessentials.shared.application.port.Logger;
@@ -88,11 +89,11 @@ public final class ModerationJailedMenu {
         // gated on this and gives the slot back as soon as somebody is in there.
         bindings.condition(
                 "moderation:none-jailed", (ctx, args) -> subject(ctx).rows().isEmpty());
-        bindings.placeholder("mod_jailed_player", ctx -> row(ctx).player());
-        bindings.placeholder("mod_jailed_jail", ctx -> row(ctx).jail());
-        bindings.placeholder("mod_jailed_issuer", ctx -> row(ctx).issuer());
-        bindings.placeholder("mod_jailed_reason", ctx -> row(ctx).reason());
-        bindings.placeholder("mod_jailed_remaining", ctx -> row(ctx).remaining());
+        MenuText.text(bindings, "mod_jailed_player", ctx -> row(ctx).player());
+        MenuText.text(bindings, "mod_jailed_jail", ctx -> row(ctx).jail());
+        MenuText.text(bindings, "mod_jailed_issuer", ctx -> row(ctx).issuer());
+        MenuText.text(bindings, "mod_jailed_reason", ctx -> row(ctx).reason());
+        MenuText.text(bindings, "mod_jailed_remaining", ctx -> row(ctx).remaining());
         bindings.action("moderation:release", this::release);
         menus.registerSpec(SPEC_ID, MenuSpecs.loadOrBundled(SPEC_RESOURCE, dataFolder, 6, EngineLog.of(log)));
     }

@@ -11,6 +11,7 @@ import java.util.function.BiConsumer;
 
 import org.bukkit.entity.Player;
 
+import com.uxplima.uxmessentials.shared.adapter.inbound.gui.MenuText;
 import com.uxplima.uxmessentials.shared.adapter.outbound.BukkitRefs;
 import com.uxplima.uxmessentials.shared.adapter.outbound.EngineLog;
 import com.uxplima.uxmessentials.shared.adapter.outbound.style.StyledText;
@@ -91,12 +92,13 @@ public final class WarpCategoryManagerMenu {
         Objects.requireNonNull(log, "log");
         bindings.list(
                 "warps:category-manager", ctx -> ctx.subject(Listing.class).categories());
-        bindings.placeholder(
+        MenuText.text(
+                bindings,
                 "warp_manager_category_icon",
                 ctx -> WarpCategoryIcons.material(categoryOf(ctx)).name());
-        bindings.placeholder(
-                "warp_manager_category_name", ctx -> categoryOf(ctx).displayName());
-        bindings.placeholder("warp_manager_category_lore", this::lore);
+        MenuText.markup(
+                bindings, "warp_manager_category_name", ctx -> categoryOf(ctx).displayName());
+        MenuText.markup(bindings, "warp_manager_category_lore", this::lore);
         bindings.action("warps:category-manager-open", this::openClicked);
         bindings.action("warps:category-manager-create", this::createClicked);
         bindings.action("warps:category-manager-back", this::backClicked);

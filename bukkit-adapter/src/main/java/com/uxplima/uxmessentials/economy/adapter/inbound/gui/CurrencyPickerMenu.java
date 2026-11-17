@@ -12,6 +12,7 @@ import org.bukkit.entity.Player;
 
 import com.uxplima.uxmessentials.economy.domain.Currency;
 import com.uxplima.uxmessentials.economy.domain.EconomyMessageKey;
+import com.uxplima.uxmessentials.shared.adapter.inbound.gui.MenuText;
 import com.uxplima.uxmessentials.shared.adapter.outbound.BukkitRefs;
 import com.uxplima.uxmessentials.shared.adapter.outbound.EngineLog;
 import com.uxplima.uxmessentials.shared.application.port.Logger;
@@ -60,18 +61,20 @@ public final class CurrencyPickerMenu {
         Objects.requireNonNull(log, "log");
         bindings.list(
                 "economy:currency-picker", ctx -> ctx.subject(Selection.class).currencies());
-        bindings.placeholder(
+        MenuText.text(
+                bindings,
                 "currency_picker_icon",
                 ctx -> CurrencyIcons.materialFor(currencyOf(ctx), Material.SUNFLOWER)
                         .name());
-        bindings.placeholder(
+        MenuText.markup(
+                bindings,
                 "currency_picker_name",
                 ctx -> messages.resolve(
                         BukkitRefs.toRef(ctx.viewer()),
                         EconomyMessageKey.ECO_ADMIN_GUI_CURRENCY_NAME,
                         Map.of("currency", currencyOf(ctx).plural())));
-        bindings.placeholder("currency_picker_lore", this::lore);
-        bindings.placeholder("currency_picker_active", ctx -> Boolean.toString(isActive(ctx)));
+        MenuText.markup(bindings, "currency_picker_lore", this::lore);
+        MenuText.text(bindings, "currency_picker_active", ctx -> Boolean.toString(isActive(ctx)));
         bindings.action("economy:currency-pick", this::pickClicked);
         menus.registerSpec(SPEC_ID, MenuSpecs.loadOrBundled(SPEC_RESOURCE, dataFolder, 6, EngineLog.of(log)));
     }

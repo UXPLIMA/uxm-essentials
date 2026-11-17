@@ -11,6 +11,7 @@ import java.util.function.Function;
 import org.bukkit.Material;
 import org.bukkit.entity.Player;
 
+import com.uxplima.uxmessentials.shared.adapter.inbound.gui.MenuText;
 import com.uxplima.uxmessentials.shared.adapter.outbound.BukkitRefs;
 import com.uxplima.uxmessentials.shared.adapter.outbound.EngineLog;
 import com.uxplima.uxmessentials.shared.application.port.Logger;
@@ -113,13 +114,17 @@ public final class WarpWelcomeMessagesView {
         Objects.requireNonNull(dataFolder, "dataFolder");
         Objects.requireNonNull(log, "log");
         bindings.list("warps:welcome", ctx -> subject(ctx).entries());
-        bindings.placeholder(
+        MenuText.text(
+                bindings,
                 "warp_welcome_material",
                 ctx -> materialFor(shown(ctx).message().type()).name());
-        bindings.placeholder(
-                "warp_welcome_index", ctx -> Integer.toString(shown(ctx).index() + 1));
-        bindings.placeholder("warp_welcome_text", ctx -> shown(ctx).message().message());
-        bindings.placeholder("warp_welcome_type", ctx -> shown(ctx).message().type());
+        MenuText.text(
+                bindings,
+                "warp_welcome_index",
+                ctx -> Integer.toString(shown(ctx).index() + 1));
+        MenuText.markup(
+                bindings, "warp_welcome_text", ctx -> shown(ctx).message().message());
+        MenuText.text(bindings, "warp_welcome_type", ctx -> shown(ctx).message().type());
         // An operator's list file from before the panel binds its left click to welcome-edit, so that name opens it.
         bindings.action("warps:welcome-edit", this::openEntry);
         bindings.action("warps:welcome-remove", this::removeEntry);

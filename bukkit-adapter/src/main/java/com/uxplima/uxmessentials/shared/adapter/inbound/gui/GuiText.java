@@ -2,6 +2,7 @@ package com.uxplima.uxmessentials.shared.adapter.inbound.gui;
 
 import java.util.Map;
 import java.util.Objects;
+import java.util.function.Predicate;
 
 import org.bukkit.entity.Player;
 
@@ -75,8 +76,9 @@ public final class GuiText implements com.uxplima.uxmlib.gui.GuiText {
         Objects.requireNonNull(placeholders, "placeholders");
         Reference reference = reference(key);
         PlayerRef who = BukkitRefs.toRef(viewer);
-        Map<String, String> engine = asWritten(placeholders);
-        String resolved = messages.resolve(who, reference.key(), asWritten(overlay(reference.arguments(), engine)));
+        Map<String, String> engine = trusting(placeholders, GuiText::madeFit);
+        String resolved =
+                messages.resolve(who, reference.key(), overlay(trusting(reference.arguments(), name -> true), engine));
         if (!PlaceholderApiSupport.hasPlaceholder(resolved)) {
             return StyledText.render(resolved);
         }
@@ -92,23 +94,28 @@ public final class GuiText implements com.uxplima.uxmlib.gui.GuiText {
     }
 
     /**
-     * {@code values} as the menu engine hands them over: the engine's values and an operator's arguments are filled as
-     * written, since the engine inserts the same values into a menu's own lines unescaped, and a value a player typed is
-     * escaped where it is bound.
+     * {@code values} with each one {@code trusted} names marked to go into the line as written ({@link TrustedMarkup}).
+     * The engine hands over the values it also puts into a menu's own lines, so they are fit for a line already: a
+     * placeholder's value was escaped where it was bound ({@link MenuText}), and an operator's own {@code @key}
+     * arguments are the operator's words.
      */
-    private static Map<String, String> asWritten(Map<String, String> values) {
+    private static Map<String, String> trusting(Map<String, String> values, Predicate<String> trusted) {
         return new java.util.AbstractMap<>() {
             @Override
             public @org.jspecify.annotations.Nullable String get(@org.jspecify.annotations.Nullable Object name) {
                 String value = values.get(name);
-                return value == null ? null : TrustedMarkup.of(value);
+                return value == null || !(name instanceof String named) ? value : marked(named, value);
             }
 
             @Override
             public java.util.Set<Map.Entry<String, String>> entrySet() {
                 Map<String, String> listed = new java.util.LinkedHashMap<>();
-                values.forEach((name, value) -> listed.put(name, TrustedMarkup.of(value)));
+                values.forEach((name, value) -> listed.put(name, marked(name, value)));
                 return listed.entrySet();
+            }
+
+            private String marked(String name, String value) {
+                return trusted.test(name) ? TrustedMarkup.of(value) : value;
             }
         };
     }
@@ -150,6 +157,17 @@ public final class GuiText implements com.uxplima.uxmlib.gui.GuiText {
         };
     }
 
+    /** The engine's own prefix for a menu argument, which is what a player typed when they opened the menu. */
+    private static final String ARGUMENT = "argument_";
+
+    /**
+     * Whether the engine's value for {@code name} was made fit for a line before it got here. Every value is but a menu
+     * argument: the engine fills that from what a player typed and binds it nowhere, so the fill escapes it.
+     */
+    private static boolean madeFit(String name) {
+        return !name.startsWith(ARGUMENT);
+    }
+
     private record Reference(MessageKey key, Map<String, String> arguments) {}
 
     /** The engine's unprefixed lookup, which strips the same brand token {@link #unprefixedText} does. */
@@ -157,7 +175,7 @@ public final class GuiText implements com.uxplima.uxmlib.gui.GuiText {
     public Component textUnprefixed(Player viewer, String key, Map<String, String> placeholders) {
         Objects.requireNonNull(viewer, "viewer");
         Objects.requireNonNull(key, "key");
-        return unprefixedText(BukkitRefs.toRef(viewer), () -> key, asWritten(placeholders));
+        return unprefixedText(BukkitRefs.toRef(viewer), () -> key, trusting(placeholders, GuiText::madeFit));
     }
 
     /**

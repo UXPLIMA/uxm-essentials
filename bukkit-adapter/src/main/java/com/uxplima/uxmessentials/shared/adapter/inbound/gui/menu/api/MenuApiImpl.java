@@ -9,6 +9,7 @@ import java.util.function.Function;
 
 import org.bukkit.inventory.ItemStack;
 
+import com.uxplima.uxmessentials.shared.adapter.inbound.gui.MenuText;
 import com.uxplima.uxmlib.menu.binding.MenuBindings;
 import com.uxplima.uxmlib.menu.providers.IconProvider;
 import com.uxplima.uxmlib.menu.providers.IconProviderRegistry;
@@ -66,7 +67,7 @@ public final class MenuApiImpl implements MenuApi {
     public void registerPlaceholder(String id, Function<MenuContext, String> handler) {
         Objects.requireNonNull(id, "id");
         Objects.requireNonNull(handler, "handler");
-        bindings.placeholder(id, handler);
+        MenuText.markup(bindings, id, handler);
     }
 
     @Override

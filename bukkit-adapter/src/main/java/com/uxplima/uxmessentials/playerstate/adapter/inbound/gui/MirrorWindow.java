@@ -11,6 +11,7 @@ import org.bukkit.inventory.Inventory;
 import org.bukkit.inventory.ItemStack;
 
 import com.uxplima.uxmessentials.playerstate.domain.PlayerstateMessageKey;
+import com.uxplima.uxmessentials.shared.adapter.inbound.gui.MenuText;
 import com.uxplima.uxmessentials.shared.adapter.outbound.BukkitRefs;
 import com.uxplima.uxmessentials.shared.adapter.outbound.EngineLog;
 import com.uxplima.uxmessentials.shared.adapter.outbound.LivePlayers;
@@ -85,8 +86,8 @@ public final class MirrorWindow {
     /** Give both specs their behaviour and register them; the wiring calls this once, before the first open. */
     public void register(MenuBindings bindings) {
         Objects.requireNonNull(bindings, "bindings");
-        bindings.placeholder("invsee_title", ctx -> title(ctx, PlayerstateMessageKey.INVSEE_TITLE));
-        bindings.placeholder("endersee_title", ctx -> title(ctx, PlayerstateMessageKey.ENDERSEE_TITLE));
+        MenuText.markup(bindings, "invsee_title", ctx -> title(ctx, PlayerstateMessageKey.INVSEE_TITLE));
+        MenuText.markup(bindings, "endersee_title", ctx -> title(ctx, PlayerstateMessageKey.ENDERSEE_TITLE));
         MirrorContent content = new MirrorContent();
         bindings.content(INVSEE_REGION, content);
         bindings.content(ENDERSEE_REGION, content);

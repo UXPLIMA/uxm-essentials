@@ -16,6 +16,7 @@ import org.bukkit.entity.Player;
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.event.ClickEvent;
 
+import com.uxplima.uxmessentials.shared.adapter.inbound.gui.MenuText;
 import com.uxplima.uxmessentials.shared.adapter.outbound.BukkitRefs;
 import com.uxplima.uxmessentials.shared.adapter.outbound.EngineLog;
 import com.uxplima.uxmessentials.shared.adapter.outbound.style.StyledText;
@@ -110,9 +111,10 @@ public final class VoteSitesMenu {
         Objects.requireNonNull(dataFolder, "dataFolder");
         Objects.requireNonNull(log, "log");
         bindings.list("vote:sites", this::entries);
-        bindings.placeholder("vote_site_icon", ctx -> materialOf(entryOf(ctx)).name());
-        bindings.placeholder("vote_site_name", ctx -> entryOf(ctx).spec().name());
-        bindings.placeholder("vote_site_lore", this::lore);
+        MenuText.text(
+                bindings, "vote_site_icon", ctx -> materialOf(entryOf(ctx)).name());
+        MenuText.text(bindings, "vote_site_name", ctx -> entryOf(ctx).spec().name());
+        MenuText.markup(bindings, "vote_site_lore", this::lore);
         bindings.action("vote:site-open", this::siteClicked);
         menus.registerSpec(SPEC_ID, MenuSpecs.loadOrBundled(SPEC_RESOURCE, dataFolder, 3, EngineLog.of(log)));
     }

@@ -13,6 +13,7 @@ import java.util.regex.Pattern;
 import org.bukkit.Bukkit;
 
 import com.google.common.base.Splitter;
+import com.uxplima.uxmessentials.shared.adapter.inbound.gui.MenuText;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.binding.MenuExecutor;
 import com.uxplima.uxmessentials.shared.adapter.outbound.BukkitRefs;
 import com.uxplima.uxmessentials.shared.adapter.outbound.BukkitRegistryKeys;
@@ -225,10 +226,10 @@ public final class MenuVocabulary {
      */
     public static void registerPlaceholders(MenuBindings bindings) {
         Objects.requireNonNull(bindings, "bindings");
-        bindings.placeholder("player", ctx -> ctx.viewer().getName());
-        bindings.placeholder(MenuExecutor.KEY, ctx -> MenuExecutor.of(ctx).name());
-        bindings.placeholder("page", ctx -> String.valueOf(ctx.page() + 1));
-        bindings.placeholder("max_page", ctx -> String.valueOf(ctx.pageCount()));
+        MenuText.text(bindings, "player", ctx -> ctx.viewer().getName());
+        MenuText.text(bindings, MenuExecutor.KEY, ctx -> MenuExecutor.of(ctx).name());
+        MenuText.text(bindings, "page", ctx -> String.valueOf(ctx.page() + 1));
+        MenuText.text(bindings, "max_page", ctx -> String.valueOf(ctx.pageCount()));
     }
 
     /**

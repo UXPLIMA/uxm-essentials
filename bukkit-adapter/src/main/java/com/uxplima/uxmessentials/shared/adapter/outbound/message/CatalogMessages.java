@@ -106,8 +106,11 @@ public final class CatalogMessages implements Messages {
 
     /**
      * {@code value} as it goes into a line: escaped unless it is {@link TrustedMarkup trusted markup}, and shielded from
-     * PlaceholderAPI either way. A character a token is built from is taken off a value first, so no value can pass
-     * itself off as markup. {@code quote} is the quote of the action argument the value sits in, if it sits in one.
+     * PlaceholderAPI either way. A value counts as markup only when it starts with this run's token, which only
+     * {@link TrustedMarkup#of} on this server puts there and which is never sent to a client, a log or another server.
+     * Any other value has every character a token is built from taken off before it is escaped, so it cannot carry a
+     * token, whole or in part, into the line. {@code quote} is the quote of the action argument the value sits in, if it
+     * sits in one.
      */
     private static String asValue(String value, Optional<Character> quote) {
         String written = TrustedMarkup.markup(value).orElseGet(() -> {

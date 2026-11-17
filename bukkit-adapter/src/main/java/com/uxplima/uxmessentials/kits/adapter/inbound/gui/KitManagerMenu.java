@@ -13,6 +13,7 @@ import com.uxplima.uxmessentials.kits.adapter.outbound.KitItemCodec;
 import com.uxplima.uxmessentials.kits.application.port.KitRepository;
 import com.uxplima.uxmessentials.kits.domain.KitDefinition;
 import com.uxplima.uxmessentials.kits.domain.KitsMessageKey;
+import com.uxplima.uxmessentials.shared.adapter.inbound.gui.MenuText;
 import com.uxplima.uxmessentials.shared.adapter.outbound.BukkitRefs;
 import com.uxplima.uxmessentials.shared.adapter.outbound.EngineLog;
 import com.uxplima.uxmessentials.shared.application.port.Logger;
@@ -87,21 +88,25 @@ public final class KitManagerMenu {
         Objects.requireNonNull(dataFolder, "dataFolder");
         Objects.requireNonNull(log, "log");
         bindings.list("kits:manager", ctx -> ctx.subject(KitGrid.class).rows());
-        bindings.placeholder("kit_manager_icon", ctx -> material(rowOf(ctx)).name());
-        bindings.placeholder("kit_manager_name", ctx -> name(BukkitRefs.toRef(ctx.viewer()), rowOf(ctx)));
-        bindings.placeholder(
-                "kit_manager_seconds", ctx -> Long.toString(rowOf(ctx).cooldownSeconds()));
-        bindings.placeholder("kit_manager_cost", ctx -> cost(BukkitRefs.toRef(ctx.viewer()), rowOf(ctx)));
-        bindings.placeholder(
+        MenuText.text(bindings, "kit_manager_icon", ctx -> material(rowOf(ctx)).name());
+        MenuText.markup(bindings, "kit_manager_name", ctx -> name(BukkitRefs.toRef(ctx.viewer()), rowOf(ctx)));
+        MenuText.text(
+                bindings, "kit_manager_seconds", ctx -> Long.toString(rowOf(ctx).cooldownSeconds()));
+        MenuText.markup(bindings, "kit_manager_cost", ctx -> cost(BukkitRefs.toRef(ctx.viewer()), rowOf(ctx)));
+        MenuText.markup(
+                bindings,
                 "kit_manager_permission",
                 ctx -> flag(BukkitRefs.toRef(ctx.viewer()), rowOf(ctx).requiresPermission(), true));
-        bindings.placeholder(
+        MenuText.markup(
+                bindings,
                 "kit_manager_onetime",
                 ctx -> flag(BukkitRefs.toRef(ctx.viewer()), rowOf(ctx).isOneTime(), false));
-        bindings.placeholder(
+        MenuText.markup(
+                bindings,
                 "kit_manager_firstjoin",
                 ctx -> flag(BukkitRefs.toRef(ctx.viewer()), rowOf(ctx).firstJoin(), false));
-        bindings.placeholder(
+        MenuText.markup(
+                bindings,
                 "kit_manager_autoequip",
                 ctx -> flag(BukkitRefs.toRef(ctx.viewer()), rowOf(ctx).autoEquip(), false));
         bindings.action("kits:manager-edit", this::edit);

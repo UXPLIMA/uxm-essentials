@@ -12,6 +12,7 @@ import org.bukkit.entity.Player;
 import com.uxplima.uxmessentials.playerwarps.application.EditPlayerWarp;
 import com.uxplima.uxmessentials.playerwarps.domain.IconSpec;
 import com.uxplima.uxmessentials.playerwarps.domain.PlayerWarpName;
+import com.uxplima.uxmessentials.shared.adapter.inbound.gui.MenuText;
 import com.uxplima.uxmessentials.shared.adapter.outbound.BukkitRefs;
 import com.uxplima.uxmessentials.shared.adapter.outbound.EngineLog;
 import com.uxplima.uxmessentials.shared.application.port.Logger;
@@ -118,8 +119,10 @@ public final class PlayerWarpIconMenu {
         Objects.requireNonNull(dataFolder, "dataFolder");
         Objects.requireNonNull(log, "log");
         bindings.list(PALETTE_SOURCE, ctx -> PALETTE);
-        bindings.placeholder(
-                "pwarp_icon_material", ctx -> ctx.entry(Material.class).name());
+        MenuText.text(
+                bindings,
+                "pwarp_icon_material",
+                ctx -> ctx.entry(Material.class).name());
         bindings.action("playerwarps:icon-set", this::setIcon);
         bindings.action("playerwarps:icon-reset", this::resetIcon);
         bindings.action("playerwarps:icon-back", this::back);

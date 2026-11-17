@@ -11,6 +11,7 @@ import com.uxplima.uxmessentials.holograms.domain.Hologram;
 import com.uxplima.uxmessentials.holograms.domain.HologramLine;
 import com.uxplima.uxmessentials.holograms.domain.HologramName;
 import com.uxplima.uxmessentials.holograms.domain.HologramsMessageKey;
+import com.uxplima.uxmessentials.shared.adapter.inbound.gui.MenuText;
 import com.uxplima.uxmessentials.shared.adapter.outbound.BukkitRefs;
 import com.uxplima.uxmessentials.shared.adapter.outbound.EngineLog;
 import com.uxplima.uxmessentials.shared.application.port.Logger;
@@ -79,18 +80,23 @@ public final class HologramListMenu {
         Objects.requireNonNull(dataFolder, "dataFolder");
         Objects.requireNonNull(log, "log");
         bindings.list("holograms:list", ctx -> repository.all());
-        bindings.placeholder("hologram_name", ctx -> holoOf(ctx).name().value());
-        bindings.placeholder(
-                "hologram_lines", ctx -> Integer.toString(holoOf(ctx).lineCount()));
-        bindings.placeholder(
-                "hologram_world", ctx -> holoOf(ctx).location().world().name());
-        bindings.placeholder(
+        MenuText.text(bindings, "hologram_name", ctx -> holoOf(ctx).name().value());
+        MenuText.text(
+                bindings, "hologram_lines", ctx -> Integer.toString(holoOf(ctx).lineCount()));
+        MenuText.text(
+                bindings,
+                "hologram_world",
+                ctx -> holoOf(ctx).location().world().name());
+        MenuText.text(
+                bindings,
                 "hologram_x",
                 ctx -> Long.toString(Math.round(holoOf(ctx).location().x())));
-        bindings.placeholder(
+        MenuText.text(
+                bindings,
                 "hologram_y",
                 ctx -> Long.toString(Math.round(holoOf(ctx).location().y())));
-        bindings.placeholder(
+        MenuText.text(
+                bindings,
                 "hologram_z",
                 ctx -> Long.toString(Math.round(holoOf(ctx).location().z())));
         bindings.action("holograms:edit", this::edit);

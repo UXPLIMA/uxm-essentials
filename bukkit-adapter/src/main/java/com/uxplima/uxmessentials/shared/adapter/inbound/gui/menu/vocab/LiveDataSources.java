@@ -16,6 +16,7 @@ import org.bukkit.entity.Player;
 import org.bukkit.inventory.Inventory;
 import org.bukkit.inventory.ItemStack;
 
+import com.uxplima.uxmessentials.shared.adapter.inbound.gui.MenuText;
 import com.uxplima.uxmessentials.shared.adapter.outbound.BukkitRefs;
 import com.uxplima.uxmessentials.shared.application.port.Scheduler;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
@@ -77,31 +78,33 @@ public final class LiveDataSources {
 
     /** The {@code %online_player_*%} placeholders, each reading one field off the bound player entry. */
     private static void registerOnlinePlayerPlaceholders(MenuBindings bindings) {
-        bindings.placeholder("online_player_name", ctx -> online(ctx, OnlinePlayerEntry::name));
-        bindings.placeholder(
-                "online_player_uuid", ctx -> online(ctx, entry -> entry.uuid().toString()));
-        bindings.placeholder("online_player_world", ctx -> online(ctx, OnlinePlayerEntry::world));
-        bindings.placeholder("online_player_ping", ctx -> online(ctx, entry -> String.valueOf(entry.ping())));
-        bindings.placeholder("online_player_gamemode", ctx -> online(ctx, OnlinePlayerEntry::gameMode));
+        MenuText.text(bindings, "online_player_name", ctx -> online(ctx, OnlinePlayerEntry::name));
+        MenuText.text(
+                bindings,
+                "online_player_uuid",
+                ctx -> online(ctx, entry -> entry.uuid().toString()));
+        MenuText.text(bindings, "online_player_world", ctx -> online(ctx, OnlinePlayerEntry::world));
+        MenuText.text(bindings, "online_player_ping", ctx -> online(ctx, entry -> String.valueOf(entry.ping())));
+        MenuText.text(bindings, "online_player_gamemode", ctx -> online(ctx, OnlinePlayerEntry::gameMode));
         // A convenience so a template can write material = "%online_player_skull%" and get a UUID-skinned head with no
         // name lookup: it yields the skull:<uuid> form the skull icon provider turns into a PLAYER_HEAD.
-        bindings.placeholder("online_player_skull", ctx -> online(ctx, entry -> "skull:" + entry.uuid()));
+        MenuText.text(bindings, "online_player_skull", ctx -> online(ctx, entry -> "skull:" + entry.uuid()));
     }
 
     /** The {@code %worlds_*%} placeholders, each reading one field off the bound world entry. */
     private static void registerWorldPlaceholders(MenuBindings bindings) {
-        bindings.placeholder("worlds_name", ctx -> world(ctx, WorldEntry::name));
-        bindings.placeholder("worlds_environment", ctx -> world(ctx, WorldEntry::environment));
-        bindings.placeholder("worlds_players", ctx -> world(ctx, entry -> String.valueOf(entry.players())));
+        MenuText.text(bindings, "worlds_name", ctx -> world(ctx, WorldEntry::name));
+        MenuText.text(bindings, "worlds_environment", ctx -> world(ctx, WorldEntry::environment));
+        MenuText.text(bindings, "worlds_players", ctx -> world(ctx, entry -> String.valueOf(entry.players())));
         // A convenience so a template can write material = "%worlds_icon%" and auto-pick the environment's block.
-        bindings.placeholder("worlds_icon", ctx -> world(ctx, entry -> environmentIcon(entry.environment())));
+        MenuText.text(bindings, "worlds_icon", ctx -> world(ctx, entry -> environmentIcon(entry.environment())));
     }
 
     /** The {@code %entry_*%} placeholders, each reading one field off the bound item-stack entry. */
     private static void registerStackPlaceholders(MenuBindings bindings) {
-        bindings.placeholder(
-                "entry_type", ctx -> stack(ctx, item -> item.getType().name()));
-        bindings.placeholder("entry_amount", ctx -> stack(ctx, item -> String.valueOf(item.getAmount())));
+        MenuText.text(
+                bindings, "entry_type", ctx -> stack(ctx, item -> item.getType().name()));
+        MenuText.text(bindings, "entry_amount", ctx -> stack(ctx, item -> String.valueOf(item.getAmount())));
     }
 
     /**

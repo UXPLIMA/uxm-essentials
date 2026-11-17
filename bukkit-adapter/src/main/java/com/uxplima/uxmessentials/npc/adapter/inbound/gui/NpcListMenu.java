@@ -12,6 +12,7 @@ import com.uxplima.uxmessentials.npc.domain.Npc;
 import com.uxplima.uxmessentials.npc.domain.NpcMessageKey;
 import com.uxplima.uxmessentials.npc.domain.NpcName;
 import com.uxplima.uxmessentials.npc.domain.NpcSkin;
+import com.uxplima.uxmessentials.shared.adapter.inbound.gui.MenuText;
 import com.uxplima.uxmessentials.shared.adapter.outbound.BukkitRefs;
 import com.uxplima.uxmessentials.shared.adapter.outbound.EngineLog;
 import com.uxplima.uxmessentials.shared.application.port.Logger;
@@ -80,17 +81,26 @@ public final class NpcListMenu {
         Objects.requireNonNull(dataFolder, "dataFolder");
         Objects.requireNonNull(log, "log");
         bindings.list("npc:list", ctx -> repository.all());
-        bindings.placeholder(
-                "npc_icon", ctx -> NpcTypeIcon.iconFor(npcOf(ctx).entityType()).name());
-        bindings.placeholder("npc_name", ctx -> npcOf(ctx).name().value());
-        bindings.placeholder("npc_type", ctx -> npcOf(ctx).entityType());
-        bindings.placeholder("npc_world", ctx -> npcOf(ctx).location().world().name());
-        bindings.placeholder(
-                "npc_x", ctx -> Long.toString(Math.round(npcOf(ctx).location().x())));
-        bindings.placeholder(
-                "npc_y", ctx -> Long.toString(Math.round(npcOf(ctx).location().y())));
-        bindings.placeholder(
-                "npc_z", ctx -> Long.toString(Math.round(npcOf(ctx).location().z())));
+        MenuText.text(
+                bindings,
+                "npc_icon",
+                ctx -> NpcTypeIcon.iconFor(npcOf(ctx).entityType()).name());
+        MenuText.text(bindings, "npc_name", ctx -> npcOf(ctx).name().value());
+        MenuText.text(bindings, "npc_type", ctx -> npcOf(ctx).entityType());
+        MenuText.text(
+                bindings, "npc_world", ctx -> npcOf(ctx).location().world().name());
+        MenuText.text(
+                bindings,
+                "npc_x",
+                ctx -> Long.toString(Math.round(npcOf(ctx).location().x())));
+        MenuText.text(
+                bindings,
+                "npc_y",
+                ctx -> Long.toString(Math.round(npcOf(ctx).location().y())));
+        MenuText.text(
+                bindings,
+                "npc_z",
+                ctx -> Long.toString(Math.round(npcOf(ctx).location().z())));
         bindings.action("npc:edit", this::edit);
         bindings.action("npc:create", this::create);
         menus.registerSpec(SPEC_ID, MenuSpecs.loadOrBundled(SPEC_RESOURCE, dataFolder, 6, EngineLog.of(log)));

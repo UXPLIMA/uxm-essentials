@@ -14,6 +14,7 @@ import org.bukkit.Statistic;
 import org.bukkit.entity.Player;
 import org.bukkit.inventory.ItemStack;
 
+import com.uxplima.uxmessentials.shared.adapter.inbound.gui.MenuText;
 import com.uxplima.uxmlib.menu.binding.MenuBindings;
 import com.uxplima.uxmlib.menu.runtime.MenuContext;
 import org.jspecify.annotations.NullMarked;
@@ -84,18 +85,22 @@ public final class InfoPlaceholders {
      */
     public static void register(MenuBindings bindings) {
         Objects.requireNonNull(bindings, "bindings");
-        bindings.placeholder(
-                "server_date", ctx -> LocalDate.now(ZoneId.systemDefault()).format(SERVER_DATE));
-        bindings.placeholder(
-                "server_time", ctx -> LocalTime.now(ZoneId.systemDefault()).format(SERVER_TIME));
-        bindings.placeholder("world_time", InfoPlaceholders::worldTime);
-        bindings.placeholder("world_time_formatted", InfoPlaceholders::worldTimeFormatted);
-        bindings.placeholder("world_day", InfoPlaceholders::worldDay);
-        bindings.placeholder("empty_slots", InfoPlaceholders::emptySlots);
-        bindings.placeholder("used_slots", InfoPlaceholders::usedSlots);
-        bindings.placeholder("held_item", InfoPlaceholders::heldItem);
-        bindings.placeholder("held_amount", InfoPlaceholders::heldAmount);
-        bindings.placeholders().fallback(id -> id.startsWith(STAT_PREFIX), InfoPlaceholders::statValue);
+        MenuText.text(
+                bindings,
+                "server_date",
+                ctx -> LocalDate.now(ZoneId.systemDefault()).format(SERVER_DATE));
+        MenuText.text(
+                bindings,
+                "server_time",
+                ctx -> LocalTime.now(ZoneId.systemDefault()).format(SERVER_TIME));
+        MenuText.text(bindings, "world_time", InfoPlaceholders::worldTime);
+        MenuText.text(bindings, "world_time_formatted", InfoPlaceholders::worldTimeFormatted);
+        MenuText.text(bindings, "world_day", InfoPlaceholders::worldDay);
+        MenuText.text(bindings, "empty_slots", InfoPlaceholders::emptySlots);
+        MenuText.text(bindings, "used_slots", InfoPlaceholders::usedSlots);
+        MenuText.text(bindings, "held_item", InfoPlaceholders::heldItem);
+        MenuText.text(bindings, "held_amount", InfoPlaceholders::heldAmount);
+        MenuText.textFallback(bindings, STAT_PREFIX, InfoPlaceholders::statValue);
     }
 
     /** The viewer's world time of day in ticks, or empty when the viewer is offline. */

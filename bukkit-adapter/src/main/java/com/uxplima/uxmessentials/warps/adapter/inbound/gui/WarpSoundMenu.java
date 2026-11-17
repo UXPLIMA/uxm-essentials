@@ -7,6 +7,7 @@ import java.util.Optional;
 
 import org.bukkit.entity.Player;
 
+import com.uxplima.uxmessentials.shared.adapter.inbound.gui.MenuText;
 import com.uxplima.uxmessentials.shared.adapter.outbound.BukkitRefs;
 import com.uxplima.uxmessentials.shared.adapter.outbound.EngineLog;
 import com.uxplima.uxmessentials.shared.application.port.Logger;
@@ -68,10 +69,14 @@ public final class WarpSoundMenu {
         Objects.requireNonNull(dataFolder, "dataFolder");
         Objects.requireNonNull(log, "log");
         bindings.list("warp:sound-options", ctx -> optionSource.getOptions());
-        bindings.placeholder(
-                "sound", ctx -> optionSource.nameOf(ctx.entry(SoundOption.class), BukkitRefs.toRef(ctx.viewer())));
-        bindings.placeholder(
-                "sound_material", ctx -> ctx.entry(SoundOption.class).material().name());
+        MenuText.markup(
+                bindings,
+                "sound",
+                ctx -> optionSource.nameOf(ctx.entry(SoundOption.class), BukkitRefs.toRef(ctx.viewer())));
+        MenuText.text(
+                bindings,
+                "sound_material",
+                ctx -> ctx.entry(SoundOption.class).material().name());
         bindings.action("warp:set-sound", this::setSound);
         bindings.action("warp:custom-sound", this::customSound);
         bindings.action("warp:remove-sound", this::removeSound);

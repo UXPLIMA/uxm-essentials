@@ -18,6 +18,7 @@ import com.uxplima.uxmessentials.homes.domain.Home;
 import com.uxplima.uxmessentials.homes.domain.HomeLabel;
 import com.uxplima.uxmessentials.homes.domain.HomeLimit;
 import com.uxplima.uxmessentials.homes.domain.HomesMessageKey;
+import com.uxplima.uxmessentials.shared.adapter.inbound.gui.MenuText;
 import com.uxplima.uxmessentials.shared.adapter.outbound.BukkitRefs;
 import com.uxplima.uxmessentials.shared.adapter.outbound.EngineLog;
 import com.uxplima.uxmessentials.shared.application.message.Notifier;
@@ -121,9 +122,9 @@ public final class HomeListMenu {
         Objects.requireNonNull(dataFolder, "dataFolder");
         Objects.requireNonNull(log, "log");
         bindings.list("home:slots", this::slots);
-        bindings.placeholder("home_icon", this::icon);
-        bindings.placeholder("home_cell_name", this::cellName);
-        bindings.placeholder("home_cell_lore", this::cellLore);
+        MenuText.text(bindings, "home_icon", this::icon);
+        MenuText.markup(bindings, "home_cell_name", this::cellName);
+        MenuText.markup(bindings, "home_cell_lore", this::cellLore);
         bindings.action("homes:open-slot", this::openSlot);
         menus.registerSpec(SPEC_ID, MenuSpecs.loadOrBundled(SPEC_RESOURCE, dataFolder, 3, EngineLog.of(log)));
     }

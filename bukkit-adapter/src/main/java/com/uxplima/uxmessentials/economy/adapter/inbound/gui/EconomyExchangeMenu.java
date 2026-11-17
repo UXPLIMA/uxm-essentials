@@ -19,6 +19,7 @@ import com.uxplima.uxmessentials.economy.domain.Currency;
 import com.uxplima.uxmessentials.economy.domain.EconomyMessageKey;
 import com.uxplima.uxmessentials.economy.domain.ExchangeRate;
 import com.uxplima.uxmessentials.economy.domain.Money;
+import com.uxplima.uxmessentials.shared.adapter.inbound.gui.MenuText;
 import com.uxplima.uxmessentials.shared.adapter.outbound.BukkitRefs;
 import com.uxplima.uxmessentials.shared.adapter.outbound.EngineLog;
 import com.uxplima.uxmessentials.shared.adapter.outbound.style.StyledText;
@@ -95,20 +96,32 @@ public final class EconomyExchangeMenu {
         Objects.requireNonNull(bindings, "bindings");
         Objects.requireNonNull(dataFolder, "dataFolder");
         Objects.requireNonNull(log, "log");
-        bindings.placeholder(
-                "exchange_source_material", ctx -> material(subject(ctx).source()));
-        bindings.placeholder(
-                "exchange_target_material", ctx -> material(subject(ctx).target()));
-        bindings.placeholder(
-                "exchange_source_currency", ctx -> subject(ctx).source().plural());
-        bindings.placeholder(
-                "exchange_target_currency", ctx -> subject(ctx).target().plural());
-        bindings.placeholder(
-                "exchange_source_balance", ctx -> notifier.amount(subject(ctx).sourceBalance()));
-        bindings.placeholder(
-                "exchange_target_balance", ctx -> notifier.amount(subject(ctx).targetBalance()));
-        bindings.placeholder("exchange_rate", ctx -> rateText(subject(ctx)));
-        bindings.placeholder("exchange_fee", ctx -> feeText(subject(ctx)));
+        MenuText.text(
+                bindings,
+                "exchange_source_material",
+                ctx -> material(subject(ctx).source()));
+        MenuText.text(
+                bindings,
+                "exchange_target_material",
+                ctx -> material(subject(ctx).target()));
+        MenuText.text(
+                bindings,
+                "exchange_source_currency",
+                ctx -> subject(ctx).source().plural());
+        MenuText.text(
+                bindings,
+                "exchange_target_currency",
+                ctx -> subject(ctx).target().plural());
+        MenuText.text(
+                bindings,
+                "exchange_source_balance",
+                ctx -> notifier.amount(subject(ctx).sourceBalance()));
+        MenuText.text(
+                bindings,
+                "exchange_target_balance",
+                ctx -> notifier.amount(subject(ctx).targetBalance()));
+        MenuText.text(bindings, "exchange_rate", ctx -> rateText(subject(ctx)));
+        MenuText.text(bindings, "exchange_fee", ctx -> feeText(subject(ctx)));
         bindings.condition(
                 "economy:exchange-has-rate", (ctx, args) -> rate(subject(ctx)).isPresent());
         bindings.condition(

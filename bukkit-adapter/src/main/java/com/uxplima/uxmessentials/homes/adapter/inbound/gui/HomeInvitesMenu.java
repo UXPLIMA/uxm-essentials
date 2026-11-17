@@ -17,6 +17,7 @@ import com.uxplima.uxmessentials.homes.application.ListHomeInvites;
 import com.uxplima.uxmessentials.homes.application.UninviteFromHome;
 import com.uxplima.uxmessentials.homes.domain.Home;
 import com.uxplima.uxmessentials.homes.domain.HomesMessageKey;
+import com.uxplima.uxmessentials.shared.adapter.inbound.gui.MenuText;
 import com.uxplima.uxmessentials.shared.adapter.outbound.BukkitRefs;
 import com.uxplima.uxmessentials.shared.adapter.outbound.EngineLog;
 import com.uxplima.uxmessentials.shared.application.message.Notifier;
@@ -100,8 +101,8 @@ public final class HomeInvitesMenu {
         Objects.requireNonNull(dataFolder, "dataFolder");
         Objects.requireNonNull(log, "log");
         bindings.list("homes:invited-players", this::invited);
-        bindings.placeholder("invited_player", this::name);
-        bindings.placeholder("invited_player_lore", this::lore);
+        MenuText.markup(bindings, "invited_player", this::name);
+        MenuText.markup(bindings, "invited_player_lore", this::lore);
         bindings.action("homes:uninvite", this::revoke);
         bindings.action("homes:invite-add", this::promptAdd);
         bindings.action("homes:invites-back", this::back);

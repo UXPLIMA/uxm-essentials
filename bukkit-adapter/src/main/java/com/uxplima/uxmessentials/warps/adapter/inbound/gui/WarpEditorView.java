@@ -14,6 +14,7 @@ import net.kyori.adventure.text.Component;
 
 import com.uxplima.uxmessentials.playerwarps.application.port.PlayerWarpRepository;
 import com.uxplima.uxmessentials.playerwarps.domain.PlayerWarpName;
+import com.uxplima.uxmessentials.shared.adapter.inbound.gui.MenuText;
 import com.uxplima.uxmessentials.shared.adapter.outbound.BukkitRefs;
 import com.uxplima.uxmessentials.shared.adapter.outbound.EngineLog;
 import com.uxplima.uxmessentials.shared.adapter.outbound.style.StyledText;
@@ -142,46 +143,65 @@ public final class WarpEditorView {
     }
 
     private void registerPlaceholders(MenuBindings bindings) {
-        bindings.placeholder("warp_edit_name", ctx -> subject(ctx).warpName());
-        bindings.placeholder(
-                "warp_edit_icon_material", ctx -> iconMaterial(subject(ctx)).name());
-        bindings.placeholder(
-                "warp_edit_icon", ctx -> iconMaterial(subject(ctx)).name().toLowerCase(Locale.ROOT));
-        bindings.placeholder(
+        MenuText.text(bindings, "warp_edit_name", ctx -> subject(ctx).warpName());
+        MenuText.text(
+                bindings,
+                "warp_edit_icon_material",
+                ctx -> iconMaterial(subject(ctx)).name());
+        MenuText.text(
+                bindings,
+                "warp_edit_icon",
+                ctx -> iconMaterial(subject(ctx)).name().toLowerCase(Locale.ROOT));
+        MenuText.markup(
+                bindings,
                 "warp_edit_lock",
                 ctx -> lockState(
                         BukkitRefs.toRef(ctx.viewer()), subject(ctx).display().isLocked()));
-        bindings.placeholder(
-                "warp_edit_password", ctx -> orNone(ctx, subject(ctx).display().password()));
-        bindings.placeholder("warp_edit_welcome", this::welcomeText);
-        bindings.placeholder("warp_edit_welcome_type", this::welcomeType);
-        bindings.placeholder(
+        MenuText.markup(
+                bindings,
+                "warp_edit_password",
+                ctx -> orNone(ctx, subject(ctx).display().password()));
+        MenuText.markup(bindings, "warp_edit_welcome", this::welcomeText);
+        MenuText.markup(bindings, "warp_edit_welcome_type", this::welcomeType);
+        MenuText.markup(
+                bindings,
                 "warp_edit_sound_departure",
                 ctx -> orNone(ctx, subject(ctx).display().departureSound()));
-        bindings.placeholder(
+        MenuText.markup(
+                bindings,
                 "warp_edit_sound_arrival",
                 ctx -> orNone(ctx, subject(ctx).display().arrivalSound()));
-        bindings.placeholder(
+        MenuText.markup(
+                bindings,
                 "warp_edit_particle_departure",
                 ctx -> orNone(ctx, subject(ctx).display().departureParticle()));
-        bindings.placeholder(
+        MenuText.markup(
+                bindings,
                 "warp_edit_particle_arrival",
                 ctx -> orNone(ctx, subject(ctx).display().arrivalParticle()));
-        bindings.placeholder(
-                "warp_edit_warmup", ctx -> seconds(ctx, subject(ctx).display().warmupOverrideSeconds()));
-        bindings.placeholder(
-                "warp_edit_cooldown", ctx -> seconds(ctx, subject(ctx).display().cooldownOverrideSeconds()));
-        bindings.placeholder("warp_edit_category", this::categoryName);
-        bindings.placeholder(
+        MenuText.markup(
+                bindings,
+                "warp_edit_warmup",
+                ctx -> seconds(ctx, subject(ctx).display().warmupOverrideSeconds()));
+        MenuText.markup(
+                bindings,
+                "warp_edit_cooldown",
+                ctx -> seconds(ctx, subject(ctx).display().cooldownOverrideSeconds()));
+        MenuText.markup(bindings, "warp_edit_category", this::categoryName);
+        MenuText.text(
+                bindings,
                 "warp_edit_world",
                 ctx -> subject(ctx).display().location().world().name());
-        bindings.placeholder(
+        MenuText.text(
+                bindings,
                 "warp_edit_x",
                 ctx -> Integer.toString(subject(ctx).display().location().blockX()));
-        bindings.placeholder(
+        MenuText.text(
+                bindings,
                 "warp_edit_y",
                 ctx -> Integer.toString(subject(ctx).display().location().blockY()));
-        bindings.placeholder(
+        MenuText.text(
+                bindings,
                 "warp_edit_z",
                 ctx -> Integer.toString(subject(ctx).display().location().blockZ()));
     }
@@ -522,7 +542,7 @@ public final class WarpEditorView {
     }
 
     private String orNone(MenuContext ctx, Optional<String> value) {
-        return value.orElseGet(() -> none(BukkitRefs.toRef(ctx.viewer())));
+        return value.map(StyledText::escape).orElseGet(() -> none(BukkitRefs.toRef(ctx.viewer())));
     }
 
     private String none(PlayerRef viewer) {

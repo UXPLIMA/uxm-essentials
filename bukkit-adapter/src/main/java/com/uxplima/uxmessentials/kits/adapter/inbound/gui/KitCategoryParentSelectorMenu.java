@@ -12,6 +12,7 @@ import org.bukkit.entity.Player;
 import com.uxplima.uxmessentials.kits.application.port.KitCategoryRepository;
 import com.uxplima.uxmessentials.kits.domain.KitCategory;
 import com.uxplima.uxmessentials.kits.domain.KitsMessageKey;
+import com.uxplima.uxmessentials.shared.adapter.inbound.gui.MenuText;
 import com.uxplima.uxmessentials.shared.adapter.outbound.BukkitRefs;
 import com.uxplima.uxmessentials.shared.adapter.outbound.EngineLog;
 import com.uxplima.uxmessentials.shared.application.port.Logger;
@@ -70,11 +71,12 @@ public final class KitCategoryParentSelectorMenu {
         bindings.list(
                 "kits:category-parent-selector",
                 ctx -> ctx.subject(Selection.class).candidates());
-        bindings.placeholder(
+        MenuText.text(
+                bindings,
                 "kit_parent_icon",
                 ctx -> KitCategoryIcons.material(candidateOf(ctx)).name());
-        bindings.placeholder("kit_parent_name", ctx -> candidateOf(ctx).displayName());
-        bindings.placeholder("kit_parent_lore", this::lore);
+        MenuText.markup(bindings, "kit_parent_name", ctx -> candidateOf(ctx).displayName());
+        MenuText.markup(bindings, "kit_parent_lore", this::lore);
         bindings.action("kits:category-parent-assign", this::assignClicked);
         bindings.action("kits:category-parent-clear", this::clearClicked);
         bindings.action("kits:category-parent-back", this::backClicked);

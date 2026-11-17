@@ -6,6 +6,7 @@ import java.util.Objects;
 
 import org.bukkit.entity.Player;
 
+import com.uxplima.uxmessentials.shared.adapter.inbound.gui.MenuText;
 import com.uxplima.uxmessentials.shared.adapter.outbound.EngineLog;
 import com.uxplima.uxmessentials.shared.application.port.Logger;
 import com.uxplima.uxmlib.menu.Menus;
@@ -52,10 +53,11 @@ public final class EntityCountMenu {
         Objects.requireNonNull(dataFolder, "dataFolder");
         Objects.requireNonNull(log, "log");
         bindings.list("itemworld:entity-tally", this::entries);
-        bindings.placeholder("entity_icon", ctx -> entry(ctx).iconMaterial());
-        bindings.placeholder("entity_type", ctx -> entry(ctx).typeKey());
-        bindings.placeholder("entity_count", ctx -> String.valueOf(entry(ctx).count()));
-        bindings.placeholder("entity_radius", ctx -> String.valueOf(subject(ctx).radius()));
+        MenuText.text(bindings, "entity_icon", ctx -> entry(ctx).iconMaterial());
+        MenuText.text(bindings, "entity_type", ctx -> entry(ctx).typeKey());
+        MenuText.text(bindings, "entity_count", ctx -> String.valueOf(entry(ctx).count()));
+        MenuText.text(
+                bindings, "entity_radius", ctx -> String.valueOf(subject(ctx).radius()));
         menus.registerSpec(GRID_SPEC_ID, MenuSpecs.loadOrBundled(GRID_RESOURCE, dataFolder, 6, EngineLog.of(log)));
         menus.registerSpec(EMPTY_SPEC_ID, MenuSpecs.loadOrBundled(EMPTY_RESOURCE, dataFolder, 6, EngineLog.of(log)));
     }

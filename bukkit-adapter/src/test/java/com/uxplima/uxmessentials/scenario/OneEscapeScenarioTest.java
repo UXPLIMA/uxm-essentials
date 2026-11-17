@@ -122,6 +122,16 @@ class OneEscapeScenarioTest {
     }
 
     @Test
+    void aBankNameWithTagsReadsAsTypedInTheBankMenu() {
+        ScenarioPlayer owner = operator("Bo");
+        running.run(owner, "bank create \"" + BOLD + "\"");
+
+        running.run(owner, "bank");
+
+        assertShown(texts(owner.getOpenInventory().getTopInventory()), BOLD);
+    }
+
+    @Test
     void aBackupNamesItsFolderAsItIs() {
         ScenarioPlayer admin = operator("Ava");
 
