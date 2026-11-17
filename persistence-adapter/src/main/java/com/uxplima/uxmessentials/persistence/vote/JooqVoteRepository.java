@@ -20,6 +20,7 @@ import com.uxplima.uxmessentials.persistence.jooq.tables.records.VoteTotalsRecor
 import com.uxplima.uxmessentials.persistence.runtime.IntegrityViolation;
 import com.uxplima.uxmessentials.persistence.runtime.JooqRepository;
 import com.uxplima.uxmessentials.persistence.runtime.PersistenceException;
+import com.uxplima.uxmessentials.shared.application.port.Logger;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmessentials.vote.application.port.VoteRanking;
 import com.uxplima.uxmessentials.vote.application.port.VoteRepository;
@@ -39,8 +40,8 @@ import org.jooq.impl.DSL;
  * concurrent votes never lose an increment. The offline queue is one row per command keyed
  * {@code (player, idx)}: {@link #enqueue} appends a batch, computing each row's {@code idx} as
  * {@code MAX(idx)+1} inside the insert and retrying on a primary-key collision so two concurrent enqueues
- * for one player can never drop a vote, and {@link #drainFor} selects then deletes a player's rows in one
- * transaction so a batch pays out exactly once. Vote totals are one row per player carrying all-time and
+ * for one player can never drop a vote, and {@link #drainFor} selects a player's rows and then deletes each one on its
+ * own, returning only the rows its own delete removed, so a reward pays out once however many servers drain at once. Vote totals are one row per player carrying all-time and
  * periodic (daily/weekly/monthly) counts plus period-window keys; {@link #saveTotals} upserts the row and
  * {@link #topVoters} orders by the period's column descending, excluding zero-count rows. Every statement
  * is typed jOOQ DSL; no SQL is ever string-concatenated.
@@ -50,8 +51,11 @@ public final class JooqVoteRepository extends JooqRepository implements VoteRepo
     private static final int PARTY_ROW_ID = 1;
     private static final int ENQUEUE_ATTEMPTS = 3;
 
-    public JooqVoteRepository(DSLContext dsl) {
+    private final Logger log;
+
+    public JooqVoteRepository(DSLContext dsl, Logger log) {
         super(dsl);
+        this.log = Objects.requireNonNull(log, "log");
     }
 
     @Override
@@ -117,13 +121,44 @@ public final class JooqVoteRepository extends JooqRepository implements VoteRepo
     @Override
     public List<QueuedReward> drainFor(PlayerRef player) {
         Objects.requireNonNull(player, "player");
-        return write(dsl -> {
-            QueuedReward batch = selectBatch(dsl, player);
-            dsl.deleteFrom(VOTE_QUEUE)
-                    .where(VOTE_QUEUE.PLAYER.eq(player.uuid().toString()))
-                    .execute();
-            return batch.commands().isEmpty() ? List.<QueuedReward>of() : List.of(batch);
-        });
+        String uuid = player.uuid().toString();
+        List<? extends Record> rows = read(dsl -> dsl.selectFrom(VOTE_QUEUE)
+                .where(VOTE_QUEUE.PLAYER.eq(uuid))
+                .orderBy(VOTE_QUEUE.IDX.asc())
+                .fetch());
+        // Each row is deleted on its own and paid only when this delete removed it: a join and a server told of a vote
+        // received elsewhere can drain the same player at once, and a row must be paid by one of them only. The row is
+        // matched on all its columns, since an index freed by a drain can be taken again by a vote queued meanwhile.
+        List<String> commands = new ArrayList<>();
+        Instant queuedAt = Instant.EPOCH;
+        for (Record row : rows) {
+            int idx = row.get(VOTE_QUEUE.IDX);
+            String command = row.get(VOTE_QUEUE.COMMAND);
+            long at = row.get(VOTE_QUEUE.QUEUED_AT);
+            boolean removed;
+            try {
+                removed = write(dsl -> dsl.deleteFrom(VOTE_QUEUE)
+                                .where(VOTE_QUEUE.PLAYER.eq(uuid))
+                                .and(VOTE_QUEUE.IDX.eq(idx))
+                                .and(VOTE_QUEUE.COMMAND.eq(command))
+                                .and(VOTE_QUEUE.QUEUED_AT.eq(at))
+                                .execute()
+                        == 1);
+            } catch (RuntimeException failure) {
+                // The rows removed so far are gone from the queue, so they are returned to be paid rather than lost
+                // with the throw; the rest stay queued for the next drain.
+                log.error(
+                        "vote reward queue drain stopped for player " + uuid + " after " + commands.size() + " of "
+                                + rows.size() + " rows",
+                        failure);
+                break;
+            }
+            if (removed) {
+                commands.add(VoteRows.toCommand(row));
+                queuedAt = VoteRows.toQueuedAt(row);
+            }
+        }
+        return commands.isEmpty() ? List.of() : List.of(new QueuedReward(player, commands, queuedAt));
     }
 
     @Override
@@ -402,18 +437,5 @@ public final class JooqVoteRepository extends JooqRepository implements VoteRepo
                             .where(VOTE_QUEUE.PLAYER.eq(player)))
                     .execute();
         }
-    }
-
-    private static QueuedReward selectBatch(DSLContext dsl, PlayerRef player) {
-        List<String> commands = new ArrayList<>();
-        java.time.Instant queuedAt = java.time.Instant.EPOCH;
-        for (Record row : dsl.selectFrom(VOTE_QUEUE)
-                .where(VOTE_QUEUE.PLAYER.eq(player.uuid().toString()))
-                .orderBy(VOTE_QUEUE.IDX.asc())
-                .fetch()) {
-            commands.add(VoteRows.toCommand(row));
-            queuedAt = VoteRows.toQueuedAt(row);
-        }
-        return new QueuedReward(player, commands, queuedAt);
     }
 }

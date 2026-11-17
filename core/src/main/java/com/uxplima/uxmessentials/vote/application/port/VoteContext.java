@@ -25,4 +25,9 @@ public interface VoteContext {
 
     /** True when the voter is currently connected. */
     boolean isOnline(PlayerRef voter);
+
+    /** True when the voter is not connected here but is online on another server of the network. */
+    default boolean isOnlineElsewhere(PlayerRef voter) {
+        return false;
+    }
 }

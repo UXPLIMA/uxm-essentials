@@ -7,6 +7,7 @@ import org.bukkit.Bukkit;
 import org.bukkit.entity.Player;
 
 import com.uxplima.uxmessentials.shared.adapter.outbound.OwningThreadReads;
+import com.uxplima.uxmessentials.shared.application.port.NetworkPresence;
 import com.uxplima.uxmessentials.shared.application.port.Permissions;
 import com.uxplima.uxmessentials.shared.application.port.PlayerLookup;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
@@ -29,11 +30,14 @@ public final class BukkitVoteContext implements VoteContext {
 
     private final Permissions permissions;
     private final PlayerLookup players;
+    private final NetworkPresence presence;
     private final OwningThreadReads reads;
 
-    public BukkitVoteContext(Permissions permissions, PlayerLookup players, OwningThreadReads reads) {
+    public BukkitVoteContext(
+            Permissions permissions, PlayerLookup players, NetworkPresence presence, OwningThreadReads reads) {
         this.permissions = Objects.requireNonNull(permissions, "permissions");
         this.players = Objects.requireNonNull(players, "players");
+        this.presence = Objects.requireNonNull(presence, "presence");
         this.reads = Objects.requireNonNull(reads, "reads");
     }
 
@@ -67,5 +71,14 @@ public final class BukkitVoteContext implements VoteContext {
     public boolean isOnline(PlayerRef voter) {
         Objects.requireNonNull(voter, "voter");
         return players.isOnline(voter.uuid());
+    }
+
+    /** Online on another backend, as the network presence knows; a memory read. */
+    @Override
+    public boolean isOnlineElsewhere(PlayerRef voter) {
+        Objects.requireNonNull(voter, "voter");
+        return presence.find(voter.uuid())
+                .map(online -> !online.server().equals(presence.localServer()))
+                .orElse(false);
     }
 }

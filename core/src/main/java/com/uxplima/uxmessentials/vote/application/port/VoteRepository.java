@@ -21,8 +21,9 @@ import com.uxplima.uxmessentials.vote.domain.VoteTally;
  * persist so leaderboards and tally displays are accurate after a reload.
  *
  * <p>The queue is ordered per player: {@link #enqueue} appends a batch, {@link #drainFor} returns every
- * pending batch for one player and removes those rows in the same transaction (so a reward is paid out
- * exactly once), and {@link #hasPending} is the cheap existence probe the join handler runs first.
+ * pending batch for one player and removes those rows, returning only what this call removed (so a reward is paid
+ * out once even when two servers drain the same player), and {@link #hasPending} is the cheap existence probe the
+ * join handler runs first.
  */
 public interface VoteRepository {
 

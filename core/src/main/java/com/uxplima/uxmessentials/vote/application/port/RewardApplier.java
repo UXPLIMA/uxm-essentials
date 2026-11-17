@@ -1,5 +1,8 @@
 package com.uxplima.uxmessentials.vote.application.port;
 
+import java.util.List;
+import java.util.Objects;
+
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmessentials.vote.domain.reward.RewardGrant;
 
@@ -17,4 +20,18 @@ public interface RewardApplier {
 
     /** Apply {@code grant} for {@code voter}: dispatch/queue commands and (when online) send messages, broadcasts, and items. */
     void apply(PlayerRef voter, boolean online, RewardGrant grant);
+
+    /**
+     * Queue every one of {@code grants} for {@code voter}, who is not online here, then run {@code afterQueued}. It runs
+     * once all of them are stored, so whatever it starts (another server paying the queue out) finds every row.
+     */
+    default void queueAll(PlayerRef voter, List<RewardGrant> grants, Runnable afterQueued) {
+        Objects.requireNonNull(voter, "voter");
+        Objects.requireNonNull(grants, "grants");
+        Objects.requireNonNull(afterQueued, "afterQueued");
+        for (RewardGrant grant : grants) {
+            apply(voter, false, grant);
+        }
+        afterQueued.run();
+    }
 }
