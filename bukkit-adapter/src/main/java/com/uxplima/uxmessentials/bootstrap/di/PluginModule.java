@@ -1769,7 +1769,7 @@ public final class PluginModule {
         } else if (module.id().equals(ModuleId.of("servertweaks"))) {
             wireServerTweaks(plugin, ctx, resources, links);
         } else if (module.id().equals(ModuleId.of("skin"))) {
-            wireSkin(plugin, ctx, persistence, resources, links);
+            wireSkin(plugin, ctx, persistence, resources, links, bus);
         }
     }
 
@@ -1778,7 +1778,8 @@ public final class PluginModule {
             ModuleContext ctx,
             Persistence persistence,
             CloseableResources resources,
-            ContextLinks links) {
+            ContextLinks links,
+            Bus bus) {
         // skin builds its jOOQ repository over persistence.dsl() and registers the /skin command plus the pre-login
         // listener that dresses a joining player before their entity exists (no respawn, no re-send, no flicker).
         // Every lookup that leaves the server - a name at Mojang, an image at MineSkin, a Bedrock skin at the Geyser
@@ -1792,7 +1793,8 @@ public final class PluginModule {
                 persistence,
                 plugin.getServer(),
                 Objects.requireNonNullElse(resources.bedrock(), BedrockDetector.NONE),
-                plugin.getDataFolder().toPath());
+                plugin.getDataFolder().toPath(),
+                bus);
         wired.commands().forEach(resources::addCommand);
         wired.listeners().forEach(resources::addListener);
         resources.onClose(wired.stop());

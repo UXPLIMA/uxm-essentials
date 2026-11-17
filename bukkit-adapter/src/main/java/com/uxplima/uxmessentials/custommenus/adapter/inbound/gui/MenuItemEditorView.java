@@ -63,8 +63,10 @@ import org.jspecify.annotations.NullMarked;
  * <p>The editor mutates the grid's per-viewer working copy in place: each property reads the item fresh from the
  * session on every draw (so a change shows on re-render) and writes back through the session's field setters, never
  * the live menu. The live menu changes only when the operator saves on the grid or overview (the validate → write →
- * hot-reload path). Back returns to the grid, which re-renders with the edit. There is no delete button, clearing a
- * cell is a grid gesture, not an item-editor field.
+ * hot-reload path). Back returns to the grid, which re-renders with the edit.
+ *
+ * <p>The remove button takes the item off the menu behind the engine's confirm and returns to the grid. The grid
+ * clears a cell on a shift click too, but a Bedrock client cannot send one, and this editor opens on a plain click.
  */
 @NullMarked
 public final class MenuItemEditorView {
@@ -120,7 +122,9 @@ public final class MenuItemEditorView {
             Optional.empty(),
             ItemType.NONE);
 
+    private final Menus menus;
     private final GuiText guiText;
+    private final BiConsumer<Player, PlayerRef> onBackToGrid;
 
     /** The colours the engine draws a list window in; asked per render so a theme reload is picked up. */
     private final Supplier<Theme> theme;
@@ -151,7 +155,7 @@ public final class MenuItemEditorView {
             BiConsumer<Player, PlayerRef> onBackToGrid,
             MenuClickActionsView clickActions,
             MenuRequirementsView requirements) {
-        Objects.requireNonNull(menus, "menus");
+        this.menus = Objects.requireNonNull(menus, "menus");
         this.guiText = Objects.requireNonNull(guiText, "guiText");
         this.theme = Objects.requireNonNull(theme, "theme");
         this.scheduler = Objects.requireNonNull(scheduler, "scheduler");
@@ -160,7 +164,7 @@ public final class MenuItemEditorView {
         this.clickActions = Objects.requireNonNull(clickActions, "clickActions");
         this.requirements = Objects.requireNonNull(requirements, "requirements");
         Objects.requireNonNull(guiLayouts, "guiLayouts");
-        Objects.requireNonNull(onBackToGrid, "onBackToGrid");
+        this.onBackToGrid = Objects.requireNonNull(onBackToGrid, "onBackToGrid");
         this.loreLayout = defaultLoreLayout();
         EntityEditorLayout layout = guiLayouts.loadEntityEditor(MODULE, LAYOUT, codeDefault());
         this.view = EntityEditorView.<ItemTarget>builder()
@@ -235,7 +239,39 @@ public final class MenuItemEditorView {
         for (String token : FLAG_TOKENS) {
             props.add(flagProperty(target, token));
         }
+        props.add(removeProperty(target));
         return props;
+    }
+
+    // --- remove -----------------------------------------------------------------------------------------------
+
+    private EditableProperty removeProperty(ItemTarget target) {
+        return new ActionProperty(
+                CustomMenusMessageKey.MENU_ITEM_EDITOR_REMOVE.key(),
+                Material.LAVA_BUCKET,
+                hint(CustomMenusMessageKey.MENU_ITEM_EDITOR_REMOVE_HINT),
+                (player, reopen) -> confirmRemove(player, target, reopen));
+    }
+
+    /**
+     * Ask before taking the item off the working copy. Yes removes it and returns to the grid, where its cell shows
+     * empty; no comes back to this editor. The live menu changes only when the grid is saved, as with every edit here.
+     */
+    private void confirmRemove(Player player, ItemTarget target, Runnable reopen) {
+        PlayerRef viewer = BukkitRefs.toRef(player);
+        String slot = Integer.toString(
+                current(target).slots().slots().stream().findFirst().orElse(0));
+        menus.confirm(
+                player,
+                guiText.text(viewer, CustomMenusMessageKey.MENU_GRID_CLEAR_CONFIRM, Map.of("slot", slot)),
+                () -> {
+                    target.session().removeItem(target.itemId());
+                    openTargets.remove(viewer.uuid(), target);
+                    player.sendMessage(
+                            guiText.text(viewer, CustomMenusMessageKey.MENU_GRID_CLEARED, Map.of("slot", slot)));
+                    onBackToGrid.accept(player, viewer);
+                },
+                reopen);
     }
 
     // --- material ---------------------------------------------------------------------------------------------

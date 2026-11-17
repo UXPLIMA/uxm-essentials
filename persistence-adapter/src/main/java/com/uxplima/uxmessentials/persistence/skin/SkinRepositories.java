@@ -28,7 +28,7 @@ public final class SkinRepositories {
      * The same repository behind a Caffeine read-cache, which is what the plugin wires. A stored skin is read on
      * every login and on every HUD refresh that shows one, and changes only when its owner asks for a new one.
      */
-    public static SkinRepository cached(Persistence persistence) {
+    public static CachedSkinRepository cached(Persistence persistence) {
         return new CachedSkinRepository(jooq(persistence));
     }
 }
