@@ -48,7 +48,30 @@ public final class MessagingActions {
 
     private static final long MILLIS_PER_TICK = 50L;
 
+    private static volatile @Nullable Whispers whispers;
+
     private MessagingActions() {}
+
+    /**
+     * A private message from a player to a named player, sent the way {@code /msg} sends it. The messaging module
+     * binds it when it wires.
+     */
+    @FunctionalInterface
+    public interface Whispers {
+
+        /** Send {@code text}, operator content in MiniMessage, from {@code from} to the player named {@code target}. */
+        void send(Player from, String target, String text);
+    }
+
+    /** Bind the private messages the whisper action sends through. Called when the messaging module has wired. */
+    public static void bindWhispers(Whispers route) {
+        whispers = Objects.requireNonNull(route, "route");
+    }
+
+    /** Forget what {@link #bindWhispers} bound, when the messaging module stops. */
+    public static void unbindWhispers() {
+        whispers = null;
+    }
 
     /**
      * Register the messaging actions into {@code bindings}. {@code toasts} is the uxmLib advancement-toast service
@@ -92,15 +115,26 @@ public final class MessagingActions {
         };
     }
 
-    /** Deliver {@code <player> <message…>} to the named target; an unknown/offline target is a silent no-op. */
+    /**
+     * Deliver {@code <player> <message…>} to the named target. Naming the clicking player shows them the text. Naming
+     * anyone else is a private message from the clicking player, sent as {@code /msg} sends it: to a player here, on
+     * another server, or offline, under the same mute, toggle, ignore, socialspy and vanish rules. Without the messaging
+     * module only a player online here is reached, and anyone else is a silent no-op.
+     */
     private static void whisper(MenuActionContext ctx, PlayerLookup players) {
         ParsedWhisper parsed = ParsedWhisper.parse(ctx.arg());
         if (parsed.target().isEmpty()) {
             return;
         }
+        Player clicker = ctx.player();
         Player target = OnlineByName.player(players, parsed.target());
+        Whispers route = whispers;
+        if (route != null && !clicker.equals(target)) {
+            route.send(clicker, parsed.target(), parsed.message());
+            return;
+        }
         if (target == null) {
-            return; // the target is offline or unknown. Nothing to deliver to, but not an error
+            return; // nobody here by that name and no messaging to reach them elsewhere: nothing to deliver
         }
         target.sendMessage(StyledText.render(parsed.message()));
     }
