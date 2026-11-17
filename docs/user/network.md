@@ -280,8 +280,7 @@ the player, or everyone on that address, wherever they are; a mute is read on th
 messages and blocked commands through the bus (without a bus carrier, within a minute: every server reads its players'
 mutes again once a minute, and again after `/uxmess import`). `/kick` and
 `/freeze` on a player connected to another server are refused with that server's name, since this server cannot
-reach them. Without LuckPerms, whether a player on another server holds `uxmessentials.bypass.punishment`
-is asked of that server over the bus; with no answer within three seconds the sanction is refused.
+reach them. Whether a target is exempt is read as [punishment exemption](#punishment-exemption) says.
 A freeze is announced over the bus and held on every server, so a frozen player who switches server stays
 frozen, and `/unfreeze` on any server lifts it everywhere. Over Velocity a server that was empty when the freeze was
 announced never heard it, so the proxy plugin keeps a frozen player off other servers and sends one who logs out
@@ -293,6 +292,25 @@ staff broadcasts stay on one server.
 The shared database holds bans (a permanent ban is stored as one that ends far in the future), mutes, warnings, jails
 and the jails made with `/setjail`, IP bans, last-seen records and the address history, the sanction history and the
 lockdown flag.
+
+#### Punishment exemption
+
+Whether a target holds `uxmessentials.bypass.punishment` is read where the answer is:
+
+- On this server, live. On another server, that server is asked over the bus and reads it live; its answer wins.
+- When that server does not answer within three seconds, or the player is offline, every source here is read, and a
+  grant from any one exempts: LuckPerms (any context), the Vault permission plugin, this server's operator list, and
+  what each server recorded when the player was last there. Each server records the live answer when the player
+  joins, leaves, and, with LuckPerms, whenever their permissions change, in `moderation_exempt_seen`.
+- For a player whose server did not answer, only a grant counts: anything else refuses the sanction, since that
+  server's own operator list and permission plugin are not read here.
+- A source that cannot tell refuses too. LuckPerms cannot tell for a player its storage never saw (storage not
+  shared with the server they played on), and Vault for a player who never joined this server, since Vault asks by
+  name: on a network with Vault and no LuckPerms, sanction such a player from a server they played on.
+
+A grant that was removed while the player was away still counts on the server that recorded it until they join it
+again. When that server is gone for good, delete its rows: `DELETE FROM moderation_exempt_seen WHERE server = 'name'`
+(with your table prefix).
 
 ### Kits, ranks and vaults
 

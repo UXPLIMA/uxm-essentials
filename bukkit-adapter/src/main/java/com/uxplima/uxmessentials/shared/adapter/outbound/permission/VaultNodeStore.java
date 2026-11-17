@@ -55,11 +55,14 @@ final class VaultNodeStore implements NodeStore {
     public Load prepare(UUID player, String node) {
         Objects.requireNonNull(node, "node");
         OfflinePlayer offline = server.getOfflinePlayer(Objects.requireNonNull(player, "player"));
-        if (offline.getName() == null) {
-            return () -> CompletableFuture.completedFuture(Answer.NO_SOURCE);
-        }
-        // The provider may read its database for a player who is not online, so the call is left to the async lane.
-        return () -> CompletableFuture.completedFuture(
-                provider.playerHas((String) null, offline, node) ? Answer.HELD : Answer.NOT_HELD);
+        // The name may be read from the player's data file, and the provider may read its database for a player who
+        // is not online, so both are left to the async lane.
+        return () -> {
+            if (offline.getName() == null) {
+                return CompletableFuture.completedFuture(Answer.NO_SOURCE);
+            }
+            return CompletableFuture.completedFuture(
+                    provider.playerHas((String) null, offline, node) ? Answer.HELD : Answer.NOT_HELD);
+        };
     }
 }

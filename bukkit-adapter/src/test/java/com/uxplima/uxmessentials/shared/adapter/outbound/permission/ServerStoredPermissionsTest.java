@@ -24,6 +24,7 @@ import com.uxplima.uxmessentials.shared.application.port.NetworkPresence;
 import com.uxplima.uxmessentials.shared.application.port.Permissions;
 import com.uxplima.uxmessentials.shared.application.port.PlayerLookup;
 import com.uxplima.uxmessentials.shared.application.port.Scheduler;
+import com.uxplima.uxmessentials.shared.application.port.StoredPermissions;
 import com.uxplima.uxmessentials.shared.application.port.StoredPermissions.Answer;
 import com.uxplima.uxmessentials.shared.domain.OnlinePlayer;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
@@ -150,7 +151,7 @@ class ServerStoredPermissionsTest {
         register(new FakeProvider("PermissionsEx", "Bert"));
 
         CompletableFuture<Answer> answer = ServerStoredPermissions.of(
-                        server, lane, presence, new Warnings(warnings), Optional.empty())
+                        server, lane, presence, new Warnings(warnings), Optional.empty(), Optional.empty())
                 .read(bert, NODE);
         lane.runAll();
 
@@ -161,7 +162,8 @@ class ServerStoredPermissionsTest {
     void vaultsOwnStandInIsNotReadAndTheOperatorListAnswers() {
         register(new FakeProvider(VaultNodeStore.SUPER_PERMS, "Bert"));
 
-        assertThat(ServerStoredPermissions.of(server, lane, presence, new Warnings(warnings), Optional.empty())
+        assertThat(ServerStoredPermissions.of(
+                                server, lane, presence, new Warnings(warnings), Optional.empty(), Optional.empty())
                         .read(bert, NODE))
                 .isCompletedWithValue(Answer.NOT_HELD);
     }
@@ -170,7 +172,8 @@ class ServerStoredPermissionsTest {
     void aProviderThatSaysNoDoesNotOutweighTheOperatorDefault() {
         register(new FakeProvider("PermissionsEx"));
 
-        assertThat(ServerStoredPermissions.of(server, lane, presence, new Warnings(warnings), Optional.empty())
+        assertThat(ServerStoredPermissions.of(
+                                server, lane, presence, new Warnings(warnings), Optional.empty(), Optional.empty())
                         .read(olaf, NODE))
                 .isCompletedWithValue(Answer.HELD);
     }
@@ -180,7 +183,7 @@ class ServerStoredPermissionsTest {
         register(new FakeProvider("PermissionsEx"));
 
         CompletableFuture<Answer> answer = ServerStoredPermissions.of(
-                        server, lane, presence, new Warnings(warnings), Optional.empty())
+                        server, lane, presence, new Warnings(warnings), Optional.empty(), Optional.empty())
                 .read(STRANGER, NODE);
         lane.runAll();
 
@@ -248,7 +251,7 @@ class ServerStoredPermissionsTest {
         BusPermissionReads reads = bus();
 
         CompletableFuture<Answer> answer = ServerStoredPermissions.of(
-                        server, lane, presence, new Warnings(warnings), Optional.of(reads))
+                        server, lane, presence, new Warnings(warnings), Optional.of(reads), Optional.empty())
                 .read(bert, NODE);
         PermissionQueryFrame asked = (PermissionQueryFrame) sent.getFirst();
         reads.onRemoteChange(new PermissionQueryFrame(
@@ -259,17 +262,56 @@ class ServerStoredPermissionsTest {
     }
 
     @Test
-    void whenThatBackendCannotAnswerAndNoStoreGrantsTheNodeItIsNotHeld() {
+    void whenThatBackendCannotAnswerAndNoStoreGrantsTheNodeThereIsStillNoAnswer() {
         register(new FakeProvider("PermissionsEx"));
         presence.at = Optional.of(new OnlinePlayer(bert, "lobby"));
         BusPermissionReads reads = bus();
 
         CompletableFuture<Answer> answer = ServerStoredPermissions.of(
-                        server, lane, presence, new Warnings(warnings), Optional.of(reads))
+                        server, lane, presence, new Warnings(warnings), Optional.of(reads), Optional.empty())
                 .read(bert, NODE);
         PermissionQueryFrame asked = (PermissionQueryFrame) sent.getFirst();
         reads.onRemoteChange(new PermissionQueryFrame(
                 "lobby", asked.queryId(), "survival", bert.uuid(), NODE, PermissionQueryFrame.NO_ANSWER));
+        lane.runAll();
+
+        assertThat(answer)
+                .as("that backend's own operator list or permission store may still exempt them")
+                .isCompletedWithValue(Answer.NO_ANSWER);
+    }
+
+    @Test
+    void anOperatorOfOnlyTheOtherBackendIsNeverReadAsNotHeldWhenThatBackendIsSilent() {
+        presence.at = Optional.of(new OnlinePlayer(bert, "lobby"));
+        BusPermissionReads reads = bus();
+
+        CompletableFuture<Answer> answer =
+                reader(store(Answer.NOT_HELD), null, Optional.of(reads)).read(bert, NODE);
+        PermissionQueryFrame asked = (PermissionQueryFrame) sent.getFirst();
+        reads.onRemoteChange(new PermissionQueryFrame(
+                "lobby", asked.queryId(), "survival", bert.uuid(), NODE, PermissionQueryFrame.NO_ANSWER));
+        lane.runAll();
+
+        assertThat(answer).isCompletedWithValue(Answer.NO_ANSWER);
+    }
+
+    @Test
+    void anOfflinePlayerAnotherBackendRecordedAsExemptIsHeldWhateverIsReadHere() {
+        StoredPermissions recorded = (who, node) -> CompletableFuture.completedFuture(Answer.HELD);
+
+        CompletableFuture<Answer> answer = reader(store(Answer.NOT_HELD), null, Optional.empty(), Optional.of(recorded))
+                .read(bert, NODE);
+        lane.runAll();
+
+        assertThat(answer).isCompletedWithValue(Answer.HELD);
+    }
+
+    @Test
+    void anOfflinePlayerNoBackendRecordedAsExemptIsReadFromTheOtherSources() {
+        StoredPermissions recorded = (who, node) -> CompletableFuture.completedFuture(Answer.NOT_HELD);
+
+        CompletableFuture<Answer> answer = reader(store(Answer.NOT_HELD), null, Optional.empty(), Optional.of(recorded))
+                .read(bert, NODE);
         lane.runAll();
 
         assertThat(answer).isCompletedWithValue(Answer.NOT_HELD);
@@ -298,7 +340,16 @@ class ServerStoredPermissionsTest {
 
     private ServerStoredPermissions reader(
             @Nullable NodeStore luckPerms, @Nullable NodeStore vault, Optional<BusPermissionReads> bus) {
-        return new ServerStoredPermissions(server, lane, presence, new Warnings(warnings), luckPerms, () -> vault, bus);
+        return reader(luckPerms, vault, bus, Optional.empty());
+    }
+
+    private ServerStoredPermissions reader(
+            @Nullable NodeStore luckPerms,
+            @Nullable NodeStore vault,
+            Optional<BusPermissionReads> bus,
+            Optional<StoredPermissions> recorded) {
+        return new ServerStoredPermissions(
+                server, lane, presence, new Warnings(warnings), luckPerms, () -> vault, bus, recorded);
     }
 
     private BusPermissionReads bus() {

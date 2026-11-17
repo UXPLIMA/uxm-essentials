@@ -32,9 +32,9 @@ import org.jspecify.annotations.Nullable;
  * answered as not held only when every source that could grant it was read and none did.
  *
  * <p>A player online on another backend is asked about over the bus first, and that backend reads the node live: that
- * answer is the truth. Without a bus, or without an answer, every permission store this server has is read as for an
- * offline player, together with the operator default; with no store at all there is no answer, since this backend's
- * operator list says nothing about a player on another one.
+ * answer is the truth. Without a bus, or without an answer, every store this server has is read as for an offline
+ * player, together with the operator default, and only a grant counts: anything else is no answer, since that
+ * backend's own operator list and permission store are not read here.
  *
  * <p>An offline player is read from every source this server has, and any one granting the node is enough:
  *
@@ -43,7 +43,8 @@ import org.jspecify.annotations.Nullable;
  *   <li>the permission plugin registered with Vault, when LuckPerms is not that plugin (see {@link VaultNodeStore});
  *   <li>the node's declared default against this backend's own operator list, including the defaults of the
  *       permissions that grant it as a child. On a network each backend has its own operator list, and this one is
- *       read.
+ *       read;
+ *   <li>what the backends recorded the player holding when they were last there, when such a record is given.
  * </ul>
  *
  * <p>Everything taken from the server (the defaults, the operator list, the provider, an offline player's name) is
@@ -64,6 +65,7 @@ public final class ServerStoredPermissions implements StoredPermissions {
 
     private final Supplier<@Nullable NodeStore> vault;
     private final Optional<BusPermissionReads> bus;
+    private final Optional<StoredPermissions> recorded;
 
     ServerStoredPermissions(
             Server server,
@@ -72,7 +74,8 @@ public final class ServerStoredPermissions implements StoredPermissions {
             Logger log,
             @Nullable NodeStore luckPerms,
             Supplier<@Nullable NodeStore> vault,
-            Optional<BusPermissionReads> bus) {
+            Optional<BusPermissionReads> bus,
+            Optional<StoredPermissions> recorded) {
         this.server = Objects.requireNonNull(server, "server");
         this.scheduler = Objects.requireNonNull(scheduler, "scheduler");
         this.presence = Objects.requireNonNull(presence, "presence");
@@ -80,23 +83,26 @@ public final class ServerStoredPermissions implements StoredPermissions {
         this.luckPerms = luckPerms;
         this.vault = Objects.requireNonNull(vault, "vault");
         this.bus = Objects.requireNonNull(bus, "bus");
+        this.recorded = Objects.requireNonNull(recorded, "recorded");
     }
 
     /**
      * The reader for this server: LuckPerms when it is enabled, the Vault permission provider, and the server's own
      * defaults and operators; for a player on another backend, that backend through {@code bus} (empty off the network).
+     * {@code recorded} is what the backends saw the player hold when they were last there, read as one more store.
      */
     public static ServerStoredPermissions of(
             Server server,
             Scheduler scheduler,
             NetworkPresence presence,
             Logger log,
-            Optional<BusPermissionReads> bus) {
+            Optional<BusPermissionReads> bus,
+            Optional<StoredPermissions> recorded) {
         // Constructed by a direct new past the guard, so a server without LuckPerms never loads its classes.
         NodeStore luckPerms = LuckPermsAccess.isPresent(server) ? new LuckPermsNodeStore() : null;
         boolean luckPermsRead = luckPerms != null;
         return new ServerStoredPermissions(
-                server, scheduler, presence, log, luckPerms, () -> vaultProvider(server, luckPermsRead), bus);
+                server, scheduler, presence, log, luckPerms, () -> vaultProvider(server, luckPermsRead), bus, recorded);
     }
 
     @Override
@@ -106,20 +112,32 @@ public final class ServerStoredPermissions implements StoredPermissions {
         boolean byDefault = byDefault(who.uuid(), node);
         // Every store is prepared here, on the calling server thread, even one only read after a bus miss: preparing
         // may read the server (an offline player's name), and the bus answers on another thread.
-        List<Pending> stored = prepared(storedSources(), who, node);
+        List<NodeStore> sources = storedSources();
+        List<Pending> stored = prepared(sources, who, node);
+        recorded.ifPresent(seen -> stored.add(new Pending(() -> seen.read(who, node), who, node)));
         Optional<String> elsewhere = anotherBackend(who.uuid());
         if (elsewhere.isPresent()) {
             CompletableFuture<Answer> live = bus.map(reads -> reads.ask(who, node, elsewhere.get()))
                     .orElseGet(() -> CompletableFuture.completedFuture(Answer.NO_SOURCE));
-            if (stored.isEmpty()) {
-                // Only the operator list is left, and it is this backend's, not the one the player is on: no answer.
+            if (sources.isEmpty()) {
+                // No permission store here, only this backend's operator list, which says nothing of a player on
+                // another one: what the bus said stands.
                 return live;
             }
             return live.thenCompose(answer -> answer == Answer.HELD || answer == Answer.NOT_HELD
                     ? CompletableFuture.completedFuture(answer)
-                    : combined(stored, byDefault));
+                    : combined(stored, byDefault).thenApply(read -> onlyAGrant(read, answer)));
         }
         return combined(stored, byDefault);
+    }
+
+    /**
+     * What the stores say of a player whose own backend did not answer ({@code missed}): a grant holds, but nothing
+     * here can show the node is not held, since that backend's operator list and its own permission store are not
+     * read here.
+     */
+    private static Answer onlyAGrant(Answer read, Answer missed) {
+        return read == Answer.NOT_HELD ? missed : read;
     }
 
     /** The permission stores this server can read: LuckPerms, and the Vault provider when it is another plugin. */
