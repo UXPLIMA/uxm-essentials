@@ -68,4 +68,15 @@ public final class Notifier {
         Objects.requireNonNull(placeholders, "placeholders");
         return messages.resolve(viewer, key, placeholders);
     }
+
+    /**
+     * {@link #render} for a line that is filled into another line, such as the reader's word for a sanction with no
+     * end ({@link Messages#fragment}).
+     */
+    public String fragment(PlayerRef viewer, MessageKey key, Map<String, String> placeholders) {
+        Objects.requireNonNull(viewer, "viewer");
+        Objects.requireNonNull(key, "key");
+        Objects.requireNonNull(placeholders, "placeholders");
+        return messages.fragment(viewer, key, placeholders);
+    }
 }

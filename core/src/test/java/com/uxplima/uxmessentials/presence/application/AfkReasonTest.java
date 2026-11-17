@@ -21,7 +21,8 @@ import org.junit.jupiter.api.Test;
 
 /**
  * A reason given for being away is kept as the player typed it, so the API and placeholders read it as written, and
- * goes into the lines other players read as words, so a tag in it does nothing.
+ * handed to the lines other players read unchanged: the line escapes every value it is filled with, so escaping it here
+ * as well would show the escapes.
  */
 class AfkReasonTest {
 
@@ -36,15 +37,14 @@ class AfkReasonTest {
             new MarkAfk(store, () -> List.of(MALLORY, READER), notifier.notifier(), new RecordingEvents(), CLOCK);
 
     @Test
-    void theReasonIsKeptAsTypedAndShownToOthersAsWords() {
+    void theReasonIsKeptAsTypedAndHandedToTheLineUnchanged() {
         markAfk.toggle(MALLORY, Optional.of(REASON));
 
         assertThat(store.current(MALLORY).afkReason()).contains(REASON);
         assertThat(notifier.sent())
                 .filteredOn(sent -> sent.viewer().equals(READER))
                 .singleElement()
-                .satisfies(sent -> assertThat(sent.placeholders().get("reason"))
-                        .isEqualTo("\\<click:run_command:'/op Mallory'>brb\\</click>"));
+                .satisfies(sent -> assertThat(sent.placeholders().get("reason")).isEqualTo(REASON));
     }
 
     /** Presence kept in memory. */

@@ -4,6 +4,8 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.StringJoiner;
 
+import com.uxplima.uxmessentials.shared.application.message.TrustedMarkup;
+
 /**
  * Turns a host {@link AuditNotice} into the formatted {@link Notification} that gets mirrored to Discord, one
  * concise line per event category (the task's "format per event category"). Audit notices render as the
@@ -30,7 +32,8 @@ public final class NotificationFormatter {
         if (notice.fromBridge()) {
             return Optional.empty();
         }
-        String line = render(notice);
+        // A trusted-markup mark only means something inside one server run, so none is sent to Discord.
+        String line = TrustedMarkup.strip(render(notice));
         return Optional.of(
                 switch (notice.category()) {
                     case AUDIT -> Notification.audit(line);

@@ -20,7 +20,6 @@ import com.mojang.brigadier.arguments.StringArgumentType;
 import com.mojang.brigadier.builder.LiteralArgumentBuilder;
 import com.mojang.brigadier.context.CommandContext;
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandFeedback;
-import com.uxplima.uxmessentials.shared.adapter.outbound.style.StyledText;
 import com.uxplima.uxmessentials.shared.application.permission.PermissionCatalog;
 import com.uxplima.uxmessentials.shared.application.permission.PermissionCatalogRenderer;
 import com.uxplima.uxmessentials.shared.application.permission.SharedPermissions;
@@ -86,7 +85,7 @@ public final class PermissionsSubcommand {
                 SharedMessageKey.ADMIN_PERMISSIONS_HEADER,
                 Map.of("count", String.valueOf(PermissionCatalog.all().size())));
         PermissionCatalogRenderer.areas().forEach(line -> line(sender, line));
-        feedback.send(sender, SharedMessageKey.ADMIN_PERMISSIONS_HINT, Map.of("args", escape(ARGUMENTS)));
+        feedback.send(sender, SharedMessageKey.ADMIN_PERMISSIONS_HINT, Map.of("args", ARGUMENTS));
         return Command.SINGLE_SUCCESS;
     }
 
@@ -100,9 +99,9 @@ public final class PermissionsSubcommand {
                 feedback.send(
                         sender,
                         SharedMessageKey.ADMIN_CATALOG_DID_YOU_MEAN,
-                        Map.of("area", escape(asked), "nearest", escape(nearest.get())));
+                        Map.of("area", asked, "nearest", nearest.get()));
             } else {
-                feedback.send(sender, SharedMessageKey.ADMIN_PERMISSIONS_NO_AREA, Map.of("area", escape(asked)));
+                feedback.send(sender, SharedMessageKey.ADMIN_PERMISSIONS_NO_AREA, Map.of("area", asked));
             }
             return 0;
         }
@@ -110,7 +109,7 @@ public final class PermissionsSubcommand {
                 sender,
                 SharedMessageKey.ADMIN_PERMISSIONS_PAGE,
                 Map.of(
-                        "area", escape(rendered.area()),
+                        "area", rendered.area(),
                         "page", String.valueOf(rendered.number()),
                         "pages", String.valueOf(rendered.of())));
         rendered.lines().forEach(line -> line(sender, line));
@@ -125,24 +124,19 @@ public final class PermissionsSubcommand {
             Files.writeString(target, PermissionCatalogRenderer.markdown(), StandardCharsets.UTF_8);
         } catch (IOException failed) {
             logger.error("could not write the permission export to " + target, failed);
-            feedback.send(sender, SharedMessageKey.ADMIN_CATALOG_WRITE_FAILED, Map.of("file", escape(EXPORT_FILE)));
+            feedback.send(sender, SharedMessageKey.ADMIN_CATALOG_WRITE_FAILED, Map.of("file", EXPORT_FILE));
             return 0;
         }
         feedback.send(
                 sender,
                 SharedMessageKey.ADMIN_PERMISSIONS_EXPORTED,
-                Map.of("count", String.valueOf(PermissionCatalog.all().size()), "file", escape(target.toString())));
+                Map.of("count", String.valueOf(PermissionCatalog.all().size()), "file", target.toString()));
         return Command.SINGLE_SUCCESS;
     }
 
     /** One line of the catalogue, which is data: its words are the catalogue's own, in English. */
     private void line(CommandSender sender, String line) {
-        feedback.send(sender, SharedMessageKey.ADMIN_LINE, Map.of("line", escape(line)));
-    }
-
-    /** Node text is data, not markup: a description must never be read as MiniMessage. */
-    private static String escape(String text) {
-        return StyledText.escape(text);
+        feedback.send(sender, SharedMessageKey.ADMIN_LINE, Map.of("line", line));
     }
 
     /** The lines the areas screen prints, exposed so a test can assert the listing without a live server. */

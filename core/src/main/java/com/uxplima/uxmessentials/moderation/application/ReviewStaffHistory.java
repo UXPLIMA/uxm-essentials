@@ -60,9 +60,7 @@ public final class ReviewStaffHistory {
                 "staff", staff.name(),
                 "action", SanctionHistoryLine.label(row.action()),
                 "target", target,
-                "reason",
-                        SanctionReasons.read(notifier::render, viewer, row.reason(), row.drawnReason())
-                                .orElse(""),
+                "reason", SanctionReasons.shown(notifier::render, viewer, row.reason(), row.drawnReason()),
                 "when", row.at().toString());
     }
 }

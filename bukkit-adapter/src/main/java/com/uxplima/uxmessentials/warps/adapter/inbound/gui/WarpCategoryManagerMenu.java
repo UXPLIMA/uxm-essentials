@@ -181,7 +181,7 @@ public final class WarpCategoryManagerMenu {
     }
 
     private String none(PlayerRef viewer) {
-        return messages.resolve(viewer, WarpsMessageKey.WARP_EDITOR_VALUE_NONE, Map.of());
+        return messages.fragment(viewer, WarpsMessageKey.WARP_EDITOR_VALUE_NONE, Map.of());
     }
 
     private String text(PlayerRef viewer, WarpsMessageKey key, Map<String, String> placeholders) {

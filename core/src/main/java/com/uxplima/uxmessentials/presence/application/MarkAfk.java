@@ -14,7 +14,6 @@ import com.uxplima.uxmessentials.presence.domain.event.WentAfk;
 import com.uxplima.uxmessentials.shared.application.message.Notifier;
 import com.uxplima.uxmessentials.shared.application.port.DomainEventPublisher;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
-import com.uxplima.uxmessentials.shared.domain.message.TypedText;
 
 /**
  * The AFK transition use case, covering both entry points: the manual
@@ -84,8 +83,8 @@ public final class MarkAfk {
     }
 
     private void announceAway(PlayerRef who, Optional<String> reason) {
-        // The reason is kept as typed; it goes into the lines as words.
-        String shown = TypedText.asWords(reason.orElse(""));
+        // The reason is kept as typed; the lines it goes into escape it, so it reads as words.
+        String shown = reason.orElse("");
         notifier.send(
                 who,
                 reason.isPresent() ? PresenceMessageKey.AFK_NOW_REASON : PresenceMessageKey.AFK_NOW,

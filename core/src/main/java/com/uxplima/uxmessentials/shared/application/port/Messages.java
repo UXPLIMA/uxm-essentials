@@ -2,6 +2,7 @@ package com.uxplima.uxmessentials.shared.application.port;
 
 import java.util.Map;
 
+import com.uxplima.uxmessentials.shared.application.message.TrustedMarkup;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmessentials.shared.domain.message.MessageKey;
 
@@ -21,10 +22,19 @@ public interface Messages {
 
     /**
      * Resolve {@code key} for {@code viewer} with {@code placeholders} substituted, in the viewer's
-     * locale. Placeholder values are literal {@code {name}} replacements, not MiniMessage tags. An
-     * unmatched {@code {name}} is left intact as a dev aid.
+     * locale. A placeholder value reads as written: a tag in it is shown as words, unless the value is markup on
+     * purpose and says so through {@link TrustedMarkup}. An unmatched {@code {name}} is left intact as a dev aid.
      */
     String resolve(PlayerRef viewer, MessageKey key, Map<String, String> placeholders);
+
+    /**
+     * {@link #resolve} for a line that is filled into another line, such as a localised word or a list of resolved
+     * entries: it is catalogue markup, so it goes in as written where a value is otherwise escaped. The result is
+     * only for a placeholder value; anything else reads {@link #resolve}.
+     */
+    default String fragment(PlayerRef viewer, MessageKey key, Map<String, String> placeholders) {
+        return TrustedMarkup.of(resolve(viewer, key, placeholders));
+    }
 
     /**
      * {@link #resolve} for arguments the operator wrote next to the key, as in an {@code @key name=value} line on a

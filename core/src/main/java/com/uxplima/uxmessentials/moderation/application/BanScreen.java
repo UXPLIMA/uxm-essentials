@@ -61,10 +61,7 @@ record BanScreen(MessageKey key, Map<String, String> placeholders, Optional<Draw
             return placeholders;
         }
         Map<String, String> read = new HashMap<>(placeholders);
-        read.put(
-                "reason",
-                SanctionReasons.read(notifier::render, who, Optional.empty(), drawn)
-                        .orElse(""));
+        read.put("reason", SanctionReasons.shown(notifier::render, who, Optional.empty(), drawn));
         return read;
     }
 

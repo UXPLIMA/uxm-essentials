@@ -46,7 +46,7 @@ import com.uxplima.uxmessentials.api.query.UxmWorldsQuery;
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandFeedback;
 import com.uxplima.uxmessentials.shared.adapter.outbound.api.ActionContexts;
 import com.uxplima.uxmessentials.shared.adapter.outbound.api.QueryContexts;
-import com.uxplima.uxmessentials.shared.adapter.outbound.style.StyledText;
+import com.uxplima.uxmessentials.shared.application.message.TrustedMarkup;
 import com.uxplima.uxmessentials.shared.application.module.ModuleRegistry;
 import com.uxplima.uxmessentials.shared.application.port.ConfigStore;
 import org.jspecify.annotations.NullMarked;
@@ -113,9 +113,10 @@ public final class UxmEssentialsApiImpl implements UxmEssentialsApi {
         Objects.requireNonNull(viewer, "viewer");
         Objects.requireNonNull(key, "key");
         Objects.requireNonNull(placeholders, "placeholders");
-        // The promise is plain text, so a value cannot carry a click or a colour into the line.
+        // The promise is plain text, which the line keeps: it escapes every value, so none can carry a click or a
+        // colour into it. A value marked as trusted markup does not count from outside the plugin.
         Map<String, String> plain = new LinkedHashMap<>();
-        placeholders.forEach((name, value) -> plain.put(name, StyledText.escape(value)));
+        placeholders.forEach((name, value) -> plain.put(name, TrustedMarkup.strip(value)));
         return lines.render(viewer, () -> key, plain);
     }
 

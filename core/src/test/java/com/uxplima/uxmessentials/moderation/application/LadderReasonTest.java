@@ -24,6 +24,7 @@ import com.uxplima.uxmessentials.moderation.domain.WarnEscalation;
 import com.uxplima.uxmessentials.moderation.domain.WarnEscalation.EscalationAction;
 import com.uxplima.uxmessentials.moderation.domain.WarnEscalation.EscalationStep;
 import com.uxplima.uxmessentials.shared.application.message.Notifier;
+import com.uxplima.uxmessentials.shared.application.message.TrustedMarkup;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
 import com.uxplima.uxmessentials.shared.application.port.NetworkPresence;
 import com.uxplima.uxmessentials.shared.domain.OnlinePlayer;
@@ -132,6 +133,11 @@ class LadderReasonTest {
 
     private record Line(PlayerRef viewer, String text) {}
 
+    /** A reason the server drew is a catalogue line, so it goes into the reader's line as written. */
+    private static String drawn(String line) {
+        return TrustedMarkup.of(line);
+    }
+
     /** A catalog that knows the reason line in two languages and echoes every other key with its reason. */
     private String resolve(PlayerRef viewer, MessageKey key, Map<String, String> placeholders) {
         String template = (viewer.equals(SAM) ? turkish : english).get(key.key());
@@ -180,9 +186,10 @@ class LadderReasonTest {
 
         assertThat(toldAlex())
                 .contains(
-                        ModerationMessageKey.MOD_CHECK_MUTED.key() + " reason=reached 2 warnings, the last for: spam",
-                        ModerationMessageKey.MOD_HISTORY_ENTRY.key()
-                                + " reason=reached 2 warnings, the last for: spam");
+                        ModerationMessageKey.MOD_CHECK_MUTED.key() + " reason="
+                                + drawn("reached 2 warnings, the last for: spam"),
+                        ModerationMessageKey.MOD_HISTORY_ENTRY.key() + " reason="
+                                + drawn("reached 2 warnings, the last for: spam"));
     }
 
     @Test
@@ -193,11 +200,13 @@ class LadderReasonTest {
         checkBan.show(ALEX, SAM);
 
         assertThat(toldAlex())
-                .containsExactly(
-                        ModerationMessageKey.MOD_CHECK_BANNED.key() + " reason=reached 3 warnings, the last for: spam");
+                .containsExactly(ModerationMessageKey.MOD_CHECK_BANNED.key() + " reason="
+                        + drawn("reached 3 warnings, the last for: spam"));
         assertThat(online.kicked())
                 .containsEntry(
-                        SAM, ModerationMessageKey.TEMPBAN_KICK.key() + " reason=3 uyarıya ulaştı, sonuncusu: spam");
+                        SAM,
+                        ModerationMessageKey.TEMPBAN_KICK.key() + " reason="
+                                + drawn("3 uyarıya ulaştı, sonuncusu: spam"));
         assertThat(records.loadTempban(SAM))
                 .isInstanceOfSatisfying(
                         TempbanState.Active.class,
@@ -212,7 +221,8 @@ class LadderReasonTest {
 
         checkMute.show(ALEX, SAM);
 
-        assertThat(toldAlex()).containsExactly(ModerationMessageKey.MOD_CHECK_MUTED.key() + " reason=warning 2: spam");
+        assertThat(toldAlex())
+                .containsExactly(ModerationMessageKey.MOD_CHECK_MUTED.key() + " reason=" + drawn("warning 2: spam"));
     }
 
     @Test

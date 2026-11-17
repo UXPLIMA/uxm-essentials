@@ -87,7 +87,7 @@ public final class ApplyRemoteJail {
             duration = SanctionDuration.format(
                     Duration.between(now, sentence.until().get()));
         } else {
-            duration = notifier.render(who, ModerationMessageKey.MOD_GUI_VALUE_PERMANENT, Map.of());
+            duration = notifier.fragment(who, ModerationMessageKey.MOD_GUI_VALUE_PERMANENT, Map.of());
         }
         return Map.of(
                 "jail",

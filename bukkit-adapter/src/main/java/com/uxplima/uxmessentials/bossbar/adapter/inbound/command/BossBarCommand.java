@@ -35,6 +35,7 @@ import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandFeedback;
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandRegistration;
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.PlayerArgument;
 import com.uxplima.uxmessentials.shared.adapter.outbound.BukkitRefs;
+import com.uxplima.uxmessentials.shared.application.message.TrustedMarkup;
 import com.uxplima.uxmessentials.shared.application.permission.ContentPermissions;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
 import com.uxplima.uxmessentials.shared.application.port.Scheduler;
@@ -243,7 +244,7 @@ public final class BossBarCommand implements CommandRegistration {
     }
 
     private String words(CommandSender sender, Duration length) {
-        return remaining.apply(CommandFeedback.refOf(sender).uuid(), length);
+        return TrustedMarkup.of(remaining.apply(CommandFeedback.refOf(sender).uuid(), length));
     }
 
     private RequiredArgumentBuilder<CommandSourceStack, PlayerSelectorArgumentResolver> playerArgument() {

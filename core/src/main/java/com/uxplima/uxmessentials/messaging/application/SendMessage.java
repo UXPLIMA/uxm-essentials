@@ -25,7 +25,6 @@ import com.uxplima.uxmessentials.shared.application.port.DomainEventPublisher;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmessentials.shared.domain.Result;
 import com.uxplima.uxmessentials.shared.domain.Unit;
-import com.uxplima.uxmessentials.shared.domain.message.TypedText;
 
 /**
  * {@code /msg <player> <text>}: send a private message, applying every delivery gate in order. The target is
@@ -221,7 +220,7 @@ public final class SendMessage {
             notifier.send(
                     sender,
                     MessagingMessageKey.MSG_TARGET_AFK,
-                    Map.of("player", target.name(), "reason", TypedText.asWords(reason.get())));
+                    Map.of("player", target.name(), "reason", reason.get()));
         }
     }
 

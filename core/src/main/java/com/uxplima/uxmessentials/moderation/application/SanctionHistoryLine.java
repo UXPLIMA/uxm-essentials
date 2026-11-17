@@ -22,9 +22,7 @@ final class SanctionHistoryLine {
         return Map.of(
                 "action", label(row.action()),
                 "issuer", row.actor().name(),
-                "reason",
-                        SanctionReasons.read(notifier::render, viewer, row.reason(), row.drawnReason())
-                                .orElse(""),
+                "reason", SanctionReasons.shown(notifier::render, viewer, row.reason(), row.drawnReason()),
                 "expires", row.expiry().map(Object::toString).orElse(""),
                 "ip", row.ip().orElse(""),
                 "when", row.at().toString());

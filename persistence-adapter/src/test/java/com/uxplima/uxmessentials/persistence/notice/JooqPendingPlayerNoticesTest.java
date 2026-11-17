@@ -1,5 +1,6 @@
 package com.uxplima.uxmessentials.persistence.notice;
 
+import static com.uxplima.uxmessentials.persistence.jooq.tables.PlayerNotices.PLAYER_NOTICES;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
@@ -11,6 +12,7 @@ import java.util.concurrent.atomic.AtomicInteger;
 import com.uxplima.uxmessentials.persistence.runtime.PersistenceException;
 import com.uxplima.uxmessentials.persistence.testing.EveryBackend;
 import com.uxplima.uxmessentials.persistence.testing.TestDatabase;
+import com.uxplima.uxmessentials.shared.application.message.TrustedMarkup;
 import com.uxplima.uxmessentials.shared.application.port.Logger;
 import com.uxplima.uxmessentials.shared.application.port.PendingPlayerNotices;
 import com.uxplima.uxmessentials.shared.domain.PlayerNotice;
@@ -118,6 +120,20 @@ class JooqPendingPlayerNoticesTest {
                 .extracting(kept -> kept.line().args().get("amount"))
                 .containsExactly("198", "199", "200");
         assertThat(store.take(KIM)).hasSize(1);
+    }
+
+    @Test
+    void aValueMarkedAsMarkupIsStoredWithoutTheMark() {
+        PendingPlayerNotices store = new JooqPendingPlayerNotices(dsl, new Quiet(), KEPT);
+        store.keep(notice(SAM, Map.of("amount", TrustedMarkup.of("<gold>$5</gold>")), FIRST));
+
+        String stored = dsl.select(PLAYER_NOTICES.ARGS).from(PLAYER_NOTICES).fetchOne(PLAYER_NOTICES.ARGS);
+
+        // The mark only counts on the server run that made it, so it is never written down.
+        assertThat(stored).doesNotContain("%EF%B7%91").doesNotContain("\uFDD1");
+        assertThat(store.take(SAM))
+                .extracting(kept -> kept.line().args().get("amount"))
+                .containsExactly("<gold>$5</gold>");
     }
 
     @Test

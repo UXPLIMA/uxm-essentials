@@ -13,6 +13,7 @@ import org.bukkit.entity.Player;
 
 import com.uxplima.uxmessentials.shared.adapter.outbound.BukkitRefs;
 import com.uxplima.uxmessentials.shared.adapter.outbound.EngineLog;
+import com.uxplima.uxmessentials.shared.application.message.TrustedMarkup;
 import com.uxplima.uxmessentials.shared.application.port.Logger;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
 import com.uxplima.uxmessentials.shared.application.port.Scheduler;
@@ -158,7 +159,10 @@ public final class WarpBrowseMenu {
                 Kind.CATEGORY,
                 category.id(),
                 WarpCategoryIcons.material(category).name(),
-                resolve(viewer, WarpsMessageKey.WARP_MENU_CATEGORY_NAME, Map.of("category", category.displayName())),
+                resolve(
+                        viewer,
+                        WarpsMessageKey.WARP_MENU_CATEGORY_NAME,
+                        Map.of("category", TrustedMarkup.of(category.displayName()))),
                 categoryLore(viewer, category));
     }
 

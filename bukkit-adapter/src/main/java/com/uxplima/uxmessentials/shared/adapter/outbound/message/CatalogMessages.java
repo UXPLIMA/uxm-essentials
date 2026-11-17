@@ -3,10 +3,13 @@ package com.uxplima.uxmessentials.shared.adapter.outbound.message;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Optional;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 import com.uxplima.uxmessentials.shared.adapter.outbound.papi.PlaceholderShield;
+import com.uxplima.uxmessentials.shared.adapter.outbound.style.StyledText;
+import com.uxplima.uxmessentials.shared.application.message.TrustedMarkup;
 import com.uxplima.uxmessentials.shared.application.port.LocaleCatalog;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
@@ -66,8 +69,14 @@ public final class CatalogMessages implements Messages {
      * what lets the catalog entry request the arguments it actually spells.
      *
      * <p>A token the map does not answer is left as written, so an operator still sees the token they typed rather
-     * than a blank. A value is inserted literally: a value that itself contains a brace token is never substituted
-     * again, so the result does not depend on map order and one value cannot rewrite another.
+     * than a blank. A value is inserted once: a value that itself contains a brace token is never substituted again, so
+     * the result does not depend on map order and one value cannot rewrite another.
+     *
+     * <p>The line is parsed as MiniMessage next, so a value is escaped ({@link StyledText#escape}) and reads as written:
+     * a name or a message a player typed cannot open a tag. A value that is markup on purpose, such as a catalogue line
+     * used inside this one, is passed in through {@link TrustedMarkup#of} and goes in as it is. Inside the quoted
+     * argument of a click or an insertion, which MiniMessage keeps as text, only the quote and the backslash are
+     * escaped, the way MiniMessage reads them there, so the command or the text to copy is exactly the value.
      *
      * <p>The line is handed to PlaceholderAPI for its reader after it is filled, so a value is shielded first (see
      * {@link PlaceholderShield}): a placeholder the operator wrote in the template is filled, and one inside a value,
@@ -86,10 +95,60 @@ public final class CatalogMessages implements Messages {
         StringBuilder out = new StringBuilder();
         while (matcher.find()) {
             String value = placeholders.get(matcher.group(1));
-            String inserted = value == null ? matcher.group() : shield ? PlaceholderShield.shield(value) : value;
+            String inserted = value == null
+                    ? matcher.group()
+                    : shield ? asValue(value, quoteAround(template, matcher.start())) : TrustedMarkup.strip(value);
             matcher.appendReplacement(out, Matcher.quoteReplacement(inserted));
         }
         matcher.appendTail(out);
         return out.toString();
+    }
+
+    /**
+     * {@code value} as it goes into a line: escaped unless it is {@link TrustedMarkup trusted markup}, and shielded from
+     * PlaceholderAPI either way. A character a token is built from is taken off a value first, so no value can pass
+     * itself off as markup. {@code quote} is the quote of the action argument the value sits in, if it sits in one.
+     */
+    private static String asValue(String value, Optional<Character> quote) {
+        String written = TrustedMarkup.markup(value).orElseGet(() -> {
+            String text = TrustedMarkup.strip(value);
+            return quote.map(mark -> asArgument(text, mark)).orElseGet(() -> StyledText.escape(text));
+        });
+        return PlaceholderShield.shield(written);
+    }
+
+    /** {@code text} inside an argument quoted with {@code quote}: MiniMessage reads a backslash before either back. */
+    private static String asArgument(String text, char quote) {
+        return text.replace("\\", "\\\\").replace(String.valueOf(quote), "\\" + quote);
+    }
+
+    /** The tags whose argument MiniMessage keeps as text rather than reading it as more MiniMessage. */
+    private static final Pattern ACTION = Pattern.compile("<(?:click|insert|insertion):", Pattern.CASE_INSENSITIVE);
+
+    /**
+     * The quote of the click or insertion argument that position {@code at} of {@code template} sits in, or empty when
+     * it sits anywhere else, an unquoted argument included, where a value is escaped like text.
+     */
+    private static Optional<Character> quoteAround(String template, int at) {
+        int open = template.lastIndexOf('<', at);
+        if (open < 0
+                || !ACTION.matcher(template).region(open, template.length()).lookingAt()) {
+            return Optional.empty();
+        }
+        char quote = 0;
+        for (int i = open; i < at; i++) {
+            char c = template.charAt(i);
+            if (quote == 0 && c == '>') {
+                return Optional.empty();
+            }
+            if (c == '\\' && quote != 0) {
+                i++;
+            } else if (quote == 0 && (c == '\'' || c == '"')) {
+                quote = c;
+            } else if (c == quote) {
+                quote = 0;
+            }
+        }
+        return quote == 0 ? Optional.empty() : Optional.of(quote);
     }
 }

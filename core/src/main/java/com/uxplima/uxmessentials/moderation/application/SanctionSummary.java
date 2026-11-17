@@ -76,7 +76,7 @@ public final class SanctionSummary {
         }
         return active.remaining()
                 .map(SanctionDuration::format)
-                .orElseGet(() -> notifier.render(viewer, ModerationMessageKey.MOD_GUI_VALUE_PERMANENT, Map.of()));
+                .orElseGet(() -> notifier.fragment(viewer, ModerationMessageKey.MOD_GUI_VALUE_PERMANENT, Map.of()));
     }
 
     private void ban(PlayerRef actor, TempbanState tempban, Instant now) {
@@ -96,6 +96,6 @@ public final class SanctionSummary {
     /** A wall-clock expiry rendered as an instant, or the {@code permanent} marker when there is none. */
     private String until(PlayerRef viewer, Optional<Instant> expiry) {
         return expiry.map(Instant::toString)
-                .orElseGet(() -> notifier.render(viewer, ModerationMessageKey.MOD_GUI_VALUE_PERMANENT, Map.of()));
+                .orElseGet(() -> notifier.fragment(viewer, ModerationMessageKey.MOD_GUI_VALUE_PERMANENT, Map.of()));
     }
 }

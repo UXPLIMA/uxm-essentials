@@ -53,15 +53,14 @@ public final class ListMutes {
                 .orElseGet(() -> mute.target().toString());
         String expires = mute.until()
                 .map(java.time.Instant::toString)
-                .orElseGet(() -> notifier.render(viewer, ModerationMessageKey.MOD_GUI_VALUE_PERMANENT, Map.of()));
+                .orElseGet(() -> notifier.fragment(viewer, ModerationMessageKey.MOD_GUI_VALUE_PERMANENT, Map.of()));
         return Map.of(
                 "player",
                 name,
                 "issuer",
                 mute.issuer().name(),
                 "reason",
-                SanctionReasons.read(notifier::render, viewer, mute.reason(), mute.drawnReason())
-                        .orElse(""),
+                SanctionReasons.shown(notifier::render, viewer, mute.reason(), mute.drawnReason()),
                 "expires",
                 expires);
     }

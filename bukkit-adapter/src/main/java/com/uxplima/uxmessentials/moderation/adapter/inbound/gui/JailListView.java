@@ -161,7 +161,7 @@ public final class JailListView {
                 .locate(name)
                 .map(at -> at.world() + " " + at.x() + ", " + at.y() + ", " + at.z())
                 .orElseGet(
-                        () -> messages.resolve(viewer, ModerationMessageKey.MOD_GUI_JAIL_LOCATION_UNKNOWN, Map.of()));
+                        () -> messages.fragment(viewer, ModerationMessageKey.MOD_GUI_JAIL_LOCATION_UNKNOWN, Map.of()));
     }
 
     /** Open the engine edit screen: resolve the jail's coordinates off-thread, then hand them in as the subject. */

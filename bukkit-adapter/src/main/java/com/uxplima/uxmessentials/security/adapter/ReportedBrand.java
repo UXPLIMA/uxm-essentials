@@ -2,7 +2,6 @@ package com.uxplima.uxmessentials.security.adapter;
 
 import java.util.Objects;
 
-import com.uxplima.uxmessentials.shared.adapter.outbound.style.StyledText;
 import org.jspecify.annotations.NullMarked;
 
 /**
@@ -31,6 +30,6 @@ public final class ReportedBrand {
                 .filter(point -> !Character.isISOControl(point))
                 .limit(MAX_LENGTH)
                 .forEach(point -> kept.appendCodePoint(point == '%' ? PERCENT_SIGN : point));
-        return StyledText.escape(kept.toString());
+        return kept.toString();
     }
 }

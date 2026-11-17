@@ -12,6 +12,7 @@ import com.uxplima.uxmessentials.shared.adapter.outbound.message.CatalogMessages
 import com.uxplima.uxmessentials.shared.adapter.outbound.papi.PlaceholderApiSupport;
 import com.uxplima.uxmessentials.shared.adapter.outbound.style.StyledText;
 import com.uxplima.uxmessentials.shared.application.message.CatalogLine;
+import com.uxplima.uxmessentials.shared.application.message.TrustedMarkup;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmessentials.shared.domain.message.MessageKey;
@@ -74,7 +75,8 @@ public final class GuiText implements com.uxplima.uxmlib.gui.GuiText {
         Objects.requireNonNull(placeholders, "placeholders");
         Reference reference = reference(key);
         PlayerRef who = BukkitRefs.toRef(viewer);
-        String resolved = messages.resolve(who, reference.key(), overlay(reference.arguments(), placeholders));
+        Map<String, String> engine = asWritten(placeholders);
+        String resolved = messages.resolve(who, reference.key(), asWritten(overlay(reference.arguments(), engine)));
         if (!PlaceholderApiSupport.hasPlaceholder(resolved)) {
             return StyledText.render(resolved);
         }
@@ -86,7 +88,29 @@ public final class GuiText implements com.uxplima.uxmlib.gui.GuiText {
         String expanded = PlaceholderApiSupport.hasPlaceholder(template)
                 ? PlaceholderApiSupport.messageBridge(viewer.getUniqueId()).apply(template)
                 : template;
-        return StyledText.render(CatalogMessages.fill(expanded, placeholders));
+        return StyledText.render(CatalogMessages.fill(expanded, engine));
+    }
+
+    /**
+     * {@code values} as the menu engine hands them over: the engine's values and an operator's arguments are filled as
+     * written, since the engine inserts the same values into a menu's own lines unescaped, and a value a player typed is
+     * escaped where it is bound.
+     */
+    private static Map<String, String> asWritten(Map<String, String> values) {
+        return new java.util.AbstractMap<>() {
+            @Override
+            public @org.jspecify.annotations.Nullable String get(@org.jspecify.annotations.Nullable Object name) {
+                String value = values.get(name);
+                return value == null ? null : TrustedMarkup.of(value);
+            }
+
+            @Override
+            public java.util.Set<Map.Entry<String, String>> entrySet() {
+                Map<String, String> listed = new java.util.LinkedHashMap<>();
+                values.forEach((name, value) -> listed.put(name, TrustedMarkup.of(value)));
+                return listed.entrySet();
+            }
+        };
     }
 
     /**
@@ -133,7 +157,7 @@ public final class GuiText implements com.uxplima.uxmlib.gui.GuiText {
     public Component textUnprefixed(Player viewer, String key, Map<String, String> placeholders) {
         Objects.requireNonNull(viewer, "viewer");
         Objects.requireNonNull(key, "key");
-        return unprefixedText(BukkitRefs.toRef(viewer), () -> key, placeholders);
+        return unprefixedText(BukkitRefs.toRef(viewer), () -> key, asWritten(placeholders));
     }
 
     /**

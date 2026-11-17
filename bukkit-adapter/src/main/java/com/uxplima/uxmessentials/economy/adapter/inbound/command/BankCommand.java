@@ -21,7 +21,6 @@ import com.uxplima.uxmessentials.economy.domain.SharedBank;
 import com.uxplima.uxmessentials.economy.domain.SharedBank.BankRole;
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandRegistration;
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandSuggestions;
-import com.uxplima.uxmessentials.shared.adapter.outbound.style.StyledText;
 import com.uxplima.uxmessentials.shared.application.permission.EconomyPermissions;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
 import com.uxplima.uxmessentials.shared.domain.NameMatch;
@@ -135,7 +134,7 @@ public final class BankCommand extends EconomyCommandSupport implements CommandR
                             .send(
                                     senderRef,
                                     EconomyMessageKey.BANK_CREATED,
-                                    java.util.Map.of("id", bank.id(), "name", StyledText.escape(bank.name())));
+                                    java.util.Map.of("id", bank.id(), "name", bank.name()));
                 } else {
                     services.notifier().send(senderRef, res.errorOrThrow().messageKey());
                 }

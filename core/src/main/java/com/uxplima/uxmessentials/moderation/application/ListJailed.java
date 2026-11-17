@@ -70,6 +70,6 @@ public final class ListJailed {
         }
         return jail.until()
                 .map(java.time.Instant::toString)
-                .orElseGet(() -> notifier.render(viewer, ModerationMessageKey.MOD_GUI_VALUE_PERMANENT, Map.of()));
+                .orElseGet(() -> notifier.fragment(viewer, ModerationMessageKey.MOD_GUI_VALUE_PERMANENT, Map.of()));
     }
 }

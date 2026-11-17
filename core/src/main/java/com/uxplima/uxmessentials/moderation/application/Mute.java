@@ -273,7 +273,7 @@ public final class Mute {
 
     /** The word for a sanction with no end, in {@code viewer}'s language: every catalogue translates it. */
     private String permanent(PlayerRef viewer) {
-        return notifier.render(viewer, ModerationMessageKey.MOD_GUI_VALUE_PERMANENT, Map.of());
+        return notifier.fragment(viewer, ModerationMessageKey.MOD_GUI_VALUE_PERMANENT, Map.of());
     }
 
     private void notifyTarget(PlayerRef target, Optional<Duration> effective, Optional<String> reason) {

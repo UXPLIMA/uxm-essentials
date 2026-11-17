@@ -82,7 +82,7 @@ public final class CompassCommand extends PlayerstateCommandSupport implements C
         Location location = Objects.requireNonNull(player.getLocation(), "player location");
         float yaw = location.getYaw();
         int eighth = Math.round(yaw / 45f) & 7;
-        String direction = messages.resolve(ref(player), DIRECTIONS[eighth], Map.of());
+        String direction = messages.fragment(ref(player), DIRECTIONS[eighth], Map.of());
         Map<String, String> placeholders = Map.of("direction", direction, "degrees", String.valueOf(Math.round(yaw)));
         feedback.send(player, PlayerstateMessageKey.COMPASS_SHOW, placeholders);
         return Command.SINGLE_SUCCESS;

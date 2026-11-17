@@ -4,7 +4,6 @@ import java.time.Clock;
 import java.time.Instant;
 import java.util.Map;
 import java.util.Objects;
-import java.util.Optional;
 
 import com.uxplima.uxmessentials.moderation.application.port.ModerationRepository;
 import com.uxplima.uxmessentials.moderation.domain.Issuer;
@@ -52,7 +51,7 @@ public final class CheckMute {
         return Map.of(
                 "player", target.name(),
                 "actor", issuer.name(),
-                "reason", reasonOf(viewer, mute).orElse(""),
+                "reason", reasonOf(viewer, mute),
                 "expiry", mute.expiry().map(Object::toString).orElse(""));
     }
 
@@ -64,13 +63,13 @@ public final class CheckMute {
         };
     }
 
-    private Optional<String> reasonOf(PlayerRef viewer, MuteState mute) {
+    private String reasonOf(PlayerRef viewer, MuteState mute) {
         return switch (mute) {
             case MuteState.Permanent permanent ->
-                SanctionReasons.read(notifier::render, viewer, permanent.reason(), permanent.drawnReason());
+                SanctionReasons.shown(notifier::render, viewer, permanent.reason(), permanent.drawnReason());
             case MuteState.Timed timed ->
-                SanctionReasons.read(notifier::render, viewer, timed.reason(), timed.drawnReason());
-            case MuteState.None none -> Optional.empty();
+                SanctionReasons.shown(notifier::render, viewer, timed.reason(), timed.drawnReason());
+            case MuteState.None none -> "";
         };
     }
 }

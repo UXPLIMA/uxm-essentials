@@ -43,6 +43,12 @@ action the argument stays inside its JSON string, and in a `broadcast-legacy` ac
 text. A custom command that let players style their text that way loses the styling; an argument going into a command
 is unchanged. The `/afk` reason is kept as the player typed it, so the API and placeholders read it as written.
 
+The same now holds for every value filled into a `{token}` of a message file: a name, a reason or a command a player
+or staff member typed reads as typed, with no backslash left over. A sanction reason staff type, a bank, vault or
+player warp name and the brand a client reports no longer take styling. A rank's `display-name`, a kit or warp
+category's name, a private message body sent with `uxmessentials.msg.color` and the plugin's own lines used inside
+another line keep their styling. Values in the `@key` lines of menus are unchanged for now.
+
 ## Placeholders typed by players stay as typed
 
 With PlaceholderAPI installed, a `%placeholder%` inside a value (a private message, mail, help request, staff chat

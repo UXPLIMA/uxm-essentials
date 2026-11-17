@@ -17,6 +17,7 @@ import java.util.stream.Collectors;
 
 import com.uxplima.uxmessentials.persistence.jooq.tables.records.PlayerNoticesRecord;
 import com.uxplima.uxmessentials.persistence.runtime.JooqRepository;
+import com.uxplima.uxmessentials.shared.application.message.TrustedMarkup;
 import com.uxplima.uxmessentials.shared.application.port.Logger;
 import com.uxplima.uxmessentials.shared.application.port.PendingPlayerNotices;
 import com.uxplima.uxmessentials.shared.domain.PlayerNotice;
@@ -154,11 +155,15 @@ public final class JooqPendingPlayerNotices extends JooqRepository implements Pe
         }
     }
 
-    /** The values in name order, so one line always stores the same text. */
+    /**
+     * The values in name order, so one line always stores the same text. A {@link TrustedMarkup} mark is taken off
+     * each value: it only means something inside one server run, so a line read back after a restart is filled like
+     * any other, escaped.
+     */
     private static String encode(Map<String, String> args) {
         return new TreeMap<>(args)
                 .entrySet().stream()
-                        .map(arg -> escape(arg.getKey()) + "=" + escape(arg.getValue()))
+                        .map(arg -> escape(arg.getKey()) + "=" + escape(TrustedMarkup.strip(arg.getValue())))
                         .collect(Collectors.joining("&"));
     }
 
