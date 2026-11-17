@@ -229,7 +229,7 @@ public final class BankCommand extends EconomyCommandSupport implements CommandR
 
         PlayerRef senderRef = ref(sender);
         offTick(() -> {
-            NameMatch match = services.players().matchByName(targetName);
+            NameMatch match = lookUp(senderRef, targetName, EconomyMessageKey.PAY_TARGET_LOOKUP_FAILED);
             Optional<PlayerRef> target = match.player();
             if (target.isEmpty()) {
                 MessageLine miss =
@@ -265,7 +265,7 @@ public final class BankCommand extends EconomyCommandSupport implements CommandR
 
         PlayerRef senderRef = ref(sender);
         offTick(() -> {
-            NameMatch match = services.players().matchByName(targetName);
+            NameMatch match = lookUp(senderRef, targetName, EconomyMessageKey.PAY_TARGET_LOOKUP_FAILED);
             Optional<PlayerRef> target = match.player();
             if (target.isEmpty()) {
                 MessageLine miss =

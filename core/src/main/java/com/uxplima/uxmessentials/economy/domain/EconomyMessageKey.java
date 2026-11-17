@@ -27,6 +27,7 @@ public enum EconomyMessageKey implements MessageKey {
     PAY_INVALID_AMOUNT("pay.invalid-amount"),
     PAY_TARGET_DISABLED("pay.target-disabled"),
     PAY_TARGET_UNKNOWN("pay.target-unknown"),
+    PAY_TARGET_LOOKUP_FAILED("pay.target-lookup-failed"),
     PAY_ERROR("pay.error"),
     PAY_CONFIRM_PROMPT("pay.confirm-prompt"),
     PAY_CONFIRM_NONE("pay.confirm-none"),

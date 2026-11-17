@@ -17,6 +17,7 @@ import io.papermc.paper.command.brigadier.Commands;
 import com.mojang.brigadier.builder.RequiredArgumentBuilder;
 import com.mojang.brigadier.context.CommandContext;
 import com.uxplima.uxmessentials.economy.adapter.EconomyServices;
+import com.uxplima.uxmessentials.economy.application.TargetLookup;
 import com.uxplima.uxmessentials.economy.domain.AmountParseError;
 import com.uxplima.uxmessentials.economy.domain.AmountParser;
 import com.uxplima.uxmessentials.economy.domain.Currency;
@@ -169,6 +170,14 @@ abstract class EconomyCommandSupport {
                 .reduce((a, b) -> a + ", " + b)
                 .orElse("");
         services.notifier().send(viewer, EconomyMessageKey.CURRENCY_UNKNOWN, Map.of("currencies", valid));
+    }
+
+    /**
+     * Who {@code name} means, read off the tick. A lookup that fails tells {@code viewer} with {@code failed} and is
+     * rethrown, so the player hears why nothing happened and the async lane logs the cause.
+     */
+    final NameMatch lookUp(PlayerRef viewer, String name, MessageKey failed) {
+        return new TargetLookup(services.players(), services.notifier()).find(viewer, name, failed);
     }
 
     /** Tell {@code viewer} the named target could not be resolved: nobody by that name, or several case variants. */
