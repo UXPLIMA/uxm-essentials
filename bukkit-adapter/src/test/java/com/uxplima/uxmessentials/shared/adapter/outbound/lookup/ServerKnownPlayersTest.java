@@ -1,4 +1,4 @@
-package com.uxplima.uxmessentials.economy.adapter.outbound;
+package com.uxplima.uxmessentials.shared.adapter.outbound.lookup;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -9,6 +9,7 @@ import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
 
+import com.uxplima.uxmessentials.shared.application.port.Logger;
 import com.uxplima.uxmessentials.shared.application.port.Scheduler;
 import com.uxplima.uxmessentials.shared.domain.PlayerName;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
@@ -55,9 +56,9 @@ class ServerKnownPlayersTest {
                     added.addAll(rows);
                     return rows.size();
                 },
-                new RecordingLog());
+                new QuietLog());
 
-        known.recordAll();
+        assertThat(known.recordAll()).isEqualTo(2);
 
         assertThat(global.calls).isEqualTo(1);
         assertThat(readOnGlobal).isEmpty();
@@ -93,5 +94,20 @@ class ServerKnownPlayersTest {
 
         @Override
         public void asyncAfter(Duration delay, Runnable task) {}
+    }
+
+    private static final class QuietLog implements Logger {
+
+        @Override
+        public void info(String message, Object... args) {}
+
+        @Override
+        public void warn(String message, Object... args) {}
+
+        @Override
+        public void error(String message, Throwable cause) {}
+
+        @Override
+        public void debug(String message, Object... args) {}
     }
 }

@@ -196,7 +196,7 @@ shared: each backend reads its own `config.conf` and module files, so keep them 
 | Worlds | Managed worlds and settings, per server | `/worlds tp` and `/worlds spawn` to another server | `worlds` `cross-server.enabled` |
 | Teleport | Pending moves | `/tpa`, `/tpahere`, staff `/tp` and `/tphere` | `teleport` `cross-server.enabled` |
 | Moderation | Bans, mutes, warnings, IP bans, jails, history | A ban or IP ban kicks everywhere; a jail sends the player to the jail's server; a freeze holds everywhere | none |
-| Messaging | Mail, ignore lists | `/msg`, `/reply`, `/helpop`; staff chat in the staff module | none |
+| Messaging | Mail, ignore lists, message and reply toggles, social spy, the `/reply` partner | `/msg`, `/reply`, `/helpop`, social spy; staff chat in the staff module | none |
 | Vanish | Vanish state | Hidden on every server | `vanish` `cross-server` |
 | Kits | One-time claims and cooldowns | none | none |
 | Ranks | Each player's rank and prestige | none | none |
@@ -207,6 +207,7 @@ shared: each backend reads its own `config.conf` and module files, so keep them 
 | Trade | Escrow | Two players on different servers trade | `trade` `cross-server` |
 | Vote | Party counter | A party pays players on every server | `voteparty.network-rewards` in `vote`, default on |
 | Playtime | Daily rows | Time on every server adds up | none |
+| Skin | Each player's chosen skin | A change is worn at once on the server the player is on | none |
 
 ### Cross-server moves
 
@@ -268,9 +269,9 @@ used on whichever server holds the player, when that server has its world. Detai
 
 Every backend knows which server each online player is on, from what the others announce with their heartbeats.
 With the network on, `/msg` and `/reply` reach a player on another server; that server applies the recipient's own
-message toggle, reply setting, ignore list and vanish, and social spies on every server see the message once.
-`/helpop` and staff chat reach the staff of every server with the sender's server in the line. `/seen` reports a
-player connected elsewhere as online there.
+message toggle, reply setting, ignore list and vanish. A spy holding `uxmessentials.msg.socialspy` sees every private
+message once, on any server; message switches and the `/reply` partner follow the player. `/helpop` and staff chat
+reach the staff of every server with the sender's server in the line. `/seen` reports a player elsewhere as online.
 
 A vanished player is hidden on every server only with `cross-server = true` in `modules/vanish/config.conf` on
 every backend; a backend with it off shows them. Vanish is kept in the database, so a player switching servers stays
@@ -360,8 +361,7 @@ same everywhere so transaction times agree.
   Use a proxy chat plugin for network chat.
 - AFK state, `/back`, `/rtp`, `/spawn` and respawns: they stay on the server the player is on.
 - `/kick` and `/freeze` of a player on another server, and `/invsee` or `/endersee` of one.
-- Warps, homes, player warps, worlds and teleports to another server while that module's `cross-server` switch is
-  off.
+- Warps, homes, player warps, worlds and teleports to another server while their `cross-server` switch is off.
 - Settings files, message files and menus. Copy them to every backend that should behave the same.
 - Command control: configure the `commandcontrol` module on each backend; the proxy jar gates only proxy commands.
 
@@ -381,7 +381,7 @@ same everywhere so transaction times agree.
    [setserver commands](#renaming-a-server-or-fixing-a-wrong-claim), or `/setjail` for a jail.
 5. Run `/uxmess doctor` on each backend once players are on: a connected bus line, the expected peer count and no
    server name failure.
-6. Move permission grants and placeholders to the new names as [upgrading](upgrading.md) describes. That release
+6. Move permission grants and placeholders to the new names as [upgrading-renames](upgrading-renames.md) describes. That release
    renames every exemption node to `uxmessentials.bypass.*` and every placeholder to `%uxm_essentials_<path>%`.
 
 ### Recovering a failed world migration on MySQL or MariaDB

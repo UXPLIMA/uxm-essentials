@@ -14,7 +14,7 @@ import org.jspecify.annotations.NullMarked;
 
 /**
  * The messaging bounded context as a first-class {@link FeatureModule}: it owns the persistent
- * {@code MailBox} and {@code IgnoreList}, the transient {@code /reply} targets, and the
+ * {@code MailBox} and {@code IgnoreList}, the shared {@code /reply} targets and switches, and the
  * {@code /msg /reply /mail /msgtoggle /ignore /unignore /ignorelist /socialspy /mailclear /helpop} command surface.
  * It <em>soft-couples</em> to two other contexts: a
  * muted sender is gated by the moderation context, and a vanished target is hidden from {@code /msg}
@@ -24,7 +24,7 @@ import org.jspecify.annotations.NullMarked;
  * <p>The mail and ignore tables ship in the persistence baseline (V4 under {@code db/migration}, always
  * applied by the persistence layer), so the module declares no extra migration location of its own; a
  * disabled module leaves the baseline tables in place but wires nothing over them. The use cases, the jOOQ
- * {@code MailRepository} / {@code IgnoreStore}, the in-memory reply store, and the self-rescheduling mail
+ * {@code MailRepository} / {@code IgnoreStore}, the shared reply and switch stores, and the self-rescheduling mail
  * expiry sweep are constructed in the adapter wiring once the module has started; the lifecycle bookkeeping
  * here keeps {@code stop()} honest.
  */
@@ -69,7 +69,7 @@ public final class MessagingModule implements FeatureModule {
     @Override
     public void start(ModuleContext ctx) {
         this.running = true;
-        // The use cases, the jOOQ MailRepository / IgnoreStore, the in-memory reply store, and the mail
+        // The use cases, the jOOQ MailRepository / IgnoreStore, the shared reply and switch stores, and the mail
         // expiry sweep are constructed over ctx.kernel() and the persistence DSL in the adapter wiring; the
         // lifecycle bookkeeping (running flag, in-flight counter) is armed here so stop() is already honest.
     }

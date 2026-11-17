@@ -96,7 +96,9 @@ public final class MessagingQueries implements UxmMessagingQuery {
     @Override
     public boolean acceptsMessages(UUID playerId) {
         Objects.requireNonNull(playerId, "playerId");
-        return toggles.acceptsMessages(subject(playerId));
+        PlayerRef subject = subject(playerId);
+        // Only a player online here has their switch held; anyone else cannot be reached live from here.
+        return toggles.ready(subject) && toggles.acceptsMessages(subject);
     }
 
     @Override

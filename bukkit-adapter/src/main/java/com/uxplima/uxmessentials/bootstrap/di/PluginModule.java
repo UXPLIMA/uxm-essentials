@@ -22,7 +22,6 @@ import java.util.logging.Logger;
 import java.util.stream.Collectors;
 
 import org.bukkit.Material;
-import org.bukkit.OfflinePlayer;
 import org.bukkit.entity.Player;
 import org.bukkit.plugin.ServicePriority;
 import org.bukkit.plugin.java.JavaPlugin;
@@ -246,6 +245,7 @@ import com.uxplima.uxmessentials.shared.adapter.outbound.hud.HudText;
 import com.uxplima.uxmessentials.shared.adapter.outbound.log.AuditChannel;
 import com.uxplima.uxmessentials.shared.adapter.outbound.log.SystemLoggerBridge;
 import com.uxplima.uxmessentials.shared.adapter.outbound.lookup.CachingPlayerNameIndex;
+import com.uxplima.uxmessentials.shared.adapter.outbound.lookup.ServerKnownPlayers;
 import com.uxplima.uxmessentials.shared.adapter.outbound.message.LocaleResolver;
 import com.uxplima.uxmessentials.shared.adapter.outbound.meta.PlayerMeta;
 import com.uxplima.uxmessentials.shared.adapter.outbound.papi.BukkitPlayerFacts;
@@ -304,7 +304,6 @@ import com.uxplima.uxmessentials.shared.application.port.ConfigStore;
 import com.uxplima.uxmessentials.shared.application.port.IpHistoryStore;
 import com.uxplima.uxmessentials.shared.application.port.IpTokens;
 import com.uxplima.uxmessentials.shared.application.port.NetworkPresence;
-import com.uxplima.uxmessentials.shared.application.port.PlayerNameIndex;
 import com.uxplima.uxmessentials.shared.application.port.PlayerNameRepository;
 import com.uxplima.uxmessentials.shared.application.reload.ReloadTask;
 import com.uxplima.uxmessentials.shared.application.teleport.PaidTeleports;
@@ -400,38 +399,6 @@ public final class PluginModule {
     /** The theme the engine draws in, recorded during wiring; a module wired before it is a composition-root defect. */
     private static EngineTheme engineTheme(CloseableResources resources) {
         return Objects.requireNonNull(resources.engineTheme(), "engineTheme");
-    }
-
-    /**
-     * Seed the name index from the server's own user cache the first time it runs, so players who joined before
-     * this version resolve by name without having to join again. It only runs while the table is empty; from then
-     * on the join listener owns the index. Called on the async lane: the server's account list is read on the global
-     * thread, the only one allowed to ask for it, and the names are written back here off the tick.
-     */
-    private static void backfillNameIndex(
-            JavaPlugin plugin,
-            com.uxplima.uxmessentials.shared.application.port.Scheduler scheduler,
-            PlayerNameRepository store,
-            PlayerNameIndex index,
-            com.uxplima.uxmessentials.shared.application.port.Logger log) {
-        if (store.count() > 0) {
-            return;
-        }
-        scheduler.onGlobal(() -> {
-            List<com.uxplima.uxmessentials.shared.domain.PlayerRef> known = new ArrayList<>();
-            for (OfflinePlayer account : plugin.getServer().getOfflinePlayers()) {
-                String name = account.getName();
-                if (name != null) {
-                    known.add(new com.uxplima.uxmessentials.shared.domain.PlayerRef(account.getUniqueId(), name));
-                }
-            }
-            scheduler.async(() -> {
-                for (com.uxplima.uxmessentials.shared.domain.PlayerRef account : known) {
-                    index.record(account.uuid(), account.name());
-                }
-                log.info("event=name_index_backfilled players={}", String.valueOf(known.size()));
-            });
-        });
     }
 
     /**
@@ -546,9 +513,18 @@ public final class PluginModule {
         CachingPlayerNameIndex nameIndex = wiredKernel.nameIndex();
         PlayerNameRepository nameStore = PlayerNameRepositories.jooq(persistence);
         int nameIndexSize = config.getInt("lookup.name-index-size", DEFAULT_NAME_INDEX_SIZE);
+        ServerKnownPlayers serverPlayers = new ServerKnownPlayers(
+                plugin.getServer(),
+                kernel.scheduler(),
+                new com.uxplima.uxmessentials.persistence.lookup.JooqPlayerNameRepository(persistence.dsl()),
+                kernelLog);
         kernel.scheduler().async(() -> {
             nameIndex.backWith(nameStore, nameIndexSize);
-            backfillNameIndex(plugin, kernel.scheduler(), nameStore, nameIndex, kernelLog);
+            // Every backend adds the players only its own data knows, whatever the others already wrote; it adds
+            // only what the list lacks, so it runs at every start.
+            if (serverPlayers.recordAll() > 0) {
+                nameIndex.rereadSharedNames();
+            }
         });
         resources.addListener(new PlayerNameRecordingListener(nameIndex));
         // Who is connected, for the lookup port's online answers. The players already online are seeded here, on
@@ -1677,6 +1653,7 @@ public final class PluginModule {
                     persistence,
                     resources,
                     links,
+                    bus,
                     guiLayouts,
                     guiRegistry,
                     textInput,
@@ -1767,7 +1744,7 @@ public final class PluginModule {
         } else if (module.id().equals(ModuleId.of("servertweaks"))) {
             wireServerTweaks(plugin, ctx, resources, links);
         } else if (module.id().equals(ModuleId.of("skin"))) {
-            wireSkin(plugin, ctx, persistence, resources, links);
+            wireSkin(plugin, ctx, persistence, resources, links, bus);
         }
     }
 
@@ -1776,7 +1753,8 @@ public final class PluginModule {
             ModuleContext ctx,
             Persistence persistence,
             CloseableResources resources,
-            ContextLinks links) {
+            ContextLinks links,
+            Bus bus) {
         // skin builds its jOOQ repository over persistence.dsl() and registers the /skin command plus the pre-login
         // listener that dresses a joining player before their entity exists (no respawn, no re-send, no flicker).
         // Every lookup that leaves the server - a name at Mojang, an image at MineSkin, a Bedrock skin at the Geyser
@@ -1790,7 +1768,8 @@ public final class PluginModule {
                 persistence,
                 plugin.getServer(),
                 Objects.requireNonNullElse(resources.bedrock(), BedrockDetector.NONE),
-                plugin.getDataFolder().toPath());
+                plugin.getDataFolder().toPath(),
+                bus);
         wired.commands().forEach(resources::addCommand);
         wired.listeners().forEach(resources::addListener);
         resources.onClose(wired.stop());
@@ -2973,8 +2952,8 @@ public final class PluginModule {
             TextInput textInput,
             Menus menus,
             MenuBindings menuBindings) {
-        // messaging builds its jOOQ mail/ignore stores over persistence.dsl() and its transient reply /
-        // socialspy / toggle stores in-memory/PDC. The mute gate starts on MutePolicy.NEVER and is captured
+        // messaging builds its jOOQ mail/ignore stores over persistence.dsl() and its reply / socialspy / toggle
+        // stores over the settings every backend shares. The mute gate starts on MutePolicy.NEVER and is captured
         // here so moderation rebinds it when it lands; the vanish gate degrades to "fully visible" without
         // presence.
         // The management GUIs consume the SP0 framework: a GuiText over the shared catalog, the data-folder layout
@@ -3005,6 +2984,7 @@ public final class PluginModule {
                 menus,
                 menuBindings);
         wired.commands().forEach(resources::addCommand);
+        wired.listeners().forEach(resources::addListener);
         wired.startBackgroundWork();
         resources.onClose(wired::stop);
         links.mutePolicy = wired.mutePolicy();
@@ -3419,13 +3399,14 @@ public final class PluginModule {
             Persistence persistence,
             CloseableResources resources,
             ContextLinks links,
+            Bus bus,
             GuiLayouts guiLayouts,
             ManagementGuiRegistry guiRegistry,
             TextInput textInput,
             Menus menus,
             MenuBindings menuBindings) {
         // communication's only durable state is the DB-backed announcement set the /announce editor owns, built
-        // over persistence.dsl(); the per-player broadcast opt-out is PDC-backed (survives relog), the sequence
+        // over persistence.dsl(); the per-player broadcast opt-out is a switch every backend shares, the sequence
         // counters are transient, and the connection policies, file announcer schedule, and info pages are
         // config-authored content. The announcer rotates over the file config PLUS the enabled store set. It carries
         // no cross-context bridge, so nothing is captured for a later context. The announcer timer on the Scheduler
@@ -3441,6 +3422,8 @@ public final class PluginModule {
                 ctx,
                 announcementStore,
                 announcerSettingsStore,
+                com.uxplima.uxmessentials.persistence.settings.SettingsStores.switches(persistence),
+                bus,
                 engineTheme(resources),
                 guiLayouts,
                 textInput,
