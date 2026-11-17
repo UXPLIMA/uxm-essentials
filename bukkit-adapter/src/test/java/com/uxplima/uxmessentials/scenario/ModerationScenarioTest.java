@@ -2,6 +2,8 @@ package com.uxplima.uxmessentials.scenario;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import java.net.InetAddress;
+import java.net.InetSocketAddress;
 import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
@@ -30,6 +32,8 @@ import org.mockbukkit.mockbukkit.MockBukkit;
 @Tag("integration")
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)
 class ModerationScenarioTest {
+
+    private static final InetAddress BEDROCK_ADDRESS = InetAddress.ofLiteral("203.0.113.9");
 
     private RunningPlugin running;
     private ScenarioPlayer moderator;
@@ -89,6 +93,22 @@ class ModerationScenarioTest {
         running.run(moderator, "ban Odin griefing");
 
         assertThat(running.join("Odin").isOnline()).as("banned while offline").isFalse();
+        assertThat(running.problems()).isEmpty();
+    }
+
+    @Test
+    void anIpBanByABedrockPlayersNameBansTheAddressTheyPlayFrom() {
+        ScenarioPlayer bedrock = new ScenarioPlayer(running.server, ".SteveBE");
+        bedrock.setAddress(new InetSocketAddress(BEDROCK_ADDRESS, 19132));
+        running.server.addPlayer(bedrock);
+        running.settle();
+        try {
+            running.run(moderator, "banip .SteveBE");
+
+            assertThat(bedrock.isOnline()).as("kicked by the address ban").isFalse();
+        } finally {
+            running.run(moderator, "unbanip 203.0.113.9");
+        }
         assertThat(running.problems()).isEmpty();
     }
 

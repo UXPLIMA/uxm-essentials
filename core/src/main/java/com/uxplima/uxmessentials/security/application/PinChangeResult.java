@@ -28,5 +28,8 @@ public enum PinChangeResult {
     NOT_NUMERIC,
 
     /** The replacement is on the blocked list; the current PIN stands. */
-    BLOCKED
+    BLOCKED,
+
+    /** Another proof of the player's was still being checked here, so this one was not; nothing changed. */
+    BUSY
 }

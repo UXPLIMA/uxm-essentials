@@ -312,7 +312,7 @@ public final class EnforcementPermissions {
                         SECURITY_PIN_REQUIRED, "Must set a PIN before playing.", PermissionDefault.FALSE, SECURITY),
                 PermissionSpec.of(
                         SECURITY_RESET,
-                        "/security reset <player> [totp|pin|all]: clear a factor a player can no longer prove.",
+                        "/security reset <player> [totp|pin|all]: clear a factor a player can no longer prove; /security forget-proxy.",
                         PermissionDefault.OP,
                         SECURITY));
     }

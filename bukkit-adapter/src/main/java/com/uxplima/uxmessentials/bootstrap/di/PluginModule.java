@@ -926,6 +926,7 @@ public final class PluginModule {
                 () -> bus.peers()
                         .map(peers -> peers.liveServerIds(System.currentTimeMillis()))
                         .orElse(java.util.Set.of()),
+                bus.health(),
                 hooks,
                 guiRegistry,
                 menus,
@@ -1275,6 +1276,7 @@ public final class PluginModule {
             Logger log,
             Bus bus,
             java.util.function.Supplier<java.util.Set<String>> livePeers,
+            com.uxplima.uxmessentials.shared.adapter.outbound.bus.BusHealth busHealth,
             Integrations hooks,
             ManagementGuiRegistry guiRegistry,
             Menus menus,
@@ -1299,6 +1301,10 @@ public final class PluginModule {
         links.dailyRewards = networkClaims.map(claims -> ClaimLedgers.dailyRewards(persistence));
         links.claimLedger = ClaimLedgers.claims(persistence);
         links.livePeers = livePeers;
+        links.proxyAnswering = () -> busHealth
+                .proxy()
+                .map(link -> link.answeredWithin(System.currentTimeMillis(), busHealth.answerWindow()))
+                .orElse(false);
         links.networked = NetworkConfig.from(config).enabled();
         // Install uxmLib's single menu listener once, before any GUI-using module (vaults, itemworld) wires,
         // and tear it down on disable so a reload re-installs cleanly (the static install state is reset).
@@ -1336,6 +1342,17 @@ public final class PluginModule {
         // here, on enable, before any menu can be clicked. The listener was constructed earlier (it installs before
         // the modules wire), so this late-init is what closes the ordering gap between the two.
         menuTextInputRef.set(textInput);
+        // The security prompts carry a PIN or a code, so they get their own door onto the same seam: one that refuses
+        // the chat mode, because a chat line can reach chat loggers before any capture sees it.
+        links.securityEntryInput = new com.uxplima.uxmessentials.security.adapter.SecureEntryInput(
+                textInput,
+                input.settings(),
+                anvil,
+                new GuiText(kernel.messages()),
+                resolvedBedrock == null ? BedrockDetector.NONE : resolvedBedrock,
+                resolvedScreen == null ? BedrockScreen.NONE : resolvedScreen,
+                kernel.scheduler(),
+                kernel.log());
         // The one shared target picker. It is infrastructure rather than a module's own screen (moderation's
         // sanction flows and the /eco admin GUI both open it), so it is built and registered with the engine here,
         // once, and handed to those modules through the links bag. Two instances would each try to claim the same
@@ -1726,7 +1743,7 @@ public final class PluginModule {
                     persistence,
                     resources,
                     links,
-                    textInput,
+                    bus,
                     menus,
                     menuBindings,
                     Objects.requireNonNull(ipCapture, "ipCapture"));
@@ -1955,7 +1972,7 @@ public final class PluginModule {
             Persistence persistence,
             CloseableResources resources,
             ContextLinks links,
-            TextInput textInput,
+            Bus bus,
             Menus menus,
             MenuBindings menuBindings,
             IpCapture ipCapture) {
@@ -1969,7 +1986,7 @@ public final class PluginModule {
         // disable or reload leaves no residual secret and no locked player.
         // The lockout escalation goes through moderation's own tempban when that module is enabled, so it lands in
         // the same ban table, history and staff broadcast as every other ban; with moderation off it binds to NONE
-        // and the lockout stays the in-memory cooldown.
+        // and the lockout stays the module's own record.
         LockoutBan lockoutBan = links.securityLockoutBan == null
                 ? LockoutBan.NONE
                 : new ModerationLockoutBan(
@@ -1986,14 +2003,15 @@ public final class PluginModule {
                 plugin,
                 ctx,
                 persistence,
-                textInput,
+                Objects.requireNonNull(links.securityEntryInput, "securityEntryInput"),
                 menus,
                 menuBindings,
                 lockoutBan,
                 proxy,
                 ipCapture.store(),
                 ipCapture.tokens(),
-                ipCapture.recorder());
+                ipCapture.recorder(),
+                new SecurityWiring.Network(links.networked, bus, links.presence, links.proxyAnswering));
         wired.commands().forEach(resources::addCommand);
         wired.listeners().forEach(resources::addListener);
         resources.worldPhase().run("security holding area", wired.holdingArea()::warmUp);
@@ -3940,6 +3958,8 @@ public final class PluginModule {
     private static final class ContextLinks {
         // The peer backends live by their heartbeats; a cross-server trade invite waits for each to answer.
         private java.util.function.Supplier<java.util.Set<String>> livePeers = java.util.Set::of;
+        // Whether the uxmEssentials proxy plugin answers on the bus now, which is when it can confirm a switch.
+        private java.util.function.BooleanSupplier proxyAnswering = () -> false;
         // Whether this backend is part of a network (network.enabled), which is when a jail can be on another one.
         private boolean networked;
         // The shared target picker, built and registered at enable before any module wires; moderation and the
@@ -4033,6 +4053,8 @@ public final class PluginModule {
                 staffTeleport;
         private com.uxplima.uxmessentials.moderation.application.@org.jspecify.annotations.Nullable TempBan
                 securityLockoutBan;
+        private com.uxplima.uxmessentials.security.adapter.@org.jspecify.annotations.Nullable SecureEntryInput
+                securityEntryInput;
         // The PlaceholderAPI read seams, filled by each enabled context that contributes placeholders.
         private final PlaceholderContexts.Builder placeholders = PlaceholderContexts.builder();
         // The leaderboards every module that ranks something defines as it wires, built once they all have.

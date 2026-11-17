@@ -3,7 +3,7 @@ package com.uxplima.uxmessentials.teleport.adapter.inbound.command;
 import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
-import java.util.regex.Pattern;
+import java.util.UUID;
 
 import org.bukkit.World;
 import org.bukkit.entity.Player;
@@ -13,6 +13,7 @@ import io.papermc.paper.command.brigadier.Commands;
 import io.papermc.paper.command.brigadier.argument.resolvers.selector.PlayerSelectorArgumentResolver;
 
 import com.mojang.brigadier.Command;
+import com.mojang.brigadier.StringReader;
 import com.mojang.brigadier.arguments.DoubleArgumentType;
 import com.mojang.brigadier.builder.RequiredArgumentBuilder;
 import com.mojang.brigadier.context.CommandContext;
@@ -40,9 +41,6 @@ import org.jspecify.annotations.Nullable;
  */
 @NullMarked
 abstract class TeleportCommandSupport {
-
-    /** A name a player could have: what a player on another backend is typed as. */
-    private static final Pattern PLAYER_NAME = Pattern.compile("[A-Za-z0-9_]{1,16}");
 
     final TeleportServices services;
     final Messages messages;
@@ -129,17 +127,49 @@ abstract class TeleportCommandSupport {
     }
 
     /**
-     * The text typed for {@code argument} when it is a plain player name rather than a selector: the only form that
+     * The player name typed for {@code argument} when it is a plain name rather than a selector: the only form that
      * can name a player on another backend.
      */
     static Optional<String> typedName(CommandContext<CommandSourceStack> ctx, String argument) {
         for (ParsedCommandNode<CommandSourceStack> node : ctx.getNodes()) {
             if (node.getNode().getName().equals(argument)) {
-                String typed = node.getRange().get(ctx.getInput());
-                return PLAYER_NAME.matcher(typed).matches() ? Optional.of(typed) : Optional.empty();
+                return plainName(node.getRange().get(ctx.getInput()));
             }
         }
         return Optional.empty();
+    }
+
+    /**
+     * The name the player selector reads from {@code typed}, unquoted when it was typed in quotes, or empty for an
+     * {@code @} selector or a UUID. The name is not checked against Java's name rules: Floodgate prefixes (any
+     * character the operator picks) and proxies that forward longer names make names the network roster knows but a
+     * pattern would refuse.
+     */
+    static Optional<String> plainName(String typed) {
+        if (typed.isEmpty() || typed.charAt(0) == '@') {
+            return Optional.empty();
+        }
+        String name = typed;
+        if (StringReader.isQuotedStringStart(typed.charAt(0))) {
+            try {
+                name = new StringReader(typed).readQuotedString();
+            } catch (CommandSyntaxException unterminatedQuote) {
+                return Optional.empty();
+            }
+        }
+        if (name.isEmpty() || isUuid(name)) {
+            return Optional.empty();
+        }
+        return Optional.of(name);
+    }
+
+    private static boolean isUuid(String text) {
+        try {
+            UUID.fromString(text);
+            return true;
+        } catch (IllegalArgumentException notUuid) {
+            return false;
+        }
     }
 
     /** Resolve a named, currently-online player to a {@link PlayerRef} and notify the actor on failure. */

@@ -1,4 +1,4 @@
-package com.uxplima.uxmessentials.shared.adapter.outbound.bus;
+package com.uxplima.uxmessentials.shared.network;
 
 import java.nio.charset.StandardCharsets;
 import java.util.List;
@@ -60,7 +60,7 @@ public final class BusSecret {
         return state == State.USABLE;
     }
 
-    /** The key bytes a signature is made with. */
+    /** The key bytes a signature is made with; only the seal in this package reads them. */
     byte[] key() {
         return value.getBytes(StandardCharsets.UTF_8);
     }

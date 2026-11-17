@@ -3,6 +3,12 @@
 What an operator edits when a release renames something an operator's own files or permission grants depend on, or
 needs a setting it did not need before.
 
+## A PIN is ASCII digits only
+
+A PIN is now made of the ten digits 0 to 9 and nothing else, because that is all the keypad can enter. An older
+release also took digits from other scripts (fullwidth or Arabic-Indic, for example), so a PIN set that way can no
+longer be entered by anyone. Run `/security reset <player> pin` for such an account; the player then sets a new one.
+
 ## Money is paid only in a currency the server knows
 
 A player warp rating reward (`ratings.rewards.*` in the player warps config) whose currency id this server does not

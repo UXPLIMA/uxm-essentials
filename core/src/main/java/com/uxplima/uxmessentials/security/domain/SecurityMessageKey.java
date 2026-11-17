@@ -60,6 +60,8 @@ public enum SecurityMessageKey implements MessageKey {
     SECURITY_PIN_CREATE_TITLE("security.pin.create-title"),
     SECURITY_PIN_CREATE_PROMPT("security.pin.create-prompt"),
     SECURITY_PIN_CREATE_CONFIRM("security.pin.create-confirm"),
+    SECURITY_PIN_CREATE_ENTRY("security.pin.create-entry"),
+    SECURITY_PIN_CONFIRM_ENTRY("security.pin.confirm-entry"),
     SECURITY_PIN_CREATE_MISMATCH("security.pin.create-mismatch"),
     SECURITY_PIN_CREATE_DONE("security.pin.create-done"),
 
@@ -93,6 +95,7 @@ public enum SecurityMessageKey implements MessageKey {
     SECURITY_ADMIN_FORCE_NOT_ENROLLED("security.admin.force-not-enrolled"),
     SECURITY_ADMIN_RESET_USAGE("security.admin.reset-usage"),
     SECURITY_ADMIN_RESET_DONE("security.admin.reset-done"),
+    SECURITY_ADMIN_PROXY_FORGOTTEN("security.admin.proxy-forgotten"),
     SECURITY_ADMIN_RESET_NOTHING("security.admin.reset-nothing"),
 
     // Join verification: the freeze prompt on join, the keypad GUI (title, digit/clear/submit/TOTP buttons
@@ -106,6 +109,7 @@ public enum SecurityMessageKey implements MessageKey {
     SECURITY_VERIFY_KEYPAD_ENTRY("security.verify.keypad-entry"),
     SECURITY_VERIFY_KEYPAD_TOTP("security.verify.keypad-totp"),
     SECURITY_VERIFY_TOTP_PROMPT("security.verify.totp-prompt"),
+    SECURITY_VERIFY_ENTRY_PROMPT("security.verify.entry-prompt"),
     SECURITY_VERIFY_SUCCESS("security.verify.success"),
     SECURITY_VERIFY_FAILED("security.verify.failed"),
     SECURITY_VERIFY_MUST_VERIFY("security.verify.must-verify"),

@@ -157,9 +157,11 @@ the party is not paid on that backend. Use `both` only while moving from one car
 
 ## The proxy plugin
 
-`uxmEssentials-velocity` does two things: it relays bus frames, and, with `command-control.enabled = true` in its
-`config.conf`, it hides and gates the proxy's own commands (`/server`, `/glist`, `/send` and proxy plugins'
-commands) by LuckPerms group. It stores no data and does not track players: each backend announces its own players.
+`uxmEssentials-velocity` relays bus frames, and, with `command-control.enabled = true` in its `config.conf`, hides
+and gates the proxy's own commands (`/server`, `/glist`, `/send` and proxy plugins' commands) by LuckPerms group. With
+`bus.secret` in its `config.conf` set to the backends' `network.bus.secret`, it also tells each backend a player
+reaches whether they switched servers or logged in (see [second factor](#second-factor)). It stores no data: each
+backend announces its own players.
 Backend commands are gated by the `commandcontrol` module on each backend.
 
 ## Checking a network
@@ -198,6 +200,7 @@ shared: each backend reads its own `config.conf` and module files, so keep them 
 | Kits | One-time claims and cooldowns | none | none |
 | Ranks | Each player's rank and prestige | none | none |
 | Vaults | Vault contents | none | none |
+| Security | Wrong PINs and codes, lockouts, proofs to carry | A lockout holds everywhere; a proof carries across a switch | `security` `join-verification.switch-grace-seconds` |
 | Holograms, NPCs, main spawn | Definitions, with a scope | Edits show on every server in scope | `network.shared-sets` |
 | Guard | Regions, with a scope | Edits apply on every server in scope | none; shared sets in `modules/guard/config.conf` |
 | Trade | Escrow | Two players on different servers trade | `trade` `cross-server` |
@@ -275,44 +278,41 @@ reads as offline to `/msg` and `/seen`.
 
 ### Moderation
 
-Bans, mutes, warnings and IP bans are in the shared database and enforced on every server. A ban or an IP ban kicks
-the player, or everyone on that address, wherever they are; a mute is read on the next chat line, and reaches private
+Bans, mutes, warnings and IP bans are in the shared database and enforced on every server. A ban or an IP ban kicks the
+player, or everyone on that address, wherever they are; a mute is read on the next chat line, and reaches private
 messages and blocked commands through the bus (without a bus carrier, within a minute: every server reads its players'
-mutes again once a minute, and again after `/uxmess import`). `/kick` and
-`/freeze` on a player connected to another server are refused with that server's name, since this server cannot
-reach them. Whether a target is exempt is read as [punishment exemption](#punishment-exemption) says.
-A freeze is announced over the bus and held on every server, so a frozen player who switches server stays
-frozen, and `/unfreeze` on any server lifts it everywhere. Over Velocity a server that was empty when the freeze was
-announced never heard it, so the proxy plugin keeps a frozen player off other servers and sends one who logs out
-frozen back to the server that froze them. Redis reaches every server, empty or not. A server that restarts, or
-reloads its moderation module, holds no freeze any more, and the proxy lets go of the players frozen there once that
-server has a player online to carry the news. `/lockdown` is one row in the shared database, so it
-closes every server on it to new joins, but its announcement goes only to the server it was run on. Command spy and
-staff broadcasts stay on one server.
-The shared database holds bans (a permanent ban is stored as one that ends far in the future), mutes, warnings, jails
-and the jails made with `/setjail`, IP bans, last-seen records and the address history, the sanction history and the
-lockdown flag.
+mutes again once a minute, and again after `/uxmess import`). `/kick` and `/freeze` on a player connected to another
+server are refused with that server's name, since this server cannot reach them. Whether a target is exempt is read as
+[punishment exemption](punishment-exemption.md) says. A freeze is announced over the bus and held on every server, so a
+frozen player who switches server stays frozen, and `/unfreeze` on any server lifts it everywhere. Over Velocity a
+server that was empty when the freeze was announced never heard it, so the proxy plugin keeps a frozen player off other
+servers and sends one who logs out frozen back to the server that froze them. Redis reaches every server, empty or not.
+A server that restarts, or reloads its moderation module, holds no freeze any more, and the proxy lets go of the players
+frozen there once that server has a player online to carry the news. `/lockdown` is one row in the shared database, so
+it closes every server on it to new joins, but its announcement goes only to the server it was run on. Command spy and
+staff broadcasts stay on one server. The shared database holds bans (a permanent ban is stored as one that ends far in
+the future), mutes, warnings, jails and the jails made with `/setjail`, IP bans, last-seen records and the address
+history, the sanction history and the lockdown flag.
 
-#### Punishment exemption
+### Second factor
 
-Whether a target holds `uxmessentials.bypass.punishment` is read where the answer is:
+Wrong PINs and authenticator codes, and the lockout they end in, are kept in the shared database: a player gets
+`max-attempts` tries across the whole network, not on each server, and a lockout holds on every server. A player who
+proved their factor keeps the proof when they switch servers, so they are not asked again on each one:
 
-- On this server, live. On another server, that server is asked over the bus and reads it live; its answer wins.
-- When that server does not answer within three seconds, or the player is offline, every source here is read, and a
-  grant from any one exempts: LuckPerms (any context), the Vault permission plugin, this server's operator list, and
-  what each server recorded when the player was last there. Each server records the live answer when the player
-  joins, leaves, and, with LuckPerms, whenever their permissions change, in `moderation_exempt_seen`.
-- For a player whose server did not answer, only a grant counts: anything else refuses the sanction, since that
-  server's own operator list and permission plugin are not read here.
-- LuckPerms cannot tell for a player its storage never saw (storage not shared with the server they played on), nor
-  Vault for a player who never joined this server, since Vault asks by name. Then the record decides: a player some
-  server recorded, with no recorded grant, is not exempt. One no server recorded cannot be sanctioned from here; do it
-  from a server they played on.
-
-The record is only as fresh as the player's last visit. An exemption granted while they are offline, in a permission
-store this server does not share, is not seen here until they join the server that has it; a grant removed while they
-are away still counts until then. When a server is gone for good, delete its rows:
-`DELETE FROM moderation_exempt_seen WHERE server = 'name'` (with your table prefix).
+- Once any server has had the word of `uxmEssentials-velocity` about a player who joined it, which the shared
+  database remembers, a proof is carried only across a switch the proxy confirms, on the connection the proof was
+  made over. Every new login asks again. The proxy says so over the player's own connection, signed with its
+  `bus.secret`, so it arrives with any `network.transport` as long as `network.bus.secret` is set to the same value;
+  without that, every switch asks again. After removing the proxy plugin, `/security forget-proxy` lets proofs carry
+  on the address again.
+- On a network that has never had the proxy plugin's word, a player who arrives from the address the proof was made
+  from is let in unasked within `switch-grace-seconds` (30) of leaving a server, or while that server still lists
+  them. That includes logging in again from the same address within that time, by the player or by anyone behind
+  the same address (a shared home or NAT) who can log in to the account: the trade-off of having no proxy to tell a
+  switch from a new login. Install the proxy plugin where that matters.
+- `switch-grace-seconds = 0` asks on every server. `/2fa force`, a factor reset and a lockout drop a carried proof.
+  A proof that cannot be read (the database is down) costs no attempt, up to three times per lockout window.
 
 ### Kits, ranks and vaults
 

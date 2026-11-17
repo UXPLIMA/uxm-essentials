@@ -77,7 +77,7 @@ frozen, by anyone: the command refuses and says so. The node defaults to operato
 `/kickall` and by an IP ban on their address, may still log in from a banned address, and is not stopped in chat or by
 `muted-blocked-commands` while muted. It is read on the player's own thread, and for one on another server from that
 server; an offline player, or one whose server does not answer, is read from every source as
-[network](network.md#punishment-exemption) explains. With no answer they count as exempt; staff are told why.
+[punishment exemption](punishment-exemption.md) explains. With no answer they count as exempt; staff are told why.
 
 ## Bans
 

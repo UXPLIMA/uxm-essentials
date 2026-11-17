@@ -306,6 +306,13 @@ public final class NetworkMessageCodec {
                 out.writeUTF(query.node());
                 out.writeUTF(query.step());
             }
+            case ProxyConnectionFrame connected -> {
+                writeUuid(out, connected.frameId());
+                writeUuid(out, connected.player());
+                writeUuid(out, connected.connection());
+                out.writeUTF(connected.server());
+                out.writeBoolean(connected.switched());
+            }
         }
     }
 
@@ -406,6 +413,9 @@ public final class NetworkMessageCodec {
             case ALL_BALANCES_CHANGED -> new AllBalancesChanged(origin, in.readUTF());
             case PERMISSION_QUERY ->
                 new PermissionQueryFrame(origin, readUuid(in), in.readUTF(), readUuid(in), in.readUTF(), in.readUTF());
+            case PROXY_CONNECTION ->
+                new ProxyConnectionFrame(
+                        origin, readUuid(in), readUuid(in), readUuid(in), in.readUTF(), in.readBoolean());
         };
     }
 
