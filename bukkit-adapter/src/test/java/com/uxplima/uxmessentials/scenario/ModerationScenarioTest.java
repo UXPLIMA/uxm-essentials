@@ -4,6 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 import java.net.InetAddress;
 import java.net.InetSocketAddress;
+import java.nio.charset.StandardCharsets;
 import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
@@ -93,6 +94,18 @@ class ModerationScenarioTest {
         running.run(moderator, "ban Odin griefing");
 
         assertThat(running.join("Odin").isOnline()).as("banned while offline").isFalse();
+        assertThat(running.problems()).isEmpty();
+    }
+
+    @Test
+    void anAccountBannedByItsUuidBeforeItEverJoinedIsTurnedAwayOnItsFirstLogin() {
+        UUID newcomer = UUID.nameUUIDFromBytes("OfflinePlayer:Newcomer".getBytes(StandardCharsets.UTF_8));
+
+        running.run(moderator, "ban " + newcomer + " known griefer");
+
+        ScenarioPlayer first = running.join("Newcomer");
+        assertThat(first.isOnline()).as("banned before joining").isFalse();
+        assertThat(logins.login.get(newcomer)).isEqualTo(PlayerLoginEvent.Result.KICK_BANNED);
         assertThat(running.problems()).isEmpty();
     }
 

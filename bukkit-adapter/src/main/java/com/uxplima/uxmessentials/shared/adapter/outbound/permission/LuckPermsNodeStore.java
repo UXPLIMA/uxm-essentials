@@ -18,9 +18,11 @@ import org.jspecify.annotations.NullMarked;
  * counts, wherever the read is made. A sanction reaches the player on every server and in every world, so a grant
  * that exempts them anywhere exempts them from it.
  *
- * <p>LuckPerms makes up an empty user for an account its storage has never seen, so such a user would read as
- * granting nothing. A player its storage has no name for (it is not shared with the server they played on, or they
- * never joined one that uses it) is therefore {@link Answer#NO_SOURCE}: this store cannot tell.
+ * <p>LuckPerms makes up an empty user for an account its storage has never seen, so such a user is not loaded. An
+ * account its storage has no name for joins into the {@code default} group, and nothing else LuckPerms holds can grant
+ * it a node: it is read for what that group grants. A player who played only where another LuckPerms storage holds
+ * their grants reads the same way here, which is why the backends' own record of the exemption is read beside this
+ * store.
  */
 @NullMarked
 final class LuckPermsNodeStore implements NodeStore {
@@ -40,9 +42,8 @@ final class LuckPermsNodeStore implements NodeStore {
         Objects.requireNonNull(player, "player");
         Objects.requireNonNull(node, "node");
         return () -> users.knownName(player)
-                .thenCompose(name -> name.isEmpty()
-                        ? CompletableFuture.completedFuture(Answer.NO_SOURCE)
-                        : users.grants(player, node).thenApply(held -> held ? Answer.HELD : Answer.NOT_HELD));
+                .thenCompose(name -> name.isEmpty() ? users.grantsNewcomers(node) : users.grants(player, node))
+                .thenApply(held -> held ? Answer.HELD : Answer.NOT_HELD);
     }
 
     /** The two reads this store makes of the LuckPerms storage, both off the tick. */
@@ -53,5 +54,8 @@ final class LuckPermsNodeStore implements NodeStore {
 
         /** Whether the stored {@code player} holds {@code node} in any context. */
         CompletableFuture<Boolean> grants(UUID player, String node);
+
+        /** Whether the {@code default} group every account joins into grants {@code node} in any context. */
+        CompletableFuture<Boolean> grantsNewcomers(String node);
     }
 }
