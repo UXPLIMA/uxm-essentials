@@ -32,7 +32,12 @@ public final class SharedBroadcastOptOut implements BroadcastOptOutStore {
 
     @Override
     public boolean toggle(PlayerRef who) {
-        return !switches.flip(who.uuid(), BROADCASTS, true);
+        return !switches.flip(who.uuid(), BROADCASTS, true).orElseGet(() -> receivesBroadcasts(who));
+    }
+
+    @Override
+    public boolean ready(PlayerRef who) {
+        return switches.ready(who.uuid());
     }
 
     @Override

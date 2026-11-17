@@ -59,8 +59,14 @@ public final class SharedSocialSpy implements SocialSpyStore, HeldSettings {
                     }
 
                     @Override
-                    public void write(UUID spy, Set<UUID> watched) {
-                        store.save(spy, watched);
+                    public void write(UUID spy, Set<UUID> before, Set<UUID> after) {
+                        Set<UUID> added = new HashSet<>(after);
+                        added.removeAll(before);
+                        Set<UUID> removed = new HashSet<>(before);
+                        removed.removeAll(after);
+                        if (!added.isEmpty() || !removed.isEmpty()) {
+                            store.change(spy, added, removed);
+                        }
                     }
                 },
                 Set.of(),
@@ -76,7 +82,12 @@ public final class SharedSocialSpy implements SocialSpyStore, HeldSettings {
 
     @Override
     public boolean toggle(PlayerRef who) {
-        return switches.flip(who.uuid(), MessagingSwitches.SOCIAL_SPY, false);
+        return switches.flip(who.uuid(), MessagingSwitches.SOCIAL_SPY, false).orElseGet(() -> isSpying(who));
+    }
+
+    @Override
+    public boolean ready(PlayerRef who) {
+        return switches.ready(who.uuid()) && targets.holds(who.uuid());
     }
 
     @Override
@@ -90,6 +101,7 @@ public final class SharedSocialSpy implements SocialSpyStore, HeldSettings {
                     }
                     return Set.copyOf(next);
                 })
+                .orElseGet(() -> targets.get(spy.uuid()))
                 .contains(watched);
     }
 
@@ -127,6 +139,11 @@ public final class SharedSocialSpy implements SocialSpyStore, HeldSettings {
     }
 
     @Override
+    public boolean holds(UUID player) {
+        return targets.holds(player);
+    }
+
+    @Override
     public void load(UUID player) {
         targets.load(player);
     }
@@ -139,10 +156,5 @@ public final class SharedSocialSpy implements SocialSpyStore, HeldSettings {
     @Override
     public void refresh(UUID player) {
         targets.refresh(player);
-    }
-
-    @Override
-    public void refreshAll() {
-        targets.refreshAll();
     }
 }

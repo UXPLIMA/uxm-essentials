@@ -5,14 +5,16 @@
 -- `player_switches` holds one row per player and switch the player has set: whether they take private messages
 -- (`/msgtoggle`), replies (`/rtoggle`) and the rotating announcements (`/broadcasttoggle`), and whether they spy on
 -- every private message (`/socialspy`). `switch_name` is the stable name of the switch and `switch_on` its state as a
--- SMALLINT (0/1), so there is no dialect-specific boolean handling. A switch with no row is at its default.
+-- SMALLINT (0/1), so there is no dialect-specific boolean handling. `changed_at` is when the player set it, in epoch
+-- milliseconds; a write older than the row is dropped, so two backends writing at once keep the newer setting. A
+-- switch with no row is at its default.
 --
 -- `messaging_spy_targets` holds one row per staff member and player whose private messages they watch
--- (`/socialspy <player>`).
+-- (`/socialspy <player>`). A backend adds and removes single rows, so it never drops a row another one added.
 --
 -- `messaging_reply_partners` holds each player's last private message partner, the one `/reply` answers. The name is
 -- the partner's name when the message was sent, `touched_at` when it was sent, in epoch milliseconds, so the reply
--- window counts from there on every backend.
+-- window counts from there on every backend; a write older than the row is dropped.
 --
 -- UUIDs are the canonical 36-character text. Same portability contract as the earlier migrations: plain CREATE TABLE
 -- in the subset SQLite, MySQL/MariaDB and PostgreSQL all accept.
@@ -20,6 +22,7 @@ CREATE TABLE ${prefix}player_switches (
     player_uuid VARCHAR(36) NOT NULL,
     switch_name VARCHAR(32) NOT NULL,
     switch_on   SMALLINT    NOT NULL,
+    changed_at  BIGINT      NOT NULL,
     CONSTRAINT ${prefix}pk_player_switches PRIMARY KEY (player_uuid, switch_name)
 );
 

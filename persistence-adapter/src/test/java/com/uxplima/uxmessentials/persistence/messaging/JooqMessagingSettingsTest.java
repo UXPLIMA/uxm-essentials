@@ -24,14 +24,14 @@ class JooqMessagingSettingsTest {
     private static final Instant LATE = Instant.parse("2030-01-01T00:00:05Z");
 
     @Test
-    void aSavedSetOfWatchedPlayersReplacesTheOneBefore(TestDatabase database) {
+    void addingAndRemovingWatchedPlayersChangesOnlyThoseRows(TestDatabase database) {
         JooqSpyTargetStore store = new JooqSpyTargetStore(database.dsl());
-        store.save(MOD, Set.of(ALEX.uuid(), SAM.uuid()));
-        store.save(MOD, Set.of(SAM.uuid()));
+        store.change(MOD, Set.of(ALEX.uuid()), Set.of());
+        new JooqSpyTargetStore(database.dsl()).change(MOD, Set.of(SAM.uuid(), ALEX.uuid()), Set.of());
+
+        store.change(MOD, Set.of(), Set.of(ALEX.uuid()));
 
         assertThat(new JooqSpyTargetStore(database.dsl()).load(MOD)).containsExactly(SAM.uuid());
-        store.save(MOD, Set.of());
-        assertThat(store.load(MOD)).isEmpty();
     }
 
     @Test
@@ -42,5 +42,15 @@ class JooqMessagingSettingsTest {
 
         assertThat(new JooqReplyPartnerStore(database.dsl()).load(MOD)).contains(LastConversation.with(SAM, LATE));
         assertThat(store.load(ALEX.uuid())).isEmpty();
+    }
+
+    @Test
+    void anOlderConversationWrittenLateKeepsTheNewerOne(TestDatabase database) {
+        JooqReplyPartnerStore store = new JooqReplyPartnerStore(database.dsl());
+        store.save(MOD, LastConversation.with(SAM, LATE));
+
+        store.save(MOD, LastConversation.with(ALEX, EARLY));
+
+        assertThat(store.load(MOD)).contains(LastConversation.with(SAM, LATE));
     }
 }

@@ -14,6 +14,9 @@ public interface ReplyPartnerStore {
     /** The last conversation of {@code owner}, if they had one. */
     Optional<LastConversation> load(UUID owner);
 
-    /** Store {@code conversation} as the last conversation of {@code owner}, replacing the one before. */
+    /**
+     * Store {@code conversation} as the last conversation of {@code owner}, replacing the one before unless that one was
+     * touched later: two backends writing at once keep the newer conversation.
+     */
     void save(UUID owner, LastConversation conversation);
 }

@@ -975,5 +975,10 @@ class CrossServerMessagingTest {
         public boolean toggle(PlayerRef who) {
             throw new UnsupportedOperationException();
         }
+
+        @Override
+        public boolean ready(PlayerRef who) {
+            return true;
+        }
     }
 }

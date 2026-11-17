@@ -43,7 +43,12 @@ public final class MessagingSwitches {
 
             @Override
             public boolean toggle(PlayerRef who) {
-                return switches.flip(who.uuid(), MESSAGES, true);
+                return switches.flip(who.uuid(), MESSAGES, true).orElseGet(() -> acceptsMessages(who));
+            }
+
+            @Override
+            public boolean ready(PlayerRef who) {
+                return switches.ready(who.uuid());
             }
         };
     }
@@ -58,7 +63,12 @@ public final class MessagingSwitches {
 
             @Override
             public boolean toggle(PlayerRef who) {
-                return switches.flip(who.uuid(), REPLIES, true);
+                return switches.flip(who.uuid(), REPLIES, true).orElseGet(() -> acceptsReplies(who));
+            }
+
+            @Override
+            public boolean ready(PlayerRef who) {
+                return switches.ready(who.uuid());
             }
         };
     }

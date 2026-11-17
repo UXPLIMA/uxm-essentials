@@ -13,7 +13,7 @@ import org.jooq.DSLContext;
 
 /**
  * The jOOQ-backed {@link SpyTargetStore} over {@code messaging_spy_targets}: one row per staff member and player they
- * watch. A save replaces the staff member's whole set in one transaction, so a reader never sees half of it.
+ * watch. A change adds and removes single rows in one transaction, so a row another backend added stays.
  */
 public final class JooqSpyTargetStore extends JooqRepository implements SpyTargetStore {
 
@@ -34,17 +34,24 @@ public final class JooqSpyTargetStore extends JooqRepository implements SpyTarge
     }
 
     @Override
-    public void save(UUID spy, Set<UUID> targets) {
+    public void change(UUID spy, Set<UUID> added, Set<UUID> removed) {
         Objects.requireNonNull(spy, "spy");
-        Objects.requireNonNull(targets, "targets");
+        Objects.requireNonNull(added, "added");
+        Objects.requireNonNull(removed, "removed");
+        String owner = spy.toString();
         write(dsl -> {
-            dsl.deleteFrom(MESSAGING_SPY_TARGETS)
-                    .where(MESSAGING_SPY_TARGETS.SPY_UUID.eq(spy.toString()))
-                    .execute();
-            for (UUID target : targets) {
+            if (!removed.isEmpty()) {
+                dsl.deleteFrom(MESSAGING_SPY_TARGETS)
+                        .where(MESSAGING_SPY_TARGETS.SPY_UUID.eq(owner))
+                        .and(MESSAGING_SPY_TARGETS.TARGET_UUID.in(
+                                removed.stream().map(UUID::toString).toList()))
+                        .execute();
+            }
+            for (UUID target : added) {
                 dsl.insertInto(MESSAGING_SPY_TARGETS)
-                        .set(MESSAGING_SPY_TARGETS.SPY_UUID, spy.toString())
+                        .set(MESSAGING_SPY_TARGETS.SPY_UUID, owner)
                         .set(MESSAGING_SPY_TARGETS.TARGET_UUID, target.toString())
+                        .onConflictDoNothing()
                         .execute();
             }
             return null;

@@ -9,6 +9,7 @@ import com.uxplima.uxmessentials.communication.domain.event.BroadcastOptOutToggl
 import com.uxplima.uxmessentials.shared.application.message.Notifier;
 import com.uxplima.uxmessentials.shared.application.port.DomainEventPublisher;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
+import com.uxplima.uxmessentials.shared.domain.message.SharedMessageKey;
 
 /**
  * {@code /broadcasttoggle}: flip whether a player receives announcer broadcasts. It toggles the player's bit in
@@ -16,7 +17,8 @@ import com.uxplima.uxmessentials.shared.domain.PlayerRef;
  * and publishes {@link BroadcastOptOutToggled} so an audit line and any observer see the change. The announcer's
  * {@code NextAnnouncement} fan-out reads the same store, so an opted-out player is skipped on the next tick.
  *
- * <p>The opt-out bit is the plugin's own per-player state. The confirmation is a {@code MessageKey}, not operator
+ * <p>The opt-out bit is the plugin's own per-player state, shared by every backend; while the player's setting is
+ * still being read the change is refused with a try-again line. The confirmation is a {@code MessageKey}, not operator
  * content. The use case never renders an announcer line itself; it only governs the subscription.
  */
 public final class BroadcastOptOut {
@@ -39,6 +41,10 @@ public final class BroadcastOptOut {
      */
     public boolean toggle(PlayerRef player) {
         Objects.requireNonNull(player, "player");
+        if (!store.ready(player)) {
+            notifier.send(player, SharedMessageKey.COMMAND_ERROR);
+            return !store.receivesBroadcasts(player);
+        }
         boolean optedOut = store.toggle(player);
         notifier.send(player, confirmation(optedOut));
         events.publish(new BroadcastOptOutToggled(player, optedOut, clock.instant()));

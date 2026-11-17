@@ -10,9 +10,10 @@ import org.jspecify.annotations.NullMarked;
 
 /**
  * Keeps the per-player settings every backend shares current across the network. A change written here is announced
- * in a {@link PlayerSettingsChanged}; a backend holding that player reads their settings again. That covers a player
- * who reached the next backend before the change was written; the safety timer reads every held player again for a
- * frame that was lost.
+ * in a {@link PlayerSettingsChanged}; a backend holding that player, or reading them for a login, reads their settings
+ * again. That covers a player who reached the next backend before the change was written. The settings are held only
+ * for the players online on a backend and read again at every login, so they stay out of the periodic resync: a lost
+ * frame lasts until the player's next login at most.
  */
 @NullMarked
 public final class PlayerSettingsSync {
@@ -25,7 +26,7 @@ public final class PlayerSettingsSync {
         return player -> bus.publish(new PlayerSettingsChanged(bus.serverId(), player));
     }
 
-    /** Registers {@code settings} to be read again on a peer's change and on the safety timer. */
+    /** Registers {@code settings} to be read again on a peer's change. */
     public static void register(RemoteSyncRegistry registry, HeldSettings settings) {
         Objects.requireNonNull(registry, "registry");
         Objects.requireNonNull(settings, "settings");
@@ -34,6 +35,5 @@ public final class PlayerSettingsSync {
                 settings.refresh(changed.player());
             }
         });
-        registry.registerResync(settings::refreshAll);
     }
 }

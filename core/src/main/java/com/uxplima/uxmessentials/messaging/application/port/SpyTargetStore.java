@@ -12,6 +12,9 @@ public interface SpyTargetStore {
     /** The players {@code spy} watches; empty when they watch nobody. */
     Set<UUID> load(UUID spy);
 
-    /** Store {@code targets} as the whole set of players {@code spy} watches. */
-    void save(UUID spy, Set<UUID> targets);
+    /**
+     * Start watching {@code added} and stop watching {@code removed} for {@code spy}. Only these rows change, so a
+     * player another backend added meanwhile stays watched.
+     */
+    void change(UUID spy, Set<UUID> added, Set<UUID> removed);
 }

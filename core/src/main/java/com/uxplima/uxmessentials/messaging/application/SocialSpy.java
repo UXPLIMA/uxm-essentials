@@ -7,6 +7,7 @@ import com.uxplima.uxmessentials.messaging.application.port.SocialSpyStore;
 import com.uxplima.uxmessentials.messaging.domain.MessagingMessageKey;
 import com.uxplima.uxmessentials.shared.application.message.Notifier;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
+import com.uxplima.uxmessentials.shared.domain.message.SharedMessageKey;
 
 /**
  * {@code /socialspy}: flip whether a staff member observes other players' private messages, in one of two
@@ -14,8 +15,9 @@ import com.uxplima.uxmessentials.shared.domain.PlayerRef;
  * while {@code /socialspy <player>} toggles one player on the staff member's target set, so they observe
  * only conversations that player is a party to. The {@link SendMessage} fan-out delivers each message to
  * every eligible observer (ALL holders plus matching target-watchers), skipping a party to the conversation.
- * The new state is reported to the staff member. The flags live in the {@link SocialSpyStore} (per-holder
- * session/PDC state); this use case flips them and renders the outcome.
+ * The new state is reported to the staff member. The flags live in the {@link SocialSpyStore}, shared by every
+ * backend; this use case flips them and renders the outcome, and refuses with a try-again line while the staff
+ * member's settings are still being read.
  */
 public final class SocialSpy {
 
@@ -30,6 +32,10 @@ public final class SocialSpy {
     /** Flip {@code staff}'s global socialspy (ALL) state and tell them the new state. */
     public boolean toggle(PlayerRef staff) {
         Objects.requireNonNull(staff, "staff");
+        if (!socialSpy.ready(staff)) {
+            notifier.send(staff, SharedMessageKey.COMMAND_ERROR);
+            return socialSpy.isSpying(staff);
+        }
         boolean spyingNow = socialSpy.toggle(staff);
         notifier.send(staff, spyingNow ? MessagingMessageKey.SOCIALSPY_ON : MessagingMessageKey.SOCIALSPY_OFF);
         return spyingNow;
@@ -39,6 +45,10 @@ public final class SocialSpy {
     public boolean watch(PlayerRef staff, PlayerRef target) {
         Objects.requireNonNull(staff, "staff");
         Objects.requireNonNull(target, "target");
+        if (!socialSpy.ready(staff)) {
+            notifier.send(staff, SharedMessageKey.COMMAND_ERROR);
+            return false;
+        }
         boolean watchingNow = socialSpy.toggleTarget(staff, target);
         MessagingMessageKey key =
                 watchingNow ? MessagingMessageKey.SOCIALSPY_WATCHING : MessagingMessageKey.SOCIALSPY_UNWATCHED;

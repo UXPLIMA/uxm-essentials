@@ -64,6 +64,7 @@ import com.uxplima.uxmessentials.shared.application.module.ModuleContext;
 import com.uxplima.uxmessentials.shared.application.port.NetworkPresence;
 import com.uxplima.uxmessentials.shared.application.settings.HeldSettings;
 import com.uxplima.uxmessentials.shared.application.settings.PlayerSwitches;
+import com.uxplima.uxmessentials.shared.application.settings.SettingsSessions;
 import com.uxplima.uxmlib.gui.input.TextInput;
 import com.uxplima.uxmlib.menu.Menus;
 import com.uxplima.uxmlib.menu.binding.MenuBindings;
@@ -136,8 +137,9 @@ public final class MessagingWiring {
         UxmChatStepBack chat = new UxmChatStepBack(plugin.getServer());
         MessagingServices services = assemble(
                 kernel, settings, stores, mutePolicy, afkStatus, vanish, network, presence, chat, Clock.systemUTC());
-        HeldSettingsListener heldSettings = new HeldSettingsListener(stores.held());
-        heldSettings.adoptOnline(plugin.getServer().getOnlinePlayers(), kernel.scheduler());
+        HeldSettingsListener heldSettings = new HeldSettingsListener(
+                new SettingsSessions(stores.held(), kernel.scheduler()), kernel.playerLookup());
+        heldSettings.adoptOnline(plugin.getServer().getOnlinePlayers());
         // An earlier version kept these two switches in the player's data on each server; they move to the shared
         // switches as each player next joins.
         List<Listener> listeners = List.of(
@@ -282,6 +284,7 @@ public final class MessagingWiring {
         PlayerSwitches switches = new PlayerSwitches(
                 MessagingSwitches.NAMES,
                 SettingsStores.switches(persistence),
+                Clock.systemUTC(),
                 kernel.scheduler(),
                 kernel.log(),
                 announce);
@@ -294,8 +297,8 @@ public final class MessagingWiring {
                 kernel.scheduler(),
                 kernel.log(),
                 announce);
-        SharedConversations conversations =
-                new SharedConversations(MessagingStores.replyPartners(persistence), kernel.scheduler(), kernel.log());
+        SharedConversations conversations = new SharedConversations(
+                MessagingStores.replyPartners(persistence), kernel.scheduler(), kernel.log(), announce);
         HeldSettings held = HeldSettings.of(switches, socialSpy, conversations);
         PlayerSettingsSync.register(bus.registry(), held);
         return new Stores(

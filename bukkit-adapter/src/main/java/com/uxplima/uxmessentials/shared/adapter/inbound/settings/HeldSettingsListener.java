@@ -8,44 +8,62 @@ import org.bukkit.event.EventHandler;
 import org.bukkit.event.EventPriority;
 import org.bukkit.event.Listener;
 import org.bukkit.event.player.AsyncPlayerPreLoginEvent;
+import org.bukkit.event.player.PlayerJoinEvent;
+import org.bukkit.event.player.PlayerQuitEvent;
 
 import com.destroystokyo.paper.event.player.PlayerConnectionCloseEvent;
-import com.uxplima.uxmessentials.shared.application.port.Scheduler;
-import com.uxplima.uxmessentials.shared.application.settings.HeldSettings;
+import com.uxplima.uxmessentials.shared.application.port.PlayerLookup;
+import com.uxplima.uxmessentials.shared.application.settings.SettingsSessions;
 import org.jspecify.annotations.NullMarked;
 
 /**
- * Reads a player's shared settings during the asynchronous pre-login, so they are in memory before any command or
- * message of theirs is handled, and lets go of them when the connection closes.
+ * Hands the moments of a player's connection to {@link SettingsSessions}: their shared settings are read during the
+ * asynchronous pre-login, read again at the join when that read did not leave them held, and let go of at the quit or
+ * when a login that never joined closes.
  */
 @NullMarked
 public final class HeldSettingsListener implements Listener {
 
-    private final HeldSettings settings;
+    private final SettingsSessions sessions;
+    private final PlayerLookup players;
 
-    public HeldSettingsListener(HeldSettings settings) {
-        this.settings = Objects.requireNonNull(settings, "settings");
+    public HeldSettingsListener(SettingsSessions sessions, PlayerLookup players) {
+        this.sessions = Objects.requireNonNull(sessions, "sessions");
+        this.players = Objects.requireNonNull(players, "players");
     }
 
     /** Monitor, so a login another plugin refuses reads nothing; the event already runs off the tick. */
     @EventHandler(priority = EventPriority.MONITOR)
     public void onPreLogin(AsyncPlayerPreLoginEvent event) {
         if (event.getLoginResult() == AsyncPlayerPreLoginEvent.Result.ALLOWED) {
-            settings.load(event.getUniqueId());
+            sessions.loggingIn(event.getUniqueId());
         }
     }
 
-    /** A quit, or a login that was read but never reached the world. */
+    /** Lowest, so a read the pre-login missed is already queued when later join handlers act. */
+    @EventHandler(priority = EventPriority.LOWEST)
+    public void onJoin(PlayerJoinEvent event) {
+        sessions.joined(event.getPlayer().getUniqueId());
+    }
+
+    @EventHandler(priority = EventPriority.MONITOR)
+    public void onQuit(PlayerQuitEvent event) {
+        sessions.quit(event.getPlayer().getUniqueId());
+    }
+
+    /**
+     * A duplicate login closes the old connection while the new session is already online; the close can fire off the
+     * tick, so the online index answers that rather than the server's player list.
+     */
     @EventHandler(priority = EventPriority.MONITOR)
     public void onConnectionClose(PlayerConnectionCloseEvent event) {
-        settings.forget(event.getPlayerUniqueId());
+        sessions.closed(event.getPlayerUniqueId(), players.isOnline(event.getPlayerUniqueId()));
     }
 
     /** Read the settings of the players already online when the module started, off the tick. */
-    public void adoptOnline(Collection<? extends Player> online, Scheduler scheduler) {
+    public void adoptOnline(Collection<? extends Player> online) {
         for (Player player : online) {
-            java.util.UUID id = player.getUniqueId();
-            scheduler.async(() -> settings.load(id));
+            sessions.adopt(player.getUniqueId());
         }
     }
 }

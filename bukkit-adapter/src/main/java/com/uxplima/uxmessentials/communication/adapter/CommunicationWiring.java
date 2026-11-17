@@ -64,6 +64,7 @@ import com.uxplima.uxmessentials.shared.application.module.ModuleContext;
 import com.uxplima.uxmessentials.shared.application.port.PlayerSwitchStore;
 import com.uxplima.uxmessentials.shared.application.port.Scheduler;
 import com.uxplima.uxmessentials.shared.application.settings.PlayerSwitches;
+import com.uxplima.uxmessentials.shared.application.settings.SettingsSessions;
 import com.uxplima.uxmessentials.shared.display.ConditionContext;
 import com.uxplima.uxmlib.gui.input.TextInput;
 import com.uxplima.uxmlib.menu.Menus;
@@ -128,13 +129,15 @@ public final class CommunicationWiring {
         PlayerSwitches switches = new PlayerSwitches(
                 SharedBroadcastOptOut.NAMES,
                 switchStore,
+                Clock.systemUTC(),
                 kernel.scheduler(),
                 kernel.log(),
                 PlayerSettingsSync.announcer(bus.publisher()));
         PlayerSettingsSync.register(bus.registry(), switches);
         BroadcastOptOutStore optOutStore = new SharedBroadcastOptOut(switches);
-        HeldSettingsListener heldSwitches = new HeldSettingsListener(switches);
-        heldSwitches.adoptOnline(plugin.getServer().getOnlinePlayers(), kernel.scheduler());
+        HeldSettingsListener heldSwitches =
+                new HeldSettingsListener(new SettingsSessions(switches, kernel.scheduler()), kernel.playerLookup());
+        heldSwitches.adoptOnline(plugin.getServer().getOnlinePlayers());
         RandomSource random = new ThreadLocalRandomSource();
         BukkitInfoSender infoSender = new BukkitInfoSender(kernel.messageSink());
         Notifier notifier = new Notifier(kernel.messages(), kernel.messageSink());

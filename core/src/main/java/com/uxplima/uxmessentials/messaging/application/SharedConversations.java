@@ -3,6 +3,7 @@ package com.uxplima.uxmessentials.messaging.application;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.UUID;
+import java.util.function.Consumer;
 
 import com.uxplima.uxmessentials.messaging.application.port.ConversationStore;
 import com.uxplima.uxmessentials.messaging.application.port.ReplyPartnerStore;
@@ -18,14 +19,15 @@ import com.uxplima.uxmessentials.shared.domain.PlayerRef;
  * and written back as it changes (see {@link HeldPlayerState}), so {@code /reply} still answers the right player after
  * a move to another backend. The reply window counts from when the conversation was last touched, on any backend.
  *
- * <p>A partner changes with every private message, so the change is not announced to the other backends: the player
- * is on this one, and the next backend reads the row when they arrive.
+ * <p>A partner is replaced whole with every private message, so it is taken even while the player's row is still
+ * being read, and announced like any other setting, so a backend the player just moved to reads it again.
  */
 public final class SharedConversations implements ConversationStore, HeldSettings {
 
     private final HeldPlayerState<Optional<LastConversation>> latest;
 
-    public SharedConversations(ReplyPartnerStore store, Scheduler scheduler, Logger log) {
+    /** @param changed told, on the async lane, that a player's partner was written */
+    public SharedConversations(ReplyPartnerStore store, Scheduler scheduler, Logger log, Consumer<UUID> changed) {
         Objects.requireNonNull(store, "store");
         this.latest = new HeldPlayerState<>(
                 "reply-partner",
@@ -36,21 +38,21 @@ public final class SharedConversations implements ConversationStore, HeldSetting
                     }
 
                     @Override
-                    public void write(UUID owner, Optional<LastConversation> conversation) {
-                        conversation.ifPresent(last -> store.save(owner, last));
+                    public void write(UUID owner, Optional<LastConversation> before, Optional<LastConversation> after) {
+                        after.ifPresent(last -> store.save(owner, last));
                     }
                 },
                 Optional.empty(),
                 scheduler,
                 log,
-                owner -> {});
+                changed);
     }
 
     @Override
     public void remember(PlayerRef owner, LastConversation conversation) {
         Objects.requireNonNull(owner, "owner");
         Objects.requireNonNull(conversation, "conversation");
-        latest.update(owner.uuid(), previous -> Optional.of(conversation));
+        latest.set(owner.uuid(), Optional.of(conversation));
     }
 
     @Override
@@ -62,6 +64,11 @@ public final class SharedConversations implements ConversationStore, HeldSetting
     @Override
     public void forget(PlayerRef owner) {
         latest.forget(Objects.requireNonNull(owner, "owner").uuid());
+    }
+
+    @Override
+    public boolean holds(UUID player) {
+        return latest.holds(player);
     }
 
     @Override
@@ -77,10 +84,5 @@ public final class SharedConversations implements ConversationStore, HeldSetting
     @Override
     public void refresh(UUID player) {
         latest.refresh(player);
-    }
-
-    @Override
-    public void refreshAll() {
-        latest.refreshAll();
     }
 }
