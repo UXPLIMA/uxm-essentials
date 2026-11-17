@@ -20,7 +20,9 @@ import com.uxplima.uxmessentials.shared.adapter.outbound.IpLiteral;
 import com.uxplima.uxmessentials.shared.application.permission.EnforcementPermissions;
 import com.uxplima.uxmessentials.shared.application.port.MessageSink;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
+import com.uxplima.uxmessentials.shared.domain.NameMatch;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
+import com.uxplima.uxmessentials.shared.domain.message.MessageLine;
 import com.uxplima.uxmlib.command.Args;
 import com.uxplima.uxmlib.command.Gate;
 import org.jspecify.annotations.NullMarked;
@@ -82,12 +84,14 @@ public final class TempbanipCommand extends ModerationCommandSupport implements 
         if (ip.isPresent()) {
             return ip.map(address -> () -> Optional.of(new BanIp.Target(address, Optional.empty())));
         }
-        Optional<PlayerRef> player = services.targets().resolve(argument);
+        NameMatch match = services.targets().resolve(argument);
+        Optional<PlayerRef> player = match.player();
         if (player.isEmpty()) {
             if (IpLiteral.malformedAddress(argument)) {
                 notify(ctx, ModerationMessageKey.BANIP_INVALID_IP, Map.of());
             } else {
-                notify(ctx, UNKNOWN_PLAYER, Map.of("player", argument));
+                MessageLine miss = match.miss(UNKNOWN_PLAYER, Map.of("player", argument));
+                notify(ctx, miss.key(), miss.args());
             }
             return Optional.empty();
         }
