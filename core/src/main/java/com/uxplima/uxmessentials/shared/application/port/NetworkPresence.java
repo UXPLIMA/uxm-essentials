@@ -22,6 +22,12 @@ import com.uxplima.uxmessentials.shared.domain.OnlinePlayer;
  */
 public interface NetworkPresence {
 
+    /**
+     * How long after a player left another backend their arrival here counts as a move between servers rather than a
+     * join, where nothing configures it otherwise.
+     */
+    Duration SWITCH_WINDOW = Duration.ofSeconds(3);
+
     /** The {@code server-name} of this backend. */
     String localServer();
 

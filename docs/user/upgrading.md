@@ -13,7 +13,8 @@ copy and does not see the shared one, so upgrade every server of the network in 
 ## Server switches show no join or quit line
 
 On a network, a player moving between servers no longer shows a join or quit line (vanilla or custom) on either
-server and is not sent the MOTD again; a quit line waits three seconds to tell a move from leaving. The first-join
+server and is not sent the MOTD or the unread-mail line again; a quit line waits three seconds to tell a move from
+leaving. The first-join
 welcome and `first-join` kits come only on a player's first join to the network. To keep the earlier lines, set
 `server-switch { hide = false }` in `modules/communication/join-quit.conf`; `count = NETWORK` makes `{count}` count
 the whole network.
