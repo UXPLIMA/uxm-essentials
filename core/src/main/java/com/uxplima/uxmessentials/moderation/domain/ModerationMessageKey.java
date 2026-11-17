@@ -154,6 +154,7 @@ public enum ModerationMessageKey implements MessageKey {
     BANIP_ALTS_DETECTED("moderation.banip.alts-detected"),
     BANIP_KICK("moderation.banip.kick"),
     BANIP_INVALID_IP("moderation.banip.invalid-ip"),
+    BANIP_SHARED_ADDRESS("moderation.banip.shared-address"),
     UNBANIP_APPLIED("moderation.unbanip.applied"),
     UNBANIP_NOT_BANNED("moderation.unbanip.not-banned"),
     // a /banip or /tempbanip that would cut short the IP ban already in force is refused, naming that ban

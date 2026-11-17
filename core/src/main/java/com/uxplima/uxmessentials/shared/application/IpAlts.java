@@ -17,21 +17,39 @@ import com.uxplima.uxmessentials.shared.domain.AltGroup;
  * <p>Shared because three moderation flows ask the same question of a single address: a login (alt-detection
  * audit), {@code /banip} and {@code /tempbanip} (the accounts the banned address carries), and {@code /seenip}
  * (the alts on a target's last address).
+ *
+ * <p>It also says which addresses are {@linkplain RelayAddresses relays}: an address every player behind Geyser or a
+ * proxy shares names no account, so it has no alts and no IP ban lands on it or is read from it.
  */
 public final class IpAlts {
 
     private final IpHistoryStore store;
     private final IpTokens tokens;
+    private final RelayAddresses relays;
 
+    /** The lookup for a server whose only relay is loopback. */
     public IpAlts(IpHistoryStore store, IpTokens tokens) {
+        this(store, tokens, RelayAddresses.LOOPBACK);
+    }
+
+    public IpAlts(IpHistoryStore store, IpTokens tokens, RelayAddresses relays) {
         this.store = Objects.requireNonNull(store, "store");
         this.tokens = Objects.requireNonNull(tokens, "tokens");
+        this.relays = Objects.requireNonNull(relays, "relays");
+    }
+
+    /** Whether {@code address} relays many players, so it says nothing about which one is behind it. */
+    public boolean isRelay(String address) {
+        return relays.isRelay(address);
     }
 
     /** The accounts ever seen on {@code address}, in a stable order, excluding {@code exclude}. */
     public List<UUID> onAddress(String address, UUID exclude) {
         Objects.requireNonNull(address, "address");
         Objects.requireNonNull(exclude, "exclude");
+        if (relays.isRelay(address)) {
+            return List.of();
+        }
         return store.accountsOnToken(tokens.tokenFor(address)).stream()
                 .filter(account -> !account.equals(exclude))
                 .sorted(Comparator.comparing(UUID::toString))

@@ -103,7 +103,8 @@ public final class LoginEnforcement {
                 ip,
                 repository.isLockedDown(),
                 repository.loadTempban(who),
-                repository.activeIpBan(ip, now),
+                // A relay carries every player behind Geyser or a proxy: a ban on it would bar them all.
+                ipAlts.isRelay(ip) ? Optional.empty() : repository.activeIpBan(ip, now),
                 ipAlts.onAddress(ip, who.uuid()),
                 caseVariants.atLogin(who, ip, now));
     }
