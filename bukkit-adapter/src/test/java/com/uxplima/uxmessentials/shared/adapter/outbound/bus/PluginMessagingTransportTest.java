@@ -25,6 +25,7 @@ import com.uxplima.uxmessentials.shared.network.FrameSeal;
 import com.uxplima.uxmessentials.shared.network.HomeChanged;
 import com.uxplima.uxmessentials.shared.network.NetworkMessage;
 import com.uxplima.uxmessentials.shared.network.NetworkMessageCodec;
+import com.uxplima.uxmessentials.shared.network.ProxyConnectionFrame;
 import com.uxplima.uxmessentials.shared.network.ServerPing;
 import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.Test;
@@ -46,6 +47,7 @@ class PluginMessagingTransportTest {
     private final RecordingLogger log = new RecordingLogger();
     private final FakeChannel pluginChannel = new FakeChannel();
     private final List<byte[]> delivered = new ArrayList<>();
+    private final CarrierReceipts receipts = new CarrierReceipts(() -> now);
     private final PluginMessagingTransport transport = transport(pluginChannel, SECRET);
 
     private PluginMessagingTransport transport(FakeChannel channel, String secret) {
@@ -54,7 +56,7 @@ class PluginMessagingTransportTest {
 
     private PluginMessagingTransport transport(FakeChannel channel, String secret, Scheduler scheduler) {
         return new PluginMessagingTransport(
-                channel, scheduler, CHANNEL, QUEUE, WINDOW, BusSecret.of(secret), log, () -> now);
+                channel, scheduler, CHANNEL, QUEUE, WINDOW, BusSecret.of(secret), receipts, log, () -> now);
     }
 
     /** What the frames the carrier sent say, as a peer decodes them. */
@@ -83,6 +85,27 @@ class PluginMessagingTransportTest {
         peer.start(bytes -> {});
         peer.send(frame);
         return peerChannel.sent.getFirst();
+    }
+
+    @Test
+    void aProxyConnectionFrameIsReceiptedWithTheConnectionThatCarriedItWhenItIsAboutThatPlayer() {
+        UUID ada = new UUID(0L, 7L);
+        UUID bob = new UUID(0L, 8L);
+        ProxyConnectionFrame aboutAda = new ProxyConnectionFrame(
+                ProxyConnectionFrame.PROXY, new UUID(2L, 1L), ada, new UUID(1L, 1L), "s", true);
+        ProxyConnectionFrame aboutAdaAgain = new ProxyConnectionFrame(
+                ProxyConnectionFrame.PROXY, new UUID(2L, 2L), ada, new UUID(1L, 1L), "s", true);
+        FrameSeal seal = new FrameSeal(BusSecret.of(SECRET), () -> now);
+        transport.start(delivered::add);
+
+        transport.noteCarrier(ada, seal.seal(NetworkMessageCodec.encode(aboutAda)));
+        transport.noteCarrier(bob, seal.seal(NetworkMessageCodec.encode(aboutAdaAgain)));
+        transport.noteCarrier(ada, seal.seal(FRAME));
+
+        assertThat(receipts.take(aboutAda.frameId())).contains(new CarrierReceipts.Receipt(ada, START));
+        assertThat(receipts.take(aboutAdaAgain.frameId()))
+                .as("carried by another player")
+                .isEmpty();
     }
 
     @Test

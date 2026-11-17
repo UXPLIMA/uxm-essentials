@@ -43,20 +43,23 @@ public final class DisableTotp {
         Objects.requireNonNull(playerId, "playerId");
         Objects.requireNonNull(code, "code");
         Objects.requireNonNull(now, "now");
-        if (limiter.isLockedOut(playerId, now)) {
-            return DisableResult.LOCKED_OUT;
-        }
         TwoFactorRegistration registration = repository.find(playerId).orElse(null);
         TwoFactorSecret secret = registration == null ? null : registration.secret();
         if (secret == null) {
-            return DisableResult.NOT_ENROLLED;
+            return limiter.isLockedOut(playerId, now) ? DisableResult.LOCKED_OUT : DisableResult.NOT_ENROLLED;
+        }
+        AttemptLimiter.Attempt attempt = limiter.begin(playerId, now);
+        if (attempt.refused()) {
+            return DisableResult.LOCKED_OUT;
         }
         if (!TotpCode.verify(secret, code, now, codeWindow)) {
-            return limiter.recordFailure(playerId, now).lockedOut()
+            return limiter.failed(playerId, attempt, now).lockedOut()
                     ? DisableResult.LOCKED_OUT
                     : DisableResult.INVALID_CODE;
         }
-        limiter.recordSuccess(playerId);
+        if (!limiter.succeeded(playerId, now)) {
+            return DisableResult.LOCKED_OUT;
+        }
         repository.clearTotp(playerId);
         return DisableResult.DISABLED;
     }

@@ -36,6 +36,15 @@ public final class MemoryAttemptStore implements AttemptStore {
     }
 
     @Override
+    public synchronized void clearExpired(UUID player, Instant now) {
+        Instant until = locks.get(player);
+        if (until != null && !now.isBefore(until)) {
+            locks.remove(player);
+            failures.remove(player);
+        }
+    }
+
+    @Override
     public synchronized boolean clear(UUID player, Instant now) {
         failures.remove(player);
         Instant until = locks.remove(player);

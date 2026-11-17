@@ -7,7 +7,8 @@ import java.time.Instant;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
-import java.util.function.Predicate;
+import java.util.OptionalLong;
+import java.util.UUID;
 
 import org.bukkit.Bukkit;
 import org.bukkit.entity.Player;
@@ -20,7 +21,6 @@ import com.uxplima.uxmessentials.security.application.AttemptLimiter;
 import com.uxplima.uxmessentials.security.application.SecurityConfig;
 import com.uxplima.uxmessentials.security.application.SessionCarry;
 import com.uxplima.uxmessentials.security.application.VerifyResult;
-import com.uxplima.uxmessentials.security.application.VerifyTwoFactor;
 import com.uxplima.uxmessentials.security.application.port.LockoutBan;
 import com.uxplima.uxmessentials.security.application.port.TrustStore;
 import com.uxplima.uxmessentials.security.application.port.TwoFactorRegistration;
@@ -39,6 +39,7 @@ import com.uxplima.uxmessentials.shared.application.port.IpTokens;
 import com.uxplima.uxmessentials.shared.application.port.Logger;
 import com.uxplima.uxmessentials.shared.application.port.MessageSink;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
+import com.uxplima.uxmessentials.shared.application.port.NetworkPresence;
 import com.uxplima.uxmessentials.shared.application.port.Permissions;
 import com.uxplima.uxmessentials.shared.application.port.Scheduler;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
@@ -70,7 +71,7 @@ public final class VerificationController implements KeypadActions {
     public static final String PIN_REQUIRED_PERMISSION = EnforcementPermissions.SECURITY_PIN_REQUIRED;
 
     private final TwoFactorRepository repository;
-    private final VerifyTwoFactor verify;
+    private final ProofChecks checks;
     private final TrustStore trustStore;
     private final IpTokens ipHashing;
     private final VerificationSessions sessions;
@@ -90,7 +91,8 @@ public final class VerificationController implements KeypadActions {
     private final SessionCarry carry;
     private final ProxyArrivals arrivals;
     private final String serverId;
-    private final Predicate<String> runningServer;
+    private final NetworkPresence presence;
+    private final PlayerLane lane;
 
     /**
      * Set once at startup when a login plugin is hooked. It is written on the main thread during wiring and read by
@@ -106,7 +108,7 @@ public final class VerificationController implements KeypadActions {
 
     public VerificationController(
             TwoFactorRepository repository,
-            VerifyTwoFactor verify,
+            ProofChecks checks,
             TrustStore trustStore,
             VerificationSessions sessions,
             AttemptLimiter limiter,
@@ -126,14 +128,14 @@ public final class VerificationController implements KeypadActions {
             SessionCarry carry,
             ProxyArrivals arrivals,
             String serverId,
-            Predicate<String> runningServer,
+            NetworkPresence presence,
             Scheduler scheduler,
             Messages messages,
             MessageSink sink,
             Logger log,
             Clock clock) {
         this.repository = Objects.requireNonNull(repository, "repository");
-        this.verify = Objects.requireNonNull(verify, "verify");
+        this.checks = Objects.requireNonNull(checks, "checks");
         this.trustStore = Objects.requireNonNull(trustStore, "trustStore");
         this.ipHashing = Objects.requireNonNull(ipHashing, "ipHashing");
         this.sessions = Objects.requireNonNull(sessions, "sessions");
@@ -153,12 +155,13 @@ public final class VerificationController implements KeypadActions {
         this.carry = Objects.requireNonNull(carry, "carry");
         this.arrivals = Objects.requireNonNull(arrivals, "arrivals");
         this.serverId = Objects.requireNonNull(serverId, "serverId");
-        this.runningServer = Objects.requireNonNull(runningServer, "runningServer");
+        this.presence = Objects.requireNonNull(presence, "presence");
         this.scheduler = Objects.requireNonNull(scheduler, "scheduler");
         this.messages = Objects.requireNonNull(messages, "messages");
         this.sink = Objects.requireNonNull(sink, "sink");
         this.log = Objects.requireNonNull(log, "log");
         this.clock = Objects.requireNonNull(clock, "clock");
+        this.lane = new PlayerLane(scheduler, log);
     }
 
     /**
@@ -172,6 +175,8 @@ public final class VerificationController implements KeypadActions {
         if (!config.enabled()) {
             return;
         }
+        // The join begins here, even when a login plugin decides it later: what the proxy said before it is stale.
+        arrivals.joined(player.getUniqueId());
         if (deferredToLoginPlugin) {
             // An offline-mode server's login plugin has not authenticated them yet, so there is no account to ask a
             // second factor of. onAuthenticated picks this up the moment there is one.
@@ -215,13 +220,7 @@ public final class VerificationController implements KeypadActions {
         arrivals.left(viewer.uuid());
         if (carry.enabled()) {
             Instant now = clock.instant();
-            scheduler.async(() -> {
-                try {
-                    carry.left(viewer.uuid(), serverId, now);
-                } catch (RuntimeException failure) {
-                    log.error("event=security_session_release_failed player=" + viewer.name(), failure);
-                }
-            });
+            lane.run(viewer.uuid(), "security_session_release_failed", () -> carry.left(viewer.uuid(), serverId, now));
         }
         Player live = Bukkit.getPlayer(viewer.uuid());
         if (live != null) {
@@ -355,7 +354,9 @@ public final class VerificationController implements KeypadActions {
             // A proof made elsewhere on the network may carry here; how the player arrived decides, and the proxy may
             // still be on its way to say so.
             var unused = arrivals.arrival(ref.uuid())
-                    .thenAccept(arrival -> scheduler.async(
+                    .thenAccept(arrival -> lane.run(
+                            ref.uuid(),
+                            "security_verify_decision_failed",
                             () -> guarded(ref, () -> carryOrFreeze(ref, ipHash, token, totpEnabled, arrival))));
             return;
         }
@@ -369,7 +370,13 @@ public final class VerificationController implements KeypadActions {
             return;
         }
         boolean carried = carry.carries(
-                ref.uuid(), serverId, arrival, Optional.ofNullable(ipHash), clock.instant(), runningServer);
+                ref.uuid(),
+                serverId,
+                arrival,
+                Optional.ofNullable(ipHash),
+                clock.instant(),
+                server -> presence.onServer(server).stream()
+                        .anyMatch(online -> online.player().uuid().equals(ref.uuid())));
         if (!carried) {
             scheduler.onEntity(ref, () -> beginFreeze(ref, totpEnabled, token));
             return;
@@ -433,35 +440,40 @@ public final class VerificationController implements KeypadActions {
     }
 
     private void verifySubmission(Player player, PlayerRef viewer, String candidate, boolean reopenOnFailure) {
-        if (!sessions.isPending(viewer.uuid())) {
+        OptionalLong token = sessions.token(viewer.uuid());
+        if (token.isEmpty() || !checks.claim(viewer.uuid())) {
+            // Not frozen, or a proof of theirs is still being checked: one at a time, so a burst cannot outrun the
+            // attempt budget.
             return;
         }
-        scheduler.async(() -> {
-            VerifyResult result = verify.verify(viewer.uuid(), candidate, clock.instant());
-            // The shared limiter is a database record, so it is counted here, off the tick, before the answer goes
-            // back to the player's thread.
-            AttemptLimiter.Outcome outcome = counted(viewer, result);
-            scheduler.onEntity(viewer, () -> applyResult(player, viewer, result, outcome, reopenOnFailure));
-        });
-    }
-
-    private AttemptLimiter.Outcome counted(PlayerRef viewer, VerifyResult result) {
-        if (result == VerifyResult.INVALID) {
-            return limiter.recordFailure(viewer.uuid(), clock.instant());
+        try {
+            scheduler.async(() -> {
+                // The shared budget is a database record, so the proof is checked here, off the tick, before the
+                // answer goes back to the player's thread.
+                ProofChecks.Checked checked = checks.check(viewer.uuid(), candidate);
+                scheduler.onEntity(
+                        viewer, () -> applyResult(player, viewer, checked, token.getAsLong(), reopenOnFailure));
+            });
+        } catch (RuntimeException refused) {
+            checks.release(viewer.uuid());
+            throw refused;
         }
-        limiter.recordSuccess(viewer.uuid());
-        return new AttemptLimiter.Outcome(false, 0);
     }
 
     private void applyResult(
-            Player player,
-            PlayerRef viewer,
-            VerifyResult result,
-            AttemptLimiter.Outcome outcome,
-            boolean reopenOnFailure) {
-        switch (result) {
-            case SUCCESS, NOT_ENROLLED -> succeed(player, viewer, result == VerifyResult.SUCCESS);
-            case INVALID -> fail(player, viewer, outcome, reopenOnFailure);
+            Player player, PlayerRef viewer, ProofChecks.Checked checked, long token, boolean reopenOnFailure) {
+        if (!sessions.isPending(viewer.uuid(), token)) {
+            // The freeze this proof was for is over: they left, timed out, or were frozen anew meanwhile.
+            return;
+        }
+        if (checked.outcome().lockedOut() || limiter.knownLockedOut(viewer.uuid(), clock.instant())) {
+            sessions.clear(viewer.uuid());
+            lockOut(viewer);
+            return;
+        }
+        switch (checked.result()) {
+            case SUCCESS, NOT_ENROLLED -> succeed(player, viewer, checked.result() == VerifyResult.SUCCESS);
+            case INVALID -> fail(player, viewer, checked.outcome(), reopenOnFailure);
         }
     }
 
@@ -510,8 +522,6 @@ public final class VerificationController implements KeypadActions {
      */
     private void lockOut(PlayerRef viewer) {
         keypad.closeFor(viewer);
-        // A locked-out account carries no proof to another backend either.
-        scheduler.async(() -> carry.revoke(viewer.uuid()));
         boolean banned = config.lockoutBans() && lockoutBan.ban(viewer, config.lockout(), config.lockoutBanReason());
         events.publish(new AccountLockedOut(viewer, config.lockout(), banned));
         if (banned) {
@@ -545,14 +555,12 @@ public final class VerificationController implements KeypadActions {
             return;
         }
         Optional<String> ipHash = Optional.ofNullable(ipHash(player));
-        Optional<java.util.UUID> connection = arrivals.connection(viewer.uuid());
-        scheduler.async(() -> {
-            try {
-                carry.proved(viewer.uuid(), serverId, connection, ipHash);
-            } catch (RuntimeException failure) {
-                log.error("event=security_session_record_failed player=" + viewer.name(), failure);
-            }
-        });
+        Optional<UUID> connection = arrivals.connection(viewer.uuid());
+        Instant now = clock.instant();
+        lane.run(
+                viewer.uuid(),
+                "security_session_record_failed",
+                () -> carry.proved(viewer.uuid(), serverId, connection, ipHash, now));
     }
 
     /** Record a device trust for the just-verified player so their next join skips the keypad (if trust is on). */

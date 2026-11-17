@@ -60,8 +60,8 @@ public final class BusSecret {
         return state == State.USABLE;
     }
 
-    /** The key bytes a signature is made with. */
-    public byte[] key() {
+    /** The key bytes a signature is made with; only the seal in this package reads them. */
+    byte[] key() {
         return value.getBytes(StandardCharsets.UTF_8);
     }
 

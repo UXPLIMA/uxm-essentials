@@ -28,7 +28,13 @@ public interface AttemptStore {
     void clearFailures(UUID player);
 
     /**
-     * Forget {@code player}'s count and lockout.
+     * Forget {@code player}'s lockout and count, only when their lockout ended at or before {@code now}: one another
+     * backend set meanwhile stays.
+     */
+    void clearExpired(UUID player, Instant now);
+
+    /**
+     * Forget {@code player}'s count and lockout, whether the lockout is still running or not.
      *
      * @return whether a lockout still running at {@code now} was lifted
      */

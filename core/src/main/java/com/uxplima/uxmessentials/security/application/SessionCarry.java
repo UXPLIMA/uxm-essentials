@@ -20,10 +20,12 @@ import com.uxplima.uxmessentials.security.application.port.VerifiedSessions.Sess
  *
  * <ul>
  *   <li>with the proxy plugin, the proxy confirms the arrival is a switch on the connection the proof was made over.
- *       A new login is a new connection, so it always proves the factor;
- *   <li>without the proxy plugin, the player arrives from the address the proof was made from, and the session was
- *       released within the grace, or is still held by a backend that is running (the switch ordering: the new backend
- *       sees the player before the old one sees them leave).
+ *       A new login is a new connection, so it always proves the factor. A proof made over a proxy connection carries
+ *       this way only;
+ *   <li>on a network that has never heard from the proxy plugin, a proof made without a proxy connection carries when
+ *       the player arrives from the address the proof was made from, and the session was released within the grace,
+ *       or the player is still on the backend that holds it as far as this server knows (the switch ordering: the new
+ *       backend sees the player before the old one sees them leave).
  * </ul>
  *
  * <p>A grace of zero turns carrying off. Every method does I/O and runs off the tick.
@@ -52,10 +54,10 @@ public final class SessionCarry {
                 && sessions.find(Objects.requireNonNull(player, "player")).isPresent();
     }
 
-    /** {@code player} proved their factor on {@code server}; see {@link VerifiedSessions#record}. */
-    public void proved(UUID player, String server, Optional<UUID> connection, Optional<String> ipHash) {
+    /** {@code player} proved their factor on {@code server} at {@code now}; see {@link VerifiedSessions#record}. */
+    public void proved(UUID player, String server, Optional<UUID> connection, Optional<String> ipHash, Instant now) {
         if (enabled()) {
-            sessions.record(player, server, connection, ipHash);
+            sessions.record(player, server, connection, ipHash, now);
         }
     }
 
@@ -63,7 +65,7 @@ public final class SessionCarry {
      * Whether {@code player}, arriving at {@code server} as {@code arrival} from the address hashed to {@code ipHash},
      * carries a session; when they do, {@code server} holds it from now on.
      *
-     * @param runningServer whether a backend is running as far as this server knows
+     * @param stillOn whether {@code player} is on the named backend as far as this server knows
      */
     public boolean carries(
             UUID player,
@@ -71,21 +73,22 @@ public final class SessionCarry {
             Arrival arrival,
             Optional<String> ipHash,
             Instant now,
-            Predicate<String> runningServer) {
+            Predicate<String> stillOn) {
         Objects.requireNonNull(player, "player");
         Objects.requireNonNull(server, "server");
         Objects.requireNonNull(arrival, "arrival");
         Objects.requireNonNull(ipHash, "ipHash");
         Objects.requireNonNull(now, "now");
-        Objects.requireNonNull(runningServer, "runningServer");
+        Objects.requireNonNull(stillOn, "stillOn");
         if (!enabled()) {
             return false;
         }
         Optional<Session> found = sessions.find(player);
-        if (found.isEmpty() || !matches(found.get(), arrival, ipHash, now, runningServer)) {
+        if (found.isEmpty() || !matches(found.get(), server, arrival, ipHash, now, stillOn)) {
             return false;
         }
-        return sessions.take(player, server, now);
+        // Taken only as it was read, so one recorded or taken anew meanwhile is judged again on the next arrival.
+        return sessions.take(player, server, found.get(), now);
     }
 
     /** {@code player} left {@code server}: their session may be taken over for the grace. */
@@ -95,9 +98,19 @@ public final class SessionCarry {
         }
     }
 
-    /** {@code server} started: every session it held was left when it stopped. */
+    /** {@code server} started at {@code now}: every session it held from before then was left when it stopped. */
     public void started(String server, Instant now) {
         sessions.releaseAll(server, now);
+    }
+
+    /** Whether any backend has ever heard from the proxy plugin, so only the proxy may confirm a switch. */
+    public boolean proxySeen() {
+        return sessions.proxySeen();
+    }
+
+    /** This backend heard from the proxy plugin at {@code now}. */
+    public void proxyHeard(Instant now) {
+        sessions.markProxySeen(now);
     }
 
     /** Forget {@code player}'s session, so their next arrival anywhere proves the factor again. */
@@ -106,7 +119,12 @@ public final class SessionCarry {
     }
 
     private static boolean matches(
-            Session session, Arrival arrival, Optional<String> ipHash, Instant now, Predicate<String> runningServer) {
+            Session session,
+            String server,
+            Arrival arrival,
+            Optional<String> ipHash,
+            Instant now,
+            Predicate<String> stillOn) {
         if (session.expiresAt().isPresent() && !now.isBefore(session.expiresAt().get())) {
             return false;
         }
@@ -116,10 +134,20 @@ public final class SessionCarry {
             case Arrival.ProxyLogin login -> false;
             case Arrival.Unconfirmed unconfirmed -> false;
             case Arrival.NoProxy none ->
-                ipHash.isPresent()
+                // A proof made over a proxy connection carries only on the proxy's word, never on the address.
+                session.connection().isEmpty()
+                        && ipHash.isPresent()
                         && session.ipHash().equals(ipHash)
-                        && (session.expiresAt().isPresent() || runningServer.test(session.heldBy()));
+                        && (session.expiresAt().isPresent() || stillElsewhere(session.heldBy(), server, stillOn));
         };
+    }
+
+    /**
+     * Whether the player is still on {@code heldBy}, another backend than the {@code server} they arrive at: the switch
+     * ordering. A session this very backend still holds was left without its release landing, so it does not count.
+     */
+    private static boolean stillElsewhere(String heldBy, String server, Predicate<String> stillOn) {
+        return !heldBy.equals(server) && stillOn.test(heldBy);
     }
 
     /** What is known about how a player arrived at a backend. */
@@ -139,7 +167,7 @@ public final class SessionCarry {
         /** The proxy plugin is there but said nothing about this arrival in time. */
         record Unconfirmed() implements Arrival {}
 
-        /** No proxy plugin runs: only the address and the grace speak for the arrival. */
+        /** The network has never heard from the proxy plugin: only the address and the grace speak for the arrival. */
         record NoProxy() implements Arrival {}
     }
 }

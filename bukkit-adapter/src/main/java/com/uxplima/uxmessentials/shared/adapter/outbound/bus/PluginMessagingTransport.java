@@ -4,6 +4,7 @@ import java.time.Duration;
 import java.util.Collection;
 import java.util.Objects;
 import java.util.OptionalLong;
+import java.util.UUID;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.Consumer;
 import java.util.function.LongSupplier;
@@ -18,6 +19,9 @@ import com.uxplima.uxmessentials.shared.network.BusChannel;
 import com.uxplima.uxmessentials.shared.network.BusSecret;
 import com.uxplima.uxmessentials.shared.network.BusTransport;
 import com.uxplima.uxmessentials.shared.network.FrameSeal;
+import com.uxplima.uxmessentials.shared.network.NetworkMessage;
+import com.uxplima.uxmessentials.shared.network.NetworkMessageCodec;
+import com.uxplima.uxmessentials.shared.network.ProxyConnectionFrame;
 import org.jspecify.annotations.NullMarked;
 import org.jspecify.annotations.Nullable;
 
@@ -76,6 +80,7 @@ public final class PluginMessagingTransport implements PluginMessageListener, Bu
     private final Duration answerWindow;
     private final @Nullable FrameSeal seal;
     private final RefusedFrameReport refusals;
+    private final CarrierReceipts receipts;
 
     private volatile boolean running;
     private volatile long lastHeardMillis = NEVER;
@@ -94,6 +99,7 @@ public final class PluginMessagingTransport implements PluginMessageListener, Bu
             int outboundQueueSize,
             Duration answerWindow,
             BusSecret secret,
+            CarrierReceipts receipts,
             Logger log) {
         this(
                 new BukkitChannel(plugin, channel),
@@ -102,6 +108,7 @@ public final class PluginMessagingTransport implements PluginMessageListener, Bu
                 outboundQueueSize,
                 answerWindow,
                 secret,
+                receipts,
                 log,
                 System::currentTimeMillis);
     }
@@ -113,9 +120,11 @@ public final class PluginMessagingTransport implements PluginMessageListener, Bu
             int outboundQueueSize,
             Duration answerWindow,
             BusSecret secret,
+            CarrierReceipts receipts,
             Logger log,
             LongSupplier clock) {
         Objects.requireNonNull(secret, "secret");
+        this.receipts = Objects.requireNonNull(receipts, "receipts");
         this.oversize = new OversizeFrameReport(Objects.requireNonNull(log, "log"), clock);
         this.refusals = new RefusedFrameReport(log, clock);
         this.seal = secret.usable() ? new FrameSeal(secret, clock) : null;
@@ -213,7 +222,31 @@ public final class PluginMessagingTransport implements PluginMessageListener, Bu
 
     @Override
     public void onPluginMessageReceived(String inboundChannel, Player carrier, byte[] frame) {
+        if (running && channel.equals(inboundChannel)) {
+            noteCarrier(carrier.getUniqueId(), frame);
+        }
         received(inboundChannel, frame);
+    }
+
+    /**
+     * Note, here on the carrier's own thread and before the frame is checked, whose connection carried a proxy
+     * connection frame about that same player, and when: the listener that acts on it learns from the receipt whether
+     * it came over that player's connection and during which of their visits. Frames of other kinds, about another
+     * player, or that do not decode are not noted; a receipt nobody takes is dropped by newer ones.
+     */
+    void noteCarrier(UUID carrier, byte[] sealed) {
+        if (sealed.length <= FrameSeal.TRAILER_BYTES
+                || !NetworkMessageCodec.isType(sealed, NetworkMessage.MessageType.PROXY_CONNECTION)) {
+            return;
+        }
+        try {
+            if (NetworkMessageCodec.decode(FrameSeal.frame(sealed)) instanceof ProxyConnectionFrame proxyFrame
+                    && proxyFrame.player().equals(carrier)) {
+                receipts.received(proxyFrame.frameId(), carrier);
+            }
+        } catch (RuntimeException unreadable) {
+            // Not a frame this build reads; the signature check refuses and counts it.
+        }
     }
 
     /**

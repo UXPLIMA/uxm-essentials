@@ -40,6 +40,7 @@ import com.uxplima.uxmessentials.security.application.VerifyTwoFactor;
 import com.uxplima.uxmessentials.security.application.port.LockoutBan;
 import com.uxplima.uxmessentials.security.application.port.TrustStore;
 import com.uxplima.uxmessentials.security.application.port.TwoFactorRepository;
+import com.uxplima.uxmessentials.security.application.port.VerifiedSessions;
 import com.uxplima.uxmessentials.security.domain.SecretGenerator;
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandRegistration;
 import com.uxplima.uxmessentials.shared.adapter.inbound.ip.IpHistoryRecorder;
@@ -104,8 +105,11 @@ public final class SecurityWiring {
         // the op re-auth keypad, /2fa disable, /pin change and /pin remove. A failed proof on any of them counts
         // toward, and a lockout blocks, all of them, on every backend of the database. Built from the
         // join-verification lockout policy and duration.
+        // A lockout also drops any proof the player could carry to another backend, so the limiter holds the sessions.
+        VerifiedSessions verifiedSessions = TrustStores.sessions(persistence);
         AttemptLimiter limiter = new AttemptLimiter(
                 TrustStores.attempts(persistence),
+                verifiedSessions,
                 config.joinVerification().lockoutPolicy(),
                 config.joinVerification().lockout());
         BeginTotpEnrollment begin = new BeginTotpEnrollment(new SecretGenerator(), pending, twoFactor.issuer());
@@ -165,6 +169,8 @@ public final class SecurityWiring {
                 ownTeleports,
                 kernel.log());
         VerifyTwoFactor verify = new VerifyTwoFactor(repository, twoFactor.codeWindow());
+        // One check in flight per player across the join freeze and the op re-auth, each reserved on the budget first.
+        ProofChecks checks = new ProofChecks(verify, limiter, clock);
         TextInputTotpPrompt totpPrompt = new TextInputTotpPrompt(textInput);
         // The create-a-PIN pad: shown to a player holding uxmessentials.security.pin.required who has no factor, so
         // "you must have a PIN" is enforceable rather than advisory. It writes through the same SetPin the /pin
@@ -182,23 +188,34 @@ public final class SecurityWiring {
                 kernel.messageSink());
         // A proof carries across a switch only on a network; off it every join is a login and proves the factor.
         SessionCarry carry = new SessionCarry(
-                TrustStores.sessions(persistence),
+                verifiedSessions,
                 network.enabled() ? config.joinVerification().switchGrace() : java.time.Duration.ZERO);
-        ProxyArrivals arrivals = new ProxyArrivals(kernel.scheduler(), network.proxyAnswering());
-        network.bus().registry().register(arrivals);
         String serverId = network.bus().publisher().serverId();
-        // Nobody is on a backend that just started, so a session it held when it stopped is released now.
+        ProxyArrivals arrivals = new ProxyArrivals(
+                kernel.scheduler(),
+                network.bus().registry().receipts(),
+                serverId,
+                network.proxyAnswering(),
+                carry,
+                kernel.log(),
+                clock);
+        network.bus().registry().register(arrivals);
+        // Nobody is on a backend that just started, so a session it held from before is released now. One it records
+        // or takes from here on carries a later time and stays, so joins need not wait for this.
         java.time.Instant started = clock.instant();
-        kernel.scheduler().async(() -> {
-            try {
-                carry.started(serverId, started);
-            } catch (RuntimeException failure) {
-                kernel.log().error("event=security_session_release_failed server=" + serverId, failure);
-            }
-        });
+        if (carry.enabled()) {
+            kernel.scheduler().async(() -> {
+                try {
+                    carry.started(serverId, started);
+                    arrivals.load();
+                } catch (RuntimeException failure) {
+                    kernel.log().error("event=security_session_start_failed server=" + serverId, failure);
+                }
+            });
+        }
         VerificationController controller = new VerificationController(
                 repository,
-                verify,
+                checks,
                 trustStore,
                 sessions,
                 limiter,
@@ -218,7 +235,7 @@ public final class SecurityWiring {
                 carry,
                 arrivals,
                 serverId,
-                network.presence()::isLive,
+                network.presence(),
                 kernel.scheduler(),
                 kernel.messages(),
                 kernel.messageSink(),
@@ -228,9 +245,8 @@ public final class SecurityWiring {
         // their next join re-verifies even from a trusted device), paired with the immediate online freeze driven
         // through the controller above. Reset is the recovery door: the one path that clears a factor without proving
         // it, for a player who has lost their authenticator or forgotten their PIN.
-        ForceReverification forceReverification =
-                new ForceReverification(repository, trustStore, TrustStores.sessions(persistence));
-        ResetFactors resetFactors = new ResetFactors(repository, trustStore, TrustStores.sessions(persistence));
+        ForceReverification forceReverification = new ForceReverification(repository, trustStore, verifiedSessions);
+        ResetFactors resetFactors = new ResetFactors(repository, trustStore, verifiedSessions);
 
         List<CommandRegistration> commands = List.of(
                 new TwoFactorCommand(
@@ -276,7 +292,7 @@ public final class SecurityWiring {
         SecurityConfig.OpProtection opProtection = config.opProtection();
         ReauthController reauthController = new ReauthController(
                 repository,
-                verify,
+                checks,
                 limiter,
                 reauthState,
                 reauthSessions,

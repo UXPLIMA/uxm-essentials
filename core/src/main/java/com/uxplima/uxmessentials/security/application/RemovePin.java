@@ -32,19 +32,22 @@ public final class RemovePin {
         Objects.requireNonNull(playerId, "playerId");
         Objects.requireNonNull(pin, "pin");
         Objects.requireNonNull(now, "now");
-        if (limiter.isLockedOut(playerId, now)) {
-            return PinRemoveResult.LOCKED_OUT;
-        }
         TwoFactorRegistration registration = repository.find(playerId).orElse(null);
         if (registration == null || !registration.pinSet()) {
-            return PinRemoveResult.NOT_SET;
+            return limiter.isLockedOut(playerId, now) ? PinRemoveResult.LOCKED_OUT : PinRemoveResult.NOT_SET;
+        }
+        AttemptLimiter.Attempt attempt = limiter.begin(playerId, now);
+        if (attempt.refused()) {
+            return PinRemoveResult.LOCKED_OUT;
         }
         if (!repository.verifyPin(playerId, pin)) {
-            return limiter.recordFailure(playerId, now).lockedOut()
+            return limiter.failed(playerId, attempt, now).lockedOut()
                     ? PinRemoveResult.LOCKED_OUT
                     : PinRemoveResult.INVALID_PIN;
         }
-        limiter.recordSuccess(playerId);
+        if (!limiter.succeeded(playerId, now)) {
+            return PinRemoveResult.LOCKED_OUT;
+        }
         repository.clearPin(playerId);
         return PinRemoveResult.REMOVED;
     }

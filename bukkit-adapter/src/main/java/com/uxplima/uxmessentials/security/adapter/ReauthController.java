@@ -3,6 +3,7 @@ package com.uxplima.uxmessentials.security.adapter;
 import java.time.Clock;
 import java.util.Map;
 import java.util.Objects;
+import java.util.OptionalLong;
 
 import org.bukkit.Bukkit;
 import org.bukkit.entity.Player;
@@ -10,8 +11,6 @@ import org.bukkit.entity.Player;
 import com.uxplima.uxmessentials.security.adapter.inbound.gui.KeypadActions;
 import com.uxplima.uxmessentials.security.adapter.inbound.gui.PinKeypadView;
 import com.uxplima.uxmessentials.security.application.AttemptLimiter;
-import com.uxplima.uxmessentials.security.application.VerifyResult;
-import com.uxplima.uxmessentials.security.application.VerifyTwoFactor;
 import com.uxplima.uxmessentials.security.application.port.TwoFactorRegistration;
 import com.uxplima.uxmessentials.security.application.port.TwoFactorRepository;
 import com.uxplima.uxmessentials.security.domain.SecurityMessageKey;
@@ -38,7 +37,7 @@ import org.jspecify.annotations.NullMarked;
 public final class ReauthController implements KeypadActions {
 
     private final TwoFactorRepository repository;
-    private final VerifyTwoFactor verify;
+    private final ProofChecks checks;
     private final AttemptLimiter limiter;
     private final ReauthState reauthState;
     private final ReauthSessions sessions;
@@ -51,7 +50,7 @@ public final class ReauthController implements KeypadActions {
 
     public ReauthController(
             TwoFactorRepository repository,
-            VerifyTwoFactor verify,
+            ProofChecks checks,
             AttemptLimiter limiter,
             ReauthState reauthState,
             ReauthSessions sessions,
@@ -62,7 +61,7 @@ public final class ReauthController implements KeypadActions {
             MessageSink sink,
             Clock clock) {
         this.repository = Objects.requireNonNull(repository, "repository");
-        this.verify = Objects.requireNonNull(verify, "verify");
+        this.checks = Objects.requireNonNull(checks, "checks");
         this.limiter = Objects.requireNonNull(limiter, "limiter");
         this.reauthState = Objects.requireNonNull(reauthState, "reauthState");
         this.sessions = Objects.requireNonNull(sessions, "sessions");
@@ -138,35 +137,39 @@ public final class ReauthController implements KeypadActions {
     }
 
     private void verifySubmission(Player player, PlayerRef viewer, String candidate, boolean reopenOnFailure) {
-        if (!sessions.isPending(viewer.uuid())) {
+        OptionalLong token = sessions.token(viewer.uuid());
+        if (token.isEmpty() || !checks.claim(viewer.uuid())) {
+            // No prompt, or a proof of theirs is still being checked: one at a time, so a burst cannot outrun the
+            // attempt budget.
             return;
         }
-        scheduler.async(() -> {
-            VerifyResult result = verify.verify(viewer.uuid(), candidate, clock.instant());
-            // The shared limiter is a database record, so it is counted here, off the tick, before the answer goes
-            // back to the player's thread.
-            AttemptLimiter.Outcome outcome = counted(viewer, result);
-            scheduler.onEntity(viewer, () -> applyResult(player, viewer, result, outcome, reopenOnFailure));
-        });
-    }
-
-    private AttemptLimiter.Outcome counted(PlayerRef viewer, VerifyResult result) {
-        if (result == VerifyResult.INVALID) {
-            return limiter.recordFailure(viewer.uuid(), clock.instant());
+        try {
+            scheduler.async(() -> {
+                // The shared budget is a database record, so the proof is checked here, off the tick, before the
+                // answer goes back to the player's thread.
+                ProofChecks.Checked checked = checks.check(viewer.uuid(), candidate);
+                scheduler.onEntity(
+                        viewer, () -> applyResult(player, viewer, checked, token.getAsLong(), reopenOnFailure));
+            });
+        } catch (RuntimeException refused) {
+            checks.release(viewer.uuid());
+            throw refused;
         }
-        limiter.recordSuccess(viewer.uuid());
-        return new AttemptLimiter.Outcome(false, 0);
     }
 
     private void applyResult(
-            Player player,
-            PlayerRef viewer,
-            VerifyResult result,
-            AttemptLimiter.Outcome outcome,
-            boolean reopenOnFailure) {
-        switch (result) {
+            Player player, PlayerRef viewer, ProofChecks.Checked checked, long token, boolean reopenOnFailure) {
+        if (!sessions.isPending(viewer.uuid(), token)) {
+            // The prompt this proof was for is over: they left, or ran another protected command meanwhile.
+            return;
+        }
+        if (checked.outcome().lockedOut() || limiter.knownLockedOut(viewer.uuid(), clock.instant())) {
+            fail(player, viewer, new AttemptLimiter.Outcome(true, 0), reopenOnFailure);
+            return;
+        }
+        switch (checked.result()) {
             case SUCCESS, NOT_ENROLLED -> succeed(viewer);
-            case INVALID -> fail(player, viewer, outcome, reopenOnFailure);
+            case INVALID -> fail(player, viewer, checked.outcome(), reopenOnFailure);
         }
     }
 

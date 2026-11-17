@@ -1,5 +1,6 @@
 package com.uxplima.uxmessentials.persistence.security;
 
+import static com.uxplima.uxmessentials.persistence.jooq.tables.SecurityNetwork.SECURITY_NETWORK;
 import static com.uxplima.uxmessentials.persistence.jooq.tables.SecuritySessions.SECURITY_SESSIONS;
 
 import java.time.Instant;
@@ -9,17 +10,22 @@ import java.util.UUID;
 
 import com.uxplima.uxmessentials.persistence.runtime.JooqRepository;
 import com.uxplima.uxmessentials.security.application.port.VerifiedSessions;
+import org.jooq.Condition;
 import org.jooq.DSLContext;
 import org.jooq.Record;
 import org.jspecify.annotations.NullMarked;
 import org.jspecify.annotations.Nullable;
 
 /**
- * The jOOQ {@link VerifiedSessions} over {@code security_sessions}, one row per account. A take and a release are
- * conditional updates, so a backend releasing a session another backend already took over changes nothing.
+ * The jOOQ {@link VerifiedSessions} over {@code security_sessions}, one row per account, and the
+ * {@code security_network} facts. A take and a release are conditional updates, so a backend releasing a session
+ * another backend already took over changes nothing, and a take of a session that changed since it was read fails.
  */
 @NullMarked
 public final class JooqVerifiedSessions extends JooqRepository implements VerifiedSessions {
+
+    /** The {@code security_network} fact a backend writes once it hears from the proxy plugin. */
+    private static final String PROXY_SEEN = "proxy_seen";
 
     public JooqVerifiedSessions(DSLContext dsl) {
         super(dsl);
@@ -40,20 +46,23 @@ public final class JooqVerifiedSessions extends JooqRepository implements Verifi
     }
 
     @Override
-    public void record(UUID player, String server, Optional<UUID> connection, Optional<String> ipHash) {
+    public void record(UUID player, String server, Optional<UUID> connection, Optional<String> ipHash, Instant now) {
         String id = Objects.requireNonNull(player, "player").toString();
         Objects.requireNonNull(server, "server");
+        long at = Objects.requireNonNull(now, "now").toEpochMilli();
         @Nullable String connectionId = connection.map(UUID::toString).orElse(null);
         @Nullable String hash = ipHash.orElse(null);
         write(dsl -> dsl.insertInto(SECURITY_SESSIONS)
                 .set(SECURITY_SESSIONS.UUID, id)
                 .set(SECURITY_SESSIONS.HELD_BY, server)
+                .set(SECURITY_SESSIONS.HELD_SINCE, at)
                 .set(SECURITY_SESSIONS.CONNECTION_ID, connectionId)
                 .set(SECURITY_SESSIONS.IP_HASH, hash)
                 .setNull(SECURITY_SESSIONS.EXPIRES_AT)
                 .onConflict(SECURITY_SESSIONS.UUID)
                 .doUpdate()
                 .set(SECURITY_SESSIONS.HELD_BY, server)
+                .set(SECURITY_SESSIONS.HELD_SINCE, at)
                 .set(SECURITY_SESSIONS.CONNECTION_ID, connectionId)
                 .set(SECURITY_SESSIONS.IP_HASH, hash)
                 .setNull(SECURITY_SESSIONS.EXPIRES_AT)
@@ -61,14 +70,24 @@ public final class JooqVerifiedSessions extends JooqRepository implements Verifi
     }
 
     @Override
-    public boolean take(UUID player, String server, Instant now) {
+    public boolean take(UUID player, String server, Session seen, Instant now) {
         String id = Objects.requireNonNull(player, "player").toString();
         Objects.requireNonNull(server, "server");
+        Objects.requireNonNull(seen, "seen");
         long at = Objects.requireNonNull(now, "now").toEpochMilli();
+        Condition sameConnection = seen.connection()
+                .map(connection -> SECURITY_SESSIONS.CONNECTION_ID.eq(connection.toString()))
+                .orElseGet(SECURITY_SESSIONS.CONNECTION_ID::isNull);
+        Condition sameAddress =
+                seen.ipHash().map(SECURITY_SESSIONS.IP_HASH::eq).orElseGet(SECURITY_SESSIONS.IP_HASH::isNull);
         return write(dsl -> dsl.update(SECURITY_SESSIONS)
                         .set(SECURITY_SESSIONS.HELD_BY, server)
+                        .set(SECURITY_SESSIONS.HELD_SINCE, at)
                         .setNull(SECURITY_SESSIONS.EXPIRES_AT)
                         .where(SECURITY_SESSIONS.UUID.eq(id))
+                        .and(SECURITY_SESSIONS.HELD_BY.eq(seen.heldBy()))
+                        .and(sameConnection)
+                        .and(sameAddress)
                         .and(SECURITY_SESSIONS.EXPIRES_AT.isNull().or(SECURITY_SESSIONS.EXPIRES_AT.gt(at)))
                         .execute())
                 > 0;
@@ -88,13 +107,29 @@ public final class JooqVerifiedSessions extends JooqRepository implements Verifi
     }
 
     @Override
-    public void releaseAll(String server, Instant at) {
+    public void releaseAll(String server, Instant startedAt) {
         Objects.requireNonNull(server, "server");
-        long until = Objects.requireNonNull(at, "at").toEpochMilli();
+        long at = Objects.requireNonNull(startedAt, "startedAt").toEpochMilli();
         write(dsl -> dsl.update(SECURITY_SESSIONS)
-                .set(SECURITY_SESSIONS.EXPIRES_AT, until)
+                .set(SECURITY_SESSIONS.EXPIRES_AT, at)
                 .where(SECURITY_SESSIONS.HELD_BY.eq(server))
                 .and(SECURITY_SESSIONS.EXPIRES_AT.isNull())
+                .and(SECURITY_SESSIONS.HELD_SINCE.lt(at))
+                .execute());
+    }
+
+    @Override
+    public boolean proxySeen() {
+        return read(dsl -> dsl.fetchExists(SECURITY_NETWORK, SECURITY_NETWORK.FACT.eq(PROXY_SEEN)));
+    }
+
+    @Override
+    public void markProxySeen(Instant at) {
+        long since = Objects.requireNonNull(at, "at").toEpochMilli();
+        write(dsl -> dsl.insertInto(SECURITY_NETWORK)
+                .set(SECURITY_NETWORK.FACT, PROXY_SEEN)
+                .set(SECURITY_NETWORK.SINCE, since)
+                .onConflictDoNothing()
                 .execute());
     }
 

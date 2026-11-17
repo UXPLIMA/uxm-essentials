@@ -82,6 +82,16 @@ public final class JooqAttemptStore extends JooqRepository implements AttemptSto
     }
 
     @Override
+    public void clearExpired(UUID player, Instant now) {
+        String id = Objects.requireNonNull(player, "player").toString();
+        long at = Objects.requireNonNull(now, "now").toEpochMilli();
+        write(dsl -> dsl.deleteFrom(SECURITY_ATTEMPTS)
+                .where(SECURITY_ATTEMPTS.UUID.eq(id))
+                .and(SECURITY_ATTEMPTS.LOCKED_UNTIL.le(at))
+                .execute());
+    }
+
+    @Override
     public boolean clear(UUID player, Instant now) {
         String id = Objects.requireNonNull(player, "player").toString();
         long at = Objects.requireNonNull(now, "now").toEpochMilli();

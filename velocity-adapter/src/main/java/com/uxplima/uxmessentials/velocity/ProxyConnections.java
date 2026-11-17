@@ -13,7 +13,6 @@ import com.velocitypowered.api.event.Subscribe;
 import com.velocitypowered.api.event.connection.DisconnectEvent;
 import com.velocitypowered.api.event.player.ServerPostConnectEvent;
 import com.velocitypowered.api.proxy.Player;
-import com.velocitypowered.api.proxy.ServerConnection;
 import com.velocitypowered.api.proxy.messages.ChannelIdentifier;
 import org.jspecify.annotations.NullMarked;
 
@@ -32,7 +31,7 @@ final class ProxyConnections {
     private final FrameSeal seal;
     private final ChannelIdentifier channel;
     private final Supplier<UUID> ids;
-    private final Map<UUID, UUID> open = new ConcurrentHashMap<>();
+    private final Map<UUID, Open> open = new ConcurrentHashMap<>();
 
     ProxyConnections(FrameSeal seal, ChannelIdentifier channel, Supplier<UUID> ids) {
         this.seal = Objects.requireNonNull(seal, "seal");
@@ -44,31 +43,53 @@ final class ProxyConnections {
     public void onServerPostConnect(ServerPostConnectEvent event) {
         Player player = event.getPlayer();
         player.getCurrentServer()
-                .ifPresent(
-                        connection -> connected(player.getUniqueId(), connection, event.getPreviousServer() != null));
+                .ifPresent(connection -> connection.sendPluginMessage(
+                        channel,
+                        frame(
+                                player.getUniqueId(),
+                                player,
+                                connection.getServerInfo().getName(),
+                                event.getPreviousServer() != null)));
     }
 
     @Subscribe
     public void onDisconnect(DisconnectEvent event) {
-        open.remove(event.getPlayer().getUniqueId());
+        Player player = event.getPlayer();
+        closed(player.getUniqueId(), player);
     }
 
-    /** Send {@code server} the sealed word that {@code player} reached it, by a switch or by a new login. */
-    void connected(UUID player, ServerConnection server, boolean switched) {
-        server.sendPluginMessage(channel, frame(player, server.getServerInfo().getName(), switched));
-    }
-
-    /** The sealed frame for {@code player} reaching {@code server}; a new login opens a new connection id. */
-    byte[] frame(UUID player, String server, boolean switched) {
-        UUID connection = switched ? open.computeIfAbsent(player, unused -> ids.get()) : fresh(player);
+    /**
+     * The sealed frame for {@code player} reaching {@code server} over the proxy connection {@code session}; a new
+     * login opens a new connection id.
+     */
+    byte[] frame(UUID player, Object session, String server, boolean switched) {
+        UUID connection = switched ? current(player, session) : fresh(player, session);
         ProxyConnectionFrame frame =
                 new ProxyConnectionFrame(ProxyConnectionFrame.PROXY, ids.get(), player, connection, server, switched);
         return seal.seal(NetworkMessageCodec.encode(frame));
     }
 
-    private UUID fresh(UUID player) {
-        UUID connection = ids.get();
-        open.put(player, connection);
-        return connection;
+    /**
+     * The proxy connection {@code session} of {@code player} ended. Only that connection's id is dropped: the old
+     * connection of a player who logged in again may end after the new one began.
+     */
+    void closed(UUID player, Object session) {
+        open.computeIfPresent(player, (id, held) -> held.session() == session ? null : held);
     }
+
+    private UUID current(UUID player, Object session) {
+        return open.compute(
+                        player,
+                        (id, held) -> held != null && held.session() == session ? held : new Open(session, ids.get()))
+                .connection();
+    }
+
+    private UUID fresh(UUID player, Object session) {
+        Open made = new Open(session, ids.get());
+        open.put(player, made);
+        return made.connection();
+    }
+
+    /** One proxy connection: the session object the proxy keeps for it, and the id it is known by. */
+    private record Open(Object session, UUID connection) {}
 }
