@@ -2,6 +2,7 @@ package com.uxplima.uxmessentials.security.adapter;
 
 import java.util.Map;
 import java.util.Objects;
+import java.util.OptionalLong;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicLong;
@@ -13,7 +14,7 @@ import org.jspecify.annotations.NullMarked;
  * is transient in-memory state owned solely by the security adapter. The freeze listeners read {@link #isPending(UUID)}
  * to decide whether to cancel a frozen player's action. The durable, account-scoped failure counter and lockout window
  * live separately in the shared {@link com.uxplima.uxmessentials.security.application.AttemptLimiter}, so that a relog
- * clears the freeze but never the accumulated attempt budget.
+ * or a move to another backend clears the freeze but never the accumulated attempt budget.
  *
  * <p>Each freeze also carries a token, a number that only ever goes up. It exists for the delayed work a freeze starts
  * (the entry time limit), which fires long after the freeze that scheduled it and must be able to tell "this player is
@@ -57,6 +58,12 @@ public final class VerificationSessions {
     public boolean isPending(UUID playerId, long token) {
         Long current = pending.get(Objects.requireNonNull(playerId, "playerId"));
         return current != null && current == token;
+    }
+
+    /** The token of {@code playerId}'s current freeze, empty when they are not frozen. */
+    public OptionalLong token(UUID playerId) {
+        Long current = pending.get(Objects.requireNonNull(playerId, "playerId"));
+        return current == null ? OptionalLong.empty() : OptionalLong.of(current);
     }
 
     /** Clear {@code playerId}'s pending freeze: on a successful verification, a cleared optimistic freeze, or a quit. */

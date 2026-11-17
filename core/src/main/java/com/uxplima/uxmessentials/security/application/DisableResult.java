@@ -16,5 +16,8 @@ public enum DisableResult {
     INVALID_CODE,
 
     /** The account is on the shared lockout after too many failed proofs; the attempt was refused outright. */
-    LOCKED_OUT
+    LOCKED_OUT,
+
+    /** Another proof of the player's was still being checked here, so this one was not; nothing changed. */
+    BUSY
 }

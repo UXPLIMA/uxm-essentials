@@ -20,7 +20,7 @@ import org.jspecify.annotations.NullMarked;
  * join is no longer waved through. Freezing a player who is on the server right now is the verification
  * controller's own concern and stays there.
  *
- * <p>Clearing a lockout touches only the in-memory window, which is what a lockout is. When the operator has the
+ * <p>Clearing a lockout lifts the shared lockout record, on every backend of the database. When the operator has the
  * lockout written to the ban list as well, that ban is lifted by the unban that lifts every other one.
  */
 @NullMarked
@@ -49,9 +49,10 @@ public final class SecurityActions implements UxmSecurityActions {
     @Override
     public CompletableFuture<UxmOutcome> clearLockout(UUID playerId) {
         Objects.requireNonNull(playerId, "playerId");
-        // In memory, so there is nothing to move off the calling thread; the future is the shape of the surface.
-        return CompletableFuture.completedFuture(
-                limiter.clearLockout(playerId)
+        // The lockout is a shared database record, so it is lifted off the calling thread.
+        return AsyncActions.perform(
+                scheduler,
+                () -> limiter.clearLockout(playerId, java.time.Instant.now())
                         ? UxmOutcome.ok()
                         : UxmOutcome.failed(UxmFailure.ALREADY_IN_STATE, "that account is not locked out"));
     }

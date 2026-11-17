@@ -3,6 +3,7 @@ package com.uxplima.uxmessentials.persistence.moderation;
 import java.util.Objects;
 
 import com.uxplima.uxmessentials.moderation.application.port.CaseCopies;
+import com.uxplima.uxmessentials.moderation.application.port.ExemptionSightings;
 import com.uxplima.uxmessentials.moderation.application.port.JailLocationStore;
 import com.uxplima.uxmessentials.moderation.application.port.ModerationRepository;
 import com.uxplima.uxmessentials.moderation.application.port.SanctionHistory;
@@ -47,5 +48,11 @@ public final class ModerationStores {
     public static SanctionHistory sanctionHistory(Persistence persistence) {
         Objects.requireNonNull(persistence, "persistence");
         return new JooqSanctionHistory(persistence.dsl());
+    }
+
+    /** A jOOQ {@link ExemptionSightings} over the shared persistence DSL: what each backend saw of an exemption. */
+    public static ExemptionSightings exemptionSightings(Persistence persistence) {
+        Objects.requireNonNull(persistence, "persistence");
+        return new JooqExemptionSightings(persistence.dsl());
     }
 }

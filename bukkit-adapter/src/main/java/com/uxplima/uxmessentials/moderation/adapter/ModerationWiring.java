@@ -18,7 +18,9 @@ import com.uxplima.uxmessentials.moderation.adapter.inbound.gui.ModerationJailed
 import com.uxplima.uxmessentials.moderation.adapter.inbound.gui.PunishmentConfirmView;
 import com.uxplima.uxmessentials.moderation.adapter.inbound.gui.PunishmentGuiFlow;
 import com.uxplima.uxmessentials.moderation.adapter.inbound.listener.CommandSpyListener;
+import com.uxplima.uxmessentials.moderation.adapter.inbound.listener.ExemptionWatch;
 import com.uxplima.uxmessentials.moderation.adapter.inbound.listener.FreezeMoveListener;
+import com.uxplima.uxmessentials.moderation.adapter.inbound.listener.LuckPermsExemptionChanges;
 import com.uxplima.uxmessentials.moderation.adapter.inbound.listener.ModerationJoinListener;
 import com.uxplima.uxmessentials.moderation.adapter.inbound.listener.ModerationLoginListener;
 import com.uxplima.uxmessentials.moderation.adapter.inbound.listener.MutedChatListener;
@@ -36,6 +38,7 @@ import com.uxplima.uxmessentials.moderation.adapter.outbound.KnownAccountTraces;
 import com.uxplima.uxmessentials.moderation.adapter.outbound.LoggingModerationAudit;
 import com.uxplima.uxmessentials.moderation.adapter.outbound.PermissionSanctionBroadcast;
 import com.uxplima.uxmessentials.moderation.adapter.outbound.PlayerLookupTargetResolver;
+import com.uxplima.uxmessentials.moderation.adapter.outbound.RecordedExemptions;
 import com.uxplima.uxmessentials.moderation.adapter.outbound.StoredNameHolders;
 import com.uxplima.uxmessentials.moderation.adapter.outbound.api.ModerationApiWrites;
 import com.uxplima.uxmessentials.moderation.application.ApplyRemoteJail;
@@ -101,6 +104,7 @@ import com.uxplima.uxmessentials.moderation.application.Unjail;
 import com.uxplima.uxmessentials.moderation.application.Unmute;
 import com.uxplima.uxmessentials.moderation.application.WarnEscalator;
 import com.uxplima.uxmessentials.moderation.application.port.CaseCopies;
+import com.uxplima.uxmessentials.moderation.application.port.ExemptionSightings;
 import com.uxplima.uxmessentials.moderation.application.port.FreezeSync;
 import com.uxplima.uxmessentials.moderation.application.port.JailLocationStore;
 import com.uxplima.uxmessentials.moderation.application.port.JailSync;
@@ -124,6 +128,9 @@ import com.uxplima.uxmessentials.shared.adapter.outbound.bus.ModerationSync;
 import com.uxplima.uxmessentials.shared.adapter.outbound.bus.NetworkConfig;
 import com.uxplima.uxmessentials.shared.adapter.outbound.hop.CrossServerHops;
 import com.uxplima.uxmessentials.shared.adapter.outbound.log.AuditChannel;
+import com.uxplima.uxmessentials.shared.adapter.outbound.permission.BusPermissionReads;
+import com.uxplima.uxmessentials.shared.adapter.outbound.permission.LuckPermsAccess;
+import com.uxplima.uxmessentials.shared.adapter.outbound.permission.ServerStoredPermissions;
 import com.uxplima.uxmessentials.shared.application.IpAlts;
 import com.uxplima.uxmessentials.shared.application.hop.HopDepartures;
 import com.uxplima.uxmessentials.shared.application.hop.port.HopGate;
@@ -136,6 +143,7 @@ import com.uxplima.uxmessentials.shared.application.port.MessageSink;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
 import com.uxplima.uxmessentials.shared.application.port.NetworkPresence;
 import com.uxplima.uxmessentials.shared.application.port.Permissions;
+import com.uxplima.uxmessentials.shared.application.port.StoredPermissions;
 import com.uxplima.uxmlib.gui.input.TextInput;
 import com.uxplima.uxmlib.menu.Menus;
 import com.uxplima.uxmlib.menu.binding.MenuBindings;
@@ -254,6 +262,20 @@ public final class ModerationWiring {
                 caseCopies,
                 new KnownAccountTraces(repository, storedNames, plugin.getServer()),
                 new IpAlts(ipHistory, ipTokens)::sharingAnyAddress);
+        // Each backend records what it sees of a player's exemption, so another can read it once they are offline.
+        ExemptionSightings sightings = ModerationStores.exemptionSightings(persistence);
+        ExemptionWatch exemptionWatch =
+                new ExemptionWatch(sightings, presence.localServer(), kernel.scheduler(), kernel.log(), clock);
+        if (LuckPermsAccess.isPresent(plugin.getServer())) {
+            LuckPermsExemptionChanges.watch(plugin, plugin.getServer(), kernel.scheduler(), exemptionWatch);
+        }
+        StoredPermissions stored = storedPermissions(
+                plugin,
+                kernel,
+                bus,
+                networked,
+                presence,
+                new RecordedExemptions(sightings, kernel.scheduler(), kernel.log()));
         ModerationServices services = assemble(
                 plugin,
                 auditChannel,
@@ -275,6 +297,7 @@ public final class ModerationWiring {
                 seenVisibility,
                 caseVariants,
                 caseCopies,
+                stored,
                 clock);
         // The live kick: on a remote ban frame, re-evaluate the now-authoritative ban here and kick an online
         // target. Self-origin frames are dropped by the bus client before dispatch, so the local /ban (which
@@ -404,6 +427,7 @@ public final class ModerationWiring {
                         commandSpyStore,
                         mutedCommands,
                         mutePolicy,
+                        exemptionWatch,
                         clock),
                 new JailServerAdoption(persistence, kernel, jailNetwork.recordedServer()),
                 sanctions,
@@ -518,6 +542,7 @@ public final class ModerationWiring {
             SeenVisibility seenVisibility,
             CaseVariantSanctions caseVariants,
             CaseCopies caseCopies,
+            StoredPermissions stored,
             Clock clock) {
         // One alt lookup for every flow that asks "who else uses this address": the login audit, /banip,
         // /tempbanip and /seenip. It tokenises first, so all four match the same rows /alts groups over.
@@ -690,8 +715,35 @@ public final class ModerationWiring {
                 .players(kernel.playerLookup())
                 .targets(new PlayerLookupTargetResolver(presence, kernel.playerLookup()))
                 .lane(new StorageLane(
-                        kernel.scheduler(), notifier, kernel.permissions(), kernel.playerLookup(), kernel.log()))
+                        kernel.scheduler(),
+                        notifier,
+                        kernel.permissions(),
+                        stored,
+                        kernel.playerLookup(),
+                        kernel.log()))
                 .build();
+    }
+
+    /**
+     * The reader for the immunity of a target who is not online here. On a network a target connected to another
+     * backend is asked about over the bus, so this backend also answers the questions other backends send it.
+     */
+    private static StoredPermissions storedPermissions(
+            Plugin plugin,
+            KernelPorts kernel,
+            Bus bus,
+            boolean networked,
+            NetworkPresence presence,
+            StoredPermissions recorded) {
+        Optional<BusPermissionReads> reads = Optional.empty();
+        if (networked) {
+            BusPermissionReads busReads = new BusPermissionReads(
+                    bus.publisher(), kernel.permissions(), kernel.playerLookup(), kernel.scheduler(), kernel.log());
+            bus.registry().register(busReads);
+            reads = Optional.of(busReads);
+        }
+        return ServerStoredPermissions.of(
+                plugin.getServer(), kernel.scheduler(), presence, kernel.log(), reads, Optional.of(recorded));
     }
 
     /**
@@ -732,6 +784,7 @@ public final class ModerationWiring {
             InMemoryCommandSpyStore commandSpyStore,
             MutedCommandPolicy mutedCommands,
             OnlineMutes mutes,
+            ExemptionWatch exemptionWatch,
             Clock clock) {
         // The listeners answer on the event's own thread, never the storage lane's, so they read permissions live.
         ModerationGuard live = new ModerationGuard(kernel.permissions());
@@ -754,7 +807,8 @@ public final class ModerationWiring {
                 new MutedCommandListener(mutes, mutedCommands, live, kernel.messages(), kernel.messageSink()),
                 new MutedCommandNamesRefresh(mutedCommands),
                 mutedChat(mutes, kernel.permissions(), kernel.messages(), kernel.messageSink()),
-                new CommandSpyListener(commandSpyStore, kernel.messages(), kernel.messageSink()));
+                new CommandSpyListener(commandSpyStore, kernel.messages(), kernel.messageSink()),
+                exemptionWatch);
     }
 
     /**

@@ -24,7 +24,7 @@ import org.jspecify.annotations.NullMarked;
  *
  * <p>The ban is deliberately <em>not</em> silent: staff seeing "the server tempbanned this account" is the point. If
  * an operator would rather it were quiet, the security config can turn the escalation off and the lockout falls back
- * to the in-memory cooldown.
+ * to the module's own lockout record.
  *
  * <p>A reason written as an {@code @key} reference is recorded in the target's own language, read when the ban is
  * made: the ban row keeps words, not a key, so the kick screen and the history show the sentence the player read. That
@@ -53,7 +53,7 @@ public final class ModerationLockoutBan implements LockoutBan {
         }
         String recorded = HudText.lineFor(target.uuid(), reason);
         // A refusal (an exempt target, most likely a staff account) is reported honestly rather than swallowed, so
-        // the caller still applies the in-memory lockout instead of believing the account was barred.
+        // the caller still applies the module's own lockout instead of believing the account was barred.
         return tempBan.tempban(
                         issuer,
                         target,

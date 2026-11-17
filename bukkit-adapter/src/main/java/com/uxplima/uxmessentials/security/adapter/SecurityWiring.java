@@ -5,6 +5,7 @@ import java.time.Clock;
 import java.util.List;
 import java.util.Objects;
 import java.util.concurrent.atomic.AtomicReference;
+import java.util.function.BooleanSupplier;
 
 import org.bukkit.event.Listener;
 import org.bukkit.plugin.Plugin;
@@ -35,19 +36,23 @@ import com.uxplima.uxmessentials.security.application.PendingTotpEnrollments;
 import com.uxplima.uxmessentials.security.application.RemovePin;
 import com.uxplima.uxmessentials.security.application.ResetFactors;
 import com.uxplima.uxmessentials.security.application.SecurityConfig;
+import com.uxplima.uxmessentials.security.application.SessionCarry;
 import com.uxplima.uxmessentials.security.application.SetPin;
 import com.uxplima.uxmessentials.security.application.VerifyTwoFactor;
 import com.uxplima.uxmessentials.security.application.port.LockoutBan;
 import com.uxplima.uxmessentials.security.application.port.TrustStore;
 import com.uxplima.uxmessentials.security.application.port.TwoFactorRepository;
+import com.uxplima.uxmessentials.security.application.port.VerifiedSessions;
 import com.uxplima.uxmessentials.security.domain.SecretGenerator;
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandRegistration;
 import com.uxplima.uxmessentials.shared.adapter.inbound.ip.IpHistoryRecorder;
 import com.uxplima.uxmessentials.shared.adapter.outbound.action.ServerConnector;
+import com.uxplima.uxmessentials.shared.adapter.outbound.bus.Bus;
 import com.uxplima.uxmessentials.shared.application.module.KernelPorts;
 import com.uxplima.uxmessentials.shared.application.module.ModuleContext;
 import com.uxplima.uxmessentials.shared.application.port.IpHistoryStore;
 import com.uxplima.uxmessentials.shared.application.port.IpTokens;
+import com.uxplima.uxmessentials.shared.application.port.NetworkPresence;
 import com.uxplima.uxmlib.menu.Menus;
 import com.uxplima.uxmlib.menu.binding.MenuBindings;
 import org.jspecify.annotations.NullMarked;
@@ -77,7 +82,8 @@ public final class SecurityWiring {
             ServerConnector proxy,
             IpHistoryStore ipHistory,
             IpTokens ipTokens,
-            IpHistoryRecorder recorder) {
+            IpHistoryRecorder recorder,
+            Network network) {
         Objects.requireNonNull(plugin, "plugin");
         Objects.requireNonNull(ctx, "ctx");
         Objects.requireNonNull(persistence, "persistence");
@@ -89,6 +95,7 @@ public final class SecurityWiring {
         Objects.requireNonNull(ipHistory, "ipHistory");
         Objects.requireNonNull(ipTokens, "ipTokens");
         Objects.requireNonNull(recorder, "recorder");
+        Objects.requireNonNull(network, "network");
         KernelPorts kernel = ctx.kernel();
         SecurityConfig config = SecurityConfig.from(ctx.config(), kernel.log());
         SecurityConfig.TwoFactorSettings twoFactor = config.twoFactor();
@@ -97,8 +104,16 @@ public final class SecurityWiring {
         PendingTotpEnrollments pending = new PendingTotpEnrollments();
         // The durable, account-scoped brute-force limiter is shared by every verification surface: the join freeze,
         // the op re-auth keypad, /2fa disable, /pin change and /pin remove. A failed proof on any of them counts
-        // toward, and a lockout blocks, all of them. Built from the join-verification lockout policy and duration.
+        // toward, and a lockout blocks, all of them, on every backend of the database. Built from the
+        // join-verification lockout policy and duration.
+        // A lockout also drops any proof the player could carry to another backend. The drop joins that player's other
+        // session writes on the lane, so a proof still being recorded cannot land after it and bring the session back.
+        VerifiedSessions verifiedSessions = TrustStores.sessions(persistence);
+        PlayerLane sessionLane = new PlayerLane(kernel.scheduler(), kernel.log());
         AttemptLimiter limiter = new AttemptLimiter(
+                TrustStores.attempts(persistence),
+                player -> sessionLane.run(
+                        player, "security_session_revoke_failed", () -> verifiedSessions.revoke(player)),
                 config.joinVerification().lockoutPolicy(),
                 config.joinVerification().lockout());
         BeginTotpEnrollment begin = new BeginTotpEnrollment(new SecretGenerator(), pending, twoFactor.issuer());
@@ -168,6 +183,8 @@ public final class SecurityWiring {
                 ownTeleports,
                 kernel.log());
         VerifyTwoFactor verify = new VerifyTwoFactor(repository, twoFactor.codeWindow());
+        // One check in flight per player across the join freeze and the op re-auth, each reserved on the budget first.
+        ProofChecks checks = new ProofChecks(verify, limiter, kernel.log(), clock);
         TextInputTotpPrompt totpPrompt = new TextInputTotpPrompt(entryInput);
         // The create-a-PIN pad: shown to a player holding uxmessentials.security.pin.required who has no factor, so
         // "you must have a PIN" is enforceable rather than advisory. It writes through the same SetPin the /pin
@@ -191,9 +208,29 @@ public final class SecurityWiring {
                         built.forceReverify(ref);
                     }
                 });
+        // A proof carries across a switch only on a network; off it every join is a login and proves the factor.
+        SessionCarry carry = new SessionCarry(
+                verifiedSessions,
+                network.enabled() ? config.joinVerification().switchGrace() : java.time.Duration.ZERO);
+        String serverId = network.bus().publisher().serverId();
+        ProxyArrivals arrivals = new ProxyArrivals(
+                kernel.scheduler(),
+                network.bus().registry().receipts(),
+                serverId,
+                network.proxyAnswering(),
+                carry,
+                kernel.log(),
+                clock);
+        network.bus().registry().register(arrivals);
+        // Nobody is on a backend that just started, so a session it held from before is released now. One it records
+        // or takes from here on carries a later time and stays, so joins need not wait for this.
+        java.time.Instant started = clock.instant();
+        if (carry.enabled()) {
+            kernel.scheduler().async(() -> releaseAtStart(kernel, carry, serverId, started, 1));
+        }
         VerificationController controller = new VerificationController(
                 repository,
-                verify,
+                checks,
                 trustStore,
                 sessions,
                 limiter,
@@ -210,6 +247,11 @@ public final class SecurityWiring {
                 proxy,
                 ipTokens,
                 kernel.events(),
+                carry,
+                arrivals,
+                serverId,
+                network.presence(),
+                sessionLane,
                 kernel.scheduler(),
                 kernel.messages(),
                 kernel.messageSink(),
@@ -220,8 +262,8 @@ public final class SecurityWiring {
         // their next join re-verifies even from a trusted device), paired with the immediate online freeze driven
         // through the controller above. Reset is the recovery door: the one path that clears a factor without proving
         // it, for a player who has lost their authenticator or forgotten their PIN.
-        ForceReverification forceReverification = new ForceReverification(repository, trustStore);
-        ResetFactors resetFactors = new ResetFactors(repository, trustStore);
+        ForceReverification forceReverification = new ForceReverification(repository, trustStore, verifiedSessions);
+        ResetFactors resetFactors = new ResetFactors(repository, trustStore, verifiedSessions);
 
         List<CommandRegistration> commands = List.of(
                 new TwoFactorCommand(
@@ -250,6 +292,7 @@ public final class SecurityWiring {
                         forceReverification,
                         resetFactors,
                         controller,
+                        carry,
                         kernel.playerLookup(),
                         kernel.log(),
                         kernel.scheduler(),
@@ -267,7 +310,7 @@ public final class SecurityWiring {
         SecurityConfig.OpProtection opProtection = config.opProtection();
         ReauthController reauthController = new ReauthController(
                 repository,
-                verify,
+                checks,
                 limiter,
                 reauthState,
                 reauthSessions,
@@ -327,6 +370,23 @@ public final class SecurityWiring {
     }
 
     /**
+     * The network this backend is on, as far as the security module needs it.
+     *
+     * @param enabled whether this backend is on a network ({@code network.enabled})
+     * @param bus the cross-server bus, where the proxy plugin's word about each arrival comes in
+     * @param presence which backend each player is on, and which backends run
+     * @param proxyAnswering whether the uxmEssentials proxy plugin answers on the bus now
+     */
+    public record Network(boolean enabled, Bus bus, NetworkPresence presence, BooleanSupplier proxyAnswering) {
+
+        public Network {
+            Objects.requireNonNull(bus, "bus");
+            Objects.requireNonNull(presence, "presence");
+            Objects.requireNonNull(proxyAnswering, "proxyAnswering");
+        }
+    }
+
+    /**
      * Everything the security module contributes once wired: the {@code /2fa}, {@code /pin} and {@code /security}
      * command registrations and the join-verification listeners to publish, plus the transient registries cleared on stop (the pending
      * un-confirmed enrolments, the freeze/lockout sessions) and the keypad view whose open windows close on stop, so
@@ -336,7 +396,7 @@ public final class SecurityWiring {
      * @param listeners the join/freeze/keypad/op-protection Bukkit listeners to register
      * @param pending the pending un-confirmed TOTP enrolments, cleared on module stop
      * @param sessions the freeze registry, cleared on module stop
-     * @param limiter the shared durable brute-force limiter, cleared on module stop
+     * @param limiter the shared durable brute-force limiter, whose memory of lockouts is dropped on module stop
      * @param keypad the keypad view whose open windows close on module stop
      * @param reauthSessions the in-flight op-command re-auth prompts, cleared on module stop
      * @param enrolmentSessions the in-flight create-a-PIN entries, cleared on module stop
@@ -388,7 +448,7 @@ public final class SecurityWiring {
             pending.clearAll();
             keypad.closeAll();
             sessions.clearAll();
-            limiter.clearAll();
+            limiter.forgetKnown();
             reauthSessions.clearAll();
             enrolmentSessions.clearAll();
             reauthState.clearAll();
@@ -398,6 +458,29 @@ public final class SecurityWiring {
             // The hook lives on another plugin's handler list, so a disable that left it there would keep calling into
             // a module that is no longer running.
             handoff.unhook();
+        }
+    }
+
+    /** How often the release at start is tried before it is left to the log. */
+    private static final int START_RELEASE_TRIES = 4;
+
+    /**
+     * Release the sessions this backend held from before {@code started}, trying again a little later each time the
+     * database refuses, since a session it still seems to hold stays carryable to the player's address.
+     */
+    private static void releaseAtStart(
+            KernelPorts kernel, SessionCarry carry, String serverId, java.time.Instant started, int attempt) {
+        try {
+            carry.started(serverId, started);
+        } catch (RuntimeException failure) {
+            if (attempt >= START_RELEASE_TRIES) {
+                kernel.log().error("event=security_session_start_failed server=" + serverId, failure);
+                return;
+            }
+            kernel.scheduler()
+                    .asyncAfter(
+                            java.time.Duration.ofSeconds(5L << (attempt - 1)),
+                            () -> releaseAtStart(kernel, carry, serverId, started, attempt + 1));
         }
     }
 }

@@ -20,8 +20,9 @@ public interface UxmSecurityQuery {
     /**
      * Whether the account is locked out as of now.
      *
-     * <p>Answered on the calling thread: the lockout window is in memory, because it is per-run state rather than a
-     * record. A lockout the operator chose to write to the ban list is a ban as well, and reads as one there.
+     * <p>Answered on the calling thread from what this server knows: the lockouts it set or read. The lockout itself
+     * is a record every server on the database shares; {@link #of} reads that record. A lockout the operator chose to
+     * write to the ban list is a ban as well, and reads as one there.
      */
     boolean isLockedOut(UUID playerId);
 }

@@ -42,6 +42,13 @@ public interface PlayerNameIndex {
         return true;
     }
 
+    /**
+     * Note that {@code uuid} is about to join under {@code name}, before it is recorded, so whether another account
+     * holds the name is known by the time the player can be named on the tick. It may read storage, so it is called
+     * off the tick. The default does nothing.
+     */
+    default void joining(UUID uuid, String name) {}
+
     /** Note that {@code uuid} is joining under {@code name}. */
     void record(UUID uuid, String name);
 

@@ -3,8 +3,10 @@ package com.uxplima.uxmessentials.security.adapter;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.OptionalLong;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.atomic.AtomicLong;
 
 import org.jspecify.annotations.NullMarked;
 
@@ -29,9 +31,28 @@ public final class PinEnrolmentSessions {
 
     private final Map<UUID, String> entries = new ConcurrentHashMap<>();
 
+    /** UUID to the token of their current create-pad session; a new session never shares one with an old. */
+    private final Map<UUID, Long> tokens = new ConcurrentHashMap<>();
+
+    private final AtomicLong nextToken = new AtomicLong();
+
     /** Put {@code playerId} at the create pad with nothing submitted yet. */
     public void begin(UUID playerId) {
-        entries.put(Objects.requireNonNull(playerId, "playerId"), NONE);
+        Objects.requireNonNull(playerId, "playerId");
+        tokens.put(playerId, nextToken.incrementAndGet());
+        entries.put(playerId, NONE);
+    }
+
+    /** The token of {@code playerId}'s current create-pad session, empty when they are not at the pad. */
+    public OptionalLong token(UUID playerId) {
+        Long token = tokens.get(Objects.requireNonNull(playerId, "playerId"));
+        return token == null || !entries.containsKey(playerId) ? OptionalLong.empty() : OptionalLong.of(token);
+    }
+
+    /** Whether {@code playerId} is still in the create-pad session that {@code token} identifies. */
+    public boolean isPending(UUID playerId, long token) {
+        Long current = tokens.get(Objects.requireNonNull(playerId, "playerId"));
+        return current != null && current == token && entries.containsKey(playerId);
     }
 
     /** Whether {@code playerId} is being made to create a PIN. */
@@ -59,10 +80,12 @@ public final class PinEnrolmentSessions {
     /** Take {@code playerId} off the create pad and drop whatever they had entered. */
     public void clear(UUID playerId) {
         entries.remove(Objects.requireNonNull(playerId, "playerId"));
+        tokens.remove(playerId);
     }
 
     /** Drop every create-pad session, called on module stop so no half-entered PIN survives a disable. */
     public void clearAll() {
         entries.clear();
+        tokens.clear();
     }
 }

@@ -7,9 +7,9 @@ import java.util.Objects;
 import java.util.function.LongSupplier;
 
 import com.uxplima.uxmessentials.shared.adapter.outbound.bus.BusHealth;
-import com.uxplima.uxmessentials.shared.adapter.outbound.bus.BusSecret;
 import com.uxplima.uxmessentials.shared.application.health.HealthCheck;
 import com.uxplima.uxmessentials.shared.application.health.HealthResult;
+import com.uxplima.uxmessentials.shared.network.BusSecret;
 import org.jspecify.annotations.NullMarked;
 
 /**

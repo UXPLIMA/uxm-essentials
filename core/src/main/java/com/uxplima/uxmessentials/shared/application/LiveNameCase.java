@@ -119,7 +119,8 @@ public final class LiveNameCase implements Supplier<NameCase> {
             return reported;
         }
         if (memory.detected()) {
-            log.info("event=name_case_restored value=sensitive reason=offline_mode_join_seen_before");
+            log.warn("event=name_case_restored value=sensitive reason=offline_mode_join_seen_before hint=set"
+                    + " lookup.name-case to insensitive to clear it");
             return NameCase.SENSITIVE;
         }
         return reported;
