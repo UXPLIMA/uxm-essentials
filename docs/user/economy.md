@@ -168,7 +168,7 @@ the usual one. The REST add-on streams it as `economy.balance-sweep`.
 | `/setworth [item] <price> [currency]` | `uxmessentials.economy.setworth` | Sets a sell price; `clear` removes it. |
 | `/withdraw`, `/deposit` | `uxmessentials.economy.withdraw`, `.deposit` | Turns money into a banknote and back. |
 | `/bank` | `uxmessentials.economy.bank` | Shared bank accounts. |
-| `/loan` | `uxmessentials.economy.loan` | Loans and credit score. |
+| `/loan` | `uxmessentials.economy.loan` | Loans and credit score. In the dashboard a left click on a loan pays an installment and a right click pays it off. A shift click, or the gold custom-repayment button and then a loan, pays an amount you type. A `modules/economy/gui/economy-loan.conf` from an older release lacks the button: copy the shipped `custom` block into it. |
 | `/exchange` | `uxmessentials.economy.exchange` | Converts between currencies. |
 | `/eco give\|take\|set <player> <amount> [currency]` | `uxmessentials.economy.admin.give`, `.take`, `.set` | Changes a balance. |
 | `/eco reset <player> [currency]` | `uxmessentials.economy.admin.set` | Resets a balance. |
