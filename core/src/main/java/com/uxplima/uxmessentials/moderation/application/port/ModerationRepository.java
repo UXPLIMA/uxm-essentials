@@ -53,8 +53,32 @@ public interface ModerationRepository {
     /** The current jail alone, for the {@code JailGate} hot path and the online-only tick. */
     JailState loadJail(PlayerRef target);
 
+    /**
+     * The jail of each of {@code targets}, keyed by uuid, {@link JailState#none()} for one with none. The default reads
+     * them one by one; a store that can read them in one query overrides it.
+     */
+    default Map<UUID, JailState> loadJails(Collection<PlayerRef> targets) {
+        Map<UUID, JailState> jails = new HashMap<>();
+        for (PlayerRef target : targets) {
+            jails.put(target.uuid(), loadJail(target));
+        }
+        return jails;
+    }
+
     /** The current tempban alone, for the ban-on-login check. */
     TempbanState loadTempban(PlayerRef target);
+
+    /**
+     * The tempban of each of {@code targets}, keyed by uuid, {@link TempbanState#none()} for one with none. The default
+     * reads them one by one; a store that can read them in one query overrides it.
+     */
+    default Map<UUID, TempbanState> loadTempbans(Collection<PlayerRef> targets) {
+        Map<UUID, TempbanState> bans = new HashMap<>();
+        for (PlayerRef target : targets) {
+            bans.put(target.uuid(), loadTempban(target));
+        }
+        return bans;
+    }
 
     /**
      * The bans still in effect at {@code now} (both timed and the far-future rows a {@code /ban} records),
@@ -145,6 +169,18 @@ public interface ModerationRepository {
 
     /** Record or advance {@code who}'s last-seen/last-IP on join/quit. */
     void recordSeen(PlayerRef who, Optional<String> ip, Instant at);
+
+    /**
+     * Advance the last-seen instant and last address of {@code who}'s seen row when there is one, and do nothing when
+     * there is none: never a new row, never the first-seen instant. For a login that was refused, which the address
+     * readers ({@code /banip <player>}, {@code /seenip}) should still see, but which must not make an account look
+     * older than it is. The default reads, then writes; a store that can do it in one statement overrides it.
+     */
+    default void touchSeen(PlayerRef who, Optional<String> ip, Instant at) {
+        if (seen(who).isPresent()) {
+            recordSeen(who, ip, at);
+        }
+    }
 
     /**
      * {@code who}'s last-seen/last-IP record, if ever recorded. The address history behind {@code /alts} and the

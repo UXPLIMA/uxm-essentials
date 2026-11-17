@@ -17,8 +17,10 @@ import net.kyori.adventure.text.serializer.legacy.LegacyComponentSerializer;
 import net.kyori.adventure.title.Title;
 
 import com.google.common.base.Splitter;
+import com.uxplima.uxmessentials.shared.adapter.outbound.lookup.OnlineByName;
 import com.uxplima.uxmessentials.shared.adapter.outbound.style.StyledText;
 import com.uxplima.uxmessentials.shared.application.port.Logger;
+import com.uxplima.uxmessentials.shared.application.port.PlayerLookup;
 import com.uxplima.uxmlib.advancement.AdvancementFrame;
 import com.uxplima.uxmlib.advancement.Toast;
 import com.uxplima.uxmlib.advancement.Toasts;
@@ -55,11 +57,12 @@ public final class MessagingActions {
      * {@link MenuVocabulary#registerActions} so that method's existing call-sites stay untouched, the composition
      * root calls both.
      */
-    public static void register(MenuBindings bindings, Toasts toasts, Logger log) {
+    public static void register(MenuBindings bindings, Toasts toasts, PlayerLookup players, Logger log) {
         Objects.requireNonNull(bindings, "bindings");
         Objects.requireNonNull(toasts, "toasts");
+        Objects.requireNonNull(players, "players");
         Objects.requireNonNull(log, "log");
-        Consumer<MenuActionContext> whisper = safe("message-to", log, MessagingActions::whisper);
+        Consumer<MenuActionContext> whisper = safe("message-to", log, ctx -> whisper(ctx, players));
         bindings.action("message-to", whisper);
         bindings.action("whisper", whisper);
         bindings.action("broadcast", safe("broadcast", log, ctx -> Bukkit.broadcast(StyledText.render(ctx.arg()))));
@@ -90,12 +93,12 @@ public final class MessagingActions {
     }
 
     /** Deliver {@code <player> <message…>} to the named target; an unknown/offline target is a silent no-op. */
-    private static void whisper(MenuActionContext ctx) {
+    private static void whisper(MenuActionContext ctx, PlayerLookup players) {
         ParsedWhisper parsed = ParsedWhisper.parse(ctx.arg());
         if (parsed.target().isEmpty()) {
             return;
         }
-        Player target = Bukkit.getPlayerExact(parsed.target());
+        Player target = OnlineByName.player(players, parsed.target());
         if (target == null) {
             return; // the target is offline or unknown. Nothing to deliver to, but not an error
         }

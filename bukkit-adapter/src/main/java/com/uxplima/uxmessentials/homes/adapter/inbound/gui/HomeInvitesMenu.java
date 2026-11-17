@@ -24,6 +24,7 @@ import com.uxplima.uxmessentials.shared.application.port.Logger;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
 import com.uxplima.uxmessentials.shared.application.port.PlayerLookup;
 import com.uxplima.uxmessentials.shared.application.port.Scheduler;
+import com.uxplima.uxmessentials.shared.domain.NameMatch;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmlib.gui.input.InputRequest;
 import com.uxplima.uxmlib.gui.input.TextInput;
@@ -193,13 +194,13 @@ public final class HomeInvitesMenu {
         Objects.requireNonNull(name, "name");
         String typed = name.strip();
         scheduler.async(() -> {
-            Optional<PlayerRef> resolved = players.findByName(typed);
+            NameMatch match = players.matchByName(typed);
+            Optional<PlayerRef> resolved = match.player();
             if (resolved.isEmpty()) {
                 scheduler.onEntity(BukkitRefs.toRef(viewer), () -> {
                     notifier.send(
                             BukkitRefs.toRef(viewer),
-                            HomesMessageKey.HOME_INVITES_UNKNOWN_PLAYER,
-                            Map.of("player", typed));
+                            match.miss(HomesMessageKey.HOME_INVITES_UNKNOWN_PLAYER, Map.of("player", typed)));
                     open(viewer, home);
                 });
                 return;

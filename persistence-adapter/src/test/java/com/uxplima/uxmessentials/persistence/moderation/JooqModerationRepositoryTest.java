@@ -14,6 +14,7 @@ import com.uxplima.uxmessentials.moderation.application.port.ModerationRepositor
 import com.uxplima.uxmessentials.moderation.domain.DrawnReason;
 import com.uxplima.uxmessentials.moderation.domain.IpBan;
 import com.uxplima.uxmessentials.moderation.domain.Issuer;
+import com.uxplima.uxmessentials.moderation.domain.JailState;
 import com.uxplima.uxmessentials.moderation.domain.ModerationMessageKey;
 import com.uxplima.uxmessentials.moderation.domain.MuteState;
 import com.uxplima.uxmessentials.moderation.domain.TempbanState;
@@ -62,6 +63,35 @@ class JooqModerationRepositoryTest {
 
         assertThat(second.loadMutes(List.of(SAM, ALEX)))
                 .isEqualTo(Map.of(SAM.uuid(), permanent, ALEX.uuid(), MuteState.none()));
+    }
+
+    @Test
+    void touchingTheSeenRowMovesTheLastAddressOnlyOfAnAccountSeenBefore() {
+        first.recordSeen(SAM, Optional.of("198.51.100.4"), NOW);
+
+        first.touchSeen(SAM, Optional.of(ADDRESS), NOW.plusSeconds(60));
+        first.touchSeen(ALEX, Optional.of(ADDRESS), NOW.plusSeconds(60));
+
+        assertThat(second.seen(SAM)).hasValueSatisfying(seen -> {
+            assertThat(seen.lastIp()).contains(ADDRESS);
+            assertThat(seen.lastSeen()).isEqualTo(NOW.plusSeconds(60));
+            assertThat(seen.firstSeen()).isEqualTo(NOW);
+        });
+        assertThat(second.seen(ALEX)).isEmpty();
+    }
+
+    @Test
+    void manyPlayersBansAndJailsAreReadAtOnceWithNoneForAPlayerWithoutOne() {
+        first.ensureUserExists(ALEX, NOW);
+        TempbanState.Active day = ban(Duration.ofDays(1), "grief", NOW);
+        JailState cell = JailState.permanent("spawn-cell", Issuer.of(ALEX), Optional.of("grief"), NOW);
+        first.saveTempban(SAM, day);
+        first.saveJail(ALEX, cell);
+
+        assertThat(second.loadTempbans(List.of(SAM, ALEX)))
+                .isEqualTo(Map.of(SAM.uuid(), day, ALEX.uuid(), TempbanState.none()));
+        assertThat(second.loadJails(List.of(SAM, ALEX)))
+                .isEqualTo(Map.of(SAM.uuid(), JailState.none(), ALEX.uuid(), cell));
     }
 
     @Test

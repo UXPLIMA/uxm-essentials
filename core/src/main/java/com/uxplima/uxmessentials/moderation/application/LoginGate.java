@@ -107,7 +107,13 @@ public final class LoginGate {
         }
         LoginEnforcement.Standing standing = entry.standing();
         LoginEnforcement.Decision decision = enforcement.decide(standing, hasBypass, exempt);
-        lane.background(who, () -> enforcement.record(standing, !decision.allowed()));
+        // On the player's lane, ahead of the join's own work there, so the jail on join finds an inherited jail.
+        lane.background(who, () -> {
+            enforcement.record(standing, !decision.allowed());
+            if (decision.allowed()) {
+                enforcement.carryOver(standing);
+            }
+        });
         return decision;
     }
 

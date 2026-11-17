@@ -15,6 +15,7 @@ import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandRegistrat
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandSuggestions;
 import com.uxplima.uxmessentials.shared.application.permission.TeleportPermissions;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
+import com.uxplima.uxmessentials.shared.domain.NameMatch;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmessentials.teleport.adapter.TeleportServices;
 import com.uxplima.uxmessentials.teleport.domain.TeleportMessageKey;
@@ -63,9 +64,11 @@ public final class TpBlockCommand extends TeleportCommandSupport implements Comm
         }
         PlayerRef actor = ref(sender);
         String name = ctx.getArgument("player", String.class);
-        Optional<PlayerRef> target = services.players().findOnlineByName(name);
+        NameMatch match = services.players().matchOnlineByName(name);
+        Optional<PlayerRef> target = match.player();
         if (target.isEmpty()) {
-            services.notifier().send(actor, TeleportMessageKey.TPA_TARGET_OFFLINE, java.util.Map.of("player", name));
+            services.notifier()
+                    .send(actor, match.miss(TeleportMessageKey.TPA_TARGET_OFFLINE, java.util.Map.of("player", name)));
             return 0;
         }
         apply(actor, target.get());

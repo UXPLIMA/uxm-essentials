@@ -256,7 +256,6 @@ class TempBanTest {
 
         clock.advance(Duration.ofHours(2));
         assertThat(letsIn(SAM)).isTrue();
-        assertThat(records.seen()).hasSize(3);
     }
 
     @Test

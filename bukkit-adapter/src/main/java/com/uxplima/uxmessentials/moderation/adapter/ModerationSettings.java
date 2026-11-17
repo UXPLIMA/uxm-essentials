@@ -11,6 +11,7 @@ import java.util.Optional;
 import java.util.Set;
 import java.util.stream.Collectors;
 
+import com.uxplima.uxmessentials.moderation.application.CaseVariantSanctions;
 import com.uxplima.uxmessentials.moderation.domain.AddressStrictness;
 import com.uxplima.uxmessentials.moderation.domain.PunishmentTemplate;
 import com.uxplima.uxmessentials.moderation.domain.SanctionDuration;
@@ -51,6 +52,10 @@ public final class ModerationSettings {
     private final boolean silentByDefault;
     private final AddressStrictness addressStrictness;
     private final boolean censorIpAddresses;
+    private final boolean refuseNameCaseVariants;
+    private final CaseVariantSanctions.Reach caseVariantSanctions;
+    private final List<String> caseVariantAddressIgnore;
+    private final int caseVariantAddressBusyAfter;
     private final Map<String, PunishmentTemplate> templates;
     private final boolean discordNotify;
 
@@ -74,6 +79,11 @@ public final class ModerationSettings {
         this.silentByDefault = config.getBoolean("broadcast.silent-by-default", false);
         this.addressStrictness = AddressStrictness.parse(config.getString("address-strictness", "NORMAL"));
         this.censorIpAddresses = config.getBoolean("censor-ip-addresses", false);
+        this.refuseNameCaseVariants = config.getBoolean("refuse-name-case-variants", false);
+        this.caseVariantSanctions =
+                CaseVariantSanctions.Reach.parse(config.getString("case-variant-sanctions", "newer-or-address"), log);
+        this.caseVariantAddressIgnore = List.copyOf(config.getStringList("case-variant-address.ignore", List.of()));
+        this.caseVariantAddressBusyAfter = Math.max(1, config.getInt("case-variant-address.busy-after", 3));
         this.templates = parseTemplates(config, log);
         this.discordNotify = config.getBoolean("discord-notify", false);
     }
@@ -118,6 +128,33 @@ public final class ModerationSettings {
     /** Whether {@code /alts} and {@code /seenip} mask the addresses they render (privacy; off by default). */
     public boolean censorIpAddresses() {
         return censorIpAddresses;
+    }
+
+    /**
+     * Whether a new account whose name is a case variant of a known one is refused at login. Read only on an
+     * offline-mode server, where each spelling is its own account.
+     */
+    public boolean refuseNameCaseVariants() {
+        return refuseNameCaseVariants;
+    }
+
+    /**
+     * Which accounts under another spelling of a sanctioned name the ban, mute or jail reaches on an offline-mode
+     * server: those with no trace from before it, those plus the ones that shared an address with the sanctioned
+     * account (the default), or all of them.
+     */
+    public CaseVariantSanctions.Reach caseVariantSanctions() {
+        return caseVariantSanctions;
+    }
+
+    /** Addresses and ranges that never link two spellings of a name: the proxy's own address, a known shared one. */
+    public List<String> caseVariantAddressIgnore() {
+        return caseVariantAddressIgnore;
+    }
+
+    /** The most accounts an address may have been used by and still link two spellings of a name. */
+    public int caseVariantAddressBusyAfter() {
+        return caseVariantAddressBusyAfter;
     }
 
     /** The configured {@code /punish} templates (name → preset reason + optional duration), parsed at wire time. */

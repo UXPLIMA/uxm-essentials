@@ -25,9 +25,12 @@ import com.uxplima.uxmessentials.shared.application.port.Logger;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
 import com.uxplima.uxmessentials.shared.application.port.PlayerLookup;
 import com.uxplima.uxmessentials.shared.application.port.Scheduler;
+import com.uxplima.uxmessentials.shared.domain.NameMatch;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmessentials.shared.domain.Result;
 import com.uxplima.uxmessentials.shared.domain.Unit;
+import com.uxplima.uxmessentials.shared.domain.message.MessageKey;
+import com.uxplima.uxmessentials.shared.domain.message.MessageLine;
 import com.uxplima.uxmlib.gui.input.InputRequest;
 import com.uxplima.uxmlib.gui.input.TextInput;
 import com.uxplima.uxmlib.menu.Menus;
@@ -162,7 +165,7 @@ public final class BankMembersMenu {
         return ctx.entry(BankMember.class);
     }
 
-    private Component text(PlayerRef viewer, EconomyMessageKey key, Map<String, String> placeholders) {
+    private Component text(PlayerRef viewer, MessageKey key, Map<String, String> placeholders) {
         return StyledText.render(messages.resolve(viewer, key, placeholders)).decoration(TextDecoration.ITALIC, false);
     }
 
@@ -185,10 +188,12 @@ public final class BankMembersMenu {
 
     private void submitAdd(Player player, PlayerRef viewer, SharedBank bank, String cleanName) {
         scheduler.async(() -> {
-            Optional<PlayerRef> resolved = players.findByName(cleanName);
+            NameMatch match = players.matchByName(cleanName);
+            Optional<PlayerRef> resolved = match.player();
             if (resolved.isEmpty()) {
+                MessageLine miss = match.miss(EconomyMessageKey.BANK_MEMBERS_GUI_ADD_FAILED, Map.of());
                 scheduler.onEntity(viewer, () -> {
-                    player.sendMessage(text(viewer, EconomyMessageKey.BANK_MEMBERS_GUI_ADD_FAILED, Map.of()));
+                    player.sendMessage(text(viewer, miss.key(), miss.args()));
                     open(player, bank);
                 });
                 return;

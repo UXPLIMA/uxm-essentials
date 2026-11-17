@@ -13,8 +13,12 @@ import java.util.Objects;
 import java.util.Optional;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.function.Predicate;
+import java.util.function.Supplier;
 
 import com.uxplima.uxmessentials.shared.application.port.NetworkPresence;
+import com.uxplima.uxmessentials.shared.domain.NameCase;
+import com.uxplima.uxmessentials.shared.domain.NameMatch;
 import com.uxplima.uxmessentials.shared.domain.OnlinePlayer;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import org.jspecify.annotations.Nullable;
@@ -46,6 +50,13 @@ import org.jspecify.annotations.Nullable;
  * one's quit travel separately. The entry this backend saw arrive last wins, so lookups follow the player at once;
  * entries that arrived in the same millisecond are ordered by server name, so every lookup answers alike.
  *
+ * <h2>Names</h2>
+ * With authenticated logins a name has one owner: a player here wins their name over one elsewhere, and an exact
+ * spelling over another case. With offline-mode logins every spelling is its own account, so only the spelling typed
+ * is found; a name several accounts online hold in other cases is ambiguous, and a name one account online holds in
+ * another case is not settled here, since the account spelled as typed may be offline. Which applies is read on every
+ * lookup.
+ *
  * <h2>Concurrency</h2>
  * Ownership: <b>concurrent-collection</b>. The local players are a {@link ConcurrentHashMap}. Each remote roster is
  * an immutable record swapped whole inside {@link ConcurrentHashMap#compute}, so frames from one backend apply
@@ -61,6 +72,8 @@ public final class NetworkRoster implements NetworkPresence {
     private final String localServer;
     private final Clock clock;
     private final long livenessMillis;
+    private final Supplier<NameCase> names;
+    private final Predicate<String> sharedName;
     private final ConcurrentHashMap<UUID, PlayerRef> local = new ConcurrentHashMap<>();
     private final ConcurrentHashMap<String, Remote> remotes = new ConcurrentHashMap<>();
 
@@ -68,10 +81,26 @@ public final class NetworkRoster implements NetworkPresence {
      * @param localServer this backend's {@code server-name}
      * @param clock the clock frames are timed with on arrival
      * @param livenessWindow how long a remote roster counts after its backend was last heard from
+     * @param names how names are told apart, asked on every lookup
      */
-    public NetworkRoster(String localServer, Clock clock, Duration livenessWindow) {
+    public NetworkRoster(String localServer, Clock clock, Duration livenessWindow, Supplier<NameCase> names) {
+        this(localServer, clock, livenessWindow, names, name -> true);
+    }
+
+    /**
+     * @param sharedName whether more than one account may hold a name in some case, answered without reading storage;
+     *     a lone player online under another spelling of a name nobody else holds is found by it
+     */
+    public NetworkRoster(
+            String localServer,
+            Clock clock,
+            Duration livenessWindow,
+            Supplier<NameCase> names,
+            Predicate<String> sharedName) {
         this.localServer = Objects.requireNonNull(localServer, "localServer");
         this.clock = Objects.requireNonNull(clock, "clock");
+        this.names = Objects.requireNonNull(names, "names");
+        this.sharedName = Objects.requireNonNull(sharedName, "sharedName");
         Objects.requireNonNull(livenessWindow, "livenessWindow");
         if (localServer.isBlank()) {
             throw new IllegalArgumentException("localServer must not be blank");
@@ -122,17 +151,72 @@ public final class NetworkRoster implements NetworkPresence {
 
     @Override
     public Optional<OnlinePlayer> findByName(String name) {
+        return resolve(name).found();
+    }
+
+    @Override
+    public NameMatch matchByName(String name) {
+        return resolve(name).match();
+    }
+
+    private Resolved resolve(String name) {
         Objects.requireNonNull(name, "name");
         String wanted = name.strip();
         if (wanted.isEmpty()) {
-            return Optional.empty();
+            return Resolved.NOBODY;
         }
-        Optional<OnlinePlayer> here = pickByName(
-                local.values().stream()
-                        .map(player -> new OnlinePlayer(player, localServer))
-                        .toList(),
-                wanted);
-        return here.isPresent() ? here : pickByName(remoteWinners(), wanted);
+        List<OnlinePlayer> locals = local.values().stream()
+                .map(player -> new OnlinePlayer(player, localServer))
+                .toList();
+        List<OnlinePlayer> remotes = remoteWinners();
+        if (names.get() == NameCase.INSENSITIVE) {
+            Resolved here = pickByName(locals, wanted);
+            boolean heldHere = locals.stream()
+                    .anyMatch(presence -> presence.player().name().equalsIgnoreCase(wanted));
+            // Case variants here that name no single account are not settled by a player elsewhere either.
+            return here.found().isPresent() || heldHere ? here : pickByName(remotes, wanted);
+        }
+        for (List<OnlinePlayer> where : List.of(locals, remotes)) {
+            for (OnlinePlayer presence : where) {
+                if (presence.player().name().equals(wanted)) {
+                    return Resolved.of(presence);
+                }
+            }
+        }
+        Map<UUID, PlayerRef> variants = new java.util.LinkedHashMap<>();
+        for (List<OnlinePlayer> where : List.of(locals, remotes)) {
+            for (OnlinePlayer presence : where) {
+                if (presence.player().name().equalsIgnoreCase(wanted)) {
+                    variants.putIfAbsent(presence.player().uuid(), presence.player());
+                }
+            }
+        }
+        if (variants.size() > 1) {
+            return new Resolved(Optional.empty(), NameMatch.ambiguous(wanted, variants.values()));
+        }
+        // A lone player online in another case is the one meant only when no other account holds the name: an
+        // offline account spelled as typed would be somebody else.
+        if (variants.size() == 1 && !sharedName.test(wanted)) {
+            PlayerRef lone = variants.values().iterator().next();
+            for (List<OnlinePlayer> where : List.of(locals, remotes)) {
+                for (OnlinePlayer presence : where) {
+                    if (presence.player().equals(lone)) {
+                        return Resolved.of(presence);
+                    }
+                }
+            }
+        }
+        return Resolved.NOBODY;
+    }
+
+    /** A name lookup: the presence found, and the match that says why there is none. */
+    private record Resolved(Optional<OnlinePlayer> found, NameMatch match) {
+
+        static final Resolved NOBODY = new Resolved(Optional.empty(), NameMatch.unknown());
+
+        static Resolved of(OnlinePlayer presence) {
+            return new Resolved(Optional.of(presence), NameMatch.found(presence.player()));
+        }
     }
 
     @Override
@@ -334,18 +418,24 @@ public final class NetworkRoster implements NetworkPresence {
         return now - remote.heardMillis() > livenessMillis;
     }
 
-    private static Optional<OnlinePlayer> pickByName(List<OnlinePlayer> candidates, String wanted) {
+    private static Resolved pickByName(List<OnlinePlayer> candidates, String wanted) {
         OnlinePlayer caseless = null;
+        Map<UUID, PlayerRef> variants = new java.util.LinkedHashMap<>();
         for (OnlinePlayer presence : candidates) {
             String name = presence.player().name();
             if (name.equals(wanted)) {
-                return Optional.of(presence);
+                return Resolved.of(presence);
             }
-            if (caseless == null && name.equalsIgnoreCase(wanted)) {
+            if (name.equalsIgnoreCase(wanted)) {
+                variants.putIfAbsent(presence.player().uuid(), presence.player());
                 caseless = presence;
             }
         }
-        return Optional.ofNullable(caseless);
+        // Two accounts online under case variants of the name: neither is the one typed, so no guess.
+        if (variants.size() > 1) {
+            return new Resolved(Optional.empty(), NameMatch.ambiguous(wanted, variants.values()));
+        }
+        return caseless == null ? Resolved.NOBODY : Resolved.of(caseless);
     }
 
     /** Builds the next roster of one backend from its current one. */

@@ -121,6 +121,28 @@ public final class SanctionHistoryRecorder {
         append(SanctionAction.MUTE, target.uuid(), actor, reason, drawn, expiry, Optional.empty(), clock.instant());
     }
 
+    /**
+     * Record a mute of {@code target} copied from another spelling of their name: it keeps the original's
+     * {@code issuer}, and {@code drawn} says where it came from.
+     */
+    public void inheritedMute(
+            Issuer issuer, PlayerRef target, DrawnReason drawn, Optional<String> reason, Optional<Instant> expiry) {
+        Objects.requireNonNull(issuer, "issuer");
+        Objects.requireNonNull(target, "target");
+        Objects.requireNonNull(drawn, "drawn");
+        Objects.requireNonNull(reason, "reason");
+        Objects.requireNonNull(expiry, "expiry");
+        store.append(new SanctionHistoryEntry(
+                SanctionAction.MUTE,
+                target.uuid(),
+                issuer,
+                reason,
+                clock.instant(),
+                expiry,
+                Optional.empty(),
+                Optional.of(drawn)));
+    }
+
     /** Record an unmute of {@code target}. */
     public void unmute(PlayerRef actor, PlayerRef target) {
         Objects.requireNonNull(target, "target");

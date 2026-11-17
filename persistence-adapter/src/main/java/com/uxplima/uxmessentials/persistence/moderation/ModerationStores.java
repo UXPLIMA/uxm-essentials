@@ -2,6 +2,7 @@ package com.uxplima.uxmessentials.persistence.moderation;
 
 import java.util.Objects;
 
+import com.uxplima.uxmessentials.moderation.application.port.CaseCopies;
 import com.uxplima.uxmessentials.moderation.application.port.ExemptionSightings;
 import com.uxplima.uxmessentials.moderation.application.port.JailLocationStore;
 import com.uxplima.uxmessentials.moderation.application.port.ModerationRepository;
@@ -35,6 +36,12 @@ public final class ModerationStores {
     public static JailLocationStore jailLocationStore(Persistence persistence) {
         Objects.requireNonNull(persistence, "persistence");
         return new JooqJailLocationStore(persistence.dsl());
+    }
+
+    /** A jOOQ {@link CaseCopies} over the shared persistence DSL: the mutes and jails copied onto other spellings. */
+    public static CaseCopies caseCopies(Persistence persistence) {
+        Objects.requireNonNull(persistence, "persistence");
+        return new JooqCaseCopies(persistence.dsl());
     }
 
     /** A jOOQ {@link SanctionHistory} over the shared persistence DSL, the append-only history seam. */

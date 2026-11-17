@@ -29,6 +29,7 @@ import com.uxplima.uxmessentials.shared.application.port.MessageSink;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
 import com.uxplima.uxmessentials.shared.application.port.PlayerLookup;
 import com.uxplima.uxmessentials.shared.application.port.Scheduler;
+import com.uxplima.uxmessentials.shared.domain.NameMatch;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmessentials.shared.domain.message.SharedMessageKey;
 import com.uxplima.uxmlib.command.Args;
@@ -218,9 +219,10 @@ public final class LangCommand implements CommandRegistration {
 
     /** The player an operator named, online or one the server has seen, or a reply that there is nobody. */
     private Optional<PlayerRef> named(CommandSender operator, String typed) {
-        Optional<PlayerRef> found = players.findByName(typed);
+        NameMatch match = players.matchByName(typed);
+        Optional<PlayerRef> found = match.player();
         if (found.isEmpty()) {
-            feedback.send(operator, SharedMessageKey.COMMAND_UNKNOWN_PLAYER, Map.of("player", typed));
+            feedback.send(operator, match.miss(SharedMessageKey.COMMAND_UNKNOWN_PLAYER, Map.of("player", typed)));
         }
         return found;
     }

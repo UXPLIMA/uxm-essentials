@@ -26,6 +26,7 @@ import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandSuggestio
 import com.uxplima.uxmessentials.shared.adapter.outbound.BukkitRefs;
 import com.uxplima.uxmessentials.shared.application.permission.EconomyPermissions;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
+import com.uxplima.uxmessentials.shared.domain.NameMatch;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmlib.command.Args;
 import com.uxplima.uxmlib.command.Gate;
@@ -320,20 +321,13 @@ public final class EcoCommand extends EconomyCommandSupport implements CommandRe
     }
 
     /**
-     * Resolve an admin command's named target to a {@link PlayerRef}, online first and then from the server's
-     * offline profile cache, so {@code /eco give|take|set|reset} can act on a player who is not currently online
-     * (the use cases materialise the offline row with {@code ensureOwner}). The cached lookup is non-blocking;
-     * an unknown name yields empty and the caller reports unknown-player.
+     * Resolve an admin command's named target, online first and then every account the server has seen, so
+     * {@code /eco give|take|set|reset} can act on a player who is not currently online (the use cases materialise
+     * the offline row with {@code ensureOwner}). The lookup is non-blocking; an unknown name, or one several case
+     * variants share, leaves no player and the caller reports why.
      */
-    private Optional<PlayerRef> resolveAnyTarget(String name) {
-        Optional<PlayerRef> online = services.players().findOnlineByName(name);
-        if (online.isPresent()) {
-            return online;
-        }
-        org.bukkit.OfflinePlayer offline = org.bukkit.Bukkit.getOfflinePlayerIfCached(name);
-        return offline != null && offline.getName() != null
-                ? Optional.of(new PlayerRef(offline.getUniqueId(), offline.getName()))
-                : Optional.empty();
+    private NameMatch resolveAnyTarget(String name) {
+        return services.players().matchByName(name);
     }
 
     private int runExport(CommandContext<CommandSourceStack> ctx) {
@@ -367,9 +361,10 @@ public final class EcoCommand extends EconomyCommandSupport implements CommandRe
     }
 
     private void resolveAndReset(PlayerRef actor, String targetName, Currency currency) {
-        Optional<PlayerRef> target = resolveAnyTarget(targetName);
+        NameMatch match = resolveAnyTarget(targetName);
+        Optional<PlayerRef> target = match.player();
         if (target.isEmpty()) {
-            rejectUnknownTarget(actor, targetName);
+            rejectUnknownTarget(actor, targetName, match);
             return;
         }
         services.ecoAdmin().reset(actor, target.get(), currency);
@@ -444,9 +439,10 @@ public final class EcoCommand extends EconomyCommandSupport implements CommandRe
     }
 
     private void resolveAndGiveRandomRange(PlayerRef actor, String targetName, Money min, Money max) {
-        Optional<PlayerRef> target = resolveAnyTarget(targetName);
+        NameMatch match = resolveAnyTarget(targetName);
+        Optional<PlayerRef> target = match.player();
         if (target.isEmpty()) {
-            rejectUnknownTarget(actor, targetName);
+            rejectUnknownTarget(actor, targetName, match);
             return;
         }
         services.ecoAdmin().giveRandomRange(actor, target.get(), min, max);
@@ -467,9 +463,10 @@ public final class EcoCommand extends EconomyCommandSupport implements CommandRe
             return 0;
         }
         String targetName = ctx.getArgument("player", String.class);
-        Optional<PlayerRef> target = resolveAnyTarget(targetName);
+        NameMatch match = resolveAnyTarget(targetName);
+        Optional<PlayerRef> target = match.player();
         if (target.isEmpty()) {
-            rejectUnknownTarget(ref(sender), targetName);
+            rejectUnknownTarget(ref(sender), targetName, match);
             return Command.SINGLE_SUCCESS;
         }
         services.historyView().open(sender, target.get().uuid(), target.get().name());
@@ -508,9 +505,10 @@ public final class EcoCommand extends EconomyCommandSupport implements CommandRe
      * is delivered on the recipient's entity thread, dropping any overflow at their feet.
      */
     private void resolveAndGiveNote(PlayerRef actor, String targetName, Money amount) {
-        Optional<PlayerRef> target = resolveAnyTarget(targetName);
+        NameMatch match = resolveAnyTarget(targetName);
+        Optional<PlayerRef> target = match.player();
         if (target.isEmpty()) {
-            rejectUnknownTarget(actor, targetName);
+            rejectUnknownTarget(actor, targetName, match);
             return;
         }
         Player online = org.bukkit.Bukkit.getPlayer(target.get().uuid());
@@ -553,9 +551,11 @@ public final class EcoCommand extends EconomyCommandSupport implements CommandRe
         if (amount.isEmpty()) {
             return null;
         }
-        Optional<PlayerRef> target = resolveAnyTarget(ctx.getArgument("player", String.class));
+        String targetName = ctx.getArgument("player", String.class);
+        NameMatch match = resolveAnyTarget(targetName);
+        Optional<PlayerRef> target = match.player();
         if (target.isEmpty()) {
-            rejectUnknownTarget(actor, ctx.getArgument("player", String.class));
+            rejectUnknownTarget(actor, targetName, match);
             return null;
         }
         return new Resolved(actor, target.get(), amount.get());
@@ -587,13 +587,15 @@ public final class EcoCommand extends EconomyCommandSupport implements CommandRe
         String targetName = ctx.getArgument("player", String.class);
         String date = ctx.getArgument("date", String.class);
         offTick(() -> {
-            Optional<PlayerRef> target = services.players().findByName(targetName);
+            NameMatch match = services.players().matchByName(targetName);
+            Optional<PlayerRef> target = match.player();
             if (target.isEmpty()) {
                 services.notifier()
                         .send(
                                 actor,
-                                EconomyMessageKey.ECO_ADMIN_RESTORE_TARGET_UNKNOWN,
-                                java.util.Map.of("player", targetName));
+                                match.miss(
+                                        EconomyMessageKey.ECO_ADMIN_RESTORE_TARGET_UNKNOWN,
+                                        java.util.Map.of("player", targetName)));
                 return;
             }
             try {

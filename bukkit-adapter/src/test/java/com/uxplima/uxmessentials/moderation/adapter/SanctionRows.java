@@ -163,7 +163,8 @@ public final class SanctionRows implements ModerationRepository {
 
     @Override
     public Optional<SeenRecord> seen(PlayerRef who) {
-        throw new UnsupportedOperationException();
+        // No seen rows are kept here: every account reads as never seen.
+        return Optional.empty();
     }
 
     @Override

@@ -26,7 +26,9 @@ import com.uxplima.uxmessentials.shared.adapter.outbound.lookup.BukkitPlayerLoca
 import com.uxplima.uxmessentials.shared.adapter.outbound.lookup.BukkitWorldLookup;
 import com.uxplima.uxmessentials.shared.adapter.outbound.lookup.CachingPlayerNameIndex;
 import com.uxplima.uxmessentials.shared.adapter.outbound.lookup.IndexedPlayerLookup;
+import com.uxplima.uxmessentials.shared.adapter.outbound.lookup.NameCaseStateFile;
 import com.uxplima.uxmessentials.shared.adapter.outbound.lookup.OnlinePlayerIndex;
+import com.uxplima.uxmessentials.shared.adapter.outbound.lookup.ServerNameCase;
 import com.uxplima.uxmessentials.shared.adapter.outbound.message.AdventureTranslations;
 import com.uxplima.uxmessentials.shared.adapter.outbound.message.CatalogMessages;
 import com.uxplima.uxmessentials.shared.adapter.outbound.message.HoconLocaleCatalog;
@@ -42,6 +44,7 @@ import com.uxplima.uxmessentials.shared.adapter.outbound.sink.BukkitMessageSink;
 import com.uxplima.uxmessentials.shared.adapter.outbound.skin.HttpClientFetcher;
 import com.uxplima.uxmessentials.shared.adapter.outbound.skin.MojangSkins;
 import com.uxplima.uxmessentials.shared.adapter.outbound.warmup.SchedulerWarmups;
+import com.uxplima.uxmessentials.shared.application.LiveNameCase;
 import com.uxplima.uxmessentials.shared.application.ledger.NetworkClaims;
 import com.uxplima.uxmessentials.shared.application.ledger.NetworkCooldowns;
 import com.uxplima.uxmessentials.shared.application.message.CatalogLines;
@@ -95,6 +98,8 @@ final class KernelWiring {
     private static final String LANGUAGE_FORCE_PATH = "language.force";
 
     private static final String SKIN_LOOKUP_PATH = "skins.mojang-lookup";
+    /** Whether names that differ only in case are one account: auto, sensitive or insensitive. */
+    private static final String NAME_CASE_PATH = "lookup.name-case";
 
     private KernelWiring() {}
 
@@ -112,6 +117,7 @@ final class KernelWiring {
      * @param nameIndex the player-name index behind the lookup port, still to be backed by the database
      * @param networkClaims the shared kit claims and cooldowns on a network, empty on a single server
      * @param online who is connected, behind the lookup port, still to be seeded and kept by a listener
+     * @param nameCase how names are told apart, still to be fed the logins that can settle it
      */
     record Kernel(
             KernelPorts ports,
@@ -121,7 +127,8 @@ final class KernelWiring {
             java.util.Locale serverDefault,
             CachingPlayerNameIndex nameIndex,
             Optional<NetworkClaims> networkClaims,
-            OnlinePlayerIndex online) {
+            OnlinePlayerIndex online,
+            LiveNameCase nameCase) {
         Kernel {
             Objects.requireNonNull(ports, "ports");
             Objects.requireNonNull(localeStore, "localeStore");
@@ -131,6 +138,7 @@ final class KernelWiring {
             Objects.requireNonNull(nameIndex, "nameIndex");
             Objects.requireNonNull(networkClaims, "networkClaims");
             Objects.requireNonNull(online, "online");
+            Objects.requireNonNull(nameCase, "nameCase");
         }
     }
 
@@ -228,6 +236,15 @@ final class KernelWiring {
         // It starts empty and memory-only; PluginModule backs it with the database once persistence is open.
         CachingPlayerNameIndex nameIndex = new CachingPlayerNameIndex(scheduler, log);
         OnlinePlayerIndex online = new OnlinePlayerIndex();
+        // A backend behind a proxy reports the proxy's online mode from settings that default to online, so on auto
+        // the answer is also corrected by the first offline-mode join (NameCaseEvidenceListener), and that finding is
+        // kept in the data folder for the next start.
+        LiveNameCase nameCase = new LiveNameCase(
+                LiveNameCase.Setting.parse(config.getString(NAME_CASE_PATH, "auto"), log),
+                ServerNameCase.of(plugin.getServer()),
+                plugin.getServer().getOnlineMode(),
+                new NameCaseStateFile(plugin.getDataFolder().toPath(), scheduler, log),
+                log);
 
         // One skin fetch for every context that dresses something in a player's skin. It asks Mojang directly
         // rather than through Bukkit's profile completion, which consults the session service only on an
@@ -256,14 +273,16 @@ final class KernelWiring {
                 new SchedulerWarmups(scheduler, permissions),
                 messages,
                 new BukkitMessageSink(scheduler, prefix, messageBridgeFactory()),
-                new IndexedPlayerLookup(new BukkitOfflineProfiles(), nameIndex, online),
+                new IndexedPlayerLookup(
+                        new BukkitOfflineProfiles(), nameIndex, online, nameCase, Bukkit::isPrimaryThread),
                 new BukkitWorldLookup(),
                 new BukkitPlayerLocator(),
                 new InProcessDomainEventPublisher(log),
                 log,
                 mojangSkins,
                 new BukkitDomainGate(vetoes, plugin.getServer().getPluginManager(), log));
-        return new Kernel(ports, localeStore, catalog, resolver, serverDefault, nameIndex, networkClaims, online);
+        return new Kernel(
+                ports, localeStore, catalog, resolver, serverDefault, nameIndex, networkClaims, online, nameCase);
     }
 
     /**

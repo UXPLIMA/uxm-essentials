@@ -29,6 +29,7 @@ import com.uxplima.uxmessentials.shared.application.permission.ContentPermission
 import com.uxplima.uxmessentials.shared.application.port.Messages;
 import com.uxplima.uxmessentials.shared.application.port.PlayerLookup;
 import com.uxplima.uxmessentials.shared.application.port.Scheduler;
+import com.uxplima.uxmessentials.shared.domain.NameMatch;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmessentials.shared.domain.message.SharedMessageKey;
 import com.uxplima.uxmessentials.skin.adapter.outbound.api.SkinSources;
@@ -360,9 +361,10 @@ public final class SkinCommand implements CommandRegistration {
 
     /** The account known by {@code name}, or null after saying nobody here goes by it. */
     private @Nullable PlayerRef named(CommandSender sender, String name) {
-        Optional<PlayerRef> found = names.findByName(name);
+        NameMatch match = names.matchByName(name);
+        Optional<PlayerRef> found = match.player();
         if (found.isEmpty()) {
-            feedback.send(sender, SkinMessageKey.SKIN_UNKNOWN_PLAYER, Map.of("player", name));
+            feedback.send(sender, match.miss(SkinMessageKey.SKIN_UNKNOWN_PLAYER, Map.of("player", name)));
             return null;
         }
         return found.get();
