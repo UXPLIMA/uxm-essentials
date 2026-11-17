@@ -62,10 +62,21 @@ public final class JooqPendingPlayerNotices extends JooqRepository implements Pe
         List<PlayerNotice> taken = new ArrayList<>();
         for (PlayerNoticesRecord row : rows) {
             String id = row.getId();
-            boolean removed = write(dsl -> dsl.deleteFrom(PLAYER_NOTICES)
-                            .where(PLAYER_NOTICES.ID.eq(id))
-                            .execute()
-                    == 1);
+            boolean removed;
+            try {
+                removed = write(dsl -> dsl.deleteFrom(PLAYER_NOTICES)
+                                .where(PLAYER_NOTICES.ID.eq(id))
+                                .execute()
+                        == 1);
+            } catch (RuntimeException failure) {
+                // The lines removed so far are gone from the table, so they are handed back to be shown rather than
+                // lost with the throw; the rest stay kept for the next take.
+                log.error(
+                        "kept notice take stopped for player " + recipient + " after " + taken.size() + " of "
+                                + rows.size() + " lines",
+                        failure);
+                break;
+            }
             if (!removed) {
                 continue;
             }
