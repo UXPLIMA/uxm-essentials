@@ -2,11 +2,21 @@ package com.uxplima.uxmessentials.scenario;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import java.util.Comparator;
+import java.util.List;
 import java.util.Map;
+import java.util.UUID;
 
 import org.bukkit.Material;
 import org.bukkit.inventory.ItemStack;
 
+import com.uxplima.uxmessentials.api.action.UxmFailure;
+import com.uxplima.uxmessentials.api.action.UxmInvRollbackActions;
+import com.uxplima.uxmessentials.api.action.UxmOutcome;
+import com.uxplima.uxmessentials.api.action.UxmResult;
+import com.uxplima.uxmessentials.api.view.UxmRestoreDelivery;
+import com.uxplima.uxmessentials.api.view.UxmSnapshot;
+import com.uxplima.uxmessentials.api.view.UxmSnapshotCause;
 import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
@@ -80,11 +90,63 @@ class InvRestoreScenarioTest {
         assertThat(running.problems()).isEmpty();
     }
 
+    @Test
+    void aPluginRestoringAPlayerWhoIsOfflineIsToldTheRestoreIsKeptAndThePlayerGetsItAsTheyJoin() {
+        UUID ola = leftHolding("Ola", 4);
+
+        UxmResult<UxmRestoreDelivery> answer = running.await(actions().restoreOrKeep(ola, logoutSnapshotOf(ola)));
+
+        assertThat(answer.value()).contains(UxmRestoreDelivery.KEPT);
+        ScenarioPlayer back = running.join("Ola");
+        assertThat(diamonds(back)).isEqualTo(4);
+        assertThat(running.problems()).isEmpty();
+    }
+
+    @Test
+    void aPluginRestoringAPlayerOnlineHereIsToldTheRestoreIsApplied() {
+        UUID uma = leftHolding("Uma", 6);
+        ScenarioPlayer back = running.join("Uma");
+
+        UxmResult<UxmRestoreDelivery> answer = running.await(actions().restoreOrKeep(uma, logoutSnapshotOf(uma)));
+        running.settle();
+
+        assertThat(answer.value()).contains(UxmRestoreDelivery.APPLIED);
+        assertThat(diamonds(back)).isEqualTo(6);
+        assertThat(running.problems()).isEmpty();
+    }
+
+    @Test
+    void theOlderRestoreStillAnswersThatAPlayerWhoIsOfflineIsAway() {
+        UUID oz = leftHolding("Oz", 2);
+
+        UxmOutcome answer = running.await(actions().restore(oz, logoutSnapshotOf(oz)));
+
+        assertThat(answer.failure()).map(UxmFailure::code).contains(UxmFailure.PLAYER_OFFLINE);
+        ScenarioPlayer back = running.join("Oz");
+        assertThat(diamonds(back)).isZero();
+    }
+
     /** {@code name} joins, picks up {@code count} diamonds and leaves, which snapshots what they hold. */
-    private void leftHolding(String name, int count) {
+    private UUID leftHolding(String name, int count) {
         ScenarioPlayer player = running.join(name);
         player.getInventory().addItem(new ItemStack(Material.DIAMOND, count));
         running.quit(player);
+        return player.getUniqueId();
+    }
+
+    /** The id of the snapshot the player's last logout took. */
+    private UUID logoutSnapshotOf(UUID player) {
+        List<UxmSnapshot> snapshots =
+                running.await(running.api().invRollback().orElseThrow().of(player));
+        return snapshots.stream()
+                .filter(snapshot -> snapshot.cause() == UxmSnapshotCause.LOGOUT)
+                .max(Comparator.comparing(UxmSnapshot::takenAt))
+                .orElseThrow()
+                .id();
+    }
+
+    private UxmInvRollbackActions actions() {
+        return running.api().actions(running.plugin).invRollback().orElseThrow();
     }
 
     /** Staff open the player's snapshots, preview the one their logout took, and restore it. */

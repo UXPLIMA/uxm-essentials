@@ -3,6 +3,8 @@ package com.uxplima.uxmessentials.api.action;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 
+import com.uxplima.uxmessentials.api.view.UxmRestoreDelivery;
+
 /**
  * Putting a stored inventory back.
  *
@@ -22,4 +24,17 @@ public interface UxmInvRollbackActions {
      * they return. A snapshot id that no longer resolves, pruned or already restored, answers {@code not-found}.
      */
     CompletableFuture<UxmOutcome> restore(UUID playerId, UUID snapshotId);
+
+    /**
+     * Restore {@code playerId}'s inventory from the snapshot with this id, now or as soon as they can receive it: the
+     * same restore {@code /invrestore} performs for staff.
+     *
+     * <p>A player online on this server gets it at once, after the same safety copy as {@link #restore}, and this
+     * answers {@link UxmRestoreDelivery#APPLIED}. For a player who is not, offline or on another server, a copy of the
+     * snapshot is kept and put on them as they next join a server that shares the database, or at once by the server
+     * they are on now, again after a safety copy; this answers {@link UxmRestoreDelivery#KEPT}. A kept restore is
+     * applied once, and outlives the snapshot it was taken from. A snapshot id that no longer resolves answers
+     * {@code not-found}.
+     */
+    CompletableFuture<UxmResult<UxmRestoreDelivery>> restoreOrKeep(UUID playerId, UUID snapshotId);
 }

@@ -88,6 +88,14 @@ public final class SnapshotRestorer {
         restore(target, id, false, whenDone);
     }
 
+    /**
+     * The staff member's restore, reporting what happened: the snapshot is put on a target online here, and kept for
+     * a target who is not, to be put on them as they next join ({@link Outcome#KEPT}).
+     */
+    public void restoreOrKeep(PlayerRef target, SnapshotId id, Consumer<Outcome> whenDone) {
+        restore(target, id, true, whenDone);
+    }
+
     private void restore(PlayerRef target, SnapshotId id, boolean keepWhenAway, Consumer<Outcome> whenDone) {
         Objects.requireNonNull(target, "target");
         Objects.requireNonNull(id, "id");
