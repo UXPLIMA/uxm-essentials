@@ -275,6 +275,7 @@ import com.uxplima.uxmessentials.shared.adapter.outbound.papi.StoreScoreboardPla
 import com.uxplima.uxmessentials.shared.adapter.outbound.papi.VillagersPlaceholders;
 import com.uxplima.uxmessentials.shared.adapter.outbound.playerdata.CachingPlayerDataStore;
 import com.uxplima.uxmessentials.shared.adapter.outbound.protocol.ViaVersionClientProtocol;
+import com.uxplima.uxmessentials.shared.adapter.outbound.skin.HeadTextures;
 import com.uxplima.uxmessentials.shared.adapter.outbound.style.EngineTheme;
 import com.uxplima.uxmessentials.shared.adapter.outbound.style.StyleTags;
 import com.uxplima.uxmessentials.shared.adapter.outbound.team.PlayerTeamCoordinator;
@@ -311,6 +312,7 @@ import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmessentials.shared.domain.message.SharedMessageKey;
 import com.uxplima.uxmessentials.skin.adapter.SkinWiring;
 import com.uxplima.uxmessentials.skin.adapter.outbound.api.SkinQueries;
+import com.uxplima.uxmessentials.skin.domain.PlayerSkin;
 import com.uxplima.uxmessentials.staff.adapter.StaffWiring;
 import com.uxplima.uxmessentials.survival.adapter.SurvivalWiring;
 import com.uxplima.uxmessentials.survival.application.port.SurvivalSales;
@@ -1285,6 +1287,7 @@ public final class PluginModule {
         links.networkClaims = networkClaims;
         links.dailyRewards = networkClaims.map(claims -> ClaimLedgers.dailyRewards(persistence));
         links.claimLedger = ClaimLedgers.claims(persistence);
+        links.kitResets = ClaimLedgers.kitResets(persistence);
         links.livePeers = livePeers;
         links.proxyAnswering = () -> busHealth
                 .proxy()
@@ -1780,6 +1783,9 @@ public final class PluginModule {
                 new SkinQueries(wired.repository(), ctx.kernel().scheduler()));
         // A HUD that shows what somebody chose reads the same cache, so a scoreboard refresh costs no query.
         links.placeholders.skin(new RepositorySkinPlaceholders(wired.repository()));
+        // A head drawn by /skull wears the stored skin, as its owner does on joining.
+        links.storedSkins = account -> wired.repository().find(account).map(PlayerSkin::texture);
+        resources.onClose(() -> links.storedSkins = HeadTextures.StoredSkins.none());
     }
 
     private static void wireServerTweaks(
@@ -2771,6 +2777,7 @@ public final class PluginModule {
                 Optional.ofNullable(links.kitEconomy),
                 links.networkClaims,
                 Objects.requireNonNull(links.claimLedger, "claimLedger"),
+                Objects.requireNonNull(links.kitResets, "kitResets"),
                 guiLayouts,
                 textInput,
                 menus,
@@ -3186,8 +3193,17 @@ public final class PluginModule {
         // and dropped with the wiring on module stop. /repair /repairall /hat /more are item commands, so itemworld
         // owns them rather than playerstate, and the two modules never double-register. The utilities
         // hub, the /recipe grid, and the /entitycount tally render through the shared menu engine.
-        ItemworldWiring.Wired wired =
-                ItemworldWiring.wire(plugin, ctx, links.auditChannel, guiLayouts, textInput, menus, menuBindings);
+        // /skull draws a head from the skin the skin module stores, read through the link at the moment it asks:
+        // skin is wired after itemworld.
+        ItemworldWiring.Wired wired = ItemworldWiring.wire(
+                plugin,
+                ctx,
+                links.auditChannel,
+                guiLayouts,
+                textInput,
+                menus,
+                menuBindings,
+                account -> links.storedSkins.of(account));
         wired.commands().forEach(resources::addCommand);
         wired.listeners().forEach(resources::addListener);
         // Write back any still-open in-inventory shulker view before the module stops, so no edit is lost on disable.
@@ -3961,6 +3977,8 @@ public final class PluginModule {
 
     /** Cross-context handles captured during wiring so a dependent context reaches its prerequisite. */
     private static final class ContextLinks {
+        // The stored skins of the skin module, for a head drawn from a texture; none while that module is off.
+        private volatile HeadTextures.StoredSkins storedSkins = HeadTextures.StoredSkins.none();
         // The peer backends live by their heartbeats; a cross-server trade invite waits for each to answer.
         private java.util.function.Supplier<java.util.Set<String>> livePeers = java.util.Set::of;
         // Whether the uxmEssentials proxy plugin answers on the bus now, which is when it can confirm a switch.
@@ -3997,6 +4015,9 @@ public final class PluginModule {
         // for a player (an import's) into their PDC as they join.
         private com.uxplima.uxmessentials.shared.application.port.@org.jspecify.annotations.Nullable PlayerClaimLedger
                 claimLedger;
+        // The kit resets a single server keeps for a player who was offline, applied as they next join.
+        private com.uxplima.uxmessentials.kits.application.port.@org.jspecify.annotations.Nullable PendingKitResets
+                kitResets;
         private @org.jspecify.annotations.Nullable HomeEconomy homeEconomy;
         private com.uxplima.uxmessentials.vaults.application.port.@org.jspecify.annotations.Nullable VaultEconomy
                 vaultEconomy;

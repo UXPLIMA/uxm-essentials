@@ -4,11 +4,14 @@ import java.io.IOException;
 import java.io.UncheckedIOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.time.Instant;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
+import java.util.UUID;
 import java.util.stream.Stream;
 
 import com.uxplima.uxmessentials.kits.domain.KitId;
@@ -22,7 +25,9 @@ import com.uxplima.uxmessentials.migration.convert.essentialsx.parse.EssXKit;
 import com.uxplima.uxmessentials.migration.convert.essentialsx.parse.EssXUserdata;
 import com.uxplima.uxmessentials.migration.convert.essentialsx.parse.KitsParser;
 import com.uxplima.uxmessentials.migration.convert.essentialsx.parse.UserdataParser;
+import com.uxplima.uxmessentials.migration.convert.essentialsx.parse.UsermapParser;
 import com.uxplima.uxmessentials.migration.convert.essentialsx.parse.WarpParser;
+import com.uxplima.uxmessentials.migration.convert.map.ImportedAccount;
 import com.uxplima.uxmessentials.shared.application.port.Logger;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import org.jspecify.annotations.NullMarked;
@@ -36,6 +41,10 @@ import org.jspecify.annotations.Nullable;
  * dropped from the stream with a warning that names them, so one bad entry never aborts the import. A dropped
  * entry never reaches the writer, so it is not in the run's summary counts; the warning is the operator's record of
  * it. A home in a world the server does not know is left out of its player, who still imports.
+ *
+ * <p>Every player's account is recorded under the name they last logged in with, from their userdata file or, for a
+ * file without one and for a player whose file is gone, from {@code usermap.csv}, so they can be named before they
+ * join again. A nickname is never taken for a name.
  *
  * <p>A player's claim of a one-time kit is told apart from a cooldown stamp by the kit's {@code delay} in
  * {@code kits.yml}, so the file is read once, before the first player, and its kits are kept for the kit records.
@@ -54,6 +63,7 @@ final class EssentialsXPlan implements ImportPlan {
     private final Logger log;
     private @Nullable List<EssXKit> parsedKits;
     private @Nullable Set<KitId> oneTimeKits;
+    private @Nullable Map<UUID, String> usermap;
 
     EssentialsXPlan(
             Path root,
@@ -75,7 +85,41 @@ final class EssentialsXPlan implements ImportPlan {
 
     @Override
     public Stream<ImportRecord> records() {
-        return Stream.concat(users(), Stream.concat(warpRecords(), kitRecords()));
+        return Stream.concat(users(), Stream.concat(usermapAccounts(), Stream.concat(warpRecords(), kitRecords())));
+    }
+
+    /** The accounts {@code usermap.csv} names that have no userdata file, which names its own. */
+    private Stream<ImportRecord> usermapAccounts() {
+        Set<UUID> withFile = new HashSet<>();
+        ymlFiles(root.resolve("userdata")).forEach(file -> fileUuid(file).ifPresent(withFile::add));
+        return usermap().entrySet().stream()
+                .filter(entry -> !withFile.contains(entry.getKey()))
+                .flatMap(entry -> ImportedAccount.of(entry.getKey(), entry.getValue(), Instant.EPOCH).stream())
+                .map(ImportRecord.AccountRecord::new);
+    }
+
+    /** {@code usermap.csv}, read on first use; empty, after one warning, when it cannot be read. */
+    private synchronized Map<UUID, String> usermap() {
+        Map<UUID, String> known = usermap;
+        if (known == null) {
+            try {
+                known = Map.copyOf(new UsermapParser().parse(root.resolve("usermap.csv")));
+            } catch (IOException | RuntimeException badFile) {
+                log.warn("skipping EssentialsX usermap.csv, names come from userdata alone: {}", reason(badFile));
+                known = Map.of();
+            }
+            usermap = known;
+        }
+        return known;
+    }
+
+    private static Optional<UUID> fileUuid(Path file) {
+        String name = file.getFileName().toString();
+        try {
+            return Optional.of(UUID.fromString(name.substring(0, name.length() - ".yml".length())));
+        } catch (IllegalArgumentException notAPlayer) {
+            return Optional.empty();
+        }
     }
 
     private Stream<ImportRecord> users() {
@@ -92,16 +136,31 @@ final class EssentialsXPlan implements ImportPlan {
         }
     }
 
-    private Stream<ImportRecord> userRecords(EssXUserdata parsed) {
-        // One userdata file yields the player record plus, when the player carries a mute or jail, a separate
-        // moderation record: both keyed by the same uuid so a re-run upserts each idempotently.
+    private Stream<ImportRecord> userRecords(EssXUserdata read) {
+        // One userdata file yields the account, the player record and, when the player carries a mute or jail, a
+        // separate moderation record: all keyed by the same uuid so a re-run upserts each idempotently.
+        EssXUserdata parsed = named(read);
+        Stream<ImportRecord> account = ImportedAccount.of(
+                parsed.uuid(), parsed.name(), parsed.lastSeen().orElse(Instant.EPOCH))
+                .<ImportRecord>map(ImportRecord.AccountRecord::new)
+                .stream();
         ImportRecord user = new ImportRecord.UserRecord(userMapper.map(parsed, oneTimeKits()));
         PlayerRef owner = new PlayerRef(parsed.uuid(), parsed.name());
-        return jailMuteMapper
-                .map(owner, parsed.moderation())
-                .<ImportRecord>map(ImportRecord.ModerationRecord::new)
-                .map(moderation -> Stream.of(user, moderation))
-                .orElseGet(() -> Stream.of(user));
+        Stream<ImportRecord> moderation =
+                jailMuteMapper
+                        .map(owner, parsed.moderation())
+                        .<ImportRecord>map(ImportRecord.ModerationRecord::new)
+                        .stream();
+        return Stream.concat(account, Stream.concat(Stream.of(user), moderation));
+    }
+
+    /** The player under the name they log in with: the file's own, or the one {@code usermap.csv} keeps for them. */
+    private EssXUserdata named(EssXUserdata parsed) {
+        if (ImportedAccount.isAccountName(parsed.name())) {
+            return parsed;
+        }
+        String mapped = usermap().get(parsed.uuid());
+        return mapped != null && ImportedAccount.isAccountName(mapped) ? parsed.withName(mapped) : parsed;
     }
 
     private Stream<ImportRecord> warpRecords() {

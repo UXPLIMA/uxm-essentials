@@ -4,6 +4,7 @@ import java.time.Clock;
 import java.util.Objects;
 
 import com.uxplima.uxmessentials.persistence.runtime.Persistence;
+import com.uxplima.uxmessentials.ranks.application.port.PendingRankActions;
 import com.uxplima.uxmessentials.ranks.application.port.PlayerRankRepository;
 import org.jspecify.annotations.NullMarked;
 
@@ -22,5 +23,11 @@ public final class PlayerRankRepositories {
     public static PlayerRankRepository jooq(Persistence persistence) {
         Objects.requireNonNull(persistence, "persistence");
         return new JooqPlayerRankRepository(persistence.dsl(), Clock.systemUTC());
+    }
+
+    /** The jOOQ store of rank actions kept for a player's next join, over the same DSL. */
+    public static PendingRankActions pendingActions(Persistence persistence) {
+        Objects.requireNonNull(persistence, "persistence");
+        return new JooqPendingRankActions(persistence.dsl(), Clock.systemUTC());
     }
 }

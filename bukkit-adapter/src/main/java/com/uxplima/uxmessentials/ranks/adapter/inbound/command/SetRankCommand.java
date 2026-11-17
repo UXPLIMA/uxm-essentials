@@ -9,6 +9,7 @@ import com.uxplima.uxmessentials.ranks.domain.RankLadder;
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandRegistration;
 import com.uxplima.uxmessentials.shared.application.port.Logger;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
+import com.uxplima.uxmessentials.shared.application.port.PlayerLookup;
 import com.uxplima.uxmessentials.shared.application.port.Scheduler;
 import com.uxplima.uxmlib.command.Gate;
 import org.jspecify.annotations.NullMarked;
@@ -29,15 +30,19 @@ public final class SetRankCommand implements CommandRegistration {
 
     private final SetRankExecutor setRank;
 
-    public SetRankCommand(SetRank setRank, RankLadder ladder, Scheduler scheduler, Logger log, Messages messages) {
-        this.setRank = new SetRankExecutor(setRank, ladder, scheduler, log, messages);
+    public SetRankCommand(
+            SetRank setRank,
+            RankLadder ladder,
+            PlayerLookup players,
+            Scheduler scheduler,
+            Logger log,
+            Messages messages) {
+        this.setRank = new SetRankExecutor(setRank, ladder, players, scheduler, log, messages);
     }
 
     @Override
     public LiteralCommandNode<CommandSourceStack> build() {
-        return Commands.literal("setrank")
-                .requires(Gate.permission(PERMISSION))
-                .then(setRank.arguments())
+        return setRank.under(Commands.literal("setrank").requires(Gate.permission(PERMISSION)))
                 .build();
     }
 

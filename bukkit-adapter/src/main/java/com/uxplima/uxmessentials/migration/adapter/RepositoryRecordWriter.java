@@ -13,6 +13,7 @@ import com.uxplima.uxmessentials.kits.adapter.outbound.KitItemCodec;
 import com.uxplima.uxmessentials.kits.application.port.KitRepository;
 import com.uxplima.uxmessentials.kits.domain.KitDefinition;
 import com.uxplima.uxmessentials.kits.domain.KitItem;
+import com.uxplima.uxmessentials.migration.AccountNames;
 import com.uxplima.uxmessentials.migration.ConflictPolicy;
 import com.uxplima.uxmessentials.migration.ImportOptions;
 import com.uxplima.uxmessentials.migration.ImportRecord;
@@ -60,6 +61,7 @@ public final class RepositoryRecordWriter implements RecordWriter {
     private final HologramRepository holograms;
     private final WorldRepository worlds;
     private final PlayerWarpRecordWriter playerWarps;
+    private final AccountNames accounts;
     private final Clock clock;
     private final Logger log;
 
@@ -71,6 +73,7 @@ public final class RepositoryRecordWriter implements RecordWriter {
             HologramRepository holograms,
             WorldRepository worlds,
             PlayerWarpRecordWriter playerWarps,
+            AccountNames accounts,
             Clock clock,
             Logger log) {
         this.users = Objects.requireNonNull(users, "users");
@@ -80,6 +83,7 @@ public final class RepositoryRecordWriter implements RecordWriter {
         this.holograms = Objects.requireNonNull(holograms, "holograms");
         this.worlds = Objects.requireNonNull(worlds, "worlds");
         this.playerWarps = Objects.requireNonNull(playerWarps, "playerWarps");
+        this.accounts = Objects.requireNonNull(accounts, "accounts");
         this.clock = Objects.requireNonNull(clock, "clock");
         this.log = Objects.requireNonNull(log, "log");
     }
@@ -89,6 +93,8 @@ public final class RepositoryRecordWriter implements RecordWriter {
         Objects.requireNonNull(record, "record");
         Objects.requireNonNull(options, "options");
         return switch (record) {
+            case ImportRecord.AccountRecord account ->
+                RecordResult.of(accounts.record(account.account()) ? RecordOutcome.WRITTEN : RecordOutcome.SKIPPED);
             case ImportRecord.UserRecord user -> users.write(user.user(), options);
             case ImportRecord.WarpRecord warp ->
                 RecordResult.of(writeWarp(warp.warp().warp(), options));

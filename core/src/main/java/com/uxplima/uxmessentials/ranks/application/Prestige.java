@@ -12,7 +12,6 @@ import java.util.concurrent.ConcurrentHashMap;
 import com.uxplima.uxmessentials.ranks.application.RanksConfig.PrestigeSettings;
 import com.uxplima.uxmessentials.ranks.application.port.OwedCredits;
 import com.uxplima.uxmessentials.ranks.application.port.PlayerRankRepository;
-import com.uxplima.uxmessentials.ranks.application.port.RankActionRunner;
 import com.uxplima.uxmessentials.ranks.application.port.RankEconomy;
 import com.uxplima.uxmessentials.ranks.application.port.RankRequirementEvaluator;
 import com.uxplima.uxmessentials.ranks.domain.Rank;
@@ -63,7 +62,7 @@ public final class Prestige {
     private final PlayerRankRepository repository;
     private final RankLadder ladder;
     private final RankRequirementEvaluator requirements;
-    private final RankActionRunner actions;
+    private final RankActions actions;
     private final Optional<RankEconomy> economy;
     private final PrestigeSettings settings;
     private final DomainEventPublisher events;
@@ -77,7 +76,7 @@ public final class Prestige {
             PlayerRankRepository repository,
             RankLadder ladder,
             RankRequirementEvaluator requirements,
-            RankActionRunner actions,
+            RankActions actions,
             Optional<RankEconomy> economy,
             Optional<OwedCredits> owed,
             PrestigeSettings settings,
@@ -205,15 +204,13 @@ public final class Prestige {
 
     /**
      * On the player's thread: run the actions and raise the event when the reset was saved, then answer. When the
-     * player left before the hop there is nobody to run actions on, but the event is still raised because the new
-     * level is durable.
+     * player left before the hop the actions are kept for their next join, and the event is still raised because the
+     * new level is durable.
      */
     private void finish(Reset reset, PrestigeResult result, boolean present, CompletableFuture<PrestigeResult> answer) {
         try {
             if (result.status() == PrestigeResult.Status.PRESTIGED) {
-                if (present) {
-                    runActions(reset);
-                }
+                actions.deliver(reset.who(), settings.actions(), present);
                 events.publish(new PlayerPrestiged(reset.who(), reset.level().level(), result.rewardMultiplier()));
             }
         } catch (RuntimeException failure) {
@@ -221,15 +218,6 @@ public final class Prestige {
         } finally {
             // Always answered, or the in-flight guard would refuse this player's every later prestige.
             answer.complete(result);
-        }
-    }
-
-    private void runActions(Reset reset) {
-        try {
-            actions.run(reset.who(), settings.actions());
-        } catch (RuntimeException failure) {
-            // The prestige is already paid for and saved; a broken action line must not hide that from the player.
-            log.error("prestige actions failed for player " + reset.who().uuid(), failure);
         }
     }
 

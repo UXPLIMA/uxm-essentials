@@ -2,6 +2,7 @@ package com.uxplima.uxmessentials.migration;
 
 import java.util.Objects;
 
+import com.uxplima.uxmessentials.migration.convert.map.ImportedAccount;
 import com.uxplima.uxmessentials.migration.convert.map.ImportedHologram;
 import com.uxplima.uxmessentials.migration.convert.map.ImportedKit;
 import com.uxplima.uxmessentials.migration.convert.map.ImportedModeration;
@@ -17,8 +18,8 @@ import org.jspecify.annotations.NullMarked;
 
 /**
  * One mapped record streamed out of a source's {@link com.uxplima.uxmessentials.migration.convert.Convert#plan
- * plan}, ready for the writer. A sealed family over the importable kinds (user, warp, kit, moderation, ban,
- * IP ban, warning, hologram, world) so the writer and the dry-run accumulator dispatch exhaustively with no default branch
+ * plan}, ready for the writer. A sealed family over the importable kinds (account, user, warp, kit, moderation,
+ * ban, IP ban, warning, hologram, world) so the writer and the dry-run accumulator dispatch exhaustively with no default branch
  * adding a kind is a compile error until every site handles it. Every kind carries an already-mapped domain
  * aggregate; the record itself is platform-neutral and free of any foreign-format type. Mutes and jails ride
  * in {@link ModerationRecord}; bans, IP bans and warnings are their own kinds carrying the moderation
@@ -30,6 +31,21 @@ public sealed interface ImportRecord {
 
     /** A coarse kind label for audit attribution and summary counting. */
     String kind();
+
+    /**
+     * An account the source knew by name, recorded in the name index so the player can be named before they join
+     * again. Every player-bearing source streams these ahead of its other records.
+     */
+    record AccountRecord(ImportedAccount account) implements ImportRecord {
+        public AccountRecord {
+            Objects.requireNonNull(account, "account");
+        }
+
+        @Override
+        public String kind() {
+            return "account";
+        }
+    }
 
     /** A mapped player: homes, balance, mailbox. */
     record UserRecord(ImportedUser user) implements ImportRecord {

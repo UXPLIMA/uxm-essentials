@@ -11,6 +11,7 @@ import com.uxplima.uxmessentials.shared.application.message.Notifier;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmessentials.shared.domain.Result;
 import com.uxplima.uxmessentials.shared.domain.Unit;
+import com.uxplima.uxmessentials.shared.domain.message.SharedMessageKey;
 
 /**
  * {@code /ignore <player>}: add a player to the owner's persistent ignore list under
@@ -40,5 +41,12 @@ public final class Ignore {
         ignores.ignore(owner, target, IgnoreScope.ALL);
         notifier.send(owner, MessagingMessageKey.IGNORE_ADDED, Map.of("player", target.name()));
         return Result.ok();
+    }
+
+    /** Tell {@code owner} that no player goes by {@code name}, so the ignore they asked for was not added. */
+    public void unknown(PlayerRef owner, String name) {
+        Objects.requireNonNull(owner, "owner");
+        Objects.requireNonNull(name, "name");
+        notifier.send(owner, SharedMessageKey.COMMAND_UNKNOWN_PLAYER, Map.of("player", name));
     }
 }

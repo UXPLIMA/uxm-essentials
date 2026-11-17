@@ -25,6 +25,7 @@ import com.uxplima.uxmessentials.ranks.adapter.outbound.api.RanksApiWrites;
 import com.uxplima.uxmessentials.ranks.application.CachedPlayerRankRepository;
 import com.uxplima.uxmessentials.ranks.application.CurrentRank;
 import com.uxplima.uxmessentials.ranks.application.Prestige;
+import com.uxplima.uxmessentials.ranks.application.RankActions;
 import com.uxplima.uxmessentials.ranks.application.RankLadders;
 import com.uxplima.uxmessentials.ranks.application.RanksConfig;
 import com.uxplima.uxmessentials.ranks.application.Rankup;
@@ -114,7 +115,15 @@ public final class RanksWiring {
         PlayerRankRepository repository = RankSync.repository(cache, bus.publisher(), kernel.log());
         CurrentRank currentRank = new CurrentRank(cache, ladder);
         RankRequirementEvaluator requirements = requirementEvaluator(plugin, kernel, persistence, currentRank, economy);
-        RankActionRunner actions = actionRunner(plugin, kernel);
+        // Kept actions are announced on the bus, so the backend the player is on runs them now; the take deletes each
+        // row first, so that backend and a later join can never both run one line.
+        RankActions actions = new RankActions(
+                actionRunner(plugin, kernel),
+                RankSync.pendingActions(
+                        PlayerRankRepositories.pendingActions(persistence), bus.publisher(), kernel.log()),
+                kernel.scheduler(),
+                kernel.log());
+        bus.registry().register(RankSync.actionsListener(actions, kernel.playerLookup()));
         Rankup rankup = new Rankup(
                 currentRank,
                 repository,
@@ -138,10 +147,18 @@ public final class RanksWiring {
         List<CommandRegistration> commands = new ArrayList<>(List.of(
                 new RankupCommand(rankup, kernel.messages()),
                 new RanksCommand(
-                        setRank, ladder, panel, currentRank, kernel.scheduler(), kernel.log(), kernel.messages()),
+                        setRank,
+                        ladder,
+                        panel,
+                        currentRank,
+                        kernel.playerLookup(),
+                        kernel.scheduler(),
+                        kernel.log(),
+                        kernel.messages()),
                 // The standalone /setrank publishes the same admin direct-set as /ranks setrank, under its own command
                 // id so it renames/disables independently through commands.conf.
-                new SetRankCommand(setRank, ladder, kernel.scheduler(), kernel.log(), kernel.messages())));
+                new SetRankCommand(
+                        setRank, ladder, kernel.playerLookup(), kernel.scheduler(), kernel.log(), kernel.messages())));
         Optional<Prestige> prestige = Optional.empty();
         if (config.prestige().enabled()) {
             // Prestige is config-gated: when off, the /prestige verb is not published at all. It reuses the same
@@ -168,7 +185,7 @@ public final class RanksWiring {
         Runnable stop = () -> cancelAutorank(autorankTask, kernel.log());
         return new Wired(
                 List.copyOf(commands),
-                new RankCacheListener(cache, kernel.playerLookup()),
+                new RankCacheListener(cache, actions, kernel.playerLookup()),
                 config,
                 currentRank,
                 ladder,

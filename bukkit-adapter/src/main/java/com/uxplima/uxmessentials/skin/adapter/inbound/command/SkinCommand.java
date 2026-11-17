@@ -268,7 +268,7 @@ public final class SkinCommand implements CommandRegistration {
                 sender,
                 () -> feedback.send(
                         sender,
-                        dropSkin.drop(target.uuid()) == DropSkin.Outcome.DROPPED
+                        dropSkin.drop(target) == DropSkin.Outcome.DROPPED
                                 ? SkinMessageKey.SKIN_DROPPED
                                 : SkinMessageKey.SKIN_NOTHING_STORED,
                         Map.of("player", target.name())));

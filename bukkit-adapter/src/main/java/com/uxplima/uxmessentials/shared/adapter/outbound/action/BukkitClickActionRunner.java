@@ -33,7 +33,6 @@ import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmessentials.shared.domain.action.ClickAction;
 import com.uxplima.uxmessentials.shared.domain.action.ClickActionType;
 import com.uxplima.uxmessentials.shared.domain.message.MessageKey;
-import com.uxplima.uxmlib.condition.action.NameFill;
 import org.jspecify.annotations.NullMarked;
 import org.jspecify.annotations.Nullable;
 
@@ -258,7 +257,7 @@ public final class BukkitClickActionRunner implements ClickActionRunner {
     }
 
     private void dispatch(Player viewer, ClickAction action) {
-        Optional<String> filled = NameFill.into(action.value(), viewer.getName());
+        Optional<String> filled = ResolvedNameFill.into(action.value(), viewer.getName());
         if (filled.isEmpty()) {
             log.warn(
                     "event=click_action_skipped type={} player={} reason=not_an_account_name",
