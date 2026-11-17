@@ -3,6 +3,15 @@
 What an operator edits when a release renames something an operator's own files or permission grants depend on, or
 needs a setting it did not need before.
 
+## Offline mode: sanctions follow other spellings of a name
+
+On an offline-mode server a ban, a mute and a jail now follow a player into another spelling of their name, by default
+only into an account first seen after the sanction (`case-variant-sanctions`). The update adds one table,
+`moderation_case_copies`, which records the mutes and jails copied that way; the first server to start on the new
+release creates it, and nothing needs editing. Upgrade every server that shares the database in the same window: a
+server on the previous release does not copy, and does not lift a copy when it lifts the original. See
+[moderation.md](moderation.md#how-a-login-is-checked).
+
 ## A PIN is ASCII digits only
 
 A PIN is now made of the ten digits 0 to 9 and nothing else, because that is all the keypad can enter. An older

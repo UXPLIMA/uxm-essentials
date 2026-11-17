@@ -40,6 +40,7 @@ import com.uxplima.uxmessentials.moderation.adapter.outbound.api.ModerationApiWr
 import com.uxplima.uxmessentials.moderation.application.ApplyRemoteJail;
 import com.uxplima.uxmessentials.moderation.application.Ban;
 import com.uxplima.uxmessentials.moderation.application.BanIp;
+import com.uxplima.uxmessentials.moderation.application.CaseVariantCopies;
 import com.uxplima.uxmessentials.moderation.application.CaseVariantSanctions;
 import com.uxplima.uxmessentials.moderation.application.CheckBan;
 import com.uxplima.uxmessentials.moderation.application.CheckMute;
@@ -98,6 +99,7 @@ import com.uxplima.uxmessentials.moderation.application.UnbanIp;
 import com.uxplima.uxmessentials.moderation.application.Unjail;
 import com.uxplima.uxmessentials.moderation.application.Unmute;
 import com.uxplima.uxmessentials.moderation.application.WarnEscalator;
+import com.uxplima.uxmessentials.moderation.application.port.CaseCopies;
 import com.uxplima.uxmessentials.moderation.application.port.FreezeSync;
 import com.uxplima.uxmessentials.moderation.application.port.JailLocationStore;
 import com.uxplima.uxmessentials.moderation.application.port.JailSync;
@@ -242,10 +244,12 @@ public final class ModerationWiring {
         // On an offline-mode server a ban, a mute and a jail follow their player into the other spellings of their
         // name; with authenticated logins a case variant of a name is somebody else and nothing is read. The name
         // case is asked live, since a proxy network can turn out to be offline-mode while the server runs.
+        CaseCopies caseCopies = ModerationStores.caseCopies(persistence);
         CaseVariantSanctions caseVariants = new CaseVariantSanctions(
                 repository,
                 new StoredNameHolders(new JooqPlayerNameRepository(persistence.dsl()), kernel.playerLookup()::nameCase),
-                settings.caseVariantSanctions());
+                settings.caseVariantSanctions(),
+                caseCopies);
         ModerationServices services = assemble(
                 plugin,
                 auditChannel,
@@ -266,6 +270,7 @@ public final class ModerationWiring {
                 presence,
                 seenVisibility,
                 caseVariants,
+                caseCopies,
                 clock);
         // The live kick: on a remote ban frame, re-evaluate the now-authoritative ban here and kick an online
         // target. Self-origin frames are dropped by the bus client before dispatch, so the local /ban (which
@@ -404,6 +409,7 @@ public final class ModerationWiring {
                 services.freeze(),
                 services.tempBan(),
                 enforce,
+                services.caseVariantCopies(),
                 repository,
                 sanctionHistory,
                 clock,
@@ -507,6 +513,7 @@ public final class ModerationWiring {
             NetworkPresence presence,
             SeenVisibility seenVisibility,
             CaseVariantSanctions caseVariants,
+            CaseCopies caseCopies,
             Clock clock) {
         // One alt lookup for every flow that asks "who else uses this address": the login audit, /banip,
         // /tempbanip and /seenip. It tokenises first, so all four match the same rows /alts groups over.
@@ -519,6 +526,18 @@ public final class ModerationWiring {
         CombinedJailDirectory jails = new CombinedJailDirectory(new ConfigJailDirectory(settings), jailLocations);
         settings.defaultJail().ifPresent(name -> warnIfNoSuchJail(kernel, jails, name));
         Sanctions sanctionPort = sanctions;
+        // The mutes and jails copied onto other spellings of a name: given at login, lifted with their original.
+        CaseVariantCopies copies = new CaseVariantCopies(
+                repository,
+                caseCopies,
+                notifier,
+                history,
+                sanctionPort,
+                sync,
+                jailNetwork.sync(),
+                kernel.events(),
+                audit,
+                clock);
         Jail jail = new Jail(
                 repository,
                 jails,
@@ -653,7 +672,15 @@ public final class ModerationWiring {
                 .jailCountdown(new JailCountdown(
                         repository, sanctionPort, jailNetwork.transfer(), audit, kernel.events(), clock))
                 .loginEnforcement(new LoginEnforcement(
-                        repository, ipAlts, notifier, audit, clock, caseVariants, settings.refuseNameCaseVariants()))
+                        repository,
+                        ipAlts,
+                        notifier,
+                        audit,
+                        clock,
+                        caseVariants,
+                        copies::carryOver,
+                        settings.refuseNameCaseVariants()))
+                .caseVariantCopies(copies)
                 .lockdown(new Lockdown(repository, notifier, broadcast, audit))
                 .repository(repository)
                 .players(kernel.playerLookup())
@@ -792,6 +819,8 @@ public final class ModerationWiring {
      * @param tempBan the tempban use case, lent to security so a verification lockout is an ordinary ban
      * @param bans the live ban kick, which a ban issued here hands its event to so the other spellings of the banned
      *     name connected here are removed too
+     * @param copies the mutes and jails copied onto other spellings, which a lift or a longer mute issued here hands
+     *     its event to so the copies follow their original
      * @param clock the clock the placeholder seam gates active ban/mute reads against
      * @param guiViews the management GUI views, whose active-punishments list the {@code /uxmess gui} hub opens
      * @param apiWrites the nine punishment use cases the published API runs, the very ones behind the commands
@@ -807,6 +836,7 @@ public final class ModerationWiring {
             Freeze freeze,
             TempBan tempBan,
             EnforceRemoteBan bans,
+            CaseVariantCopies copies,
             ModerationRepository repository,
             SanctionHistory sanctionHistory,
             Clock clock,
@@ -825,6 +855,7 @@ public final class ModerationWiring {
             Objects.requireNonNull(freeze, "freeze");
             Objects.requireNonNull(tempBan, "tempBan");
             Objects.requireNonNull(bans, "bans");
+            Objects.requireNonNull(copies, "copies");
             Objects.requireNonNull(repository, "repository");
             Objects.requireNonNull(sanctionHistory, "sanctionHistory");
             Objects.requireNonNull(clock, "clock");

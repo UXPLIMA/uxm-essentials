@@ -10,7 +10,10 @@ import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 
+import com.uxplima.uxmessentials.moderation.application.port.CaseCopies;
+import com.uxplima.uxmessentials.moderation.application.port.JailSync;
 import com.uxplima.uxmessentials.moderation.application.port.NameHolders;
+import com.uxplima.uxmessentials.moderation.application.port.SanctionSync;
 import com.uxplima.uxmessentials.moderation.domain.IpBan;
 import com.uxplima.uxmessentials.moderation.domain.Issuer;
 import com.uxplima.uxmessentials.moderation.domain.JailState;
@@ -117,7 +120,7 @@ class LoginEnforcementTest {
                 Logins.check(offlineMode(name -> List.of(STEVE), false), UPPER_STEVE, HOME, false, false);
 
         assertThat(decision.allowed()).isTrue();
-        assertThat(repository.loadMute(UPPER_STEVE)).isEqualTo(STEVES_MUTE);
+        assertThat(repository.loadMute(UPPER_STEVE).expiry()).isEqualTo(STEVES_MUTE.expiry());
         assertThat(repository.loadJail(UPPER_STEVE)).isEqualTo(STEVES_JAIL);
     }
 
@@ -148,7 +151,7 @@ class LoginEnforcementTest {
 
         assertThat(decision.allowed()).isFalse();
         assertThat(decision.kickReason()).contains(ModerationMessageKey.TEMPBAN_KICK.key());
-        assertThat(repository.loadMute(UPPER_STEVE)).isEqualTo(STEVES_MUTE);
+        assertThat(repository.loadMute(UPPER_STEVE).expiry()).isEqualTo(STEVES_MUTE.expiry());
     }
 
     @Test
@@ -190,6 +193,17 @@ class LoginEnforcementTest {
                 new SilentAudit(),
                 CLOCK,
                 new CaseVariantSanctions(repository, holders, reach),
+                new CaseVariantCopies(
+                        repository,
+                        CaseCopies.NONE,
+                        notifier.notifier(),
+                        new SanctionHistoryRecorder(new RecordedHistory(), CLOCK),
+                        new OnlinePlayers(),
+                        SanctionSync.NONE,
+                        JailSync.NONE,
+                        event -> {},
+                        new SilentAudit(),
+                        CLOCK)::carryOver,
                 refuseCaseVariants);
     }
 

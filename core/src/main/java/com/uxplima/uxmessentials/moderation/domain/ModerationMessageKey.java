@@ -221,6 +221,8 @@ public enum ModerationMessageKey implements MessageKey {
     // the reason stored with a ladder sanction: the warning count that tripped the step, and that warning's reason
     MOD_WARN_ESCALATION_REASON("moderation.warn-escalation-reason"),
     MOD_WARN_ESCALATION_REASON_BARE("moderation.warn-escalation-reason-bare"),
+    MOD_CASE_VARIANT_REASON("moderation.case-variant-reason"),
+    MOD_CASE_VARIANT_REASON_BARE("moderation.case-variant-reason-bare"),
 
     // shared moderation failures
     TARGET_EXEMPT("moderation.target-exempt"),

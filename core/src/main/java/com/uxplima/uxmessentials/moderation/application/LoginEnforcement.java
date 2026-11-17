@@ -12,9 +12,7 @@ import java.util.UUID;
 import com.uxplima.uxmessentials.moderation.application.port.ModerationAudit;
 import com.uxplima.uxmessentials.moderation.application.port.ModerationRepository;
 import com.uxplima.uxmessentials.moderation.domain.IpBan;
-import com.uxplima.uxmessentials.moderation.domain.JailState;
 import com.uxplima.uxmessentials.moderation.domain.ModerationMessageKey;
-import com.uxplima.uxmessentials.moderation.domain.MuteState;
 import com.uxplima.uxmessentials.moderation.domain.TempbanState;
 import com.uxplima.uxmessentials.shared.application.IpAlts;
 import com.uxplima.uxmessentials.shared.application.message.Notifier;
@@ -56,16 +54,18 @@ public final class LoginEnforcement {
     private final ModerationAudit audit;
     private final Clock clock;
     private final CaseVariantSanctions caseVariants;
+    private final CarryOver carryOver;
     private final boolean refuseCaseVariants;
 
     /** The check for a server whose logins are authenticated, where a name has one owner in any case. */
     public LoginEnforcement(
             ModerationRepository repository, IpAlts ipAlts, Notifier notifier, ModerationAudit audit, Clock clock) {
-        this(repository, ipAlts, notifier, audit, clock, CaseVariantSanctions.none(repository), false);
+        this(repository, ipAlts, notifier, audit, clock, CaseVariantSanctions.none(repository), CarryOver.NONE, false);
     }
 
     /**
      * @param caseVariants the sanctions that follow a login from the other spellings of its name
+     * @param carryOver gives the joining account the mute and the jail it inherits
      * @param refuseCaseVariants whether a new account under a case variant of a known name is refused even when no
      *     ban is involved
      */
@@ -76,6 +76,7 @@ public final class LoginEnforcement {
             ModerationAudit audit,
             Clock clock,
             CaseVariantSanctions caseVariants,
+            CarryOver carryOver,
             boolean refuseCaseVariants) {
         this.repository = Objects.requireNonNull(repository, "repository");
         this.ipAlts = Objects.requireNonNull(ipAlts, "ipAlts");
@@ -83,6 +84,7 @@ public final class LoginEnforcement {
         this.audit = Objects.requireNonNull(audit, "audit");
         this.clock = Objects.requireNonNull(clock, "clock");
         this.caseVariants = Objects.requireNonNull(caseVariants, "caseVariants");
+        this.carryOver = Objects.requireNonNull(carryOver, "carryOver");
         this.refuseCaseVariants = refuseCaseVariants;
     }
 
@@ -108,32 +110,13 @@ public final class LoginEnforcement {
     }
 
     /**
-     * Give {@code standing}'s account the mute and the jail it inherits from another spelling of its name, unless it
-     * already has an active one of its own. The copy is an ordinary sanction on the account: the chat and command
-     * checks, the jail on join, the placeholders and every other server read it as they read any other, and it runs
-     * out when the original would have. It writes to storage, so call it off the tick, before the login is decided.
+     * Give {@code standing}'s account the mute and the jail it inherits from another spelling of its name, through the
+     * {@link CarryOver} the server was built with. It writes to storage, so call it off the tick, before the login is
+     * decided.
      */
     public void carryOver(Standing standing) {
         Objects.requireNonNull(standing, "standing");
-        CaseVariantSanctions.Inherited inherited = standing.inherited();
-        Instant now = clock.instant();
-        boolean mute = inherited.mute().isActiveAt(now);
-        boolean jail = inherited.jail().isActiveAt(now);
-        if (!mute && !jail) {
-            return;
-        }
-        PlayerRef who = standing.who();
-        repository.ensureUserExists(who, now);
-        if (mute) {
-            MuteState own = repository.loadMute(who);
-            if (!own.isActiveAt(now)) {
-                // Guarded on the mute just read, so a mute staff give the account meanwhile is never overwritten.
-                repository.replaceMute(who, own, inherited.mute());
-            }
-        }
-        if (jail && !repository.loadJail(who).isActiveAt(now) && inherited.jail() instanceof JailState.Active held) {
-            repository.saveJail(who, held);
-        }
+        carryOver.carryOver(standing.who(), standing.inherited());
     }
 
     /**
@@ -203,6 +186,16 @@ public final class LoginEnforcement {
 
     private String render(PlayerRef who, MessageKey key, Map<String, String> ph) {
         return notifier.render(who, key, ph);
+    }
+
+    /** Gives a joining account the mute and the jail it inherits ({@link CaseVariantCopies#carryOver}). */
+    @FunctionalInterface
+    public interface CarryOver {
+
+        /** Nothing is ever inherited: the answer for a server whose logins are authenticated. */
+        CarryOver NONE = (who, inherited) -> {};
+
+        void carryOver(PlayerRef who, CaseVariantSanctions.Inherited inherited);
     }
 
     /**
