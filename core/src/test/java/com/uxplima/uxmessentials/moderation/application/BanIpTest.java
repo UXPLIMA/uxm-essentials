@@ -17,8 +17,10 @@ import com.uxplima.uxmessentials.moderation.domain.IpBan;
 import com.uxplima.uxmessentials.moderation.domain.ModerationError;
 import com.uxplima.uxmessentials.moderation.domain.ModerationMessageKey;
 import com.uxplima.uxmessentials.shared.application.IpAlts;
+import com.uxplima.uxmessentials.shared.application.RelayAddresses;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmessentials.testing.FakePermissions;
+import com.uxplima.uxmessentials.testing.QuietLog;
 import com.uxplima.uxmessentials.testing.RecordingEvents;
 import com.uxplima.uxmessentials.testing.RecordingNotifier;
 import org.junit.jupiter.api.Test;
@@ -41,6 +43,7 @@ class BanIpTest {
     private final Peers peers = new Peers();
     private final RecordingNotifier notifier = new RecordingNotifier();
     private final FakePermissions permissions = new FakePermissions();
+    private RelayAddresses relays = RelayAddresses.LOOPBACK;
 
     private BanIp banIp() {
         return new BanIp(
@@ -161,8 +164,33 @@ class BanIpTest {
         });
     }
 
-    private static IpAlts noAlts() {
-        return new IpAlts(new NoIpHistory(), address -> address);
+    @Test
+    void anAddressEveryPlayerBehindGeyserSharesIsNeverBannedForAPlayerOrTyped() {
+        String geyser = "198.51.100.2";
+        relays = RelayAddresses.of(List.of(geyser), new QuietLog());
+
+        assertThat(banIp().banIp(STAFF, new BanIp.Target(geyser, Optional.of(ROBIN.uuid())), "", Optional.empty())
+                        .errorOrThrow())
+                .isEqualTo(ModerationError.SHARED_ADDRESS);
+        assertThat(tempBanIp()
+                        .tempBanIp(STAFF, new BanIp.Target("127.0.0.1", Optional.empty()), "1h", Optional.empty())
+                        .errorOrThrow())
+                .isEqualTo(ModerationError.SHARED_ADDRESS);
+
+        assertThat(repository.loadIpBan(geyser)).isEmpty();
+        assertThat(repository.loadIpBan("127.0.0.1")).isEmpty();
+        assertThat(online.kicked()).isEmpty();
+        assertThat(peers.ipBans).isEmpty();
+        assertThat(notifier.sent())
+                .containsExactly(
+                        new RecordingNotifier.Sent(
+                                STAFF, ModerationMessageKey.BANIP_SHARED_ADDRESS.key(), Map.of("ip", geyser)),
+                        new RecordingNotifier.Sent(
+                                STAFF, ModerationMessageKey.BANIP_SHARED_ADDRESS.key(), Map.of("ip", "127.0.0.1")));
+    }
+
+    private IpAlts noAlts() {
+        return new IpAlts(new NoIpHistory(), address -> address, relays);
     }
 
     /** The bus seam, keeping each address announced to the other servers. */

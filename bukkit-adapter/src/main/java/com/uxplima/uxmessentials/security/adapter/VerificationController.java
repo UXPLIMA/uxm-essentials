@@ -33,6 +33,7 @@ import com.uxplima.uxmessentials.security.domain.event.VerificationPassed;
 import com.uxplima.uxmessentials.shared.adapter.outbound.BukkitRefs;
 import com.uxplima.uxmessentials.shared.adapter.outbound.action.ServerConnector;
 import com.uxplima.uxmessentials.shared.adapter.outbound.style.StyledText;
+import com.uxplima.uxmessentials.shared.application.RelayAddresses;
 import com.uxplima.uxmessentials.shared.application.permission.EnforcementPermissions;
 import com.uxplima.uxmessentials.shared.application.port.DomainEventPublisher;
 import com.uxplima.uxmessentials.shared.application.port.IpTokens;
@@ -74,6 +75,7 @@ public final class VerificationController implements KeypadActions {
     private final ProofChecks checks;
     private final TrustStore trustStore;
     private final IpTokens ipHashing;
+    private final RelayAddresses relays;
     private final VerificationSessions sessions;
     private final AttemptLimiter limiter;
     private final ReauthState reauthState;
@@ -124,6 +126,7 @@ public final class VerificationController implements KeypadActions {
             FreezeHoldingArea holdingArea,
             ServerConnector proxy,
             IpTokens ipHashing,
+            RelayAddresses relays,
             DomainEventPublisher events,
             SessionCarry carry,
             ProxyArrivals arrivals,
@@ -139,6 +142,7 @@ public final class VerificationController implements KeypadActions {
         this.checks = Objects.requireNonNull(checks, "checks");
         this.trustStore = Objects.requireNonNull(trustStore, "trustStore");
         this.ipHashing = Objects.requireNonNull(ipHashing, "ipHashing");
+        this.relays = Objects.requireNonNull(relays, "relays");
         this.sessions = Objects.requireNonNull(sessions, "sessions");
         this.limiter = Objects.requireNonNull(limiter, "limiter");
         this.reauthState = Objects.requireNonNull(reauthState, "reauthState");
@@ -636,13 +640,20 @@ public final class VerificationController implements KeypadActions {
         }
     }
 
+    /**
+     * The device a player connects from, as a token, or null when it cannot be told: no address, or a relay every
+     * player behind Geyser or a proxy shares, which would trust each of their devices as one.
+     */
     private @Nullable String ipHash(Player player) {
         InetSocketAddress socket = player.getAddress();
         if (socket == null) {
             return null;
         }
         InetAddress address = socket.getAddress();
-        return address == null ? null : ipHashing.tokenFor(address.getHostAddress());
+        if (address == null || relays.isRelay(address.getHostAddress())) {
+            return null;
+        }
+        return ipHashing.tokenFor(address.getHostAddress());
     }
 
     private void notify(PlayerRef viewer, SecurityMessageKey key) {

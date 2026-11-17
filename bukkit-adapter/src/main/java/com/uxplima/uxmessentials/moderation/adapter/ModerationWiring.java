@@ -134,6 +134,7 @@ import com.uxplima.uxmessentials.shared.adapter.outbound.permission.BusPermissio
 import com.uxplima.uxmessentials.shared.adapter.outbound.permission.LuckPermsAccess;
 import com.uxplima.uxmessentials.shared.adapter.outbound.permission.ServerStoredPermissions;
 import com.uxplima.uxmessentials.shared.application.IpAlts;
+import com.uxplima.uxmessentials.shared.application.RelayAddresses;
 import com.uxplima.uxmessentials.shared.application.hop.HopDepartures;
 import com.uxplima.uxmessentials.shared.application.hop.port.HopGate;
 import com.uxplima.uxmessentials.shared.application.message.Notifier;
@@ -204,6 +205,7 @@ public final class ModerationWiring {
             Path dataFolder,
             IpHistoryStore ipHistory,
             IpTokens ipTokens,
+            RelayAddresses relays,
             NetworkPresence presence,
             SeenVisibility seenVisibility) {
         Objects.requireNonNull(plugin, "plugin");
@@ -221,6 +223,7 @@ public final class ModerationWiring {
         Objects.requireNonNull(dataFolder, "dataFolder");
         Objects.requireNonNull(ipHistory, "ipHistory");
         Objects.requireNonNull(ipTokens, "ipTokens");
+        Objects.requireNonNull(relays, "relays");
         Objects.requireNonNull(presence, "presence");
         Objects.requireNonNull(seenVisibility, "seenVisibility");
         KernelPorts kernel = ctx.kernel();
@@ -266,7 +269,7 @@ public final class ModerationWiring {
                 new CaseVariantAddresses(
                         ipHistory,
                         ipTokens,
-                        AddressFilter.of(settings.caseVariantAddressIgnore(), kernel.log()),
+                        AddressFilter.of(settings.caseVariantAddressIgnore(), relays, kernel.log()),
                         settings.caseVariantAddressBusyAfter()));
         // Each backend records what it sees of a player's exemption, so another can read it once they are offline.
         ExemptionSightings sightings = ModerationStores.exemptionSightings(persistence);
@@ -299,6 +302,7 @@ public final class ModerationWiring {
                 freezes,
                 ipHistory,
                 ipTokens,
+                relays,
                 presence,
                 seenVisibility,
                 caseVariants,
@@ -544,6 +548,7 @@ public final class ModerationWiring {
             NetworkFreeze freezes,
             IpHistoryStore ipHistory,
             IpTokens ipTokens,
+            RelayAddresses relays,
             NetworkPresence presence,
             SeenVisibility seenVisibility,
             CaseVariantSanctions caseVariants,
@@ -552,7 +557,7 @@ public final class ModerationWiring {
             Clock clock) {
         // One alt lookup for every flow that asks "who else uses this address": the login audit, /banip,
         // /tempbanip and /seenip. It tokenises first, so all four match the same rows /alts groups over.
-        IpAlts ipAlts = new IpAlts(ipHistory, ipTokens);
+        IpAlts ipAlts = new IpAlts(ipHistory, ipTokens, relays);
         Notifier notifier = new Notifier(kernel.messages(), kernel.messageSink());
         // The operator audit is wrapped so a successful punishment also emits a name-based Discord notice on the
         // same channel when discord-notify is on; disabled or bridge-absent, it is a no-op.

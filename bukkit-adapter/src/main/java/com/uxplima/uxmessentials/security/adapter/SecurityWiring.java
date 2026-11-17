@@ -48,6 +48,7 @@ import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandRegistrat
 import com.uxplima.uxmessentials.shared.adapter.inbound.ip.IpHistoryRecorder;
 import com.uxplima.uxmessentials.shared.adapter.outbound.action.ServerConnector;
 import com.uxplima.uxmessentials.shared.adapter.outbound.bus.Bus;
+import com.uxplima.uxmessentials.shared.application.RelayAddresses;
 import com.uxplima.uxmessentials.shared.application.module.KernelPorts;
 import com.uxplima.uxmessentials.shared.application.module.ModuleContext;
 import com.uxplima.uxmessentials.shared.application.port.IpHistoryStore;
@@ -83,6 +84,7 @@ public final class SecurityWiring {
             IpHistoryStore ipHistory,
             IpTokens ipTokens,
             IpHistoryRecorder recorder,
+            RelayAddresses relays,
             Network network) {
         Objects.requireNonNull(plugin, "plugin");
         Objects.requireNonNull(ctx, "ctx");
@@ -95,6 +97,7 @@ public final class SecurityWiring {
         Objects.requireNonNull(ipHistory, "ipHistory");
         Objects.requireNonNull(ipTokens, "ipTokens");
         Objects.requireNonNull(recorder, "recorder");
+        Objects.requireNonNull(relays, "relays");
         Objects.requireNonNull(network, "network");
         KernelPorts kernel = ctx.kernel();
         SecurityConfig config = SecurityConfig.from(ctx.config(), kernel.log());
@@ -246,6 +249,7 @@ public final class SecurityWiring {
                 holdingArea,
                 proxy,
                 ipTokens,
+                relays,
                 kernel.events(),
                 carry,
                 arrivals,

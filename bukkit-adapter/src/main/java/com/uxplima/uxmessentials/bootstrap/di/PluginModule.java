@@ -210,6 +210,7 @@ import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.vocab.Requireme
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.vocab.SoundActions;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.vocab.StringConditions;
 import com.uxplima.uxmessentials.shared.adapter.inbound.ip.IpHistoryRecorder;
+import com.uxplima.uxmessentials.shared.adapter.inbound.ip.RelaySetup;
 import com.uxplima.uxmessentials.shared.adapter.inbound.lookup.NameCaseEvidenceListener;
 import com.uxplima.uxmessentials.shared.adapter.inbound.lookup.OnlinePlayerIndexListener;
 import com.uxplima.uxmessentials.shared.adapter.inbound.lookup.PlayerNameRecordingListener;
@@ -282,6 +283,8 @@ import com.uxplima.uxmessentials.shared.adapter.outbound.style.EngineTheme;
 import com.uxplima.uxmessentials.shared.adapter.outbound.style.StyleTags;
 import com.uxplima.uxmessentials.shared.adapter.outbound.team.PlayerTeamCoordinator;
 import com.uxplima.uxmessentials.shared.adapter.outbound.update.UpdateCheckSettings;
+import com.uxplima.uxmessentials.shared.application.RelayAddresses;
+import com.uxplima.uxmessentials.shared.application.RelayFilteredIpHistory;
 import com.uxplima.uxmessentials.shared.application.command.CommandCatalog;
 import com.uxplima.uxmessentials.shared.application.command.CommandCatalogRenderer;
 import com.uxplima.uxmessentials.shared.application.command.CommandDefinition;
@@ -1239,9 +1242,11 @@ public final class PluginModule {
         }
         Path keyFile = plugin.getDataFolder().toPath().resolve("modules/security/secret.key");
         IpHashing tokens = new IpHashing(SecurityKeyFile.loadOrCreate(keyFile));
-        IpHistoryStore store = IpHistoryStores.jooq(persistence);
+        RelayAddresses relays = RelayAddresses.of(config.getStringList("relay-addresses", List.of()), kernel.log());
+        RelaySetup.report(plugin.getServer().getPluginManager(), relays, kernel.log());
+        IpHistoryStore store = new RelayFilteredIpHistory(IpHistoryStores.jooq(persistence), tokens, relays);
         IpHistoryRecorder recorder =
-                new IpHistoryRecorder(store, tokens, kernel.scheduler(), Clock.systemUTC(), moderation);
+                new IpHistoryRecorder(store, tokens, kernel.scheduler(), Clock.systemUTC(), moderation, relays);
         resources.addListener(recorder);
         kernel.scheduler().async(() -> {
             int moved = LegacyIpHistoryBackfill.run(persistence, tokens, moderation);
@@ -1249,11 +1254,15 @@ public final class PluginModule {
                 kernel.log().info("folded {} legacy address rows into the shared ip history", moved);
             }
         });
-        return new IpCapture(store, tokens, recorder);
+        return new IpCapture(store, tokens, recorder, relays);
     }
 
-    /** The kernel IP-history seam handed to the two contexts that read it. */
-    private record IpCapture(IpHistoryStore store, IpTokens tokens, IpHistoryRecorder recorder) {}
+    /**
+     * The kernel IP-history seam handed to the two contexts that read it. The store already leaves the relay addresses
+     * out; the relays travel with it for the reads that see an address before any row does.
+     */
+    private record IpCapture(
+            IpHistoryStore store, IpTokens tokens, IpHistoryRecorder recorder, RelayAddresses relays) {}
 
     private static PlaceholderContexts wireModules(
             JavaPlugin plugin,
@@ -2022,6 +2031,7 @@ public final class PluginModule {
                 ipCapture.store(),
                 ipCapture.tokens(),
                 ipCapture.recorder(),
+                ipCapture.relays(),
                 new SecurityWiring.Network(links.networked, bus, links.presence, links.proxyAnswering));
         wired.commands().forEach(resources::addCommand);
         wired.listeners().forEach(resources::addListener);
@@ -3110,6 +3120,7 @@ public final class PluginModule {
                 plugin.getDataFolder().toPath(),
                 ipCapture.store(),
                 ipCapture.tokens(),
+                ipCapture.relays(),
                 links.presence,
                 seenVisibility(links, persistence));
         wired.commands().forEach(resources::addCommand);
