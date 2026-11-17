@@ -83,6 +83,30 @@ class JooqPendingPlayerNoticesTest {
     }
 
     @Test
+    void aTakeThatLosesARaceReadsAgainAndHandsOutTheLines() {
+        PendingPlayerNotices store = new JooqPendingPlayerNotices(dsl, new Quiet(), KEPT);
+        store.keep(notice(SAM, Map.of("amount", "1"), FIRST));
+        store.keep(notice(SAM, Map.of("amount", "2"), FIRST.plusSeconds(1)));
+        PendingPlayerNotices racing = new JooqPendingPlayerNotices(losingDeletes(1), new Quiet(), KEPT);
+
+        assertThat(racing.take(SAM))
+                .extracting(kept -> kept.line().args().get("amount"))
+                .containsExactly("1", "2");
+        assertThat(store.take(SAM)).isEmpty();
+    }
+
+    @Test
+    void aTakeThatKeepsLosingGivesUpAndLeavesTheLinesForTheNextOne() {
+        PendingPlayerNotices store = new JooqPendingPlayerNotices(dsl, new Quiet(), KEPT);
+        store.keep(notice(SAM, Map.of("amount", "1"), FIRST));
+        PendingPlayerNotices racing = new JooqPendingPlayerNotices(losingDeletes(Integer.MAX_VALUE), new Quiet(), KEPT);
+
+        assertThat(racing.take(SAM)).isEmpty();
+
+        assertThat(store.take(SAM)).hasSize(1);
+    }
+
+    @Test
     void aPlayerSentMoreLinesThanAreKeptHoldsTheNewest() {
         PendingPlayerNotices store = new JooqPendingPlayerNotices(dsl, new Quiet(), 3);
         for (int i = 1; i <= 200; i++) {
@@ -123,6 +147,25 @@ class JooqPendingPlayerNoticesTest {
             }
         };
         return dsl.configuration().deriveAppending(failure).dsl();
+    }
+
+    /**
+     * The shared database, where the first {@code times} deletes find their rows already gone, as when another server
+     * took them in between this take's read and its delete.
+     */
+    private DSLContext losingDeletes(int times) {
+        AtomicInteger deletes = new AtomicInteger();
+        ExecuteListener race = new ExecuteListener() {
+            // The statement is prepared from the rendered text, so the text is changed as it is rendered.
+            @Override
+            public void renderEnd(ExecuteContext ctx) {
+                String sql = ctx.sql();
+                if (ctx.query() instanceof Delete<?> && sql != null && deletes.incrementAndGet() <= times) {
+                    ctx.sql(sql + " AND 1 = 0");
+                }
+            }
+        };
+        return dsl.configuration().deriveAppending(race).dsl();
     }
 
     private static PlayerNotice notice(UUID recipient, Map<String, String> args, Instant at) {

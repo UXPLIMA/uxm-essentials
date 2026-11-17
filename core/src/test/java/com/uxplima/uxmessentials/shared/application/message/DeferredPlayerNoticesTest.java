@@ -118,6 +118,37 @@ class DeferredPlayerNoticesTest {
     }
 
     @Test
+    void linesTakenForAPlayerTheChatCannotReachAreKeptAgain() {
+        DeferredPlayerNotices showingTwo = noticesShowing(2);
+        for (int i = 1; i <= 3; i++) {
+            showingTwo.tell(SAM, paid("$" + i));
+        }
+        online.here.add(SAM.uuid());
+        chat.unreachable = true;
+
+        showingTwo.deliver(SAM);
+        lanes.runAsync();
+
+        assertThat(shown).isEmpty();
+        assertThat(kept.rows.get(SAM.uuid()))
+                .extracting(PlayerNotice::line)
+                .containsExactlyInAnyOrder(paid("$1"), paid("$2"), paid("$3"));
+    }
+
+    @Test
+    void aLineThatCannotBeShownToAPlayerHereIsKept() {
+        online.here.add(SAM.uuid());
+        chat.failOn = "$40.00";
+
+        notices.tell(SAM, LINE);
+
+        assertThat(shown).isEmpty();
+        assertThat(kept.rows.get(SAM.uuid()))
+                .singleElement()
+                .satisfies(notice -> assertThat(notice.line()).isEqualTo(LINE));
+    }
+
+    @Test
     void aLineForAPlayerStillLoggingInIsKeptRatherThanLost() {
         online.here.add(SAM.uuid());
         chat.unreachable = true;

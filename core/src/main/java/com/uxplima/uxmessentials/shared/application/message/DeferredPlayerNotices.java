@@ -67,18 +67,15 @@ public final class DeferredPlayerNotices implements PlayerNotices {
         Objects.requireNonNull(recipient, "recipient");
         Objects.requireNonNull(line, "line");
         PlayerNotice notice = new PlayerNotice(recipient.uuid(), line, clock.instant());
+        boolean shown;
         try {
-            if (players.isOnline(recipient.uuid())) {
-                // Online here can still mean logging in, before there is a player to show it to, or just leaving.
-                notifier.send(recipient, line, () -> scheduler.async(() -> keep(notice)));
-                return;
-            }
-            keep(notice);
+            shown = players.isOnline(recipient.uuid()) && show(recipient, notice);
         } catch (RuntimeException failure) {
-            log.error(
-                    "could not tell player " + recipient.uuid() + " "
-                            + line.key().key(),
-                    failure);
+            log.error("could not tell whether player " + recipient.uuid() + " is online", failure);
+            shown = false;
+        }
+        if (!shown) {
+            keep(notice);
         }
     }
 
@@ -97,26 +94,34 @@ public final class DeferredPlayerNotices implements PlayerNotices {
         // The newest lines are the ones shown; the older ones are counted in one line ahead of them.
         List<PlayerNotice> shown = kept.subList(left, kept.size());
         if (left > 0) {
-            if (players.isOnline(recipient.uuid())) {
-                show(
-                        recipient,
-                        new MessageLine(SharedMessageKey.COMMON_NOTICES_MORE, Map.of("count", Integer.toString(left))));
-            } else {
-                kept.subList(0, left).forEach(this::keep);
+            List<PlayerNotice> older = List.copyOf(kept.subList(0, left));
+            MessageLine more =
+                    new MessageLine(SharedMessageKey.COMMON_NOTICES_MORE, Map.of("count", Integer.toString(left)));
+            // The count stands for the older lines, so if it cannot reach the player they are kept instead.
+            if (!players.isOnline(recipient.uuid()) || !show(recipient, more, () -> older.forEach(this::keep))) {
+                older.forEach(this::keep);
             }
         }
         for (PlayerNotice notice : shown) {
-            if (!players.isOnline(recipient.uuid()) || !show(recipient, notice.line())) {
+            if (!players.isOnline(recipient.uuid()) || !show(recipient, notice)) {
                 keep(notice);
             }
         }
         return kept.size();
     }
 
-    /** Show {@code line}; false when showing it failed, so the caller keeps it rather than lose it. */
-    private boolean show(PlayerRef recipient, MessageLine line) {
+    /**
+     * Show {@code notice}; false when showing it failed, so the caller keeps it rather than lose it. A line that turns
+     * out not to reach the player (still logging in, or quitting) is kept on the async lane.
+     */
+    private boolean show(PlayerRef recipient, PlayerNotice notice) {
+        return show(recipient, notice.line(), () -> keep(notice));
+    }
+
+    /** Show {@code line}, running {@code unshown} on the async lane when it cannot reach the player; false on failure. */
+    private boolean show(PlayerRef recipient, MessageLine line, Runnable unshown) {
         try {
-            notifier.send(recipient, line);
+            notifier.send(recipient, line, () -> scheduler.async(unshown));
             return true;
         } catch (RuntimeException failure) {
             log.error(

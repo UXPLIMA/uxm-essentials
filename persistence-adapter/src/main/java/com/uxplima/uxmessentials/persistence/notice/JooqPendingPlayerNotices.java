@@ -31,11 +31,14 @@ import org.jooq.DSLContext;
  *
  * <p>A keep drops the recipient's oldest rows past {@code keptPerPlayer} in the same transaction, so one player never
  * holds more. A take reads the recipient's rows and removes them with one delete, in one transaction; a delete that
- * removed fewer rows than were read means another server took some of them first, so the take is rolled back and
- * hands out nothing, and the rows still there wait for the next take. A line is therefore handed to one taker only,
+ * removed fewer rows than were read means another server took some of them first, so that attempt is rolled back,
+ * having removed nothing, and the take reads what is left again, up to {@link #TAKE_ATTEMPTS} times. A line is therefore handed to one taker only,
  * and a take the database fails leaves every row where it was.
  */
 public final class JooqPendingPlayerNotices extends JooqRepository implements PendingPlayerNotices {
+
+    /** How many times a take that lost a race to another server reads again. */
+    static final int TAKE_ATTEMPTS = 3;
 
     private final Logger log;
     private final int keptPerPlayer;
@@ -80,29 +83,42 @@ public final class JooqPendingPlayerNotices extends JooqRepository implements Pe
     @Override
     public List<PlayerNotice> take(UUID recipient) {
         Objects.requireNonNull(recipient, "recipient");
-        List<PlayerNoticesRecord> rows;
-        try {
-            rows = write(dsl -> {
-                List<PlayerNoticesRecord> read = dsl.selectFrom(PLAYER_NOTICES)
-                        .where(PLAYER_NOTICES.RECIPIENT.eq(recipient.toString()))
-                        .orderBy(PLAYER_NOTICES.CREATED_AT, PLAYER_NOTICES.ID)
-                        .fetch();
-                if (read.isEmpty()) {
-                    return read;
+        // A take that lost a race reads again what the other server left; a few tries settle it.
+        for (int attempt = 1; ; attempt++) {
+            try {
+                return decoded(recipient, takeRows(recipient));
+            } catch (LostRace race) {
+                if (attempt >= TAKE_ATTEMPTS) {
+                    // The rows left wait for the next take, at the player's next join or the next kept line.
+                    return List.of();
                 }
-                List<String> ids = read.stream().map(PlayerNoticesRecord::getId).toList();
-                int removed = dsl.deleteFrom(PLAYER_NOTICES)
-                        .where(PLAYER_NOTICES.ID.in(ids))
-                        .execute();
-                if (removed != ids.size()) {
-                    throw new LostRace();
-                }
-                return read;
-            });
-        } catch (LostRace race) {
-            // Another server took some of these lines first; it shows those, and the rest wait for the next take.
-            return List.of();
+            }
         }
+    }
+
+    /** Remove and return {@code recipient}'s rows, or throw {@link LostRace} having removed none. */
+    private List<PlayerNoticesRecord> takeRows(UUID recipient) {
+        return write(dsl -> {
+            List<PlayerNoticesRecord> read = dsl.selectFrom(PLAYER_NOTICES)
+                    .where(PLAYER_NOTICES.RECIPIENT.eq(recipient.toString()))
+                    .orderBy(PLAYER_NOTICES.CREATED_AT, PLAYER_NOTICES.ID)
+                    .fetch();
+            if (read.isEmpty()) {
+                return read;
+            }
+            List<String> ids = read.stream().map(PlayerNoticesRecord::getId).toList();
+            int removed = dsl.deleteFrom(PLAYER_NOTICES)
+                    .where(PLAYER_NOTICES.ID.in(ids))
+                    .execute();
+            if (removed != ids.size()) {
+                throw new LostRace();
+            }
+            return read;
+        });
+    }
+
+    /** The lines {@code rows} hold; a row whose values do not read is logged and left out. */
+    private List<PlayerNotice> decoded(UUID recipient, List<PlayerNoticesRecord> rows) {
         List<PlayerNotice> taken = new ArrayList<>(rows.size());
         for (PlayerNoticesRecord row : rows) {
             Map<String, String> args;
