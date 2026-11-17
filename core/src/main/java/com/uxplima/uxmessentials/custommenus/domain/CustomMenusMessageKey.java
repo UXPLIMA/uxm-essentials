@@ -152,7 +152,7 @@ public enum CustomMenusMessageKey implements MessageKey {
     /** Feedback that the item at {@code {slot}} was cleared from the grid. */
     MENU_GRID_CLEARED("menu.editor.grid.cleared"),
 
-    /** Title of the confirm window the grid's shift-click-to-clear opens ({@code {slot}}). */
+    /** Title of the confirm window a clear of a grid cell opens ({@code {slot}}). */
     MENU_GRID_CLEAR_CONFIRM("menu.editor.grid.clear-confirm"),
 
     /** Title of the per-item property editor opened from a grid cell ({@code {id}{slot}}). */
@@ -181,6 +181,12 @@ public enum CustomMenusMessageKey implements MessageKey {
 
     /** Feedback that the capture button was clicked with an empty hand. */
     MENU_ITEM_EDITOR_CAPTURE_EMPTY("menu.item-editor.capture-empty"),
+
+    /** Label of the item editor's remove-from-the-menu button. */
+    MENU_ITEM_EDITOR_REMOVE("menu.item-editor.remove"),
+
+    /** Hint lore of the remove-from-the-menu button. */
+    MENU_ITEM_EDITOR_REMOVE_HINT("menu.item-editor.remove-hint"),
 
     /** Label of the item editor's name field. */
     MENU_ITEM_EDITOR_NAME("menu.item-editor.name"),
