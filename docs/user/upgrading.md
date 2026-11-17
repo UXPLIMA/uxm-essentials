@@ -7,8 +7,10 @@ needs a setting it did not need before.
 
 A tag in text a player wrote is now shown as the words, never as styling or a click: a display name, a renamed weapon
 or the vanilla death line in a join, quit or death message, the `/me` action, the `/afk` reason, and an argument a
-custom command puts into a `broadcast`, `message`, `title`, `action-bar` or `toast` action. A custom command that let
-players style their text that way loses the styling; an argument going into a command is unchanged.
+custom command puts into a `broadcast`, `message`, `title`, `action-bar` or `toast` action. In a `broadcast-json`
+action the argument stays inside its JSON string, and in a `broadcast-legacy` action a typed `&` colour code shows as
+text. A custom command that let players style their text that way loses the styling; an argument going into a command
+is unchanged. The `/afk` reason is kept as the player typed it, so the API and placeholders read it as written.
 
 ## Nicks are kept in the database
 

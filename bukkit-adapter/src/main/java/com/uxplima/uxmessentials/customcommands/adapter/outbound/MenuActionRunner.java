@@ -1,5 +1,6 @@
 package com.uxplima.uxmessentials.customcommands.adapter.outbound;
 
+import java.util.LinkedHashMap;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
@@ -64,6 +65,12 @@ public final class MenuActionRunner implements ActionRunner {
     /** The head whose value is a JSON text component, where an argument goes into a JSON string as its text. */
     private static final String JSON_HEAD = "broadcast-json";
 
+    /** The head whose value is a legacy line, where {@code &} and a code character change the colour. */
+    private static final String LEGACY_HEAD = "broadcast-legacy";
+
+    /** The characters that follow an {@code &} or {@code §} in a legacy colour, format or hex code. */
+    private static final String LEGACY_CODES = "0123456789abcdefklmnorx#";
+
     private final Menus menus;
     private final Scheduler scheduler;
     private final Logger log;
@@ -100,6 +107,9 @@ public final class MenuActionRunner implements ActionRunner {
         }
         for (ActionStep step : chain.steps()) {
             String token = expand(step.token(), arguments);
+            // The engine fills %argument_<name>% and %<name>% in the step from the values it is handed, so it is
+            // handed them made ready for this step exactly as expand made its own.
+            Map<String, String> values = forStep(head(step.token()), arguments);
             if (!permitted(token, allowed)) {
                 // A chain that names a privileged action the operator turned off skips that step and says which
                 // head it lost, rather than quietly granting the privilege or dropping the whole chain.
@@ -114,11 +124,10 @@ public final class MenuActionRunner implements ActionRunner {
             // The engine spends a live player, so an action for somebody who has left is dropped rather than run
             // against a name, the same as the engine does when its own lookup misses.
             if (step.offset().isZero()) {
-                LivePlayers.of(actor).ifPresent(live -> menus.execute(live, ref, arguments));
+                LivePlayers.of(actor).ifPresent(live -> menus.execute(live, ref, values));
             } else {
                 scheduler.asyncAfter(
-                        step.offset(),
-                        () -> LivePlayers.of(actor).ifPresent(live -> menus.execute(live, ref, arguments)));
+                        step.offset(), () -> LivePlayers.of(actor).ifPresent(live -> menus.execute(live, ref, values)));
             }
         }
     }
@@ -206,6 +215,13 @@ public final class MenuActionRunner implements ActionRunner {
         return out.toString();
     }
 
+    /** Every value of {@code arguments} as it goes into an action with this {@code head}. */
+    private static Map<String, String> forStep(String head, Map<String, String> arguments) {
+        Map<String, String> ready = new LinkedHashMap<>();
+        arguments.forEach((name, value) -> ready.put(name, asTextFor(head, value)));
+        return ready;
+    }
+
     /** {@code value} as it goes into an action with this {@code head}: as words where the action shows text. */
     private static String asTextFor(String head, String value) {
         if (STYLED_TEXT_HEADS.contains(head)) {
@@ -214,7 +230,26 @@ public final class MenuActionRunner implements ActionRunner {
         if (JSON_HEAD.equals(head)) {
             return jsonStringContent(value);
         }
+        if (LEGACY_HEAD.equals(head)) {
+            return withoutColourCodes(value);
+        }
         return value;
+    }
+
+    /**
+     * {@code value} with no colour or format code a legacy line would read: an {@code &} or {@code §} followed by a
+     * code character is written as a full-width ampersand, which reads the same and is no code.
+     */
+    private static String withoutColourCodes(String value) {
+        StringBuilder kept = new StringBuilder(value.length());
+        for (int i = 0; i < value.length(); i++) {
+            char character = value.charAt(i);
+            boolean code = (character == '&' || character == '\u00a7')
+                    && i + 1 < value.length()
+                    && LEGACY_CODES.indexOf(Character.toLowerCase(value.charAt(i + 1))) >= 0;
+            kept.append(code ? '\uff06' : character);
+        }
+        return kept.toString();
     }
 
     /** {@code value} as the inside of a JSON string, so it cannot close the string and add keys of its own. */
@@ -224,6 +259,8 @@ public final class MenuActionRunner implements ActionRunner {
             char character = value.charAt(i);
             switch (character) {
                 case '"' -> escaped.append("\\\"");
+                // Gson also reads a string written in single quotes, so a quote of either kind is escaped.
+                case '\'' -> escaped.append("\\u0027");
                 case '\\' -> escaped.append("\\\\");
                 default -> {
                     if (character < 0x20) {

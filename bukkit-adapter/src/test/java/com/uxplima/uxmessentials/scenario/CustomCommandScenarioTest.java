@@ -47,38 +47,97 @@ class CustomCommandScenarioTest {
             actions = ["broadcast:<gold>%arg_words%</gold>"]
             """;
 
+    // The same broadcast written with the menu engine's own token for the argument.
+    private static final String YELL = """
+            command {
+              name = "yell"
+              description = "Say something to everyone, loudly"
+              cost = 0
+            }
+            arguments = [
+              { name = "words", type = rest }
+            ]
+            actions = ["broadcast:<red>%argument_words%</red>"]
+            """;
+
+    private static final String CLICK = "<click:run_command:'/op Mallory'>free diamonds</click>";
+
     private RunningPlugin running;
 
     @BeforeAll
     void start() {
-        running =
-                RunningPlugin.start(Map.of("commands/custom/reward.conf", REWARD, "commands/custom/shout.conf", SHOUT));
+        running = RunningPlugin.start(Map.of(
+                "commands/custom/reward.conf",
+                REWARD,
+                "commands/custom/shout.conf",
+                SHOUT,
+                "commands/custom/yell.conf",
+                YELL));
     }
 
     @Test
     void whatAPlayerTypesIntoABroadcastIsShownAsWordsAndRunsNothing() {
         ScenarioPlayer mallory = running.join("Mallory");
         ScenarioPlayer reader = running.join("Reader");
-        String typed = "<click:run_command:'/op Mallory'>free diamonds</click>";
 
-        running.run(mallory, "shout " + typed);
+        running.run(mallory, "shout " + CLICK);
         running.settle();
 
+        List<Component> lines = heardBy(reader);
+        assertThat(lines)
+                .anySatisfy(shown -> assertThat(
+                                PlainTextComponentSerializer.plainText().serialize(shown))
+                        .isEqualTo(CLICK));
+        assertNoClicks(lines);
+        assertThat(running.problems()).isEmpty();
+    }
+
+    @Test
+    void anEngineTokenTypedIntoABroadcastIsFilledWithWordsToo() {
+        ScenarioPlayer mallory = running.join("Mallet");
+        ScenarioPlayer reader = running.join("Reed");
+
+        running.run(mallory, "shout %argument_words% " + CLICK);
+        running.settle();
+
+        List<Component> lines = heardBy(reader);
+        assertThat(lines).isNotEmpty();
+        assertNoClicks(lines);
+        assertThat(running.problems()).isEmpty();
+    }
+
+    @Test
+    void aBroadcastWrittenWithTheEngineTokenShowsWhatWasTypedAsWords() {
+        ScenarioPlayer mallory = running.join("Malone");
+        ScenarioPlayer reader = running.join("Rhea");
+
+        running.run(mallory, "yell " + CLICK);
+        running.settle();
+
+        List<Component> lines = heardBy(reader);
+        assertThat(lines)
+                .anySatisfy(shown -> assertThat(
+                                PlainTextComponentSerializer.plainText().serialize(shown))
+                        .isEqualTo(CLICK));
+        assertNoClicks(lines);
+        assertThat(running.problems()).isEmpty();
+    }
+
+    private static List<Component> heardBy(ScenarioPlayer reader) {
         List<Component> lines = new ArrayList<>();
         @Nullable Component line;
         while ((line = reader.nextComponentMessage()) != null) {
             lines.add(line);
         }
-        assertThat(lines)
-                .anySatisfy(shown -> assertThat(
-                                PlainTextComponentSerializer.plainText().serialize(shown))
-                        .isEqualTo(typed));
+        return lines;
+    }
+
+    private static void assertNoClicks(List<Component> lines) {
         assertThat(lines).allSatisfy(shown -> {
             List<Component> parts = new ArrayList<>();
             shown.iterator(ComponentIteratorType.DEPTH_FIRST).forEachRemaining(parts::add);
             assertThat(parts).allSatisfy(part -> assertThat(part.clickEvent()).isNull());
         });
-        assertThat(running.problems()).isEmpty();
     }
 
     @AfterAll

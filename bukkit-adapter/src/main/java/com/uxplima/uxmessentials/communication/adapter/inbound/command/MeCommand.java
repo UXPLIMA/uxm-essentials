@@ -15,11 +15,11 @@ import com.mojang.brigadier.context.CommandContext;
 import com.mojang.brigadier.tree.LiteralCommandNode;
 import com.uxplima.uxmessentials.communication.domain.CommunicationMessageKey;
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandRegistration;
-import com.uxplima.uxmessentials.shared.adapter.outbound.style.StyledText;
 import com.uxplima.uxmessentials.shared.application.message.Notifier;
 import com.uxplima.uxmessentials.shared.application.permission.SocialPermissions;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
 import com.uxplima.uxmessentials.shared.application.port.Scheduler;
+import com.uxplima.uxmessentials.shared.domain.message.TypedText;
 import com.uxplima.uxmlib.command.Gate;
 import org.jspecify.annotations.NullMarked;
 
@@ -69,12 +69,13 @@ public final class MeCommand extends CommunicationCommandSupport implements Comm
         if (actor == null) {
             return 0;
         }
-        // What the player typed goes into a line every player reads, so it goes in as words, never as markup.
+        // What the player typed goes into a line every player reads, so it goes in as words, never as markup. It is not
+        // kept anywhere, so it is made ready here, where the line is built.
         Map<String, String> placeholders = Map.of(
                 "player",
-                StyledText.escape(actor.getName()),
+                TypedText.asWords(actor.getName()),
                 ACTION_ARG,
-                StyledText.escape(StringArgumentType.getString(ctx, ACTION_ARG)));
+                TypedText.asWords(StringArgumentType.getString(ctx, ACTION_ARG)));
         scheduler.onGlobal(() -> {
             for (Player viewer : Bukkit.getOnlinePlayers()) {
                 notifier.send(ref(viewer), CommunicationMessageKey.ME, placeholders);
