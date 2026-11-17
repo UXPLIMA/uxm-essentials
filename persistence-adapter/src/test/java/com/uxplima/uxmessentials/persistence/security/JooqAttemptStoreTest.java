@@ -51,10 +51,10 @@ class JooqAttemptStoreTest {
         }
         survivalStore = new JooqAttemptStore(dsl);
         sessions = new JooqVerifiedSessions(dsl);
-        survival = new AttemptLimiter(survivalStore, sessions, new LockoutPolicy(3), LOCKOUT);
+        survival = new AttemptLimiter(survivalStore, sessions::revoke, new LockoutPolicy(3), LOCKOUT);
         lobby = new AttemptLimiter(
                 new JooqAttemptStore(database.dsl()),
-                new JooqVerifiedSessions(database.dsl()),
+                new JooqVerifiedSessions(database.dsl())::revoke,
                 new LockoutPolicy(3),
                 LOCKOUT);
     }
@@ -132,6 +132,18 @@ class JooqAttemptStoreTest {
 
         assertThat(checked).isLessThanOrEqualTo(3);
         assertThat(survival.isLockedOut(ADA, NOW)).isTrue();
+    }
+
+    @Test
+    void aFailureGivenBackIsTakenOffTheCountButNeverBelowZero() {
+        survivalStore.addFailure(ADA);
+        survivalStore.addFailure(ADA);
+
+        for (int i = 0; i < 3; i++) {
+            new JooqAttemptStore(dsl).refundFailure(ADA);
+        }
+
+        assertThat(survivalStore.addFailure(ADA)).isEqualTo(1);
     }
 
     @Test

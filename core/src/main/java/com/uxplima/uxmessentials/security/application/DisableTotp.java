@@ -48,17 +48,21 @@ public final class DisableTotp {
         if (secret == null) {
             return limiter.isLockedOut(playerId, now) ? DisableResult.LOCKED_OUT : DisableResult.NOT_ENROLLED;
         }
-        AttemptLimiter.Attempt attempt = limiter.begin(playerId, now);
-        if (attempt.refused()) {
-            return DisableResult.LOCKED_OUT;
-        }
-        if (!TotpCode.verify(secret, code, now, codeWindow)) {
-            return limiter.failed(playerId, attempt, now).lockedOut()
-                    ? DisableResult.LOCKED_OUT
-                    : DisableResult.INVALID_CODE;
-        }
-        if (!limiter.succeeded(playerId, now)) {
-            return DisableResult.LOCKED_OUT;
+        AttemptLimiter.Checked checked =
+                limiter.check(playerId, now, () -> TotpCode.verify(secret, code, now, codeWindow));
+        switch (checked.verdict()) {
+            case PASSED -> {
+                // Proven: go on below.
+            }
+            case WRONG -> {
+                return DisableResult.INVALID_CODE;
+            }
+            case LOCKED_OUT -> {
+                return DisableResult.LOCKED_OUT;
+            }
+            case BUSY -> {
+                return DisableResult.BUSY;
+            }
         }
         repository.clearTotp(playerId);
         return DisableResult.DISABLED;

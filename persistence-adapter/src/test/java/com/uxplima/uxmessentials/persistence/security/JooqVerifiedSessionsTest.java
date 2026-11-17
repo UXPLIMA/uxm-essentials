@@ -110,6 +110,9 @@ class JooqVerifiedSessionsTest {
         lobbyStore.markProxySeen(NOW.plusSeconds(1));
 
         assertThat(survivalStore.proxySeen()).isTrue();
+
+        survivalStore.forgetProxySeen();
+        assertThat(lobbyStore.proxySeen()).as("forgotten for every backend").isFalse();
     }
 
     @Test

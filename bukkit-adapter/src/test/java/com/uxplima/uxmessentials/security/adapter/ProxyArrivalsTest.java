@@ -39,6 +39,7 @@ class ProxyArrivalsTest {
 
     private final Delays delays = new Delays();
     private final Flag shared = new Flag();
+    private final List<String> warnings = new ArrayList<>();
     private long nanos = 1_000L;
     private final CarrierReceipts receipts = new CarrierReceipts(() -> nanos);
     private boolean proxyAnswering = true;
@@ -48,7 +49,7 @@ class ProxyArrivalsTest {
             HERE,
             () -> proxyAnswering,
             new SessionCarry(shared, Duration.ofSeconds(30)),
-            new Silent(),
+            new Warnings(warnings),
             Clock.fixed(Instant.parse("2030-01-01T12:00:00Z"), ZoneOffset.UTC));
 
     @BeforeEach
@@ -124,40 +125,58 @@ class ProxyArrivalsTest {
     }
 
     @Test
-    void aNetworkThatNeverHadTheProxyPluginHasNothingToWaitFor() {
+    void aNetworkThatNeverHadTheProxyPluginsWordHasNothingToWaitFor() {
         proxyAnswering = false;
-        arrivals.load();
 
         assertThat(arrivals.arrival(ADA)).isCompletedWithValue(new Arrival.NoProxy());
     }
 
     @Test
-    void untilTheSharedRecordIsReadTheProxyCountsAsSeen() {
+    void aProxyAnsweringOnTheBusKeepsThisArrivalWaitingButIsNeverRecorded() {
+        // What a client echoing a backend's own signed heartbeat back looks like: the bus seems to have a proxy.
+        CompletableFuture<Arrival> arrival = arrivals.arrival(ADA);
+        arrivals.onRemoteChange(frame(ProxyConnectionFrame.PROXY, HERE, true));
+        delays.runAll();
+
+        assertThat(arrival).isCompletedWithValue(new Arrival.Unconfirmed());
+        assertThat(shared.seen)
+                .as("only a word the player's own connection carried is recorded")
+                .isFalse();
         proxyAnswering = false;
+        arrivals.joined(ADA);
+        assertThat(arrivals.arrival(ADA)).isCompletedWithValue(new Arrival.NoProxy());
+    }
+
+    @Test
+    void aRecordThatCannotBeReadCountsAsSeen() {
+        proxyAnswering = false;
+        shared.unreadable = true;
 
         assertThat(arrivals.arrival(ADA)).isNotDone();
     }
 
     @Test
-    void onceTheProxyWasHeardAnArrivalWaitsForItEvenWhileItIsSilent() {
-        arrivals.load();
+    void onceTheProxysWordArrivedEveryArrivalWaitsForItUntilAnOperatorForgetsIt() {
         hear(frame(ProxyConnectionFrame.PROXY, HERE, false), ADA);
         delays.runAll();
         proxyAnswering = false;
 
         assertThat(shared.seen).isTrue();
-        ProxyArrivals restarted = new ProxyArrivals(
-                delays,
-                receipts,
-                HERE,
-                () -> false,
-                new SessionCarry(shared, Duration.ofSeconds(30)),
-                new Silent(),
-                Clock.systemUTC());
-        restarted.load();
-        restarted.joined(BOB);
+        arrivals.joined(BOB);
+        assertThat(arrivals.arrival(BOB)).isNotDone();
 
-        assertThat(restarted.arrival(BOB)).isNotDone();
+        new SessionCarry(shared, Duration.ofSeconds(30)).forgetProxy();
+        arrivals.joined(BOB);
+        assertThat(arrivals.arrival(BOB)).isCompletedWithValue(new Arrival.NoProxy());
+    }
+
+    @Test
+    void aWordNamingThisBackendByAnotherNameIsWarnedAboutOnce() {
+        hear(frame(ProxyConnectionFrame.PROXY, "survival-1", true), ADA);
+        hear(frame(ProxyConnectionFrame.PROXY, "survival-1", true), ADA);
+
+        assertThat(warnings).containsExactly("event=security_proxy_server_mismatch");
+        assertThat(arrivals.connection(ADA)).isEmpty();
     }
 
     /** {@code frame} arrives over {@code carrier}'s connection now and reaches the listener. */
@@ -175,15 +194,24 @@ class ProxyArrivalsTest {
     private static final class Flag implements VerifiedSessions {
 
         volatile boolean seen;
+        volatile boolean unreadable;
 
         @Override
         public boolean proxySeen() {
+            if (unreadable) {
+                throw new IllegalStateException("database down");
+            }
             return seen;
         }
 
         @Override
         public void markProxySeen(Instant at) {
             seen = true;
+        }
+
+        @Override
+        public void forgetProxySeen() {
+            seen = false;
         }
 
         @Override
@@ -257,13 +285,15 @@ class ProxyArrivalsTest {
         }
     }
 
-    private static final class Silent implements Logger {
+    private record Warnings(List<String> lines) implements Logger {
 
         @Override
         public void info(String message, Object... args) {}
 
         @Override
-        public void warn(String message, Object... args) {}
+        public void warn(String message, Object... args) {
+            lines.add(message.substring(0, message.indexOf(" ")));
+        }
 
         @Override
         public void error(String message, Throwable cause) {}

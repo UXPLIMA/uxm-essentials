@@ -134,6 +134,13 @@ public final class JooqVerifiedSessions extends JooqRepository implements Verifi
     }
 
     @Override
+    public void forgetProxySeen() {
+        write(dsl -> dsl.deleteFrom(SECURITY_NETWORK)
+                .where(SECURITY_NETWORK.FACT.eq(PROXY_SEEN))
+                .execute());
+    }
+
+    @Override
     public void revoke(UUID player) {
         String id = Objects.requireNonNull(player, "player").toString();
         write(dsl -> dsl.deleteFrom(SECURITY_SESSIONS)

@@ -129,6 +129,7 @@ public final class VerificationController implements KeypadActions {
             ProxyArrivals arrivals,
             String serverId,
             NetworkPresence presence,
+            PlayerLane lane,
             Scheduler scheduler,
             Messages messages,
             MessageSink sink,
@@ -156,12 +157,12 @@ public final class VerificationController implements KeypadActions {
         this.arrivals = Objects.requireNonNull(arrivals, "arrivals");
         this.serverId = Objects.requireNonNull(serverId, "serverId");
         this.presence = Objects.requireNonNull(presence, "presence");
+        this.lane = Objects.requireNonNull(lane, "lane");
         this.scheduler = Objects.requireNonNull(scheduler, "scheduler");
         this.messages = Objects.requireNonNull(messages, "messages");
         this.sink = Objects.requireNonNull(sink, "sink");
         this.log = Objects.requireNonNull(log, "log");
         this.clock = Objects.requireNonNull(clock, "clock");
-        this.lane = new PlayerLane(scheduler, log);
     }
 
     /**
@@ -441,39 +442,50 @@ public final class VerificationController implements KeypadActions {
 
     private void verifySubmission(Player player, PlayerRef viewer, String candidate, boolean reopenOnFailure) {
         OptionalLong token = sessions.token(viewer.uuid());
-        if (token.isEmpty() || !checks.claim(viewer.uuid())) {
-            // Not frozen, or a proof of theirs is still being checked: one at a time, so a burst cannot outrun the
-            // attempt budget.
+        if (token.isEmpty()) {
             return;
         }
-        try {
-            scheduler.async(() -> {
-                // The shared budget is a database record, so the proof is checked here, off the tick, before the
-                // answer goes back to the player's thread.
-                ProofChecks.Checked checked = checks.check(viewer.uuid(), candidate);
-                scheduler.onEntity(
-                        viewer, () -> applyResult(player, viewer, checked, token.getAsLong(), reopenOnFailure));
-            });
-        } catch (RuntimeException refused) {
-            checks.release(viewer.uuid());
-            throw refused;
-        }
+        scheduler.async(() -> {
+            // The shared budget is a database record, so the proof is checked here, off the tick, before the answer
+            // goes back to the player's thread. One check runs per player; a submission made meanwhile is dropped.
+            ProofChecks.Checked checked = checks.check(viewer.uuid(), candidate);
+            scheduler.onEntity(
+                    viewer, () -> applyResult(player, viewer, checked, token.getAsLong(), reopenOnFailure), () -> {
+                        // They are gone before the answer reached them; a lockout is still put on record.
+                        if (checked.status() == ProofChecks.Status.LOCKED_OUT) {
+                            scheduler.onGlobal(() -> recordLockout(viewer));
+                        }
+                    });
+        });
     }
 
     private void applyResult(
             Player player, PlayerRef viewer, ProofChecks.Checked checked, long token, boolean reopenOnFailure) {
-        if (!sessions.isPending(viewer.uuid(), token)) {
-            // The freeze this proof was for is over: they left, timed out, or were frozen anew meanwhile.
-            return;
-        }
-        if (checked.outcome().lockedOut() || limiter.knownLockedOut(viewer.uuid(), clock.instant())) {
+        boolean pending = sessions.isPending(viewer.uuid(), token);
+        boolean lockedOut = checked.status() == ProofChecks.Status.LOCKED_OUT
+                || (pending && limiter.knownLockedOut(viewer.uuid(), clock.instant()));
+        if (lockedOut) {
+            // Even when the freeze this proof was for is over, a lockout this proof met is put on record.
             sessions.clear(viewer.uuid());
             lockOut(viewer);
             return;
         }
-        switch (checked.result()) {
-            case SUCCESS, NOT_ENROLLED -> succeed(player, viewer, checked.result() == VerifyResult.SUCCESS);
-            case INVALID -> fail(player, viewer, checked.outcome(), reopenOnFailure);
+        if (!pending) {
+            // The freeze this proof was for is over: they left, timed out, or were frozen anew meanwhile.
+            return;
+        }
+        switch (checked.status()) {
+            case PASSED -> succeed(player, viewer, checked.result() == VerifyResult.SUCCESS);
+            case WRONG -> fail(player, viewer, new AttemptLimiter.Outcome(false, checked.remaining()), reopenOnFailure);
+            case UNAVAILABLE -> {
+                notify(viewer, SecurityMessageKey.SECURITY_VERIFY_UNAVAILABLE);
+                if (reopenOnFailure) {
+                    reopenKeypad(player, viewer);
+                }
+            }
+            case BUSY, LOCKED_OUT -> {
+                // Busy: the check already running answers. Locked out: handled above.
+            }
         }
     }
 
@@ -522,12 +534,17 @@ public final class VerificationController implements KeypadActions {
      */
     private void lockOut(PlayerRef viewer) {
         keypad.closeFor(viewer);
-        boolean banned = config.lockoutBans() && lockoutBan.ban(viewer, config.lockout(), config.lockoutBanReason());
-        events.publish(new AccountLockedOut(viewer, config.lockout(), banned));
-        if (banned) {
+        if (recordLockout(viewer)) {
             return;
         }
         kick(viewer, SecurityMessageKey.SECURITY_VERIFY_LOCKED_OUT);
+    }
+
+    /** Put a lockout on record: the ban the operator asked for, and the event. Whether the ban was written. */
+    private boolean recordLockout(PlayerRef viewer) {
+        boolean banned = config.lockoutBans() && lockoutBan.ban(viewer, config.lockout(), config.lockoutBanReason());
+        events.publish(new AccountLockedOut(viewer, config.lockout(), banned));
+        return banned;
     }
 
     private void reopenKeypad(Player player, PlayerRef viewer) {

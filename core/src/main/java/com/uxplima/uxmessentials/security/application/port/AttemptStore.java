@@ -27,6 +27,9 @@ public interface AttemptStore {
     /** Start {@code player}'s count again from zero, leaving any lockout as it is. */
     void clearFailures(UUID player);
 
+    /** Take back one failure of {@code player}, never below zero: one reserved for a proof that was never checked. */
+    void refundFailure(UUID player);
+
     /**
      * Forget {@code player}'s lockout and count, only when their lockout ended at or before {@code now}: one another
      * backend set meanwhile stays.

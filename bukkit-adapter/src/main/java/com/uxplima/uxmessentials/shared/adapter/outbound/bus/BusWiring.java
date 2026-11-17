@@ -116,7 +116,10 @@ public final class BusWiring {
             }
             case REDIS -> {
                 BusTransport redis = redis(plugin, network, scheduler, log);
-                yield new Carriers(redis, null, redis);
+                // The proxy plugin still speaks to each backend over the player's connection: listen for that alone.
+                BusTransport proxyWord =
+                        new ProxyWordTransport(pluginMessaging(plugin, network, scheduler, receipts, log));
+                yield new Carriers(new CompositeBusTransport(proxyWord, redis), null, redis);
             }
             case BOTH -> {
                 PluginMessagingTransport proxy = pluginMessaging(plugin, network, scheduler, receipts, log);

@@ -74,6 +74,11 @@ public final class MemoryVerifiedSessions implements VerifiedSessions {
         proxySeen = true;
     }
 
+    @Override
+    public void forgetProxySeen() {
+        proxySeen = false;
+    }
+
     private record Row(Session session, Instant heldSince) {
 
         Row expiring(Instant at) {

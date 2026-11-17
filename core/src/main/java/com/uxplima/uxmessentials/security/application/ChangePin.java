@@ -40,17 +40,20 @@ public final class ChangePin {
         if (registration == null || !registration.pinSet()) {
             return limiter.isLockedOut(playerId, now) ? PinChangeResult.LOCKED_OUT : PinChangeResult.NOT_SET;
         }
-        AttemptLimiter.Attempt attempt = limiter.begin(playerId, now);
-        if (attempt.refused()) {
-            return PinChangeResult.LOCKED_OUT;
-        }
-        if (!repository.verifyPin(playerId, oldPin)) {
-            return limiter.failed(playerId, attempt, now).lockedOut()
-                    ? PinChangeResult.LOCKED_OUT
-                    : PinChangeResult.INVALID_PIN;
-        }
-        if (!limiter.succeeded(playerId, now)) {
-            return PinChangeResult.LOCKED_OUT;
+        AttemptLimiter.Checked checked = limiter.check(playerId, now, () -> repository.verifyPin(playerId, oldPin));
+        switch (checked.verdict()) {
+            case PASSED -> {
+                // Proven: go on below.
+            }
+            case WRONG -> {
+                return PinChangeResult.INVALID_PIN;
+            }
+            case LOCKED_OUT -> {
+                return PinChangeResult.LOCKED_OUT;
+            }
+            case BUSY -> {
+                return PinChangeResult.BUSY;
+            }
         }
         return switch (pinPolicy.validate(newPin)) {
             case OK -> {

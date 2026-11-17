@@ -4,11 +4,13 @@ import java.time.Duration;
 import java.time.Instant;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.function.BooleanSupplier;
+import java.util.function.Consumer;
 
 import com.uxplima.uxmessentials.security.application.port.AttemptStore;
-import com.uxplima.uxmessentials.security.application.port.VerifiedSessions;
 import com.uxplima.uxmessentials.security.domain.LockoutPolicy;
 
 /**
@@ -24,7 +26,8 @@ import com.uxplima.uxmessentials.security.domain.LockoutPolicy;
  * let it be checked once the budget is spent, so attempts made in parallel (several keypad submissions, two backends at
  * once) can never check more proofs than the budget allows. {@link #succeeded} forgets the count again, and
  * {@link #failed} turns the reserved failure into a lockout when it was the last one allowed. A lockout also drops
- * any proof the player could carry to another backend.
+ * any proof the player could carry to another backend. {@link #check} does all of that for one proof, with one proof
+ * in flight per player on this server, and gives the reserved attempt back when the proof could not be checked at all.
  *
  * <p>The count and the lockout live in the {@link AttemptStore}, which every backend on the database shares, so every
  * method but {@link #knownLockedOut} does I/O and runs off the tick. The pure retry/lock decision is delegated to
@@ -34,16 +37,23 @@ import com.uxplima.uxmessentials.security.domain.LockoutPolicy;
 public final class AttemptLimiter {
 
     private final AttemptStore store;
-    private final VerifiedSessions sessions;
+    private final Consumer<UUID> revokeSession;
     private final LockoutPolicy policy;
     private final Duration lockout;
 
     /** UUID to the end of a lockout this server set or read, for the answers that may not wait on the store. */
     private final ConcurrentHashMap<UUID, Instant> known = new ConcurrentHashMap<>();
 
-    public AttemptLimiter(AttemptStore store, VerifiedSessions sessions, LockoutPolicy policy, Duration lockout) {
+    /** The players with a proof being checked on this server right now. */
+    private final Set<UUID> checking = ConcurrentHashMap.newKeySet();
+
+    /**
+     * A limiter over {@code store}. {@code revokeSession} drops the proof a player could carry to another backend; it is
+     * called on every lockout, and may queue the drop behind that player's other session writes.
+     */
+    public AttemptLimiter(AttemptStore store, Consumer<UUID> revokeSession, LockoutPolicy policy, Duration lockout) {
         this.store = Objects.requireNonNull(store, "store");
-        this.sessions = Objects.requireNonNull(sessions, "sessions");
+        this.revokeSession = Objects.requireNonNull(revokeSession, "revokeSession");
         this.policy = Objects.requireNonNull(policy, "policy");
         this.lockout = Objects.requireNonNull(lockout, "lockout");
         if (lockout.isNegative()) {
@@ -80,6 +90,50 @@ public final class AttemptLimiter {
         Objects.requireNonNull(now, "now");
         Instant until = known.get(playerId);
         return until != null && now.isBefore(until);
+    }
+
+    /**
+     * Check one proof of {@code playerId} against the budget: reserve the attempt, run {@code proof} (true when the
+     * proof is right), and count the answer. A player has one proof in flight on this server at a time; another is
+     * {@link Verdict#BUSY} and not checked. When {@code proof} throws, the reserved attempt is given back, since nothing
+     * was proved either way, and the failure is passed on. Does I/O: run it off the tick.
+     */
+    public Checked check(UUID playerId, Instant now, BooleanSupplier proof) {
+        Objects.requireNonNull(playerId, "playerId");
+        Objects.requireNonNull(now, "now");
+        Objects.requireNonNull(proof, "proof");
+        if (!checking.add(playerId)) {
+            return Checked.BUSY;
+        }
+        try {
+            Attempt attempt = begin(playerId, now);
+            if (attempt.refused()) {
+                return Checked.LOCKED_OUT;
+            }
+            boolean right;
+            try {
+                right = proof.getAsBoolean();
+            } catch (RuntimeException failure) {
+                giveBack(playerId, failure);
+                throw failure;
+            }
+            if (!right) {
+                Outcome outcome = failed(playerId, attempt, now);
+                return outcome.lockedOut() ? Checked.LOCKED_OUT : new Checked(Verdict.WRONG, outcome.remaining());
+            }
+            return succeeded(playerId, now) ? Checked.PASSED : Checked.LOCKED_OUT;
+        } finally {
+            checking.remove(playerId);
+        }
+    }
+
+    /** Give back the attempt reserved for a proof that could not be checked; a failure here rides on {@code cause}. */
+    private void giveBack(UUID playerId, RuntimeException cause) {
+        try {
+            store.refundFailure(playerId);
+        } catch (RuntimeException refundFailed) {
+            cause.addSuppressed(refundFailed);
+        }
     }
 
     /**
@@ -168,7 +222,7 @@ public final class AttemptLimiter {
         store.lock(playerId, until);
         known.put(playerId, until);
         // A locked-out account carries no proof to another backend either.
-        sessions.revoke(playerId);
+        revokeSession.accept(playerId);
     }
 
     /**
@@ -181,6 +235,35 @@ public final class AttemptLimiter {
 
         static Attempt denied() {
             return new Attempt(true, 0);
+        }
+    }
+
+    /** What {@link #check} found. */
+    public enum Verdict {
+        /** The proof was right. */
+        PASSED,
+        /** The proof was wrong; attempts remain. */
+        WRONG,
+        /** The account is locked out, now or already; the proof counts for nothing. */
+        LOCKED_OUT,
+        /** Another proof of this player is being checked here; this one was not. */
+        BUSY
+    }
+
+    /**
+     * The result of {@link #check}.
+     *
+     * @param verdict what the check found
+     * @param remaining the attempts left after a {@link Verdict#WRONG} proof, zero otherwise
+     */
+    public record Checked(Verdict verdict, int remaining) {
+
+        public static final Checked PASSED = new Checked(Verdict.PASSED, 0);
+        public static final Checked LOCKED_OUT = new Checked(Verdict.LOCKED_OUT, 0);
+        public static final Checked BUSY = new Checked(Verdict.BUSY, 0);
+
+        public Checked {
+            Objects.requireNonNull(verdict, "verdict");
         }
     }
 

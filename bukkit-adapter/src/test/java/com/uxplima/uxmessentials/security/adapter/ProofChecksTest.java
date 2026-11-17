@@ -12,6 +12,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
+import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -22,14 +23,15 @@ import java.util.concurrent.atomic.AtomicInteger;
 import com.uxplima.uxmessentials.security.application.AttemptLimiter;
 import com.uxplima.uxmessentials.security.application.VerifyResult;
 import com.uxplima.uxmessentials.security.application.port.AttemptStore;
-import com.uxplima.uxmessentials.security.application.port.VerifiedSessions;
 import com.uxplima.uxmessentials.security.domain.LockoutPolicy;
+import com.uxplima.uxmessentials.shared.application.port.Logger;
 import org.junit.jupiter.api.Test;
 
 /**
  * A submitted proof is checked against the shared budget one at a time per player, its attempt counted before it is
- * checked: a burst of submissions on two backends at once checks no more proofs than the budget, and a right proof
- * checked while the account was locked out meanwhile reads as the lockout, never as a pass.
+ * checked: a burst of submissions on two backends at once checks no more proofs than the budget, a right proof checked
+ * while the account was locked out meanwhile reads as the lockout, and a proof that cannot be checked at all gives its
+ * attempt back.
  */
 class ProofChecksTest {
 
@@ -39,32 +41,27 @@ class ProofChecksTest {
 
     private final SharedAttempts store = new SharedAttempts();
     private final AtomicInteger checked = new AtomicInteger();
+    private final List<String> errors = new CopyOnWriteArrayList<>();
 
     @Test
-    void aPlayerHasOneCheckInFlightAtATime() throws Exception {
+    void aSecondSubmissionWhileTheFirstIsCheckedIsNotChecked() throws Exception {
         CountDownLatch inside = new CountDownLatch(1);
         CountDownLatch finish = new CountDownLatch(1);
-        ProofChecks checks = new ProofChecks(
+        ProofChecks checks = checks(
                 (player, candidate, now) -> {
                     inside.countDown();
                     await(finish);
                     return VerifyResult.INVALID;
                 },
-                limiter(),
-                CLOCK);
+                limiter());
         ExecutorService lane = Executors.newSingleThreadExecutor();
         try {
-            assertThat(checks.claim(ADA)).isTrue();
             Future<ProofChecks.Checked> first = lane.submit(() -> checks.check(ADA, "0000"));
             assertThat(inside.await(10, TimeUnit.SECONDS)).isTrue();
 
-            assertThat(checks.claim(ADA))
-                    .as("a second submission while the first is checked")
-                    .isFalse();
+            assertThat(checks.check(ADA, "1111")).isEqualTo(ProofChecks.Checked.BUSY);
             finish.countDown();
-            first.get(10, TimeUnit.SECONDS);
-
-            assertThat(checks.claim(ADA)).as("once the first is done").isTrue();
+            assertThat(first.get(10, TimeUnit.SECONDS).status()).isEqualTo(ProofChecks.Status.WRONG);
         } finally {
             lane.shutdownNow();
         }
@@ -83,9 +80,7 @@ class ProofChecksTest {
                 ProofChecks backend = i % 2 == 0 ? survival : lobby;
                 done.add(pool.submit(() -> {
                     await(start);
-                    if (backend.claim(ADA)) {
-                        backend.check(ADA, "0000");
-                    }
+                    backend.check(ADA, "0000");
                 }));
             }
             start.countDown();
@@ -95,7 +90,6 @@ class ProofChecksTest {
         } finally {
             pool.shutdownNow();
         }
-
         // Whatever the burst left of the budget, spend it one proof at a time.
         for (int i = 0; i < 3; i++) {
             survival.check(ADA, "0000");
@@ -109,15 +103,14 @@ class ProofChecksTest {
     @Test
     void aRightProofCheckedWhileAnotherBackendLockedTheAccountIsTheLockout() {
         AttemptLimiter lobby = limiter();
-        ProofChecks survival = new ProofChecks(
+        ProofChecks survival = checks(
                 (player, candidate, now) -> {
                     for (int i = 0; i < 3; i++) {
                         lobby.failed(ADA, lobby.begin(ADA, now), now);
                     }
                     return VerifyResult.SUCCESS;
                 },
-                limiter(),
-                CLOCK);
+                limiter());
 
         assertThat(survival.check(ADA, RIGHT)).isEqualTo(ProofChecks.Checked.LOCKED_OUT);
     }
@@ -129,21 +122,45 @@ class ProofChecksTest {
         survival.check(ADA, "0000");
 
         assertThat(survival.check(ADA, RIGHT).result()).isEqualTo(VerifyResult.SUCCESS);
-        assertThat(survival.check(ADA, "0000").outcome()).isEqualTo(new AttemptLimiter.Outcome(false, 2));
+        assertThat(survival.check(ADA, "0000"))
+                .isEqualTo(new ProofChecks.Checked(ProofChecks.Status.WRONG, VerifyResult.INVALID, 2));
+    }
+
+    @Test
+    void aProofThatCannotBeCheckedGivesItsAttemptBackAndSaysSo() {
+        ProofChecks outage = checks(
+                (player, candidate, now) -> {
+                    throw new IllegalStateException("database down");
+                },
+                limiter());
+        ProofChecks survival = counting(limiter());
+        survival.check(ADA, "0000");
+
+        for (int i = 0; i < 5; i++) {
+            assertThat(outage.check(ADA, RIGHT)).isEqualTo(ProofChecks.Checked.UNAVAILABLE);
+        }
+
+        assertThat(errors).hasSize(5).allMatch(line -> line.startsWith("event=security_proof_unchecked"));
+        assertThat(survival.check(ADA, "0000"))
+                .as("the outage spent nothing: one wrong proof before it, this is the second")
+                .isEqualTo(new ProofChecks.Checked(ProofChecks.Status.WRONG, VerifyResult.INVALID, 1));
     }
 
     private ProofChecks counting(AttemptLimiter limiter) {
-        return new ProofChecks(
+        return checks(
                 (player, candidate, now) -> {
                     checked.incrementAndGet();
                     return candidate.equals(RIGHT) ? VerifyResult.SUCCESS : VerifyResult.INVALID;
                 },
-                limiter,
-                CLOCK);
+                limiter);
+    }
+
+    private ProofChecks checks(ProofChecks.Prover prover, AttemptLimiter limiter) {
+        return new ProofChecks(prover, limiter, new Errors(errors), CLOCK);
     }
 
     private AttemptLimiter limiter() {
-        return new AttemptLimiter(store, new NoSessions(), new LockoutPolicy(3), Duration.ofMinutes(5));
+        return new AttemptLimiter(store, player -> {}, new LockoutPolicy(3), Duration.ofMinutes(5));
     }
 
     private static void await(CountDownLatch latch) {
@@ -183,6 +200,11 @@ class ProofChecksTest {
         }
 
         @Override
+        public synchronized void refundFailure(UUID player) {
+            failures.computeIfPresent(player, (id, count) -> Math.max(0, count - 1));
+        }
+
+        @Override
         public synchronized void clearExpired(UUID player, Instant now) {
             Instant until = locks.get(player);
             if (until != null && !now.isBefore(until)) {
@@ -199,38 +221,20 @@ class ProofChecksTest {
         }
     }
 
-    /** No player here holds a session to carry; a lockout drops none. */
-    private static final class NoSessions implements VerifiedSessions {
+    private record Errors(List<String> lines) implements Logger {
 
         @Override
-        public Optional<Session> find(UUID player) {
-            return Optional.empty();
+        public void info(String message, Object... args) {}
+
+        @Override
+        public void warn(String message, Object... args) {}
+
+        @Override
+        public void error(String message, Throwable cause) {
+            lines.add(message);
         }
 
         @Override
-        public void record(
-                UUID player, String server, Optional<UUID> connection, Optional<String> ipHash, Instant now) {}
-
-        @Override
-        public boolean take(UUID player, String server, Session seen, Instant now) {
-            return false;
-        }
-
-        @Override
-        public void release(UUID player, String server, Instant expiresAt) {}
-
-        @Override
-        public void releaseAll(String server, Instant startedAt) {}
-
-        @Override
-        public void revoke(UUID player) {}
-
-        @Override
-        public boolean proxySeen() {
-            return false;
-        }
-
-        @Override
-        public void markProxySeen(Instant at) {}
+        public void debug(String message, Object... args) {}
     }
 }

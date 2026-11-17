@@ -36,6 +36,11 @@ public final class MemoryAttemptStore implements AttemptStore {
     }
 
     @Override
+    public synchronized void refundFailure(UUID player) {
+        failures.computeIfPresent(player, (id, count) -> Math.max(0, count - 1));
+    }
+
+    @Override
     public synchronized void clearExpired(UUID player, Instant now) {
         Instant until = locks.get(player);
         if (until != null && !now.isBefore(until)) {

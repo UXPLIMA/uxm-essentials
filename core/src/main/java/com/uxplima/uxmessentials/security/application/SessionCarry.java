@@ -113,6 +113,14 @@ public final class SessionCarry {
         sessions.markProxySeen(now);
     }
 
+    /**
+     * Forget that the proxy plugin was ever heard, so proofs carry on the address again until it is heard anew: what an
+     * operator does after removing the proxy plugin, or when the record was set by mistake.
+     */
+    public void forgetProxy() {
+        sessions.forgetProxySeen();
+    }
+
     /** Forget {@code player}'s session, so their next arrival anywhere proves the factor again. */
     public void revoke(UUID player) {
         sessions.revoke(player);

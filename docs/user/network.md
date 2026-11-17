@@ -301,16 +301,19 @@ Wrong PINs and authenticator codes, and the lockout they end in, are kept in the
 `max-attempts` tries across the whole network, not on each server, and a lockout holds on every server. A player who
 proved their factor keeps the proof when they switch servers, so they are not asked again on each one:
 
-- Once any server has heard from `uxmEssentials-velocity`, which the shared database remembers, a proof is carried
-  only across a switch the proxy confirms, on the connection the proof was made over. Every new login asks again.
-  The proxy says so over the Velocity carrier and signs it with its `bus.secret`: without that secret, or with
-  `network.transport = redis` alone, its word never arrives and every switch asks again.
-- On a network that has never heard from the proxy plugin, a player who arrives from the address the proof was made
+- Once any server has had the word of `uxmEssentials-velocity` about a player who joined it, which the shared
+  database remembers, a proof is carried only across a switch the proxy confirms, on the connection the proof was
+  made over. Every new login asks again. The proxy says so over the player's own connection, signed with its
+  `bus.secret`, so it arrives with any `network.transport` as long as `network.bus.secret` is set to the same value;
+  without that, every switch asks again. After removing the proxy plugin, `/security forget-proxy` lets proofs carry
+  on the address again.
+- On a network that has never had the proxy plugin's word, a player who arrives from the address the proof was made
   from is let in unasked within `switch-grace-seconds` (30) of leaving a server, or while that server still lists
   them. That includes logging in again from the same address within that time, by the player or by anyone behind
   the same address (a shared home or NAT) who can log in to the account: the trade-off of having no proxy to tell a
   switch from a new login. Install the proxy plugin where that matters.
 - `switch-grace-seconds = 0` asks on every server. `/2fa force`, a factor reset and a lockout drop a carried proof.
+  A proof that cannot be checked (the database is down) costs no attempt; the player is told to try again.
 
 ### Kits, ranks and vaults
 

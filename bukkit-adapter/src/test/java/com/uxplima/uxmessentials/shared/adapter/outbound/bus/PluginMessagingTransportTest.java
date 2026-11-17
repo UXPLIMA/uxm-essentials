@@ -88,6 +88,27 @@ class PluginMessagingTransportTest {
     }
 
     @Test
+    void onARedisBusOnlyTheProxysSignedWordIsTakenFromThePlayerChannelAndNothingIsSentOnIt() {
+        ProxyConnectionFrame word = new ProxyConnectionFrame(
+                ProxyConnectionFrame.PROXY, new UUID(2L, 3L), new UUID(0L, 7L), new UUID(1L, 1L), "s", false);
+        FrameSeal seal = new FrameSeal(BusSecret.of(SECRET), () -> now);
+        FrameSeal other = new FrameSeal(BusSecret.of("sJ2gF0dH5cB3yN6wZ1tR8pL4vX9m2Q7k-other"), () -> now);
+        ProxyWordTransport listening = new ProxyWordTransport(transport);
+        listening.start(delivered::add);
+
+        transport.received(CHANNEL, seal.seal(NetworkMessageCodec.encode(word)));
+        transport.received(CHANNEL, seal.seal(FRAME));
+        transport.received(CHANNEL, other.seal(NetworkMessageCodec.encode(word)));
+        pluginChannel.online = true;
+        listening.send(FRAME);
+
+        assertThat(delivered).hasSize(1);
+        assertThat(NetworkMessageCodec.decode(delivered.getFirst())).isEqualTo(word);
+        assertThat(pluginChannel.sent).isEmpty();
+        assertThat(listening.healthy()).isFalse();
+    }
+
+    @Test
     void aProxyConnectionFrameIsReceiptedWithTheConnectionThatCarriedItWhenItIsAboutThatPlayer() {
         UUID ada = new UUID(0L, 7L);
         UUID bob = new UUID(0L, 8L);

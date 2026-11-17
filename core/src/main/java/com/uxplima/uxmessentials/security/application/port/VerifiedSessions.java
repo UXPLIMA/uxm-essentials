@@ -53,6 +53,9 @@ public interface VerifiedSessions {
     /** A backend heard from the proxy plugin at {@code at}; from now on {@link #proxySeen} answers true everywhere. */
     void markProxySeen(Instant at);
 
+    /** Forget that the proxy plugin was heard, for every backend, until a backend hears from it again. */
+    void forgetProxySeen();
+
     /**
      * One player's session as stored.
      *

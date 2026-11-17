@@ -138,23 +138,15 @@ public final class ReauthController implements KeypadActions {
 
     private void verifySubmission(Player player, PlayerRef viewer, String candidate, boolean reopenOnFailure) {
         OptionalLong token = sessions.token(viewer.uuid());
-        if (token.isEmpty() || !checks.claim(viewer.uuid())) {
-            // No prompt, or a proof of theirs is still being checked: one at a time, so a burst cannot outrun the
-            // attempt budget.
+        if (token.isEmpty()) {
             return;
         }
-        try {
-            scheduler.async(() -> {
-                // The shared budget is a database record, so the proof is checked here, off the tick, before the
-                // answer goes back to the player's thread.
-                ProofChecks.Checked checked = checks.check(viewer.uuid(), candidate);
-                scheduler.onEntity(
-                        viewer, () -> applyResult(player, viewer, checked, token.getAsLong(), reopenOnFailure));
-            });
-        } catch (RuntimeException refused) {
-            checks.release(viewer.uuid());
-            throw refused;
-        }
+        scheduler.async(() -> {
+            // The shared budget is a database record, so the proof is checked here, off the tick, before the answer
+            // goes back to the player's thread. One check runs per player; a submission made meanwhile is dropped.
+            ProofChecks.Checked checked = checks.check(viewer.uuid(), candidate);
+            scheduler.onEntity(viewer, () -> applyResult(player, viewer, checked, token.getAsLong(), reopenOnFailure));
+        });
     }
 
     private void applyResult(
@@ -163,13 +155,23 @@ public final class ReauthController implements KeypadActions {
             // The prompt this proof was for is over: they left, or ran another protected command meanwhile.
             return;
         }
-        if (checked.outcome().lockedOut() || limiter.knownLockedOut(viewer.uuid(), clock.instant())) {
+        if (checked.status() == ProofChecks.Status.LOCKED_OUT
+                || limiter.knownLockedOut(viewer.uuid(), clock.instant())) {
             fail(player, viewer, new AttemptLimiter.Outcome(true, 0), reopenOnFailure);
             return;
         }
-        switch (checked.result()) {
-            case SUCCESS, NOT_ENROLLED -> succeed(viewer);
-            case INVALID -> fail(player, viewer, checked.outcome(), reopenOnFailure);
+        switch (checked.status()) {
+            case PASSED -> succeed(viewer);
+            case WRONG -> fail(player, viewer, new AttemptLimiter.Outcome(false, checked.remaining()), reopenOnFailure);
+            case UNAVAILABLE -> {
+                notify(viewer, SecurityMessageKey.SECURITY_VERIFY_UNAVAILABLE);
+                if (reopenOnFailure) {
+                    reopenKeypad(player, viewer);
+                }
+            }
+            case BUSY, LOCKED_OUT -> {
+                // Busy: the check already running answers. Locked out: handled above.
+            }
         }
     }
 

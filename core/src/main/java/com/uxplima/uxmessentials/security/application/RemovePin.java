@@ -36,17 +36,20 @@ public final class RemovePin {
         if (registration == null || !registration.pinSet()) {
             return limiter.isLockedOut(playerId, now) ? PinRemoveResult.LOCKED_OUT : PinRemoveResult.NOT_SET;
         }
-        AttemptLimiter.Attempt attempt = limiter.begin(playerId, now);
-        if (attempt.refused()) {
-            return PinRemoveResult.LOCKED_OUT;
-        }
-        if (!repository.verifyPin(playerId, pin)) {
-            return limiter.failed(playerId, attempt, now).lockedOut()
-                    ? PinRemoveResult.LOCKED_OUT
-                    : PinRemoveResult.INVALID_PIN;
-        }
-        if (!limiter.succeeded(playerId, now)) {
-            return PinRemoveResult.LOCKED_OUT;
+        AttemptLimiter.Checked checked = limiter.check(playerId, now, () -> repository.verifyPin(playerId, pin));
+        switch (checked.verdict()) {
+            case PASSED -> {
+                // Proven: go on below.
+            }
+            case WRONG -> {
+                return PinRemoveResult.INVALID_PIN;
+            }
+            case LOCKED_OUT -> {
+                return PinRemoveResult.LOCKED_OUT;
+            }
+            case BUSY -> {
+                return PinRemoveResult.BUSY;
+            }
         }
         repository.clearPin(playerId);
         return PinRemoveResult.REMOVED;

@@ -6,6 +6,7 @@ import java.util.Objects;
 import org.bukkit.command.CommandSender;
 import org.bukkit.entity.Player;
 
+import com.uxplima.uxmessentials.security.domain.SecurityMessageKey;
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandFeedback;
 import com.uxplima.uxmessentials.shared.adapter.outbound.BukkitRefs;
 import com.uxplima.uxmessentials.shared.application.port.MessageSink;
@@ -56,6 +57,20 @@ abstract class SecurityCommandSupport {
     /** Send {@code key} to {@code sender} synchronously on the calling (tick) thread: for the cheap gating replies. */
     protected void reply(CommandSender sender, MessageKey key) {
         feedback.send(sender, key);
+    }
+
+    /**
+     * Run {@code work}, a proof checked off the tick, and tell {@code who} the check is unavailable when it fails (the
+     * database or the key file could not be read): the attempt was given back, and they may try again. The failure is
+     * passed on to be logged.
+     */
+    protected void unavailableOnFailure(PlayerRef who, Runnable work) {
+        try {
+            work.run();
+        } catch (RuntimeException failure) {
+            notify(who, SecurityMessageKey.SECURITY_VERIFY_UNAVAILABLE);
+            throw failure;
+        }
     }
 
     /** Resolve {@code key} for {@code viewer} and deliver it through the sink, safe to call off the tick thread. */

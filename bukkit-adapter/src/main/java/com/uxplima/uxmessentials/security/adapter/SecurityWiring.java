@@ -105,11 +105,14 @@ public final class SecurityWiring {
         // the op re-auth keypad, /2fa disable, /pin change and /pin remove. A failed proof on any of them counts
         // toward, and a lockout blocks, all of them, on every backend of the database. Built from the
         // join-verification lockout policy and duration.
-        // A lockout also drops any proof the player could carry to another backend, so the limiter holds the sessions.
+        // A lockout also drops any proof the player could carry to another backend. The drop joins that player's other
+        // session writes on the lane, so a proof still being recorded cannot land after it and bring the session back.
         VerifiedSessions verifiedSessions = TrustStores.sessions(persistence);
+        PlayerLane sessionLane = new PlayerLane(kernel.scheduler(), kernel.log());
         AttemptLimiter limiter = new AttemptLimiter(
                 TrustStores.attempts(persistence),
-                verifiedSessions,
+                player -> sessionLane.run(
+                        player, "security_session_revoke_failed", () -> verifiedSessions.revoke(player)),
                 config.joinVerification().lockoutPolicy(),
                 config.joinVerification().lockout());
         BeginTotpEnrollment begin = new BeginTotpEnrollment(new SecretGenerator(), pending, twoFactor.issuer());
@@ -170,7 +173,7 @@ public final class SecurityWiring {
                 kernel.log());
         VerifyTwoFactor verify = new VerifyTwoFactor(repository, twoFactor.codeWindow());
         // One check in flight per player across the join freeze and the op re-auth, each reserved on the budget first.
-        ProofChecks checks = new ProofChecks(verify, limiter, clock);
+        ProofChecks checks = new ProofChecks(verify, limiter, kernel.log(), clock);
         TextInputTotpPrompt totpPrompt = new TextInputTotpPrompt(textInput);
         // The create-a-PIN pad: shown to a player holding uxmessentials.security.pin.required who has no factor, so
         // "you must have a PIN" is enforceable rather than advisory. It writes through the same SetPin the /pin
@@ -204,14 +207,7 @@ public final class SecurityWiring {
         // or takes from here on carries a later time and stays, so joins need not wait for this.
         java.time.Instant started = clock.instant();
         if (carry.enabled()) {
-            kernel.scheduler().async(() -> {
-                try {
-                    carry.started(serverId, started);
-                    arrivals.load();
-                } catch (RuntimeException failure) {
-                    kernel.log().error("event=security_session_start_failed server=" + serverId, failure);
-                }
-            });
+            kernel.scheduler().async(() -> releaseAtStart(kernel, carry, serverId, started, 1));
         }
         VerificationController controller = new VerificationController(
                 repository,
@@ -236,6 +232,7 @@ public final class SecurityWiring {
                 arrivals,
                 serverId,
                 network.presence(),
+                sessionLane,
                 kernel.scheduler(),
                 kernel.messages(),
                 kernel.messageSink(),
@@ -275,6 +272,7 @@ public final class SecurityWiring {
                         forceReverification,
                         resetFactors,
                         controller,
+                        carry,
                         kernel.playerLookup(),
                         kernel.log(),
                         kernel.scheduler(),
@@ -438,6 +436,29 @@ public final class SecurityWiring {
             // The hook lives on another plugin's handler list, so a disable that left it there would keep calling into
             // a module that is no longer running.
             handoff.unhook();
+        }
+    }
+
+    /** How often the release at start is tried before it is left to the log. */
+    private static final int START_RELEASE_TRIES = 4;
+
+    /**
+     * Release the sessions this backend held from before {@code started}, trying again a little later each time the
+     * database refuses, since a session it still seems to hold stays carryable to the player's address.
+     */
+    private static void releaseAtStart(
+            KernelPorts kernel, SessionCarry carry, String serverId, java.time.Instant started, int attempt) {
+        try {
+            carry.started(serverId, started);
+        } catch (RuntimeException failure) {
+            if (attempt >= START_RELEASE_TRIES) {
+                kernel.log().error("event=security_session_start_failed server=" + serverId, failure);
+                return;
+            }
+            kernel.scheduler()
+                    .asyncAfter(
+                            java.time.Duration.ofSeconds(5L << (attempt - 1)),
+                            () -> releaseAtStart(kernel, carry, serverId, started, attempt + 1));
         }
     }
 }

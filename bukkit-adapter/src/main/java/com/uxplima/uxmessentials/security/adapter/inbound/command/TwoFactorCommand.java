@@ -203,7 +203,8 @@ public final class TwoFactorCommand extends SecurityCommandSupport implements Co
         }
         String code = ctx.getArgument("code", String.class);
         PlayerRef who = ref(player);
-        scheduler.async(() -> notify(who, disableMessage(disable.disable(who.uuid(), code, clock.instant()))));
+        scheduler.async(() -> unavailableOnFailure(
+                who, () -> notify(who, disableMessage(disable.disable(who.uuid(), code, clock.instant())))));
         return Command.SINGLE_SUCCESS;
     }
 
@@ -221,6 +222,7 @@ public final class TwoFactorCommand extends SecurityCommandSupport implements Co
             case NOT_ENROLLED -> SecurityMessageKey.SECURITY_2FA_DISABLE_NOT_ENROLLED;
             case INVALID_CODE -> SecurityMessageKey.SECURITY_2FA_DISABLE_INVALID;
             case LOCKED_OUT -> SecurityMessageKey.SECURITY_2FA_DISABLE_LOCKED_OUT;
+            case BUSY -> SecurityMessageKey.SECURITY_VERIFY_UNAVAILABLE;
         };
     }
 }

@@ -2,12 +2,14 @@ package com.uxplima.uxmessentials.security.adapter;
 
 import java.time.Clock;
 import java.time.Duration;
+import java.time.Instant;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.BooleanSupplier;
 
 import com.uxplima.uxmessentials.security.application.SessionCarry;
@@ -30,10 +32,12 @@ import org.jspecify.annotations.NullMarked;
  * ({@link CarrierReceipts}), and arrived after that join began: what the proxy said about an earlier visit never
  * speaks for a later one.
  *
- * <p>Once any backend of the network has heard from the proxy plugin, it is remembered in the shared store, and every
- * arrival waits for the proxy's word from then on: a proof is never carried on the address alone on a network that
- * runs the proxy plugin. Until that is read at start, the proxy counts as seen. Only a network that has never heard
- * from it gets {@link Arrival.NoProxy}.
+ * <p>Once any backend of the network has had such a frame, it is remembered in the shared store, and every arrival
+ * waits for the proxy's word from then on: a proof is never carried on the address alone on a network that runs the
+ * proxy plugin. Only such a frame records it: the proxy answering on the bus is proof of nothing a client could not
+ * echo, so it only keeps the current arrival waiting. The record is read on every arrival, so an operator's reset
+ * applies at once; a record that cannot be read counts as seen. Only a network that has never had the proxy plugin's
+ * word gets {@link Arrival.NoProxy}.
  */
 @NullMarked
 public final class ProxyArrivals implements RemoteSyncListener {
@@ -54,17 +58,11 @@ public final class ProxyArrivals implements RemoteSyncListener {
 
     private final Map<UUID, Heard> heard = new ConcurrentHashMap<>();
     private final Map<UUID, CompletableFuture<Arrival>> waiting = new ConcurrentHashMap<>();
-    private final Object seenLock = new Object();
-
-    /** Whether the network has heard from the proxy plugin; true until the shared store says otherwise. */
-    private boolean seen = true;
-
-    /** Whether the shared store already holds that the proxy was heard, so it is written once. */
-    private boolean stored;
+    private final AtomicBoolean warnedServerName = new AtomicBoolean();
 
     /**
      * Arrivals heard through the bus by {@code serverId}. {@code proxyAnswering} says whether the proxy answers on the
-     * bus now; {@code carry} keeps whether it ever did.
+     * bus now; {@code carry} keeps whether its word ever reached a backend.
      */
     public ProxyArrivals(
             Scheduler scheduler,
@@ -83,18 +81,6 @@ public final class ProxyArrivals implements RemoteSyncListener {
         this.clock = Objects.requireNonNull(clock, "clock");
     }
 
-    /** Read whether the network has ever heard from the proxy plugin. Does I/O: run it off the tick, at start. */
-    public void load() {
-        boolean known = carry.proxySeen();
-        synchronized (seenLock) {
-            if (known) {
-                stored = true;
-            } else if (!stored) {
-                seen = false;
-            }
-        }
-    }
-
     /** {@code player}'s join begins now: nothing the proxy said before it speaks for it. Call it on their thread. */
     public void joined(UUID player) {
         Objects.requireNonNull(player, "player");
@@ -109,12 +95,20 @@ public final class ProxyArrivals implements RemoteSyncListener {
             return;
         }
         Optional<CarrierReceipts.Receipt> receipt = receipts.take(frame.frameId());
-        if (receipt.isEmpty()
-                || !receipt.get().carrier().equals(frame.player())
-                || !frame.server().equals(serverId)) {
+        if (receipt.isEmpty() || !receipt.get().carrier().equals(frame.player())) {
             return;
         }
-        heardFromProxy();
+        if (!frame.server().equals(serverId)) {
+            if (warnedServerName.compareAndSet(false, true)) {
+                log.warn(
+                        "event=security_proxy_server_mismatch proxy_name={} server_name={} the proxy calls this backend"
+                                + " by another name than network.server-name, so no switch it confirms is carried here",
+                        frame.server(),
+                        serverId);
+            }
+            return;
+        }
+        remember();
         Heard word = new Heard(frame, receipt.get().receivedNanos());
         heard.merge(frame.player(), word, (old, now) -> now.receivedNanos() - old.receivedNanos() >= 0 ? now : old);
         CompletableFuture<Arrival> asked = waiting.get(frame.player());
@@ -125,13 +119,11 @@ public final class ProxyArrivals implements RemoteSyncListener {
 
     /**
      * How {@code player}, who just joined, arrived: once the proxy has said so, or as unconfirmed when it has not
-     * within {@link #WAIT}. Never completes exceptionally.
+     * within {@link #WAIT}. Reads the shared store: run it off the tick. Never completes exceptionally.
      */
     public CompletableFuture<Arrival> arrival(UUID player) {
         Objects.requireNonNull(player, "player");
-        if (proxyAnswering.getAsBoolean()) {
-            heardFromProxy();
-        } else if (!proxySeen()) {
+        if (!proxyAnswering.getAsBoolean() && !proxySeen()) {
             return CompletableFuture.completedFuture(new Arrival.NoProxy());
         }
         Optional<ProxyConnectionFrame> known = said(player);
@@ -183,36 +175,29 @@ public final class ProxyArrivals implements RemoteSyncListener {
         return began != null && word.receivedNanos() - began >= 0;
     }
 
+    /** Whether the network ever had the proxy's word; a store that cannot be read counts as yes. */
     private boolean proxySeen() {
-        synchronized (seenLock) {
-            return seen;
+        try {
+            return carry.proxySeen();
+        } catch (RuntimeException failure) {
+            log.error("event=security_proxy_seen_unread", failure);
+            return true;
         }
     }
 
-    /** The proxy plugin answered: remember it here, and once in the shared store for every backend. */
-    private void heardFromProxy() {
-        synchronized (seenLock) {
-            seen = true;
-            if (stored) {
-                return;
-            }
-            stored = true;
-        }
+    /** A frame from the proxy plugin reached this backend: record it once for every backend. */
+    private void remember() {
+        Instant now = clock.instant();
         try {
             scheduler.async(() -> {
                 try {
-                    carry.proxyHeard(clock.instant());
+                    carry.proxyHeard(now);
                 } catch (RuntimeException failure) {
-                    synchronized (seenLock) {
-                        stored = false;
-                    }
                     log.error("event=security_proxy_seen_unwritten", failure);
                 }
             });
         } catch (RuntimeException refused) {
-            synchronized (seenLock) {
-                stored = false;
-            }
+            // The scheduler refuses work while the plugin stops; the next frame records it.
         }
     }
 

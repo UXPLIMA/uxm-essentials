@@ -48,7 +48,16 @@ final class PlayerLane {
                 player,
                 (id, tail) -> (tail == null ? IDLE : tail)
                         .handle((done, failure) -> (Void) null)
-                        .thenRunAsync(guarded, scheduler::async));
+                        .thenRunAsync(guarded, this::submit));
         var unused = next.whenComplete((done, failure) -> tails.remove(player, next));
+    }
+
+    /** Hand one step to the async lane; one the scheduler refuses while the plugin stops is dropped. */
+    private void submit(Runnable step) {
+        try {
+            scheduler.async(step);
+        } catch (RuntimeException refused) {
+            log.warn("event=security_session_write_dropped reason=scheduler_stopped");
+        }
     }
 }

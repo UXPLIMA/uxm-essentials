@@ -2,6 +2,7 @@ package com.uxplima.uxmessentials.security.application;
 
 import static com.uxplima.uxmessentials.testing.Fixtures.NOW;
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import java.time.Duration;
 import java.time.Instant;
@@ -32,8 +33,8 @@ class AttemptLimiterTest {
 
     private final MemoryAttemptStore shared = new MemoryAttemptStore();
     private final MemoryVerifiedSessions sessions = new MemoryVerifiedSessions();
-    private final AttemptLimiter survival = new AttemptLimiter(shared, sessions, new LockoutPolicy(3), LOCKOUT);
-    private final AttemptLimiter lobby = new AttemptLimiter(shared, sessions, new LockoutPolicy(3), LOCKOUT);
+    private final AttemptLimiter survival = new AttemptLimiter(shared, sessions::revoke, new LockoutPolicy(3), LOCKOUT);
+    private final AttemptLimiter lobby = new AttemptLimiter(shared, sessions::revoke, new LockoutPolicy(3), LOCKOUT);
 
     @Test
     void hoppingBetweenBackendsDoesNotBuyMoreAttempts() {
@@ -129,6 +130,36 @@ class AttemptLimiterTest {
         } finally {
             pool.shutdownNow();
         }
+    }
+
+    @Test
+    void aProofThatCannotBeCheckedGivesItsAttemptBackAndIsPassedOn() {
+        wrong(survival, NOW);
+
+        for (int i = 0; i < 5; i++) {
+            assertThatThrownBy(() -> survival.check(ADA, NOW, () -> {
+                        throw new IllegalStateException("database down");
+                    }))
+                    .isInstanceOf(IllegalStateException.class);
+        }
+
+        assertThat(lobby.check(ADA, NOW, () -> false))
+                .as("the outage spent nothing: one wrong proof before it, this is the second")
+                .isEqualTo(new AttemptLimiter.Checked(AttemptLimiter.Verdict.WRONG, 1));
+    }
+
+    @Test
+    void aProofSubmittedWhileAnotherIsCheckedOnThisServerIsNotChecked() {
+        AttemptLimiter.Checked[] inner = new AttemptLimiter.Checked[1];
+
+        AttemptLimiter.Checked outer = survival.check(ADA, NOW, () -> {
+            inner[0] = survival.check(ADA, NOW, () -> true);
+            return false;
+        });
+
+        assertThat(inner[0]).isEqualTo(AttemptLimiter.Checked.BUSY);
+        assertThat(outer).isEqualTo(new AttemptLimiter.Checked(AttemptLimiter.Verdict.WRONG, 2));
+        assertThat(survival.check(ADA, NOW, () -> true)).isEqualTo(AttemptLimiter.Checked.PASSED);
     }
 
     @Test
