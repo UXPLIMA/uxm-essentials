@@ -117,13 +117,33 @@ public final class JooqVoteRepository extends JooqRepository implements VoteRepo
     @Override
     public List<QueuedReward> drainFor(PlayerRef player) {
         Objects.requireNonNull(player, "player");
-        return write(dsl -> {
-            QueuedReward batch = selectBatch(dsl, player);
-            dsl.deleteFrom(VOTE_QUEUE)
-                    .where(VOTE_QUEUE.PLAYER.eq(player.uuid().toString()))
-                    .execute();
-            return batch.commands().isEmpty() ? List.<QueuedReward>of() : List.of(batch);
-        });
+        String uuid = player.uuid().toString();
+        List<? extends Record> rows = read(dsl -> dsl.selectFrom(VOTE_QUEUE)
+                .where(VOTE_QUEUE.PLAYER.eq(uuid))
+                .orderBy(VOTE_QUEUE.IDX.asc())
+                .fetch());
+        // Each row is deleted on its own and paid only when this delete removed it: a join and a server told of a vote
+        // received elsewhere can drain the same player at once, and a row must be paid by one of them only. The row is
+        // matched on all its columns, since an index freed by a drain can be taken again by a vote queued meanwhile.
+        List<String> commands = new ArrayList<>();
+        java.time.Instant queuedAt = java.time.Instant.EPOCH;
+        for (Record row : rows) {
+            int idx = row.get(VOTE_QUEUE.IDX);
+            String command = row.get(VOTE_QUEUE.COMMAND);
+            long at = row.get(VOTE_QUEUE.QUEUED_AT);
+            boolean removed = write(dsl -> dsl.deleteFrom(VOTE_QUEUE)
+                            .where(VOTE_QUEUE.PLAYER.eq(uuid))
+                            .and(VOTE_QUEUE.IDX.eq(idx))
+                            .and(VOTE_QUEUE.COMMAND.eq(command))
+                            .and(VOTE_QUEUE.QUEUED_AT.eq(at))
+                            .execute()
+                    == 1);
+            if (removed) {
+                commands.add(VoteRows.toCommand(row));
+                queuedAt = VoteRows.toQueuedAt(row);
+            }
+        }
+        return commands.isEmpty() ? List.of() : List.of(new QueuedReward(player, commands, queuedAt));
     }
 
     @Override
@@ -402,18 +422,5 @@ public final class JooqVoteRepository extends JooqRepository implements VoteRepo
                             .where(VOTE_QUEUE.PLAYER.eq(player)))
                     .execute();
         }
-    }
-
-    private static QueuedReward selectBatch(DSLContext dsl, PlayerRef player) {
-        List<String> commands = new ArrayList<>();
-        java.time.Instant queuedAt = java.time.Instant.EPOCH;
-        for (Record row : dsl.selectFrom(VOTE_QUEUE)
-                .where(VOTE_QUEUE.PLAYER.eq(player.uuid().toString()))
-                .orderBy(VOTE_QUEUE.IDX.asc())
-                .fetch()) {
-            commands.add(VoteRows.toCommand(row));
-            queuedAt = VoteRows.toQueuedAt(row);
-        }
-        return new QueuedReward(player, commands, queuedAt);
     }
 }

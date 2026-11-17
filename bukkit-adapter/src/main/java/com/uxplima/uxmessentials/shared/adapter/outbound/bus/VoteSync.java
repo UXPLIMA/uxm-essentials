@@ -11,12 +11,19 @@ import java.util.function.Consumer;
 
 import com.uxplima.uxmessentials.persistence.vote.CachedVoteRepository;
 import com.uxplima.uxmessentials.shared.application.RecentIds;
+import com.uxplima.uxmessentials.shared.application.port.Logger;
+import com.uxplima.uxmessentials.shared.application.port.PlayerLookup;
+import com.uxplima.uxmessentials.shared.application.port.Scheduler;
 import com.uxplima.uxmessentials.shared.display.BroadcastChannel;
 import com.uxplima.uxmessentials.shared.domain.DomainEvent;
+import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmessentials.shared.network.VoteCounterChanged;
 import com.uxplima.uxmessentials.shared.network.VotePartyFired;
+import com.uxplima.uxmessentials.shared.network.VoteRewardsQueued;
+import com.uxplima.uxmessentials.vote.application.PayRemoteVote;
 import com.uxplima.uxmessentials.vote.application.RewardNetworkParty;
 import com.uxplima.uxmessentials.vote.application.port.ForwardingVoteRepository;
+import com.uxplima.uxmessentials.vote.application.port.RemoteVoter;
 import com.uxplima.uxmessentials.vote.application.port.VoteBroadcaster;
 import com.uxplima.uxmessentials.vote.application.port.VoteRepository;
 import com.uxplima.uxmessentials.vote.domain.VoteMessageKey;
@@ -67,7 +74,57 @@ public final class VoteSync {
      */
     static final Duration LATE_COPY_GRACE = Duration.ofSeconds(60);
 
+    /**
+     * How often, and how far apart, a server paying a vote received elsewhere looks for the queued rewards again: the
+     * receiving server writes the queue on its async lane, so the announcement can arrive before the rows do.
+     */
+    static final int PAY_ATTEMPTS = 3;
+
+    static final Duration PAY_RETRY = Duration.ofSeconds(1);
+
     private VoteSync() {}
+
+    /**
+     * A {@link RemoteVoter} that announces a vote credited to a player on another server as a {@link VoteRewardsQueued}
+     * frame, so that server pays the queued rewards now. A lost announcement only means the rewards wait for the
+     * player's next join.
+     */
+    public static RemoteVoter remoteVoter(BusPublisher bus, Logger log) {
+        Objects.requireNonNull(bus, "bus");
+        Objects.requireNonNull(log, "log");
+        return (voter, serviceName) -> {
+            try {
+                bus.publish(new VoteRewardsQueued(bus.serverId(), voter.uuid(), serviceName));
+            } catch (RuntimeException failure) {
+                log.error("failed to announce the queued vote rewards of player " + voter.uuid(), failure);
+            }
+        };
+    }
+
+    /**
+     * A listener that, on a remote {@link VoteRewardsQueued} for a player online here, pays them what is queued, off the
+     * tick. A drain that finds nothing yet is tried again a few times, since the queue may not be written yet; the
+     * drain removes what it pays, so a second copy of the frame, or the player's next join, pays nothing twice.
+     */
+    public static RemoteSyncListener queuedListener(PayRemoteVote pay, PlayerLookup players, Scheduler scheduler) {
+        Objects.requireNonNull(pay, "pay");
+        Objects.requireNonNull(players, "players");
+        Objects.requireNonNull(scheduler, "scheduler");
+        return message -> {
+            if (message instanceof VoteRewardsQueued queued && players.isOnline(queued.player())) {
+                players.findByUuid(queued.player())
+                        .ifPresent(voter -> scheduler.async(
+                                () -> payOrRetry(pay, scheduler, voter, queued.service(), PAY_ATTEMPTS)));
+            }
+        };
+    }
+
+    private static void payOrRetry(
+            PayRemoteVote pay, Scheduler scheduler, PlayerRef voter, String service, int attemptsLeft) {
+        if (!pay.pay(voter, service) && attemptsLeft > 1) {
+            scheduler.asyncAfter(PAY_RETRY, () -> payOrRetry(pay, scheduler, voter, service, attemptsLeft - 1));
+        }
+    }
 
     /** A {@link VoteRepository} that broadcasts a {@link VoteCounterChanged} after every counter mutation. */
     public static VoteRepository repository(CachedVoteRepository delegate, BusPublisher bus) {

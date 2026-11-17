@@ -206,7 +206,7 @@ shared: each backend reads its own `config.conf` and module files, so keep them 
 | Holograms, NPCs, main spawn | Definitions, with a scope | Edits show on every server in scope | `network.shared-sets` |
 | Guard | Regions, with a scope | Edits apply on every server in scope | none; shared sets in `modules/guard/config.conf` |
 | Trade | Escrow | Two players on different servers trade | `trade` `cross-server` |
-| Vote | Party counter | A party pays players on every server | `voteparty.network-rewards` in `vote`, default on |
+| Vote | Party counter, queued rewards | A party pays players on every server; a vote for a player on another server pays them there at once | `voteparty.network-rewards` in `vote`, default on |
 | Playtime | Daily rows | Time on every server adds up | none |
 | Skin | Each player's chosen skin | A change is worn at once on the server the player is on | none |
 

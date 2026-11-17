@@ -38,6 +38,7 @@ import com.uxplima.uxmessentials.shared.application.module.KernelPorts;
 import com.uxplima.uxmessentials.shared.application.module.ModuleContext;
 import com.uxplima.uxmessentials.shared.application.permission.EconomyPermissions;
 import com.uxplima.uxmessentials.shared.application.port.ConfigStore;
+import com.uxplima.uxmessentials.shared.application.port.NetworkPresence;
 import com.uxplima.uxmessentials.shared.application.port.Scheduler;
 import com.uxplima.uxmessentials.shared.display.BroadcastChannel;
 import com.uxplima.uxmessentials.shared.domain.DomainEvent;
@@ -66,6 +67,7 @@ import com.uxplima.uxmessentials.vote.application.ForceParty;
 import com.uxplima.uxmessentials.vote.application.GiveVote;
 import com.uxplima.uxmessentials.vote.application.HandleVote;
 import com.uxplima.uxmessentials.vote.application.PartyConfig;
+import com.uxplima.uxmessentials.vote.application.PayRemoteVote;
 import com.uxplima.uxmessentials.vote.application.ResetVoterTotals;
 import com.uxplima.uxmessentials.vote.application.RewardEngine;
 import com.uxplima.uxmessentials.vote.application.RewardNetworkParty;
@@ -80,6 +82,7 @@ import com.uxplima.uxmessentials.vote.application.VotePartyStatus;
 import com.uxplima.uxmessentials.vote.application.VoteReminderEligibility;
 import com.uxplima.uxmessentials.vote.application.port.BroadcastThrottle;
 import com.uxplima.uxmessentials.vote.application.port.BroadcastVisibility;
+import com.uxplima.uxmessentials.vote.application.port.RemoteVoter;
 import com.uxplima.uxmessentials.vote.application.port.RewardApplier;
 import com.uxplima.uxmessentials.vote.application.port.VoteAudience;
 import com.uxplima.uxmessentials.vote.application.port.VoteBroadcaster;
@@ -148,7 +151,8 @@ public final class VoteWiring {
             Menus menus,
             MenuBindings menuBindings,
             ObjLongConsumer<UUID> board,
-            boolean bothCarriers) {
+            boolean bothCarriers,
+            NetworkPresence presence) {
         Objects.requireNonNull(plugin, "plugin");
         Objects.requireNonNull(ctx, "ctx");
         Objects.requireNonNull(persistence, "persistence");
@@ -157,6 +161,7 @@ public final class VoteWiring {
         Objects.requireNonNull(guiRegistry, "guiRegistry");
         Objects.requireNonNull(menus, "menus");
         Objects.requireNonNull(menuBindings, "menuBindings");
+        Objects.requireNonNull(presence, "presence");
         KernelPorts kernel = ctx.kernel();
         CachedVoteRepository cachedRepository = VoteRepositories.cachedConcrete(persistence);
         VoteRepository repository =
@@ -171,6 +176,7 @@ public final class VoteWiring {
         VoteContext context = new BukkitVoteContext(
                 kernel.permissions(),
                 kernel.playerLookup(),
+                presence,
                 OwningThreadReads.onServer(kernel.scheduler(), plugin, kernel.log()));
         Set<String> disabledWorlds = Set.copyOf(ctx.config().getStringList("reward.disabled-worlds", List.of()));
         RewardEngine engine = new RewardEngine(loadCatalog(plugin, kernel), disabledWorlds);
@@ -214,11 +220,18 @@ public final class VoteWiring {
                 broadcastThrottle,
                 broadcastVisibility,
                 party,
+                VoteSync.remoteVoter(bus.publisher(), kernel.log()),
                 streakGraceDays,
                 voteLinks,
                 siteCatalog,
                 reminderPrefs,
                 sitesGuiView);
+        // A vote for a player on another server queues the rewards and tells that server, which pays them out now.
+        bus.registry()
+                .register(VoteSync.queuedListener(
+                        new PayRemoteVote(services.applyQueuedRewards(), kernel.events()),
+                        kernel.playerLookup(),
+                        kernel.scheduler()));
 
         // Subscribe the party sound/particle handler to the in-process bus.
         @Nullable Sound sound = BukkitRegistryKeys.resolveSound(ctx.config().getString("voteparty.sound", ""));
@@ -436,6 +449,7 @@ public final class VoteWiring {
             BroadcastThrottle broadcastThrottle,
             BroadcastVisibility broadcastVisibility,
             PartyConfig party,
+            RemoteVoter remote,
             int streakGraceDays,
             List<String> voteLinks,
             VoteSiteCatalog siteCatalog,
@@ -453,6 +467,7 @@ public final class VoteWiring {
                 broadcastThrottle,
                 kernel.events(),
                 party,
+                remote,
                 streakGraceDays,
                 ZoneId.systemDefault());
         ApplyQueuedRewards applyQueuedRewards = new ApplyQueuedRewards(

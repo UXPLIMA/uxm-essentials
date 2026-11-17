@@ -10,6 +10,7 @@ import java.util.Objects;
 import com.uxplima.uxmessentials.shared.application.port.DomainEventPublisher;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmessentials.vote.application.port.BroadcastThrottle;
+import com.uxplima.uxmessentials.vote.application.port.RemoteVoter;
 import com.uxplima.uxmessentials.vote.application.port.RewardApplier;
 import com.uxplima.uxmessentials.vote.application.port.VoteAudience;
 import com.uxplima.uxmessentials.vote.application.port.VoteBroadcaster;
@@ -29,7 +30,9 @@ import com.uxplima.uxmessentials.vote.domain.reward.RewardGrant;
  * milestone specs whose chance/permission/world gates pass become {@link RewardGrant}s, each applied via
  * the {@link RewardApplier}. An online voter has the grants applied at once (commands run, messages and
  * items delivered) with {@link VoteReceived} published; an offline voter has the grants queued for their
- * next join (the applier queues the commands). Whether the credited vote is then announced is decided by
+ * next join (the applier queues the commands). A voter online on another server of the network has them queued the
+ * same way, and that server is told to pay the queue out at once ({@link RemoteVoter}); for the thank-you broadcast
+ * such a voter counts as online. Whether the credited vote is then announced is decided by
  * {@link BroadcastDecision} against the configured {@link BroadcastSettings}. When it is, the thank-you
  * fans out through the {@link com.uxplima.uxmessentials.vote.application.port.VoteBroadcaster} across the
  * configured channels. Then the global party counter advances. When it reaches the configured threshold a
@@ -53,6 +56,7 @@ public final class HandleVote {
     private final DomainEventPublisher events;
     private final PartyConfig party;
     private final PartyService partyService;
+    private final RemoteVoter remote;
     private final int streakGraceDays;
     private final ZoneId zone;
 
@@ -67,6 +71,7 @@ public final class HandleVote {
             BroadcastThrottle throttle,
             DomainEventPublisher events,
             PartyConfig party,
+            RemoteVoter remote,
             int streakGraceDays,
             ZoneId zone) {
         this.repository = Objects.requireNonNull(repository, "repository");
@@ -79,6 +84,7 @@ public final class HandleVote {
         this.throttle = Objects.requireNonNull(throttle, "throttle");
         this.events = Objects.requireNonNull(events, "events");
         this.party = Objects.requireNonNull(party, "party");
+        this.remote = Objects.requireNonNull(remote, "remote");
         this.streakGraceDays = streakGraceDays;
         this.zone = Objects.requireNonNull(zone, "zone");
         this.partyService = new PartyService(
@@ -95,8 +101,13 @@ public final class HandleVote {
         repository.recordLastVoteAtSite(voter, vote.serviceName(), vote.at());
         boolean streakAdvanced = before.streakDayKey() != after.streakDayKey();
         boolean voterOnline = context.isOnline(voter);
+        boolean elsewhere = !voterOnline && context.isOnlineElsewhere(voter);
         boolean rewarded = creditVoter(vote, after, streakAdvanced, voterOnline);
-        maybeBroadcastThanks(vote, after, voterOnline);
+        if (elsewhere) {
+            // The rewards are queued in the shared database, so the server the voter is on pays them out now.
+            remote.rewardsQueued(voter, vote.serviceName());
+        }
+        maybeBroadcastThanks(vote, after, voterOnline || elsewhere);
         repository.markPartyParticipant(voter);
         boolean partyFired = advanceCounter(vote);
         return new Outcome(rewarded, partyFired);
