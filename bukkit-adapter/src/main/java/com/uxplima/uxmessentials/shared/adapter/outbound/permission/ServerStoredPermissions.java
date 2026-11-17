@@ -32,8 +32,9 @@ import org.jspecify.annotations.Nullable;
  * answered as not held only when every source that could grant it was read and none did.
  *
  * <p>A player online on another backend is asked about over the bus first, and that backend reads the node live: that
- * answer is the truth. Without a bus, or without an answer, the LuckPerms storage is read when LuckPerms is installed;
- * otherwise there is {@link Answer#NO_SOURCE}.
+ * answer is the truth. Without a bus, or without an answer, every permission store this server has is read as for an
+ * offline player, together with the operator default; with no store at all there is no answer, since this backend's
+ * operator list says nothing about a player on another one.
  *
  * <p>An offline player is read from every source this server has, and any one granting the node is enough:
  *
@@ -103,19 +104,26 @@ public final class ServerStoredPermissions implements StoredPermissions {
         Objects.requireNonNull(who, "who");
         Objects.requireNonNull(node, "node");
         boolean byDefault = byDefault(who.uuid(), node);
+        // Every store is prepared here, on the calling server thread, even one only read after a bus miss: preparing
+        // may read the server (an offline player's name), and the bus answers on another thread.
+        List<Pending> stored = prepared(storedSources(), who, node);
         Optional<String> elsewhere = anotherBackend(who.uuid());
         if (elsewhere.isPresent()) {
             CompletableFuture<Answer> live = bus.map(reads -> reads.ask(who, node, elsewhere.get()))
                     .orElseGet(() -> CompletableFuture.completedFuture(Answer.NO_SOURCE));
-            NodeStore stored = luckPerms;
-            if (stored == null) {
+            if (stored.isEmpty()) {
+                // Only the operator list is left, and it is this backend's, not the one the player is on: no answer.
                 return live;
             }
-            // The LuckPerms store reads nothing from the server while it prepares, so it may start off the tick.
             return live.thenCompose(answer -> answer == Answer.HELD || answer == Answer.NOT_HELD
                     ? CompletableFuture.completedFuture(answer)
-                    : combined(prepared(List.of(stored), who, node), byDefault));
+                    : combined(stored, byDefault));
         }
+        return combined(stored, byDefault);
+    }
+
+    /** The permission stores this server can read: LuckPerms, and the Vault provider when it is another plugin. */
+    private List<NodeStore> storedSources() {
         List<NodeStore> stores = new ArrayList<>(2);
         if (luckPerms != null) {
             stores.add(luckPerms);
@@ -124,7 +132,7 @@ public final class ServerStoredPermissions implements StoredPermissions {
         if (provider != null) {
             stores.add(provider);
         }
-        return combined(prepared(stores, who, node), byDefault);
+        return stores;
     }
 
     /** Start each store's read here, on the calling thread; a store that cannot start counts as no answer. */

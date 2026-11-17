@@ -42,8 +42,9 @@ import org.mockbukkit.mockbukkit.entity.PlayerMock;
 
 /**
  * A player who is not here is read failing closed. One on another backend is asked over the bus first, and its live
- * answer wins; LuckPerms is read when that backend does not answer. An offline one is held when any source grants the
- * node: LuckPerms, the Vault permission provider, or the default against the operator list here.
+ * answer wins; every permission store is read when that backend does not answer, and with none there is no answer.
+ * An offline one is held when any source grants the node: LuckPerms, the Vault permission provider, or the default
+ * against the operator list here.
  */
 class ServerStoredPermissionsTest {
 
@@ -234,11 +235,44 @@ class ServerStoredPermissionsTest {
     }
 
     @Test
-    void withoutLuckPermsOrABusAPlayerOnAnotherBackendHasNoSource() {
+    void withoutAPermissionStoreOrABusAPlayerOnAnotherBackendHasNoSourceEvenAsAnOperatorHere() {
         presence.at = Optional.of(new OnlinePlayer(olaf, "lobby"));
 
-        assertThat(reader(null, store(Answer.NOT_HELD), Optional.empty()).read(olaf, NODE))
-                .isCompletedWithValue(Answer.NO_SOURCE);
+        assertThat(reader(null, null, Optional.empty()).read(olaf, NODE)).isCompletedWithValue(Answer.NO_SOURCE);
+    }
+
+    @Test
+    void whenThatBackendCannotAnswerTheVaultProviderIsReadAndItsGrantHolds() {
+        register(new FakeProvider("PermissionsEx", "Bert"));
+        presence.at = Optional.of(new OnlinePlayer(bert, "lobby"));
+        BusPermissionReads reads = bus();
+
+        CompletableFuture<Answer> answer = ServerStoredPermissions.of(
+                        server, lane, presence, new Warnings(warnings), Optional.of(reads))
+                .read(bert, NODE);
+        PermissionQueryFrame asked = (PermissionQueryFrame) sent.getFirst();
+        reads.onRemoteChange(new PermissionQueryFrame(
+                "lobby", asked.queryId(), "survival", bert.uuid(), NODE, PermissionQueryFrame.NO_ANSWER));
+        lane.runAll();
+
+        assertThat(answer).isCompletedWithValue(Answer.HELD);
+    }
+
+    @Test
+    void whenThatBackendCannotAnswerAndNoStoreGrantsTheNodeItIsNotHeld() {
+        register(new FakeProvider("PermissionsEx"));
+        presence.at = Optional.of(new OnlinePlayer(bert, "lobby"));
+        BusPermissionReads reads = bus();
+
+        CompletableFuture<Answer> answer = ServerStoredPermissions.of(
+                        server, lane, presence, new Warnings(warnings), Optional.of(reads))
+                .read(bert, NODE);
+        PermissionQueryFrame asked = (PermissionQueryFrame) sent.getFirst();
+        reads.onRemoteChange(new PermissionQueryFrame(
+                "lobby", asked.queryId(), "survival", bert.uuid(), NODE, PermissionQueryFrame.NO_ANSWER));
+        lane.runAll();
+
+        assertThat(answer).isCompletedWithValue(Answer.NOT_HELD);
     }
 
     /** A server that, like a real one, knows no name for a player who never joined it. */
