@@ -2050,6 +2050,7 @@ public final class PluginModule {
                 ctx.kernel().messages(),
                 ctx.kernel().messageSink(),
                 ctx.kernel().log(),
+                ctx.kernel().playerLookup()::nameCase,
                 SecurityConfig.AllowedOperators.from(ctx.config()).list());
         resources.addListener(new OperatorLockListener(operators));
         AutoCloseable sweep = operators.startSweep();
