@@ -9,7 +9,6 @@ import org.bukkit.entity.Player;
 
 import io.papermc.paper.command.brigadier.CommandSourceStack;
 import io.papermc.paper.command.brigadier.Commands;
-import io.papermc.paper.command.brigadier.argument.ArgumentTypes;
 import io.papermc.paper.command.brigadier.argument.resolvers.selector.PlayerSelectorArgumentResolver;
 
 import com.mojang.brigadier.Command;
@@ -22,6 +21,7 @@ import com.uxplima.uxmessentials.poses.application.TogglePlayerSit;
 import com.uxplima.uxmessentials.poses.domain.PosesMessageKey;
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandFeedback;
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandRegistration;
+import com.uxplima.uxmessentials.shared.adapter.inbound.command.PlayerArgument;
 import com.uxplima.uxmessentials.shared.adapter.outbound.BukkitRefs;
 import com.uxplima.uxmessentials.shared.application.permission.SocialPermissions;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
@@ -83,7 +83,7 @@ public final class PosesCommand implements CommandRegistration {
                         .executes(this::openGui))
                 .then(Commands.literal("reveal")
                         .requires(Gate.permission(REVEAL_PERMISSION))
-                        .then(Commands.argument(TARGET, ArgumentTypes.player()).executes(this::reveal)))
+                        .then(Commands.argument(TARGET, PlayerArgument.player()).executes(this::reveal)))
                 .executes(this::open)
                 .build();
     }
@@ -127,8 +127,7 @@ public final class PosesCommand implements CommandRegistration {
         List<Player> named =
                 ctx.getArgument(TARGET, PlayerSelectorArgumentResolver.class).resolve(ctx.getSource());
         if (named.isEmpty()) {
-            String typed = ctx.getInput().substring(ctx.getInput().lastIndexOf(' ') + 1);
-            feedback.send(sender, SharedMessageKey.COMMAND_UNKNOWN_PLAYER, Map.of(TARGET, typed));
+            feedback.send(sender, PlayerArgument.miss(ctx, TARGET, SharedMessageKey.COMMAND_UNKNOWN_PLAYER));
             return 0;
         }
         Player target = named.get(0);

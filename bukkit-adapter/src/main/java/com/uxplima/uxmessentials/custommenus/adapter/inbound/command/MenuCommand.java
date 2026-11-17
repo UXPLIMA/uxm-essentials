@@ -17,7 +17,6 @@ import org.bukkit.entity.Player;
 
 import io.papermc.paper.command.brigadier.CommandSourceStack;
 import io.papermc.paper.command.brigadier.Commands;
-import io.papermc.paper.command.brigadier.argument.ArgumentTypes;
 import io.papermc.paper.command.brigadier.argument.resolvers.selector.PlayerSelectorArgumentResolver;
 
 import net.kyori.adventure.text.minimessage.MiniMessage;
@@ -40,6 +39,7 @@ import com.uxplima.uxmessentials.custommenus.adapter.spec.MenuSpecPersistence;
 import com.uxplima.uxmessentials.custommenus.domain.CustomMenusMessageKey;
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandFeedback;
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandRegistration;
+import com.uxplima.uxmessentials.shared.adapter.inbound.command.PlayerArgument;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.binding.MenuExecutor;
 import com.uxplima.uxmessentials.shared.adapter.outbound.BukkitRefs;
 import com.uxplima.uxmessentials.shared.application.permission.ContentPermissions;
@@ -151,7 +151,7 @@ public final class MenuCommand implements CommandRegistration {
                         .then(menuArgument().executes(this::reloadOne)))
                 .then(Commands.literal("execute")
                         .requires(Gate.permission(ADMIN))
-                        .then(Commands.argument("player", ArgumentTypes.player())
+                        .then(Commands.argument("player", PlayerArgument.player())
                                 .then(Commands.argument("action", StringArgumentType.greedyString())
                                         .executes(this::executeAction))))
                 .then(Commands.literal("dump")
@@ -235,7 +235,7 @@ public final class MenuCommand implements CommandRegistration {
 
     /** The {@code <target>} player argument, present only for a sender holding {@code uxmessentials.menu.open.others}. */
     private RequiredArgumentBuilder<CommandSourceStack, PlayerSelectorArgumentResolver> targetArgument() {
-        return Commands.argument("target", ArgumentTypes.player());
+        return Commands.argument("target", PlayerArgument.player());
     }
 
     /**
@@ -259,7 +259,7 @@ public final class MenuCommand implements CommandRegistration {
         }
         Player target = resolveTarget(ctx);
         if (target == null) {
-            feedback.send(sender, SharedMessageKey.COMMAND_UNKNOWN_PLAYER);
+            feedback.send(sender, PlayerArgument.miss(ctx, "target", SharedMessageKey.COMMAND_UNKNOWN_PLAYER));
             return 0;
         }
         PlayerRef executor = sender instanceof Player p ? BukkitRefs.toRef(p) : BukkitRefs.toRef(target);
@@ -274,11 +274,14 @@ public final class MenuCommand implements CommandRegistration {
     }
 
     /** Resolve the single target the {@code <target>} selector names, or null when it matched none (or more than one). */
-    private static @Nullable Player resolveTarget(CommandContext<CommandSourceStack> ctx)
-            throws CommandSyntaxException {
-        PlayerSelectorArgumentResolver resolver = ctx.getArgument("target", PlayerSelectorArgumentResolver.class);
-        List<Player> resolved = resolver.resolve(ctx.getSource());
-        return resolved.size() == 1 ? resolved.get(0) : null;
+    private static @Nullable Player resolveTarget(CommandContext<CommandSourceStack> ctx) {
+        try {
+            PlayerSelectorArgumentResolver resolver = ctx.getArgument("target", PlayerSelectorArgumentResolver.class);
+            List<Player> resolved = resolver.resolve(ctx.getSource());
+            return resolved.size() == 1 ? resolved.get(0) : null;
+        } catch (CommandSyntaxException unmatched) {
+            return null;
+        }
     }
 
     /**
@@ -383,7 +386,7 @@ public final class MenuCommand implements CommandRegistration {
         CommandSender sender = Sender.audience(ctx.getSource());
         Player target = resolvePlayer(ctx);
         if (target == null) {
-            feedback.send(sender, SharedMessageKey.COMMAND_UNKNOWN_PLAYER);
+            feedback.send(sender, PlayerArgument.miss(ctx, "player", SharedMessageKey.COMMAND_UNKNOWN_PLAYER));
             return 0;
         }
         String actionString = StringArgumentType.getString(ctx, "action").strip();

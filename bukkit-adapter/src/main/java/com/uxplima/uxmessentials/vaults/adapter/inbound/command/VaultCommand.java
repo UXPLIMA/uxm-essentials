@@ -12,7 +12,6 @@ import org.bukkit.entity.Player;
 
 import io.papermc.paper.command.brigadier.CommandSourceStack;
 import io.papermc.paper.command.brigadier.Commands;
-import io.papermc.paper.command.brigadier.argument.ArgumentTypes;
 import io.papermc.paper.command.brigadier.argument.resolvers.selector.PlayerSelectorArgumentResolver;
 
 import com.mojang.brigadier.Command;
@@ -26,6 +25,7 @@ import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandFeedback;
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandRegistration;
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandSuggestions;
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.OffTickNames;
+import com.uxplima.uxmessentials.shared.adapter.inbound.command.PlayerArgument;
 import com.uxplima.uxmessentials.shared.adapter.outbound.BukkitRefs;
 import com.uxplima.uxmessentials.shared.application.permission.DestinationPermissions;
 import com.uxplima.uxmessentials.shared.application.port.Scheduler;
@@ -38,6 +38,7 @@ import com.uxplima.uxmessentials.vaults.application.VaultOpenFee;
 import com.uxplima.uxmessentials.vaults.application.VaultSummary;
 import com.uxplima.uxmessentials.vaults.domain.Vault;
 import com.uxplima.uxmessentials.vaults.domain.VaultError;
+import com.uxplima.uxmessentials.vaults.domain.VaultsMessageKey;
 import com.uxplima.uxmlib.command.Args;
 import com.uxplima.uxmlib.command.Gate;
 import com.uxplima.uxmlib.command.Sender;
@@ -126,7 +127,7 @@ public final class VaultCommand implements CommandRegistration {
                                                 StringArgumentType.getString(ctx, "material"))))))
                 .then(Commands.argument("n", IntegerArgumentType.integer(1))
                         .executes(ctx -> openOwn(ctx, ctx.getArgument("n", Integer.class))))
-                .then(Commands.argument("player", ArgumentTypes.player())
+                .then(Commands.argument("player", PlayerArgument.player())
                         .suggests(CommandSuggestions.singlePlayerTarget())
                         .requires(Gate.permission(OTHERS))
                         .executes(ctx -> openOther(ctx, DEFAULT_INDEX))
@@ -339,7 +340,7 @@ public final class VaultCommand implements CommandRegistration {
             PlayerSelectorArgumentResolver resolver = ctx.getArgument("player", PlayerSelectorArgumentResolver.class);
             List<Player> matched = resolver.resolve(ctx.getSource());
             if (matched.isEmpty()) {
-                notifier.unknownTarget(actor, typedTarget(ctx));
+                notifier.tell(actor, PlayerArgument.miss(ctx, "player", VaultsMessageKey.VAULT_ADMIN_UNKNOWN_TARGET));
                 return Optional.empty();
             }
             return Optional.of(matched.get(0));

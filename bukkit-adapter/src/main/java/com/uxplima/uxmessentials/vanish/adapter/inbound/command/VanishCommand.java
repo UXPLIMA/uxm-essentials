@@ -14,7 +14,6 @@ import org.bukkit.entity.Player;
 
 import io.papermc.paper.command.brigadier.CommandSourceStack;
 import io.papermc.paper.command.brigadier.Commands;
-import io.papermc.paper.command.brigadier.argument.ArgumentTypes;
 import io.papermc.paper.command.brigadier.argument.resolvers.selector.PlayerSelectorArgumentResolver;
 
 import com.mojang.brigadier.Command;
@@ -24,6 +23,7 @@ import com.mojang.brigadier.tree.LiteralCommandNode;
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandFeedback;
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandRegistration;
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandSuggestions;
+import com.uxplima.uxmessentials.shared.adapter.inbound.command.PlayerArgument;
 import com.uxplima.uxmessentials.shared.adapter.outbound.BukkitRefs;
 import com.uxplima.uxmessentials.shared.application.permission.EnforcementPermissions;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
@@ -121,7 +121,7 @@ public final class VanishCommand implements CommandRegistration {
                 .then(Commands.literal("list")
                         .requires(Gate.permission(LIST_PERMISSION))
                         .executes(this::list))
-                .then(Commands.argument(TARGET_ARG, ArgumentTypes.player())
+                .then(Commands.argument(TARGET_ARG, PlayerArgument.player())
                         .requires(Gate.permission(OTHERS_PERMISSION))
                         .suggests(CommandSuggestions.singlePlayerTarget())
                         .executes(this::vanishOther))
@@ -167,7 +167,7 @@ public final class VanishCommand implements CommandRegistration {
         CommandSender sender = Sender.audience(ctx.getSource());
         Optional<Player> target = resolveTarget(ctx);
         if (target.isEmpty()) {
-            feedback.send(sender, SharedMessageKey.COMMAND_UNKNOWN_PLAYER, Map.of("player", targetToken(ctx)));
+            feedback.send(sender, PlayerArgument.miss(ctx, TARGET_ARG, SharedMessageKey.COMMAND_UNKNOWN_PLAYER));
             return 0;
         }
         Player resolved = target.get();
@@ -246,19 +246,15 @@ public final class VanishCommand implements CommandRegistration {
         return online != null ? Optional.of(online.getName()) : networkName.apply(id);
     }
 
-    private Optional<Player> resolveTarget(CommandContext<CommandSourceStack> ctx) throws CommandSyntaxException {
-        PlayerSelectorArgumentResolver resolver = ctx.getArgument(TARGET_ARG, PlayerSelectorArgumentResolver.class);
-        List<Player> resolved = resolver.resolve(ctx.getSource());
-        return resolved.isEmpty() ? Optional.empty() : Optional.of(resolved.get(0));
-    }
-
-    /** The exact text the actor typed for the target argument, for the unknown-player reply. */
-    private static String targetToken(CommandContext<CommandSourceStack> ctx) {
-        return ctx.getNodes().stream()
-                .filter(node -> TARGET_ARG.equals(node.getNode().getName()))
-                .findFirst()
-                .map(node -> node.getRange().get(ctx.getInput()))
-                .orElse(ctx.getInput());
+    private Optional<Player> resolveTarget(CommandContext<CommandSourceStack> ctx) {
+        try {
+            PlayerSelectorArgumentResolver resolver = ctx.getArgument(TARGET_ARG, PlayerSelectorArgumentResolver.class);
+            List<Player> resolved = resolver.resolve(ctx.getSource());
+            return resolved.isEmpty() ? Optional.empty() : Optional.of(resolved.get(0));
+        } catch (CommandSyntaxException unmatched) {
+            // A selector that matched nobody is answered like a name nobody holds, never as a raw parse error.
+            return Optional.empty();
+        }
     }
 
     /** The invoking player's ref, or {@code null} (after the players-only reply) for a console source. */

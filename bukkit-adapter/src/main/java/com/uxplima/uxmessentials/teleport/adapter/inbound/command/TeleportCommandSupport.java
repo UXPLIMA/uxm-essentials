@@ -17,10 +17,10 @@ import com.mojang.brigadier.StringReader;
 import com.mojang.brigadier.arguments.DoubleArgumentType;
 import com.mojang.brigadier.builder.RequiredArgumentBuilder;
 import com.mojang.brigadier.context.CommandContext;
-import com.mojang.brigadier.context.ParsedCommandNode;
 import com.mojang.brigadier.exceptions.CommandSyntaxException;
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandFeedback;
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandSuggestions;
+import com.uxplima.uxmessentials.shared.adapter.inbound.command.PlayerArgument;
 import com.uxplima.uxmessentials.shared.adapter.outbound.BukkitRefs;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
 import com.uxplima.uxmessentials.shared.domain.NameMatch;
@@ -132,12 +132,7 @@ abstract class TeleportCommandSupport {
      * can name a player on another backend.
      */
     static Optional<String> typedName(CommandContext<CommandSourceStack> ctx, String argument) {
-        for (ParsedCommandNode<CommandSourceStack> node : ctx.getNodes()) {
-            if (node.getNode().getName().equals(argument)) {
-                return plainName(node.getRange().get(ctx.getInput()));
-            }
-        }
-        return Optional.empty();
+        return PlayerArgument.name(ctx, argument).filter(name -> !name.isEmpty() && !isUuid(name));
     }
 
     /**
