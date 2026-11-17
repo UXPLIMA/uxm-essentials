@@ -1650,7 +1650,7 @@ public final class PluginModule {
         } else if (module.id().equals(ModuleId.of("vanish"))) {
             wireVanish(plugin, ctx, persistence, resources, links, bus);
         } else if (module.id().equals(ModuleId.of("presence"))) {
-            wirePresence(plugin, ctx, resources, links, guiLayouts, guiRegistry, menus);
+            wirePresence(plugin, ctx, persistence, resources, links, bus, guiLayouts, guiRegistry, menus);
         } else if (module.id().equals(ModuleId.of("moderation"))) {
             wireModeration(
                     plugin,
@@ -3403,25 +3403,27 @@ public final class PluginModule {
     private static void wirePresence(
             JavaPlugin plugin,
             ModuleContext ctx,
+            Persistence persistence,
             CloseableResources resources,
             ContextLinks links,
+            Bus bus,
             GuiLayouts guiLayouts,
             ManagementGuiRegistry guiRegistry,
             Menus menus) {
-        // presence persists nothing: the per-player PlayerPresence map is transient in-memory state. Vanish lives
-        // in its own context (wired earlier), so presence receives that authority's isVanished lookup, overlaid onto
-        // its store so the %..._vanished% placeholder and the sleep exclusion reflect the one vanish state, and a
-        // vanish-toggle handle for the settings panel; both degrade to no-ops when the vanish module is off. The
-        // AFK soft-couple: presence rebinds messaging's MutableAfkStatus (captured during the earlier messaging
-        // wiring) to a PresenceAfkStatus over this store so /msg adds the AFK courtesy notice.
+        // presence persists only the players' nicks; the per-player PlayerPresence map is transient in-memory state.
+        // Vanish lives in its own context (wired earlier), so presence receives that authority's isVanished lookup,
+        // overlaid onto its store so the %..._vanished% placeholder and the sleep exclusion reflect the one vanish
+        // state, and a vanish-toggle handle for the settings panel; both degrade to no-ops when the vanish module is
+        // off. The AFK soft-couple: presence rebinds messaging's MutableAfkStatus (captured during the earlier
+        // messaging wiring) to a PresenceAfkStatus over this store so /msg adds the AFK courtesy notice.
         com.uxplima.uxmessentials.vanish.application.port.VanishStore vanishStore = links.vanishStore;
         java.util.function.Predicate<java.util.UUID> vanishLookup =
                 vanishStore == null ? uuid -> false : vanishStore::isVanished;
         com.uxplima.uxmessentials.vanish.application.ToggleVanish vanishToggle = links.vanishToggle;
         java.util.function.Consumer<com.uxplima.uxmessentials.shared.domain.PlayerRef> vanishToggleHandle =
                 vanishToggle == null ? who -> {} : vanishToggle::toggle;
-        PresenceWiring.Wired wired =
-                PresenceWiring.wire(plugin, ctx, vanishLookup, vanishToggleHandle, guiLayouts, guiRegistry, menus);
+        PresenceWiring.Wired wired = PresenceWiring.wire(
+                plugin, ctx, vanishLookup, vanishToggleHandle, guiLayouts, guiRegistry, menus, persistence, bus);
         wired.commands().forEach(resources::addCommand);
         wired.listeners().forEach(resources::addListener);
         wired.startBackgroundWork();

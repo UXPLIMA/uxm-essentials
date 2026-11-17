@@ -28,7 +28,6 @@ import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmlib.command.Gate;
 import com.uxplima.uxmlib.command.Sender;
 import org.jspecify.annotations.NullMarked;
-import org.jspecify.annotations.Nullable;
 
 /**
  * {@code /whois <player>} ({@code uxmessentials.whois.use}): a staff identity and status summary for one online
@@ -74,7 +73,7 @@ public final class WhoisCommand extends PresenceCommandSupport implements Comman
         // iterating Bukkit.getOnlinePlayers() off it); the matched player's live status fields are then read on that
         // player's own entity thread, and the one reply lands on the sender's own thread.
         scheduler.onGlobal(() -> {
-            Player match = findVisibleMatch(sender, query);
+            Player match = VisibleNameMatch.find(sender, query);
             if (match == null) {
                 replyOnSenderThread(
                         sender,
@@ -107,20 +106,5 @@ public final class WhoisCommand extends PresenceCommandSupport implements Comman
                 "health", String.valueOf((int) Math.round(match.getHealth())),
                 "ping", String.valueOf(match.getPing()),
                 "world", match.getWorld().getName());
-    }
-
-    /** First online player the sender may see whose account or display name matches {@code query}, else {@code null}. */
-    private @Nullable Player findVisibleMatch(CommandSender sender, String query) {
-        Player viewer = sender instanceof Player player ? player : null;
-        for (Player target : Bukkit.getOnlinePlayers()) {
-            if (viewer != null && !viewer.canSee(target)) {
-                continue;
-            }
-            if (target.getName().equalsIgnoreCase(query)
-                    || PLAIN.serialize(target.displayName()).equalsIgnoreCase(query)) {
-                return target;
-            }
-        }
-        return null;
     }
 }

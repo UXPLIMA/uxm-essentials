@@ -12,23 +12,29 @@ import java.util.function.Predicate;
 import org.bukkit.event.Listener;
 import org.bukkit.plugin.Plugin;
 
+import com.uxplima.uxmessentials.persistence.lookup.PlayerNameRepositories;
+import com.uxplima.uxmessentials.persistence.presence.PresenceStores;
+import com.uxplima.uxmessentials.persistence.runtime.Persistence;
 import com.uxplima.uxmessentials.presence.adapter.inbound.command.PresenceCommands;
 import com.uxplima.uxmessentials.presence.adapter.inbound.command.PresenceSettingsCommand;
 import com.uxplima.uxmessentials.presence.adapter.inbound.gui.OnlinePlayerListView;
 import com.uxplima.uxmessentials.presence.adapter.inbound.gui.PresenceSettingsView;
 import com.uxplima.uxmessentials.presence.adapter.inbound.listener.AfkPickupListener;
+import com.uxplima.uxmessentials.presence.adapter.inbound.listener.NickJoinListener;
 import com.uxplima.uxmessentials.presence.adapter.inbound.listener.PresenceActivityListener;
 import com.uxplima.uxmessentials.presence.adapter.inbound.listener.PresenceLifecycleListener;
 import com.uxplima.uxmessentials.presence.adapter.inbound.listener.SleepExclusionListener;
 import com.uxplima.uxmessentials.presence.adapter.outbound.AfkSweep;
+import com.uxplima.uxmessentials.presence.adapter.outbound.BukkitNickDisplay;
 import com.uxplima.uxmessentials.presence.adapter.outbound.BukkitPresenceAudience;
 import com.uxplima.uxmessentials.presence.adapter.outbound.InMemoryPresenceStore;
-import com.uxplima.uxmessentials.presence.adapter.outbound.PdcNickStore;
 import com.uxplima.uxmessentials.presence.application.ClearAfkOnActivity;
 import com.uxplima.uxmessentials.presence.application.ClearNick;
 import com.uxplima.uxmessentials.presence.application.MarkAfk;
+import com.uxplima.uxmessentials.presence.application.NickOwners;
+import com.uxplima.uxmessentials.presence.application.PlayerNicks;
 import com.uxplima.uxmessentials.presence.application.SetNick;
-import com.uxplima.uxmessentials.presence.application.port.NickStore;
+import com.uxplima.uxmessentials.presence.application.port.NickRecords;
 import com.uxplima.uxmessentials.presence.application.port.PresenceAudience;
 import com.uxplima.uxmessentials.presence.application.port.PresenceStore;
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandRegistration;
@@ -36,10 +42,15 @@ import com.uxplima.uxmessentials.shared.adapter.inbound.gui.GuiLayouts;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.GuiText;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.ManagementGuiEntry;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.ManagementGuiRegistry;
+import com.uxplima.uxmessentials.shared.adapter.inbound.settings.HeldSettingsListener;
+import com.uxplima.uxmessentials.shared.adapter.outbound.bus.Bus;
+import com.uxplima.uxmessentials.shared.adapter.outbound.bus.PlayerSettingsSync;
 import com.uxplima.uxmessentials.shared.application.message.Notifier;
 import com.uxplima.uxmessentials.shared.application.module.KernelPorts;
 import com.uxplima.uxmessentials.shared.application.module.ModuleContext;
 import com.uxplima.uxmessentials.shared.application.permission.SocialPermissions;
+import com.uxplima.uxmessentials.shared.application.port.PlayerNameRepository;
+import com.uxplima.uxmessentials.shared.application.settings.SettingsSessions;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmlib.menu.Menus;
 import com.uxplima.uxmlib.scheduler.PaperScheduler;
@@ -75,8 +86,12 @@ public final class PresenceWiring {
             Consumer<PlayerRef> vanishToggle,
             GuiLayouts guiLayouts,
             ManagementGuiRegistry guiRegistry,
-            Menus menus) {
+            Menus menus,
+            Persistence persistence,
+            Bus bus) {
         Objects.requireNonNull(plugin, "plugin");
+        Objects.requireNonNull(persistence, "persistence");
+        Objects.requireNonNull(bus, "bus");
         Objects.requireNonNull(ctx, "ctx");
         Objects.requireNonNull(vanishLookup, "vanishLookup");
         Objects.requireNonNull(vanishToggle, "vanishToggle");
@@ -91,9 +106,23 @@ public final class PresenceWiring {
         InMemoryPresenceStore store = new InMemoryPresenceStore(clock, vanishLookup);
         PresenceAudience audience = new BukkitPresenceAudience();
         Notifier notifier = new Notifier(kernel.messages(), kernel.messageSink());
-        NickStore nicks = new PdcNickStore(plugin, kernel.scheduler());
+        // The nicks every backend shares: read at login, shown at join, written back and announced when they change,
+        // and read again when another backend announces a change for a player here.
+        NickRecords nickRecords = PresenceStores.nicks(persistence);
+        PlayerNicks nicks = new PlayerNicks(
+                nickRecords,
+                new BukkitNickDisplay(plugin.getServer(), kernel.scheduler()),
+                kernel.scheduler(),
+                kernel.log(),
+                clock,
+                PlayerSettingsSync.announcer(bus.publisher()));
+        PlayerSettingsSync.register(bus.registry(), nicks.settings());
+        HeldSettingsListener heldNicks = new HeldSettingsListener(
+                new SettingsSessions(nicks.settings(), kernel.scheduler()), kernel.playerLookup());
+        heldNicks.adoptOnline(plugin.getServer().getOnlinePlayers());
 
-        PresenceServices services = assemble(kernel, store, audience, notifier, nicks);
+        PresenceServices services = assemble(
+                kernel, store, audience, notifier, nicks, nickRecords, PlayerNameRepositories.jooq(persistence));
         AfkSweep sweep = new AfkSweep(
                 kernel.scheduler(),
                 store,
@@ -134,8 +163,10 @@ public final class PresenceWiring {
         List<CommandRegistration> commands = new ArrayList<>(
                 PresenceCommands.all(services, kernel.messages(), kernel.scheduler(), listView, kernel.playerLookup()));
         commands.add(new PresenceSettingsCommand(services, kernel.messages(), kernel.scheduler(), settingsView));
-        List<Listener> listeners = listeners(kernel, settings, services, store, notifier);
-        return new Wired(commands, listeners, sweep, store, services, running, clock);
+        List<Listener> listeners = new ArrayList<>(listeners(kernel, settings, services, store, notifier));
+        listeners.add(heldNicks);
+        listeners.add(new NickJoinListener(plugin, nicks));
+        return new Wired(commands, List.copyOf(listeners), sweep, store, services, running, clock);
     }
 
     private static List<Listener> listeners(
@@ -158,14 +189,21 @@ public final class PresenceWiring {
     }
 
     private static PresenceServices assemble(
-            KernelPorts kernel, PresenceStore store, PresenceAudience audience, Notifier notifier, NickStore nicks) {
+            KernelPorts kernel,
+            PresenceStore store,
+            PresenceAudience audience,
+            Notifier notifier,
+            PlayerNicks nicks,
+            NickRecords nickRecords,
+            PlayerNameRepository names) {
         var events = kernel.events();
         Clock clock = Clock.systemUTC();
         MarkAfk markAfk = new MarkAfk(store, audience, notifier, events, clock);
         ClearAfkOnActivity clearAfk = new ClearAfkOnActivity(store, audience, notifier, events, clock);
-        SetNick setNick = new SetNick(nicks, notifier);
+        SetNick setNick = new SetNick(nicks, nickRecords, names, kernel.scheduler(), notifier, kernel.log());
         ClearNick clearNick = new ClearNick(nicks, notifier);
-        return new PresenceServices(markAfk, clearAfk, setNick, clearNick);
+        return new PresenceServices(
+                markAfk, clearAfk, setNick, clearNick, new NickOwners(nickRecords, kernel.playerLookup()));
     }
 
     /**
