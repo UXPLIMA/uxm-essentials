@@ -81,6 +81,8 @@ dependencies {
     testImplementation(uxm.mockbukkit)
     // The Vault bridge's own tests call it the way another plugin does, through Vault's types.
     testImplementation(libs.vault.api)
+    // The placeholder shield is checked against PlaceholderAPI's own parser, not a copy of its rules.
+    testImplementation(uxm.placeholderapi)
     testRuntimeOnly(libs.configurate.yaml)
     testRuntimeOnly(libs.gson)
     testRuntimeOnly(libs.bundles.db)

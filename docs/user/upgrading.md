@@ -12,6 +12,13 @@ action the argument stays inside its JSON string, and in a `broadcast-legacy` ac
 text. A custom command that let players style their text that way loses the styling; an argument going into a command
 is unchanged. The `/afk` reason is kept as the player typed it, so the API and placeholders read it as written.
 
+## Placeholders typed by players stay as typed
+
+With PlaceholderAPI installed, a `%placeholder%` inside a value (a private message, mail, help request, staff chat
+line, nickname, item or sign name, or a line relayed from another server) is no longer filled in for the reader; it
+shows as typed. Placeholders you write into a message file, the `<prefix>`, an `@key` line's own arguments and a
+`/broadcast` line are still filled, and the `<prefix>` now fills its placeholders too.
+
 ## Nicks are kept in the database
 
 A `/nick` is kept in the new `player_nicks` table, so it survives a relog and follows the player to every server; it

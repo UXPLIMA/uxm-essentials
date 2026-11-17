@@ -51,7 +51,7 @@ public final class CatalogLines {
             return line;
         }
         String key = reference.get().key();
-        return messages.resolve(viewer, () -> key, reference.get().arguments());
+        return messages.resolveAsWritten(viewer, () -> key, reference.get().arguments());
     }
 
     private Optional<CatalogLine> reference(String line) {
