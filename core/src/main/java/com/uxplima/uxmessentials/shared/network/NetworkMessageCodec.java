@@ -360,6 +360,7 @@ public final class NetworkMessageCodec {
                     out.writeUTF(value.getValue());
                 }
             }
+            case PlayerNoticesKept kept -> writeUuid(out, kept.recipient());
         }
     }
 
@@ -477,6 +478,7 @@ public final class NetworkMessageCodec {
             case BROADCAST -> new BroadcastFrame(origin, readUuid(in), in.readUTF());
             case VOTE_REWARDS_QUEUED -> readQueuedVote(in, origin);
             case STAFF_ACTION -> readStaffAction(in, origin);
+            case PLAYER_NOTICES_KEPT -> new PlayerNoticesKept(origin, readUuid(in));
         };
     }
 

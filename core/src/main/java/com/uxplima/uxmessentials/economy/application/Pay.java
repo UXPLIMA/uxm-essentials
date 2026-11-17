@@ -14,7 +14,9 @@ import com.uxplima.uxmessentials.economy.domain.Money;
 import com.uxplima.uxmessentials.economy.domain.PendingPay;
 import com.uxplima.uxmessentials.economy.domain.TransferError;
 import com.uxplima.uxmessentials.economy.domain.TransferResult;
+import com.uxplima.uxmessentials.shared.application.port.PlayerNotices;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
+import com.uxplima.uxmessentials.shared.domain.message.MessageLine;
 import com.uxplima.uxmessentials.shared.domain.message.SharedMessageKey;
 
 /**
@@ -34,6 +36,7 @@ public final class Pay {
     private final PayPreferences preferences;
     private final PendingPayRegistry pending;
     private final EconomyNotifier notifier;
+    private final PlayerNotices payees;
     private final PayTaxation taxation;
     private final Clock clock;
 
@@ -42,12 +45,14 @@ public final class Pay {
             PayPreferences preferences,
             PendingPayRegistry pending,
             EconomyNotifier notifier,
+            PlayerNotices payees,
             PayTaxation taxation,
             Clock clock) {
         this.economy = Objects.requireNonNull(economy, "economy");
         this.preferences = Objects.requireNonNull(preferences, "preferences");
         this.pending = Objects.requireNonNull(pending, "pending");
         this.notifier = Objects.requireNonNull(notifier, "notifier");
+        this.payees = Objects.requireNonNull(payees, "payees");
         this.taxation = Objects.requireNonNull(taxation, "taxation");
         this.clock = Objects.requireNonNull(clock, "clock");
     }
@@ -146,8 +151,11 @@ public final class Pay {
         if (!tax.isZero()) {
             notifier.send(from, EconomyMessageKey.PAY_TAX_APPLIED, Map.of("amount", notifier.amount(tax)));
         }
-        notifier.send(
-                to, EconomyMessageKey.PAY_RECEIVED, Map.of("player", from.name(), "amount", notifier.amount(net)));
+        // The payee may be offline or on another server: the line waits for them rather than being dropped.
+        payees.tell(
+                to,
+                new MessageLine(
+                        EconomyMessageKey.PAY_RECEIVED, Map.of("player", from.name(), "amount", notifier.amount(net))));
         return PayOutcome.sent();
     }
 
