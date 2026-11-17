@@ -361,14 +361,13 @@ connects, before the server thread is involved. The decision follows a moment la
 are known, so a login never makes the server wait on the database. A login is never let in unchecked: when the read
 fails, or the decision finds no read for that connection (or one more than 30 seconds old), the player is refused with
 `moderation.login.unchecked`, which asks them to join again, and a line is written to the log.
-On an offline-mode server (no online-mode proxy in front) each spelling of a name is its own account, so `Steve` and `STEVE` log in with two uuids. A ban on one also refuses a login under any other spelling of the name, with the banned account's ban screen. With `refuse-name-case-variants = true` a new account whose name only differs in case from one the server already knows is refused too, ban or not, with `moderation.login.name-variant`, which names the spelling to use; accounts that already joined keep joining. Mutes and jails stay on the account they were given to. With authenticated logins a name has one owner and neither check applies.
+On an offline-mode server (no online-mode proxy in front) each spelling of a name is its own account, so `Steve` and `STEVE` log in with two uuids. A ban, a mute or a jail on one follows the player into another spelling: the login is refused with the banned account's ban screen, and a mute or a jail is copied onto the account as it connects, so every server holds it and it runs out when the original does. Lifting the original does not lift a copy; lift that too. By default a sanction reaches only an account first seen after it was issued, since one already playing under its own spelling is somebody else; `case-variant-sanctions = "all"` makes it reach every spelling. When a ban lands, the spellings it reaches that are connected at that moment are kicked too, on every server. With `refuse-name-case-variants = true` a new account whose name only differs in case from one the server already knows is refused too, sanction or not, with `moderation.login.name-variant`, which names the spelling to use; accounts that already joined keep joining. With authenticated logins a name has one owner and none of this applies.
 
 ## Kick screens and appeals
 
 The plugin has no appeal system. The ban, IP ban, kick and lockdown screens are messages (`moderation.ban.kick`,
 `moderation.tempban.kick`, `moderation.banip.kick`, `moderation.kick.kicked`, `moderation.lockdown.kick`) in
-`messages/messages_<language>.conf`. Add your appeal link or Discord invite there, in both `moderation.ban.kick`
-(permanent bans) and `moderation.tempban.kick` (timed bans).
+`messages/messages_<language>.conf`. Add your appeal link or Discord invite there, in both `moderation.ban.kick` (permanent bans) and `moderation.tempban.kick` (timed bans).
 
 ## On a network
 
@@ -398,3 +397,4 @@ mutes, warnings and jails over from EssentialsX and LiteBans.
 | `discord-notify` | `false` | Sends punishment lines to the Discord bridge. |
 | `censor-ip-addresses` | `false` | Masks the address in `/seenip`. |
 | `refuse-name-case-variants` | `false` | Offline mode: refuses a new account named as a case variant of a known one. |
+| `case-variant-sanctions` | `"newer"` | Offline mode: which other spellings a sanction reaches, `newer` accounts or `all`. |

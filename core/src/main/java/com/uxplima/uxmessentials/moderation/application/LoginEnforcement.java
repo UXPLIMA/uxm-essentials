@@ -2,7 +2,6 @@ package com.uxplima.uxmessentials.moderation.application;
 
 import java.time.Clock;
 import java.time.Instant;
-import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -12,9 +11,10 @@ import java.util.UUID;
 
 import com.uxplima.uxmessentials.moderation.application.port.ModerationAudit;
 import com.uxplima.uxmessentials.moderation.application.port.ModerationRepository;
-import com.uxplima.uxmessentials.moderation.application.port.NameHolders;
 import com.uxplima.uxmessentials.moderation.domain.IpBan;
+import com.uxplima.uxmessentials.moderation.domain.JailState;
 import com.uxplima.uxmessentials.moderation.domain.ModerationMessageKey;
+import com.uxplima.uxmessentials.moderation.domain.MuteState;
 import com.uxplima.uxmessentials.moderation.domain.TempbanState;
 import com.uxplima.uxmessentials.shared.application.IpAlts;
 import com.uxplima.uxmessentials.shared.application.message.Notifier;
@@ -29,13 +29,16 @@ import com.uxplima.uxmessentials.shared.domain.message.MessageKey;
  * the login before player data loads.
  *
  * <p>The case variants matter on an offline-mode server only, where the uuid is derived from the exact spelling: a
- * banned {@code Steve} who logs in as {@code STEVE} arrives as another account with no ban of its own. The
- * {@link NameHolders} the server is built with answer nothing on an authenticated server, where a name has one owner
- * and a case variant of a banned name is somebody else.
+ * banned {@code Steve} who logs in as {@code STEVE} arrives as another account with no ban of its own.
+ * {@link CaseVariantSanctions} says which bans, mutes and jails follow the login there; it reads nothing while names
+ * are not case-sensitive, where a case variant of a sanctioned name is somebody else.
  *
  * <ul>
  *   <li>{@link #read} fetches everything the check needs from storage. It runs at pre-login, off the tick, where no
  *       {@code Player} exists yet and so no permission can be read.
+ *   <li>{@link #carryOver} gives the account the mute and the jail it inherits, so every check that reads its own
+ *       mute or jail, on this server and the others, holds it from the moment it joins. It writes to storage, so it
+ *       runs right after the read, still off the tick.
  *   <li>{@link #decide} weighs what was read against the two permission answers (the lockdown bypass and the
  *       punishment exemption). It touches no storage, so it runs at login, on the server thread, where the
  *       permissions are attached.
@@ -52,17 +55,17 @@ public final class LoginEnforcement {
     private final Notifier notifier;
     private final ModerationAudit audit;
     private final Clock clock;
-    private final NameHolders holders;
+    private final CaseVariantSanctions caseVariants;
     private final boolean refuseCaseVariants;
 
     /** The check for a server whose logins are authenticated, where a name has one owner in any case. */
     public LoginEnforcement(
             ModerationRepository repository, IpAlts ipAlts, Notifier notifier, ModerationAudit audit, Clock clock) {
-        this(repository, ipAlts, notifier, audit, clock, NameHolders.NONE, false);
+        this(repository, ipAlts, notifier, audit, clock, CaseVariantSanctions.none(repository), false);
     }
 
     /**
-     * @param holders the accounts seen under a name in any case; {@link NameHolders#NONE} on an authenticated server
+     * @param caseVariants the sanctions that follow a login from the other spellings of its name
      * @param refuseCaseVariants whether a new account under a case variant of a known name is refused even when no
      *     ban is involved
      */
@@ -72,14 +75,14 @@ public final class LoginEnforcement {
             Notifier notifier,
             ModerationAudit audit,
             Clock clock,
-            NameHolders holders,
+            CaseVariantSanctions caseVariants,
             boolean refuseCaseVariants) {
         this.repository = Objects.requireNonNull(repository, "repository");
         this.ipAlts = Objects.requireNonNull(ipAlts, "ipAlts");
         this.notifier = Objects.requireNonNull(notifier, "notifier");
         this.audit = Objects.requireNonNull(audit, "audit");
         this.clock = Objects.requireNonNull(clock, "clock");
-        this.holders = Objects.requireNonNull(holders, "holders");
+        this.caseVariants = Objects.requireNonNull(caseVariants, "caseVariants");
         this.refuseCaseVariants = refuseCaseVariants;
     }
 
@@ -94,18 +97,6 @@ public final class LoginEnforcement {
         Objects.requireNonNull(who, "who");
         Objects.requireNonNull(ip, "ip");
         Instant now = clock.instant();
-        List<PlayerRef> underName = holders.underName(who.name());
-        List<PlayerRef> variants = new ArrayList<>();
-        TempbanState variantBan = TempbanState.none();
-        for (PlayerRef holder : underName) {
-            if (holder.equals(who) || holder.name().equals(who.name())) {
-                continue;
-            }
-            variants.add(holder);
-            if (!variantBan.isActiveAt(now)) {
-                variantBan = repository.loadTempban(holder);
-            }
-        }
         return new Standing(
                 who,
                 ip,
@@ -113,9 +104,36 @@ public final class LoginEnforcement {
                 repository.loadTempban(who),
                 repository.activeIpBan(ip, now),
                 ipAlts.onAddress(ip, who.uuid()),
-                variantBan,
-                variants,
-                underName.contains(who));
+                caseVariants.atLogin(who, now));
+    }
+
+    /**
+     * Give {@code standing}'s account the mute and the jail it inherits from another spelling of its name, unless it
+     * already has an active one of its own. The copy is an ordinary sanction on the account: the chat and command
+     * checks, the jail on join, the placeholders and every other server read it as they read any other, and it runs
+     * out when the original would have. It writes to storage, so call it off the tick, before the login is decided.
+     */
+    public void carryOver(Standing standing) {
+        Objects.requireNonNull(standing, "standing");
+        CaseVariantSanctions.Inherited inherited = standing.inherited();
+        Instant now = clock.instant();
+        boolean mute = inherited.mute().isActiveAt(now);
+        boolean jail = inherited.jail().isActiveAt(now);
+        if (!mute && !jail) {
+            return;
+        }
+        PlayerRef who = standing.who();
+        repository.ensureUserExists(who, now);
+        if (mute) {
+            MuteState own = repository.loadMute(who);
+            if (!own.isActiveAt(now)) {
+                // Guarded on the mute just read, so a mute staff give the account meanwhile is never overwritten.
+                repository.replaceMute(who, own, inherited.mute());
+            }
+        }
+        if (jail && !repository.loadJail(who).isActiveAt(now) && inherited.jail() instanceof JailState.Active held) {
+            repository.saveJail(who, held);
+        }
     }
 
     /**
@@ -135,7 +153,7 @@ public final class LoginEnforcement {
             return Decision.deny(BanScreen.of(ban, now).render(notifier, who));
         }
         // The same person under another spelling: the ban follows them, exempt or not, as it does on their own uuid.
-        if (standing.variantBan() instanceof TempbanState.Active ban && ban.isActiveAt(now)) {
+        if (standing.inherited().ban() instanceof TempbanState.Active ban && ban.isActiveAt(now)) {
             return Decision.deny(BanScreen.of(ban, now).render(notifier, who));
         }
         Optional<IpBan> ipBan = standing.ipBan().filter(ban -> !exempt && ban.isActiveAt(now));
@@ -151,11 +169,12 @@ public final class LoginEnforcement {
         }
         // An account that already joined keeps joining: the option stops new look-alikes, it does not pick between
         // accounts the server already has.
-        if (refuseCaseVariants && !standing.known() && !standing.variants().isEmpty()) {
+        CaseVariantSanctions.Inherited inherited = standing.inherited();
+        if (refuseCaseVariants && !inherited.known() && !inherited.variants().isEmpty()) {
             return Decision.deny(render(
                     who,
                     ModerationMessageKey.MOD_LOGIN_NAME_VARIANT,
-                    Map.of("player", who.name(), "matches", spellings(standing.variants()))));
+                    Map.of("player", who.name(), "matches", spellings(inherited.variants()))));
         }
         return Decision.allow();
     }
@@ -188,8 +207,8 @@ public final class LoginEnforcement {
 
     /**
      * What storage said about one login: whether the server is locked down, the player's tempban, the IP ban on
-     * their address, the other accounts seen on that address, and, on an offline-mode server, the accounts under a
-     * case variant of the name, the first active ban among them, and whether this account was seen before.
+     * their address, the other accounts seen on that address, and, on an offline-mode server, what the login inherits
+     * from the other spellings of its name.
      */
     public record Standing(
             PlayerRef who,
@@ -198,9 +217,7 @@ public final class LoginEnforcement {
             TempbanState tempban,
             Optional<IpBan> ipBan,
             List<UUID> alts,
-            TempbanState variantBan,
-            List<PlayerRef> variants,
-            boolean known) {
+            CaseVariantSanctions.Inherited inherited) {
 
         public Standing {
             Objects.requireNonNull(who, "who");
@@ -208,8 +225,7 @@ public final class LoginEnforcement {
             Objects.requireNonNull(tempban, "tempban");
             Objects.requireNonNull(ipBan, "ipBan");
             alts = List.copyOf(alts);
-            Objects.requireNonNull(variantBan, "variantBan");
-            variants = List.copyOf(variants);
+            Objects.requireNonNull(inherited, "inherited");
         }
     }
 

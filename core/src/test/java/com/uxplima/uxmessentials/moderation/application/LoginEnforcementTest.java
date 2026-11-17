@@ -13,7 +13,10 @@ import java.util.UUID;
 import com.uxplima.uxmessentials.moderation.application.port.NameHolders;
 import com.uxplima.uxmessentials.moderation.domain.IpBan;
 import com.uxplima.uxmessentials.moderation.domain.Issuer;
+import com.uxplima.uxmessentials.moderation.domain.JailState;
 import com.uxplima.uxmessentials.moderation.domain.ModerationMessageKey;
+import com.uxplima.uxmessentials.moderation.domain.MuteState;
+import com.uxplima.uxmessentials.moderation.domain.SeenRecord;
 import com.uxplima.uxmessentials.moderation.domain.TempbanState;
 import com.uxplima.uxmessentials.shared.application.IpAlts;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
@@ -22,7 +25,9 @@ import org.junit.jupiter.api.Test;
 
 /**
  * A banned address is refused at login, except for an exempt holder, as the live kick spares them. On an offline-mode
- * server a ban also follows its player into the other spellings of their name, which log in as other accounts.
+ * server a ban, a mute and a jail also follow their player into the other spellings of their name, which log in as
+ * other accounts: by default into an account first seen after the sanction, or into every spelling when the server
+ * says so.
  */
 class LoginEnforcementTest {
 
@@ -56,6 +61,7 @@ class LoginEnforcementTest {
         banSteve();
         LoginEnforcement offline = offlineMode(name -> List.of(STEVE), false);
 
+        // A first login under the new spelling: the account did not exist when the ban was issued.
         LoginEnforcement.Decision decision = Logins.check(offline, UPPER_STEVE, HOME, false, true);
 
         assertThat(decision.allowed()).isFalse();
@@ -102,20 +108,88 @@ class LoginEnforcementTest {
         assertThat(Logins.check(strict, STEVE, HOME, false, false).allowed()).isTrue();
     }
 
+    @Test
+    void offlineModeAMuteAndAJailFollowANewAccountUnderAnotherSpelling() {
+        repository.saveMute(STEVE, STEVES_MUTE);
+        repository.saveJail(STEVE, STEVES_JAIL);
+
+        LoginEnforcement.Decision decision =
+                Logins.check(offlineMode(name -> List.of(STEVE), false), UPPER_STEVE, HOME, false, false);
+
+        assertThat(decision.allowed()).isTrue();
+        assertThat(repository.loadMute(UPPER_STEVE)).isEqualTo(STEVES_MUTE);
+        assertThat(repository.loadJail(UPPER_STEVE)).isEqualTo(STEVES_JAIL);
+    }
+
+    @Test
+    void offlineModeAnAccountPlayingBeforeTheSanctionsIsSomebodyElseByDefault() {
+        banSteve();
+        repository.saveMute(STEVE, STEVES_MUTE);
+        repository.saveJail(STEVE, STEVES_JAIL);
+        playingSinceLastMonth(UPPER_STEVE);
+
+        LoginEnforcement.Decision decision =
+                Logins.check(offlineMode(name -> List.of(STEVE, UPPER_STEVE), false), UPPER_STEVE, HOME, false, false);
+
+        assertThat(decision.allowed()).isTrue();
+        assertThat(repository.loadMute(UPPER_STEVE)).isEqualTo(MuteState.none());
+        assertThat(repository.loadJail(UPPER_STEVE)).isEqualTo(JailState.none());
+    }
+
+    @Test
+    void offlineModeEverySpellingIsReachedWhenTheServerSaysSo() {
+        banSteve();
+        repository.saveMute(STEVE, STEVES_MUTE);
+        playingSinceLastMonth(UPPER_STEVE);
+        LoginEnforcement everySpelling =
+                offlineMode(name -> List.of(STEVE, UPPER_STEVE), false, CaseVariantSanctions.Reach.ALL);
+
+        LoginEnforcement.Decision decision = Logins.check(everySpelling, UPPER_STEVE, HOME, false, false);
+
+        assertThat(decision.allowed()).isFalse();
+        assertThat(decision.kickReason()).contains(ModerationMessageKey.TEMPBAN_KICK.key());
+        assertThat(repository.loadMute(UPPER_STEVE)).isEqualTo(STEVES_MUTE);
+    }
+
+    @Test
+    void offlineModeAMuteOfTheAccountsOwnIsKept() {
+        MuteState own = MuteState.permanent(Issuer.of(ALEX), Optional.of("spam"), NOW.minus(Duration.ofDays(2)));
+        repository.saveMute(UPPER_STEVE, own);
+        repository.saveMute(STEVE, STEVES_MUTE);
+
+        Logins.check(offlineMode(name -> List.of(STEVE), false), UPPER_STEVE, HOME, false, false);
+
+        assertThat(repository.loadMute(UPPER_STEVE)).isEqualTo(own);
+    }
+
+    private static final MuteState STEVES_MUTE = MuteState.timed(
+            NOW.plus(Duration.ofDays(1)), Issuer.of(ALEX), Optional.of("slurs"), NOW.minus(Duration.ofHours(1)));
+    private static final JailState STEVES_JAIL =
+            JailState.permanent("cell", Issuer.of(ALEX), Optional.of("grief"), NOW.minus(Duration.ofHours(1)));
+
     private void banSteve() {
         repository.saveTempban(
                 STEVE,
                 TempbanState.active(NOW.plus(Duration.ofDays(1)), Issuer.of(ALEX), Optional.of("cheating"), NOW));
     }
 
+    private void playingSinceLastMonth(PlayerRef account) {
+        repository.recordSeen(SeenRecord.firstJoin(account, Optional.of(HOME), NOW.minus(Duration.ofDays(30))));
+    }
+
     private LoginEnforcement offlineMode(NameHolders holders, boolean refuseCaseVariants) {
+        return offlineMode(holders, refuseCaseVariants, CaseVariantSanctions.Reach.NEWER);
+    }
+
+    private LoginEnforcement offlineMode(
+            NameHolders holders, boolean refuseCaseVariants, CaseVariantSanctions.Reach reach) {
         return new LoginEnforcement(
                 repository,
                 new IpAlts(new NoIpHistory(), address -> address),
                 notifier.notifier(),
                 new SilentAudit(),
                 CLOCK,
-                holders,
+                new CaseVariantSanctions(repository, holders, reach),
                 refuseCaseVariants);
     }
 

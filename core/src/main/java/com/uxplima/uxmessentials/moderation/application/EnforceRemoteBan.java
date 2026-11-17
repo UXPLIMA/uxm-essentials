@@ -2,12 +2,16 @@ package com.uxplima.uxmessentials.moderation.application;
 
 import java.time.Clock;
 import java.time.Instant;
+import java.util.List;
 import java.util.Objects;
 import java.util.UUID;
 
 import com.uxplima.uxmessentials.moderation.application.port.ModerationRepository;
 import com.uxplima.uxmessentials.moderation.application.port.Sanctions;
+import com.uxplima.uxmessentials.moderation.domain.SeenRecord;
 import com.uxplima.uxmessentials.moderation.domain.TempbanState;
+import com.uxplima.uxmessentials.moderation.domain.event.ModerationEvent;
+import com.uxplima.uxmessentials.moderation.domain.event.PlayerTempbanned;
 import com.uxplima.uxmessentials.shared.application.message.Notifier;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 
@@ -34,6 +38,10 @@ import com.uxplima.uxmessentials.shared.domain.PlayerRef;
  *
  * <p>Self-origin frames never reach here: the bus client drops any frame whose origin equals this backend's id
  * before dispatching to a listener, so the player the local {@code /ban} already kicked is not kicked twice.
+ *
+ * <p>On an offline-mode server the ban also reaches the other spellings of the banned name that
+ * {@link CaseVariantSanctions#reachedBy} names, and any of them connected here is removed with the same screen: from
+ * the frame on every other backend, and from the ban's own event ({@link #onBanned}) on the backend that issued it.
  */
 public final class EnforceRemoteBan {
 
@@ -41,12 +49,23 @@ public final class EnforceRemoteBan {
     private final Sanctions sanctions;
     private final Notifier notifier;
     private final Clock clock;
+    private final CaseVariantSanctions caseVariants;
 
     public EnforceRemoteBan(ModerationRepository repository, Sanctions sanctions, Notifier notifier, Clock clock) {
+        this(repository, sanctions, notifier, clock, CaseVariantSanctions.none(repository));
+    }
+
+    public EnforceRemoteBan(
+            ModerationRepository repository,
+            Sanctions sanctions,
+            Notifier notifier,
+            Clock clock,
+            CaseVariantSanctions caseVariants) {
         this.repository = Objects.requireNonNull(repository, "repository");
         this.sanctions = Objects.requireNonNull(sanctions, "sanctions");
         this.notifier = Objects.requireNonNull(notifier, "notifier");
         this.clock = Objects.requireNonNull(clock, "clock");
+        this.caseVariants = Objects.requireNonNull(caseVariants, "caseVariants");
     }
 
     /** Re-evaluate {@code target}'s ban here and kick them if it is in effect; a no-op when not connected. */
@@ -58,6 +77,28 @@ public final class EnforceRemoteBan {
         Instant now = clock.instant();
         if (repository.loadTempban(ref) instanceof TempbanState.Active ban && ban.isActiveAt(now)) {
             BanScreen.of(ban, now).kick(sanctions, notifier, ref);
+            // The frame carries the uuid alone; the name the other spellings are found under is the stored one.
+            repository.seen(ref).map(SeenRecord::player).ifPresent(named -> kickVariants(named, ban, now));
+        }
+    }
+
+    /**
+     * A moderation event of this server: a ban issued here also removes the other spellings of the banned name it
+     * reaches that are connected here. The banned account itself was removed by the ban. Reads storage, so deliver
+     * it off the tick.
+     */
+    public void onBanned(ModerationEvent event) {
+        Objects.requireNonNull(event, "event");
+        Instant now = clock.instant();
+        if (event instanceof PlayerTempbanned banned && banned.ban().isActiveAt(now)) {
+            kickVariants(banned.target(), banned.ban(), now);
+        }
+    }
+
+    private void kickVariants(PlayerRef banned, TempbanState.Active ban, Instant now) {
+        List<PlayerRef> reached = caseVariants.reachedBy(banned, ban.issuedAt());
+        for (PlayerRef variant : reached) {
+            BanScreen.of(ban, now).kick(sanctions, notifier, variant);
         }
     }
 }

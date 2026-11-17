@@ -20,14 +20,16 @@ import com.uxplima.uxmessentials.moderation.domain.Warn;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 
 /**
- * A moderation store that keeps IP bans in memory, with no lockdown and no player ban: what the IP ban use cases
- * and the login check read, plus the seen records {@code /seen} reads.
+ * A moderation store that keeps IP bans, player bans, mutes and jails in memory, with no lockdown: what the IP ban use
+ * cases and the login check read and write, plus the seen records {@code /seen} reads.
  */
 final class InMemoryIpBans implements ModerationRepository {
 
     private final Map<String, IpBan> ipBans = new HashMap<>();
     private final Map<java.util.UUID, SeenRecord> seen = new HashMap<>();
     private final Map<java.util.UUID, TempbanState> tempbans = new HashMap<>();
+    private final Map<java.util.UUID, MuteState> mutes = new HashMap<>();
+    private final Map<java.util.UUID, JailState> jails = new HashMap<>();
 
     /** Keep {@code record} as the seen record of its player. */
     void recordSeen(SeenRecord record) {
@@ -70,12 +72,12 @@ final class InMemoryIpBans implements ModerationRepository {
 
     @Override
     public MuteState loadMute(PlayerRef target) {
-        throw new UnsupportedOperationException();
+        return mutes.getOrDefault(target.uuid(), MuteState.none());
     }
 
     @Override
     public JailState loadJail(PlayerRef target) {
-        throw new UnsupportedOperationException();
+        return jails.getOrDefault(target.uuid(), JailState.none());
     }
 
     @Override
@@ -100,17 +102,21 @@ final class InMemoryIpBans implements ModerationRepository {
 
     @Override
     public void saveMute(PlayerRef target, MuteState mute) {
-        throw new UnsupportedOperationException();
+        mutes.put(target.uuid(), mute);
     }
 
     @Override
     public boolean replaceMute(PlayerRef target, MuteState expected, MuteState replacement) {
-        throw new UnsupportedOperationException();
+        if (!loadMute(target).equals(expected)) {
+            return false;
+        }
+        mutes.put(target.uuid(), replacement);
+        return true;
     }
 
     @Override
     public void saveJail(PlayerRef target, JailState jail) {
-        throw new UnsupportedOperationException();
+        jails.put(target.uuid(), jail);
     }
 
     @Override
@@ -155,7 +161,7 @@ final class InMemoryIpBans implements ModerationRepository {
 
     @Override
     public void ensureUserExists(PlayerRef target, Instant at) {
-        throw new UnsupportedOperationException();
+        seen.putIfAbsent(target.uuid(), SeenRecord.firstJoin(target, Optional.empty(), at));
     }
 
     @Override

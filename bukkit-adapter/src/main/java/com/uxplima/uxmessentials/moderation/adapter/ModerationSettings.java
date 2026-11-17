@@ -11,6 +11,7 @@ import java.util.Optional;
 import java.util.Set;
 import java.util.stream.Collectors;
 
+import com.uxplima.uxmessentials.moderation.application.CaseVariantSanctions;
 import com.uxplima.uxmessentials.moderation.domain.AddressStrictness;
 import com.uxplima.uxmessentials.moderation.domain.PunishmentTemplate;
 import com.uxplima.uxmessentials.moderation.domain.SanctionDuration;
@@ -52,6 +53,7 @@ public final class ModerationSettings {
     private final AddressStrictness addressStrictness;
     private final boolean censorIpAddresses;
     private final boolean refuseNameCaseVariants;
+    private final CaseVariantSanctions.Reach caseVariantSanctions;
     private final Map<String, PunishmentTemplate> templates;
     private final boolean discordNotify;
 
@@ -76,6 +78,8 @@ public final class ModerationSettings {
         this.addressStrictness = AddressStrictness.parse(config.getString("address-strictness", "NORMAL"));
         this.censorIpAddresses = config.getBoolean("censor-ip-addresses", false);
         this.refuseNameCaseVariants = config.getBoolean("refuse-name-case-variants", false);
+        this.caseVariantSanctions =
+                CaseVariantSanctions.Reach.parse(config.getString("case-variant-sanctions", "newer"), log);
         this.templates = parseTemplates(config, log);
         this.discordNotify = config.getBoolean("discord-notify", false);
     }
@@ -128,6 +132,14 @@ public final class ModerationSettings {
      */
     public boolean refuseNameCaseVariants() {
         return refuseNameCaseVariants;
+    }
+
+    /**
+     * Which accounts under another spelling of a sanctioned name the ban, mute or jail reaches on an offline-mode
+     * server: only those first seen after it was issued (the default), or all of them.
+     */
+    public CaseVariantSanctions.Reach caseVariantSanctions() {
+        return caseVariantSanctions;
     }
 
     /** The configured {@code /punish} templates (name → preset reason + optional duration), parsed at wire time. */

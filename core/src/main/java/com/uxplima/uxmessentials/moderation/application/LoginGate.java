@@ -16,7 +16,9 @@ import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 
 /**
  * Carries the ban-on-login check across the two events a login passes through, so the server thread never waits on
- * storage. At pre-login, off the tick, it reads the player's {@link LoginEnforcement.Standing} and holds it. At login,
+ * storage. At pre-login, off the tick, it reads the player's {@link LoginEnforcement.Standing}, gives the account the
+ * mute and jail it inherits from another spelling of its name ({@link LoginEnforcement#carryOver}), and holds what it
+ * read. At login,
  * where the connecting {@code Player} has its permissions, it takes what it held and decides from it without reading
  * storage again. The last-seen row and the audit line are then written on the storage lane.
  *
@@ -66,6 +68,7 @@ public final class LoginGate {
         LoginEnforcement.Standing standing;
         try {
             standing = enforcement.read(who, ip);
+            enforcement.carryOver(standing);
         } catch (RuntimeException failure) {
             log.warn(
                     "event=login_check_failed player={} reason={}; the login was refused so a banned player cannot"
