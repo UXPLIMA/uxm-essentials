@@ -3,6 +3,13 @@
 What an operator edits when a release renames something an operator's own files or permission grants depend on, or
 needs a setting it did not need before.
 
+## Text players write is shown as written
+
+A tag in text a player wrote is now shown as the words, never as styling or a click: a display name, a renamed weapon
+or the vanilla death line in a join, quit or death message, the `/me` action, the `/afk` reason, and an argument a
+custom command puts into a `broadcast`, `message`, `title`, `action-bar` or `toast` action. A custom command that let
+players style their text that way loses the styling; an argument going into a command is unchanged.
+
 ## Nicks are kept in the database
 
 A `/nick` is kept in the new `player_nicks` table, so it survives a relog and follows the player to every server; it

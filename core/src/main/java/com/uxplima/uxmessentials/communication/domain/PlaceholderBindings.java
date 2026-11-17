@@ -9,8 +9,9 @@ import java.util.Objects;
  * {@code {world}}, and the handful of other tokens a channel offers. The substitution contract is the pure half
  * of rendering a template: it replaces every {@code {token}} it knows with the bound value and leaves an unknown
  * {@code {token}} untouched, so an operator typo surfaces verbatim rather than silently vanishing. MiniMessage
- * parsing happens later in the adapter, on the already-substituted string. Placeholders are resolved first so a
- * value that itself contains a tag-like sequence is not reinterpreted as markup.
+ * parsing happens later in the adapter, on the already-substituted string, so a value that may hold text a player
+ * wrote (a display name, an item name, the vanilla death line) is escaped for MiniMessage by the adapter before it is
+ * bound.
  *
  * <p>The map is copied defensively and the order is preserved only for deterministic iteration in tests; it
  * carries no meaning. Values are operator/runtime content (a player name, a count), never plugin {@code
@@ -50,11 +51,26 @@ public final class PlaceholderBindings {
      */
     public String apply(String template) {
         Objects.requireNonNull(template, "template");
-        String result = template;
-        for (Map.Entry<String, String> entry : tokens.entrySet()) {
-            result = result.replace("{" + entry.getKey() + "}", entry.getValue());
+        StringBuilder result = new StringBuilder(template.length() + 16);
+        int from = 0;
+        while (from < template.length()) {
+            int open = template.indexOf('{', from);
+            int close = open < 0 ? -1 : template.indexOf('}', open + 1);
+            if (close < 0) {
+                break;
+            }
+            String value = tokens.get(template.substring(open + 1, close));
+            if (value == null) {
+                // Not a token this binding knows: the brace is kept and the scan goes on from the next character, so
+                // a stray "{" before a real token does not hide it.
+                result.append(template, from, open + 1);
+                from = open + 1;
+                continue;
+            }
+            result.append(template, from, open).append(value);
+            from = close + 1;
         }
-        return result;
+        return result.append(template, from, template.length()).toString();
     }
 
     /** A read-only view of the bound tokens, for inspection and tests. */

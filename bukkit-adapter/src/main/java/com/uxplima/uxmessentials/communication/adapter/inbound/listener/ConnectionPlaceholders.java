@@ -8,6 +8,7 @@ import net.kyori.adventure.text.serializer.plain.PlainTextComponentSerializer;
 
 import com.uxplima.uxmessentials.communication.domain.DeathCause;
 import com.uxplima.uxmessentials.communication.domain.PlaceholderBindings;
+import com.uxplima.uxmessentials.shared.adapter.outbound.style.StyledText;
 import org.jspecify.annotations.NullMarked;
 
 /**
@@ -16,10 +17,12 @@ import org.jspecify.annotations.NullMarked;
  * name and display name, the online count, the world. Never plugin {@code MessageKey} strings, so nothing here
  * is parity-checked.
  *
- * <p>The display name is flattened to plain text so a substituted {@code {displayname}} cannot smuggle a
- * MiniMessage tag the operator did not author into the template the adapter parses; the bare {@code {player}}
- * carries the account name. The translation from a live {@code Player} to tokens lives here so the listener stays
- * focused on the policy decision.
+ * <p>Every value is escaped for MiniMessage before it is bound, because the template is parsed with the values in it
+ * and a value can hold text a player wrote: a display name a nick or another plugin set, the name of a renamed weapon,
+ * the vanilla death line with the item and entity names in it. Flattening a name to plain text keeps its own styling
+ * out, but its words can still be a tag, so without the escape an anvil-renamed sword could put a click into a line
+ * every player reads. The bare {@code {player}} carries the account name, escaped the same way. The translation from a
+ * live {@code Player} to tokens lives here so the listener stays focused on the policy decision.
  */
 @NullMarked
 final class ConnectionPlaceholders {
@@ -30,11 +33,20 @@ final class ConnectionPlaceholders {
 
     /** Tokens for a join or quit: {@code player}, {@code displayname}, {@code count}, {@code world}. */
     static PlaceholderBindings connection(Player player, int onlineCount) {
+        return connection(
+                player.getName(),
+                PLAIN.serialize(player.displayName()),
+                onlineCount,
+                player.getWorld().getName());
+    }
+
+    /** {@link #connection(Player, int)} over the values themselves, each escaped as it is bound. */
+    static PlaceholderBindings connection(String name, String displayName, int onlineCount, String world) {
         return PlaceholderBindings.empty()
-                .with("player", player.getName())
-                .with("displayname", PLAIN.serialize(player.displayName()))
+                .with("player", StyledText.escape(name))
+                .with("displayname", StyledText.escape(displayName))
                 .with("count", Integer.toString(onlineCount))
-                .with("world", player.getWorld().getName());
+                .with("world", StyledText.escape(world));
     }
 
     /**
@@ -46,10 +58,16 @@ final class ConnectionPlaceholders {
      */
     static PlaceholderBindings death(
             Player player, int onlineCount, DeathCause cause, String deathMessage, String killer, String killerWeapon) {
-        return connection(player, onlineCount)
-                .with("message", deathMessage)
-                .with("killer", killer)
-                .with("killer_weapon", killerWeapon)
+        return withDeath(connection(player, onlineCount), cause, deathMessage, killer, killerWeapon);
+    }
+
+    /** The death tokens on top of {@code connection}, each escaped as it is bound. */
+    static PlaceholderBindings withDeath(
+            PlaceholderBindings connection, DeathCause cause, String deathMessage, String killer, String killerWeapon) {
+        return connection
+                .with("message", StyledText.escape(deathMessage))
+                .with("killer", StyledText.escape(killer))
+                .with("killer_weapon", StyledText.escape(killerWeapon))
                 .with("cause", cause.name().toLowerCase(Locale.ROOT));
     }
 }

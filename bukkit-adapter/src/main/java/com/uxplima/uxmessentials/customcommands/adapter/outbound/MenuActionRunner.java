@@ -5,6 +5,8 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
 import java.util.function.Supplier;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 import org.bukkit.Bukkit;
 
@@ -48,8 +50,19 @@ public final class MenuActionRunner implements ActionRunner {
     /** The heads that still mean something when the actor is the console rather than a player. */
     private static final Set<String> CONSOLE_SAFE_HEADS = Set.of(CONSOLE_HEAD, BROADCAST_HEAD, MESSAGE_HEAD);
 
-    /** The token carrying the raw remaining input a command was invoked with. */
-    private static final String RAW_ARGUMENTS = "%args%";
+    /** An argument token: {@code %args%} or {@code %arg_<name>%}; {@code group(1)} is the name, absent for the first. */
+    private static final Pattern ARGUMENT = Pattern.compile("%(?:args|arg_([^%\\s]+))%");
+
+    /**
+     * The heads whose value is parsed as MiniMessage and shown to players. An argument the player typed goes into one
+     * as text, so a tag in it reads as the words: typed into a {@code broadcast}, a click tag would otherwise reach
+     * every player on the server.
+     */
+    private static final Set<String> STYLED_TEXT_HEADS =
+            Set.of(BROADCAST_HEAD, MESSAGE_HEAD, "message-to", "whisper", "action-bar", "actionbar", "title", "toast");
+
+    /** The head whose value is a JSON text component, where an argument goes into a JSON string as its text. */
+    private static final String JSON_HEAD = "broadcast-json";
 
     private final Menus menus;
     private final Scheduler scheduler;
@@ -171,13 +184,57 @@ public final class MenuActionRunner implements ActionRunner {
      * Expand the argument tokens a definition may write inside an action: {@code %arg_<name>%} for each declared
      * argument and {@code %args%} for the raw remainder. The map is handed to the engine unchanged as well, so the
      * engine's own {@code %argument_<name>%} expansion still works and a file written either way behaves the same.
+     *
+     * <p>One pass: an argument that itself holds {@code %args%} or another argument's token is put in as typed. An
+     * argument going into text players read is put in as text ({@link #STYLED_TEXT_HEADS}, {@link #JSON_HEAD}); one
+     * going into a command is put in as typed, since a command takes its words exactly.
      */
     private static String expand(String token, Map<String, String> arguments) {
-        String expanded = token;
-        for (Map.Entry<String, String> argument : arguments.entrySet()) {
-            expanded = expanded.replace("%arg_" + argument.getKey() + "%", argument.getValue());
+        if (token.indexOf('%') < 0) {
+            return token;
         }
-        return expanded.replace(RAW_ARGUMENTS, arguments.getOrDefault("args", ""));
+        String head = head(token);
+        Matcher matcher = ARGUMENT.matcher(token);
+        StringBuilder out = new StringBuilder(token.length() + 16);
+        while (matcher.find()) {
+            String name = matcher.group(1);
+            String value = name == null ? arguments.getOrDefault("args", "") : arguments.get(name);
+            String inserted = value == null ? matcher.group() : asTextFor(head, value);
+            matcher.appendReplacement(out, Matcher.quoteReplacement(inserted));
+        }
+        matcher.appendTail(out);
+        return out.toString();
+    }
+
+    /** {@code value} as it goes into an action with this {@code head}: as words where the action shows text. */
+    private static String asTextFor(String head, String value) {
+        if (STYLED_TEXT_HEADS.contains(head)) {
+            return StyledText.escape(value);
+        }
+        if (JSON_HEAD.equals(head)) {
+            return jsonStringContent(value);
+        }
+        return value;
+    }
+
+    /** {@code value} as the inside of a JSON string, so it cannot close the string and add keys of its own. */
+    private static String jsonStringContent(String value) {
+        StringBuilder escaped = new StringBuilder(value.length() + 8);
+        for (int i = 0; i < value.length(); i++) {
+            char character = value.charAt(i);
+            switch (character) {
+                case '"' -> escaped.append("\\\"");
+                case '\\' -> escaped.append("\\\\");
+                default -> {
+                    if (character < 0x20) {
+                        escaped.append(String.format(Locale.ROOT, "\\u%04x", (int) character));
+                    } else {
+                        escaped.append(character);
+                    }
+                }
+            }
+        }
+        return escaped.toString();
     }
 
     /** Whether the module's policy allows this action head; every head but the two privileged ones is allowed. */

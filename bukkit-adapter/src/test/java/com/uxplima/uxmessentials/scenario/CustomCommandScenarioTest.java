@@ -2,10 +2,17 @@ package com.uxplima.uxmessentials.scenario;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Map;
 
 import org.bukkit.Location;
 
+import net.kyori.adventure.text.Component;
+import net.kyori.adventure.text.ComponentIteratorType;
+import net.kyori.adventure.text.serializer.plain.PlainTextComponentSerializer;
+
+import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Tag;
@@ -27,11 +34,51 @@ class CustomCommandScenarioTest {
             + "}\n"
             + "actions = [\"message:" + RAN + "\"]\n";
 
+    // An operator's broadcast that puts what the player typed into a styled line.
+    private static final String SHOUT = """
+            command {
+              name = "shout"
+              description = "Say something to everyone"
+              cost = 0
+            }
+            arguments = [
+              { name = "words", type = rest }
+            ]
+            actions = ["broadcast:<gold>%arg_words%</gold>"]
+            """;
+
     private RunningPlugin running;
 
     @BeforeAll
     void start() {
-        running = RunningPlugin.start(Map.of("commands/custom/reward.conf", REWARD));
+        running =
+                RunningPlugin.start(Map.of("commands/custom/reward.conf", REWARD, "commands/custom/shout.conf", SHOUT));
+    }
+
+    @Test
+    void whatAPlayerTypesIntoABroadcastIsShownAsWordsAndRunsNothing() {
+        ScenarioPlayer mallory = running.join("Mallory");
+        ScenarioPlayer reader = running.join("Reader");
+        String typed = "<click:run_command:'/op Mallory'>free diamonds</click>";
+
+        running.run(mallory, "shout " + typed);
+        running.settle();
+
+        List<Component> lines = new ArrayList<>();
+        @Nullable Component line;
+        while ((line = reader.nextComponentMessage()) != null) {
+            lines.add(line);
+        }
+        assertThat(lines)
+                .anySatisfy(shown -> assertThat(
+                                PlainTextComponentSerializer.plainText().serialize(shown))
+                        .isEqualTo(typed));
+        assertThat(lines).allSatisfy(shown -> {
+            List<Component> parts = new ArrayList<>();
+            shown.iterator(ComponentIteratorType.DEPTH_FIRST).forEachRemaining(parts::add);
+            assertThat(parts).allSatisfy(part -> assertThat(part.clickEvent()).isNull());
+        });
+        assertThat(running.problems()).isEmpty();
     }
 
     @AfterAll

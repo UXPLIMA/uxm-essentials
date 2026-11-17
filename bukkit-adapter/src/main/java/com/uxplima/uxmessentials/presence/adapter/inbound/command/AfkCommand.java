@@ -13,6 +13,7 @@ import com.mojang.brigadier.context.CommandContext;
 import com.mojang.brigadier.tree.LiteralCommandNode;
 import com.uxplima.uxmessentials.presence.adapter.PresenceServices;
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandRegistration;
+import com.uxplima.uxmessentials.shared.adapter.outbound.style.StyledText;
 import com.uxplima.uxmessentials.shared.application.permission.SocialPermissions;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
 import com.uxplima.uxmessentials.shared.application.port.Scheduler;
@@ -40,7 +41,10 @@ public final class AfkCommand extends PresenceCommandSupport implements CommandR
                 .requires(Gate.permission(PERMISSION))
                 .executes(ctx -> toggle(ctx, Optional.empty()))
                 .then(Commands.argument("reason", StringArgumentType.greedyString())
-                        .executes(ctx -> toggle(ctx, Optional.of(ctx.getArgument("reason", String.class)))))
+                        // The reason is shown to every player and through the afk_reason placeholder, so it is kept
+                        // as words, never as markup.
+                        .executes(ctx ->
+                                toggle(ctx, Optional.of(StyledText.escape(ctx.getArgument("reason", String.class))))))
                 .build();
     }
 
