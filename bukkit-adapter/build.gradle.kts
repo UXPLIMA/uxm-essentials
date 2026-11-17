@@ -83,6 +83,10 @@ dependencies {
     testImplementation(libs.vault.api)
     // The placeholder shield is checked against PlaceholderAPI's own parser, not a copy of its rules.
     testImplementation(uxm.placeholderapi)
+    // A server that runs Geyser without Floodgate is faked through Geyser's own API, which uxmLib reads typed. Taken
+    // without dependencies, as uxmLib takes it: Cumulus is the only one a fake needs, and the rest are snapshots.
+    testImplementation(libs.geyser.base.api) { isTransitive = false }
+    testImplementation(libs.cumulus) { isTransitive = false }
     testRuntimeOnly(libs.configurate.yaml)
     testRuntimeOnly(libs.gson)
     testRuntimeOnly(libs.bundles.db)

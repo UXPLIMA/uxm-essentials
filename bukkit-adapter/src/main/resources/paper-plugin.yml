@@ -196,8 +196,9 @@ dependencies:
       load: BEFORE
       required: false
     # Geyser is the same integration for networks that run it without Floodgate: it can still name a Bedrock
-    # connection, so those players get native forms rather than a chest menu. Read reflectively, and only when
-    # Floodgate is absent, since Floodgate is the richer source when both are installed.
+    # connection, so those players get native forms rather than a chest menu. uxmLib binds to Geyser's own API
+    # (org.geysermc.api) only past a plugin-present guard, so a server without Geyser loads none of its classes, and
+    # only when Floodgate is absent, since Floodgate is the richer source when both are installed.
     Geyser-Spigot:
       load: BEFORE
       required: false

@@ -88,11 +88,12 @@ public final class MessagingActions {
         Consumer<MenuActionContext> whisper = safe("message-to", log, ctx -> whisper(ctx, players));
         bindings.action("message-to", whisper);
         bindings.action("whisper", whisper);
-        bindings.action("broadcast", safe("broadcast", log, ctx -> Bukkit.broadcast(StyledText.render(ctx.arg()))));
+        // Each of these draws its value as MiniMessage, so it reads the value with what a player typed escaped.
+        bindings.action("broadcast", safe("broadcast", log, ctx -> Bukkit.broadcast(StyledText.render(ctx.textArg()))));
         bindings.action("broadcast-json", safe("broadcast-json", log, MessagingActions::broadcastJson));
         bindings.action("broadcast-legacy", safe("broadcast-legacy", log, MessagingActions::broadcastLegacy));
         Consumer<MenuActionContext> actionBar =
-                safe("action-bar", log, ctx -> ctx.player().sendActionBar(StyledText.render(ctx.arg())));
+                safe("action-bar", log, ctx -> ctx.player().sendActionBar(StyledText.render(ctx.textArg())));
         bindings.action("action-bar", actionBar);
         bindings.action("actionbar", actionBar);
         bindings.action("title", safe("title", log, MessagingActions::title));
@@ -122,7 +123,7 @@ public final class MessagingActions {
      * module only a player online here is reached, and anyone else is a silent no-op.
      */
     private static void whisper(MenuActionContext ctx, PlayerLookup players) {
-        ParsedWhisper parsed = ParsedWhisper.parse(ctx.arg());
+        ParsedWhisper parsed = ParsedWhisper.parse(ctx.textArg());
         if (parsed.target().isEmpty()) {
             return;
         }
@@ -151,7 +152,7 @@ public final class MessagingActions {
 
     /** Show a {@code title|subtitle|fadeIn|stay|fadeOut} title to the viewer, defaulting the optional segments. */
     private static void title(MenuActionContext ctx) {
-        ParsedTitle parsed = ParsedTitle.parse(ctx.arg());
+        ParsedTitle parsed = ParsedTitle.parse(ctx.textArg());
         Component title = StyledText.render(parsed.title());
         Component subtitle = parsed.subtitle().isEmpty() ? Component.empty() : StyledText.render(parsed.subtitle());
         Title.Times times = Title.Times.times(
@@ -163,7 +164,7 @@ public final class MessagingActions {
 
     /** Pop an advancement toast; a missing title or unknown icon material is a fail-soft skip, frame defaults TASK. */
     private static void toast(MenuActionContext ctx, Toasts toasts) {
-        ParsedToast parsed = ParsedToast.parse(ctx.arg());
+        ParsedToast parsed = ParsedToast.parse(ctx.textArg());
         if (parsed.title().isBlank()) {
             return; // the title is required. Without it there is no toast to build
         }
