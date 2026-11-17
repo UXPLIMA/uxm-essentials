@@ -37,7 +37,7 @@ Every node below defaults to operators. The full list, with the review and modul
 | `/freeze <player>`, `/unfreeze <player>` | `uxmessentials.moderation.freeze` | Holds a player in place, and lets them go. |
 | `/lockdown [on\|off]` | `uxmessentials.moderation.lockdown` | Lets only bypass holders log in. No argument flips it. |
 
-The lookup commands are listed under [History and lookups](#history-and-lookups).
+The lookup commands are listed under [History and lookups](#history-and-lookups). A `<player>` may also be a uuid, with or without dashes. A uuid nobody has seen, and on an offline-mode server a Java name nobody has used, names the account it will join as, so a ban, mute, warning or jail waits for it; the staff member reads `moderation.target-never-joined`. A Bedrock name that never joined has no account yet: use the uuid Floodgate gives it.
 
 ## Durations and reasons
 

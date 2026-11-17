@@ -10,6 +10,7 @@ import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
 
+import com.uxplima.uxmessentials.persistence.runtime.ColumnFit;
 import com.uxplima.uxmessentials.persistence.runtime.JooqRepository;
 import com.uxplima.uxmessentials.shared.application.port.PlayerNameRepository;
 import com.uxplima.uxmessentials.shared.domain.PlayerName;
@@ -36,8 +37,8 @@ public final class JooqPlayerNameRepository extends JooqRepository implements Pl
     /** Rows per insert when adding a server's whole list. */
     private static final int BATCH = 500;
 
-    /** The width of the name columns, the longest name a Java login carries. */
-    private static final int NAME_LENGTH = 16;
+    /** The longest name the index holds; a longer one is no name any login carries. */
+    private static final int NAME_LENGTH = PLAYER_NAMES.NAME.getDataType().length();
 
     public JooqPlayerNameRepository(DSLContext dsl) {
         super(dsl);
@@ -82,6 +83,9 @@ public final class JooqPlayerNameRepository extends JooqRepository implements Pl
     @Override
     public void upsert(PlayerName record) {
         Objects.requireNonNull(record, "record");
+        if (!indexable(record)) {
+            return;
+        }
         String lower = record.name().toLowerCase(Locale.ROOT);
         write(dsl -> dsl.insertInto(PLAYER_NAMES)
                 .set(PLAYER_NAMES.UUID, record.uuid().toString())
@@ -115,7 +119,7 @@ public final class JooqPlayerNameRepository extends JooqRepository implements Pl
                         PLAYER_NAMES.LAST_SEEN);
                 boolean any = false;
                 for (PlayerName record : batch) {
-                    if (record.name().length() > NAME_LENGTH) {
+                    if (!indexable(record)) {
                         continue;
                     }
                     insert = insert.values(
@@ -158,5 +162,14 @@ public final class JooqPlayerNameRepository extends JooqRepository implements Pl
     @Override
     public int count() {
         return read(dsl -> dsl.fetchCount(PLAYER_NAMES));
+    }
+
+    /**
+     * Whether {@code record} names its account: a name no longer than the column, which is not blank and not the
+     * account's uuid standing in for a name nobody knows.
+     */
+    private static boolean indexable(PlayerName record) {
+        String name = record.name();
+        return !name.isBlank() && name.length() <= NAME_LENGTH && !ColumnFit.isUuid(name);
     }
 }

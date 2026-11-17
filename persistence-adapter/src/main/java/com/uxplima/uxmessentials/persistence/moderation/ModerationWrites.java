@@ -21,6 +21,7 @@ import com.uxplima.uxmessentials.moderation.domain.Warn;
 import com.uxplima.uxmessentials.persistence.jooq.tables.records.ModerationIpBansRecord;
 import com.uxplima.uxmessentials.persistence.jooq.tables.records.ModerationMutesRecord;
 import com.uxplima.uxmessentials.persistence.jooq.tables.records.ModerationTempbansRecord;
+import com.uxplima.uxmessentials.persistence.runtime.ColumnFit;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import org.jooq.Condition;
 import org.jooq.DSLContext;
@@ -100,7 +101,7 @@ final class ModerationWrites {
         row.setReasonKey(ReasonLines.key(drawn));
         row.setReasonArgs(ReasonLines.args(drawn));
         row.setMutedBy(issuerUuid(issuer));
-        row.setMutedByName(fit(MODERATION_MUTES.MUTED_BY_NAME, issuer.name()));
+        row.setMutedByName(ColumnFit.name(MODERATION_MUTES.MUTED_BY_NAME, issuer.name()));
     }
 
     private static Instant issuedAt(MuteState mute) {
@@ -133,7 +134,8 @@ final class ModerationWrites {
                 .set(MODERATION_JAILS.JAILED_BY, issuerUuid(active.issuer()))
                 .set(
                         MODERATION_JAILS.JAILED_BY_NAME,
-                        fit(MODERATION_JAILS.JAILED_BY_NAME, active.issuer().name()))
+                        ColumnFit.name(
+                                MODERATION_JAILS.JAILED_BY_NAME, active.issuer().name()))
                 .set(MODERATION_JAILS.CREATED_AT, active.issuedAt().toEpochMilli())
                 .execute();
     }
@@ -188,7 +190,8 @@ final class ModerationWrites {
         row.setReasonKey(ReasonLines.key(ban.drawnReason()));
         row.setReasonArgs(ReasonLines.args(ban.drawnReason()));
         row.setBannedBy(issuerUuid(ban.issuer()));
-        row.setBannedByName(fit(MODERATION_TEMPBANS.BANNED_BY_NAME, ban.issuer().name()));
+        row.setBannedByName(
+                ColumnFit.name(MODERATION_TEMPBANS.BANNED_BY_NAME, ban.issuer().name()));
         row.setCreatedAt(ban.issuedAt().toEpochMilli());
         return row;
     }
@@ -203,7 +206,8 @@ final class ModerationWrites {
                 .set(MODERATION_WARNS.WARNED_BY, issuerUuid(warn.issuer()))
                 .set(
                         MODERATION_WARNS.WARNED_BY_NAME,
-                        fit(MODERATION_WARNS.WARNED_BY_NAME, warn.issuer().name()))
+                        ColumnFit.name(
+                                MODERATION_WARNS.WARNED_BY_NAME, warn.issuer().name()))
                 .set(MODERATION_WARNS.TS, warn.issuedAt().toEpochMilli())
                 .set(MODERATION_WARNS.EXPIRES_AT, expiresAt)
                 .execute();
@@ -286,7 +290,8 @@ final class ModerationWrites {
         row.setReasonArgs(ReasonLines.args(ban.drawnReason()));
         row.setTarget(ban.target().map(java.util.UUID::toString).orElse(null));
         row.setBannedBy(issuerUuid(ban.issuer()));
-        row.setBannedByName(fit(MODERATION_IP_BANS.BANNED_BY_NAME, ban.issuer().name()));
+        row.setBannedByName(
+                ColumnFit.name(MODERATION_IP_BANS.BANNED_BY_NAME, ban.issuer().name()));
         row.setCreatedAt(ban.issuedAt().toEpochMilli());
         return row;
     }
@@ -297,9 +302,11 @@ final class ModerationWrites {
         if (!exists) {
             return insertSeen(dsl, key, who.name(), ip, at);
         }
-        var update = dsl.update(MODERATION_SEEN)
-                .set(MODERATION_SEEN.NAME, who.name())
-                .set(MODERATION_SEEN.LAST_SEEN, at.toEpochMilli());
+        var update = dsl.update(MODERATION_SEEN).set(MODERATION_SEEN.LAST_SEEN, at.toEpochMilli());
+        // A uuid standing in for an unknown name never replaces the name a join recorded.
+        if (!ColumnFit.isUuid(who.name())) {
+            update = update.set(MODERATION_SEEN.NAME, fit(MODERATION_SEEN.NAME, who.name()));
+        }
         if (ip != null) {
             update = update.set(MODERATION_SEEN.LAST_IP, ip);
         }
@@ -326,7 +333,7 @@ final class ModerationWrites {
     private static int insertSeen(DSLContext dsl, String key, String name, @Nullable String ip, Instant at) {
         return dsl.insertInto(MODERATION_SEEN)
                 .set(MODERATION_SEEN.UUID, key)
-                .set(MODERATION_SEEN.NAME, name)
+                .set(MODERATION_SEEN.NAME, ColumnFit.name(MODERATION_SEEN.NAME, name))
                 .set(MODERATION_SEEN.LAST_IP, ip)
                 .set(MODERATION_SEEN.FIRST_SEEN, at.toEpochMilli())
                 .set(MODERATION_SEEN.LAST_SEEN, at.toEpochMilli())

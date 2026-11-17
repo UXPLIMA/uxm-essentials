@@ -36,7 +36,7 @@ import org.sqlite.SQLiteDataSource;
 
 /**
  * On MySQL and MariaDB a TEXT column holds 64 KB, so every column that stores serialized item stacks is widened there
- * by scripts only that backend reads. These tests hold the scripts to the shared schema: they parse as MySQL, they
+ * by scripts only that backend reads, beside the player name columns every network backend widens. These tests hold the scripts to the shared schema: they parse as MySQL, they
  * touch real columns without changing whether a column takes NULL, and every text column of the schema is either
  * widened or named here as one that never holds items. A new text column fails the last test until its author decides
  * which it is.
@@ -70,19 +70,23 @@ class MariadbItemColumnsTest {
     private static final Pattern WIDEN =
             Pattern.compile("ALTER TABLE \\$\\{prefix}(\\w+) MODIFY (\\w+) LONGTEXT( NOT NULL)?;");
 
+    /** A player name column widened to the length every backend now declares. */
+    private static final Pattern WIDEN_NAME =
+            Pattern.compile("ALTER TABLE \\$\\{prefix}(\\w+) MODIFY (\\w+) VARCHAR\\(64\\)( NOT NULL)?;");
+
     private static final DSLContext MYSQL = DSL.using(SQLDialect.MYSQL);
 
     @TempDir
     Path folder;
 
     @Test
-    void onlyMariadbReadsTheVendorScripts() {
+    void eachNetworkBackendReadsItsOwnVendorScriptsAndSqliteNone() {
         assertThat(FlywayMigrationRunner.resolvedLocations(DatabaseBackend.MARIADB, List.of()))
                 .containsExactly("classpath:db/migration", "classpath:db/vendor/mariadb");
         assertThat(FlywayMigrationRunner.resolvedLocations(DatabaseBackend.SQLITE, List.of()))
                 .containsExactly("classpath:db/migration");
         assertThat(FlywayMigrationRunner.resolvedLocations(DatabaseBackend.POSTGRES, List.of("db/migration")))
-                .containsExactly("classpath:db/migration");
+                .containsExactly("classpath:db/migration", "classpath:db/vendor/postgresql");
     }
 
     @Test
@@ -90,8 +94,8 @@ class MariadbItemColumnsTest {
         List<String> shared = versions(DatabaseBackend.SQLITE);
         List<String> mariadb = versions(DatabaseBackend.MARIADB);
 
-        assertThat(mariadb).containsAll(shared).contains("105").doesNotHaveDuplicates();
-        assertThat(shared).doesNotContain("105");
+        assertThat(mariadb).containsAll(shared).contains("105", "120.1").doesNotHaveDuplicates();
+        assertThat(shared).doesNotContain("105", "120.1");
     }
 
     @Test
@@ -100,7 +104,8 @@ class MariadbItemColumnsTest {
 
         Queries parsed = MYSQL.parser().parse(bare(script));
 
-        assertThat(parsed.queries()).hasSize(widened(script).size());
+        assertThat(parsed.queries())
+                .hasSize(widened(script).size() + widenedNames(script).size());
     }
 
     @Test
@@ -111,6 +116,9 @@ class MariadbItemColumnsTest {
 
         assertThat(nullability(after)).isEqualTo(nullability(before));
         for (Map.Entry<String, Boolean> column : widened(vendorScripts()).entrySet()) {
+            assertThat(nullability(before)).containsEntry(column.getKey(), column.getValue());
+        }
+        for (Map.Entry<String, Boolean> column : widenedNames(vendorScripts()).entrySet()) {
             assertThat(nullability(before)).containsEntry(column.getKey(), column.getValue());
         }
     }
@@ -158,6 +166,16 @@ class MariadbItemColumnsTest {
         return columns;
     }
 
+    /** Each player name column widened, as table.column, mapped to whether it takes NULL after the script. */
+    static Map<String, Boolean> widenedNames(String script) {
+        Map<String, Boolean> columns = new HashMap<>();
+        Matcher statement = WIDEN_NAME.matcher(script);
+        while (statement.find()) {
+            columns.put(statement.group(1) + "." + statement.group(2), statement.group(3) == null);
+        }
+        return columns;
+    }
+
     private static Map<String, Boolean> nullability(Meta meta) {
         Map<String, Boolean> columns = new HashMap<>();
         for (Table<?> table : meta.getTables()) {
@@ -174,7 +192,7 @@ class MariadbItemColumnsTest {
         return script.replace("${prefix}", "");
     }
 
-    private static String vendorScripts() {
+    static String vendorScripts() {
         URL folder = Objects.requireNonNull(
                 MariadbItemColumnsTest.class.getClassLoader().getResource("db/vendor/mariadb"), "db/vendor/mariadb");
         try (Stream<Path> files = Files.list(Path.of(folder.toURI()))) {

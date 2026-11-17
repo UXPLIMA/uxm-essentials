@@ -2,13 +2,16 @@ package com.uxplima.uxmessentials.moderation.adapter.outbound;
 
 import java.util.Objects;
 import java.util.Optional;
+import java.util.UUID;
 
 import com.uxplima.uxmessentials.moderation.application.port.TargetResolver;
 import com.uxplima.uxmessentials.shared.application.port.NetworkPresence;
 import com.uxplima.uxmessentials.shared.application.port.PlayerLookup;
 import com.uxplima.uxmessentials.shared.domain.NameCase;
 import com.uxplima.uxmessentials.shared.domain.NameMatch;
+import com.uxplima.uxmessentials.shared.domain.OfflineAccounts;
 import com.uxplima.uxmessentials.shared.domain.OnlinePlayer;
+import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import org.jspecify.annotations.NullMarked;
 
 /**
@@ -43,10 +46,41 @@ public final class PlayerLookupTargetResolver implements TargetResolver {
     public NameMatch resolve(String name) {
         Objects.requireNonNull(name, "name");
         String typed = name.strip();
+        Optional<UUID> id = OfflineAccounts.uuidLiteral(typed);
+        if (id.isPresent()) {
+            return byUuid(id.get());
+        }
         Optional<OnlinePlayer> online = presence.findByName(typed);
         if (lookup.nameCase() == NameCase.SENSITIVE) {
             online = online.filter(found -> found.player().name().equals(typed));
         }
         return online.isPresent() ? NameMatch.found(online.get().player()) : lookup.matchByName(typed);
+    }
+
+    /**
+     * The account a typed uuid stands for, or on an offline-mode server the one a never-seen Java name logs in as. The
+     * name a uuid goes by is the uuid itself until the account joins.
+     */
+    @Override
+    public Optional<PlayerRef> neverJoined(String typed) {
+        Objects.requireNonNull(typed, "typed");
+        String text = typed.strip();
+        Optional<UUID> id = OfflineAccounts.uuidLiteral(text);
+        if (id.isPresent()) {
+            return Optional.of(new PlayerRef(id.get(), id.get().toString()));
+        }
+        if (lookup.nameCase() != NameCase.SENSITIVE) {
+            return Optional.empty();
+        }
+        return OfflineAccounts.uuidOf(text).map(uuid -> new PlayerRef(uuid, text));
+    }
+
+    /** An account by its uuid: online on any backend, then known to the lookup under its last name. */
+    private NameMatch byUuid(UUID id) {
+        Optional<OnlinePlayer> online = presence.find(id);
+        if (online.isPresent()) {
+            return NameMatch.found(online.get().player());
+        }
+        return NameMatch.of(lookup.findByUuid(id));
     }
 }

@@ -1,7 +1,6 @@
 package com.uxplima.uxmessentials.persistence.messaging;
 
 import static com.uxplima.uxmessentials.persistence.jooq.tables.Mail.MAIL;
-import static com.uxplima.uxmessentials.persistence.runtime.ColumnFit.fit;
 
 import java.time.Instant;
 import java.util.Optional;
@@ -12,6 +11,7 @@ import com.uxplima.uxmessentials.messaging.domain.MailItem;
 import com.uxplima.uxmessentials.messaging.domain.MailSender;
 import com.uxplima.uxmessentials.messaging.domain.MessageBody;
 import com.uxplima.uxmessentials.persistence.jooq.tables.records.MailRecord;
+import com.uxplima.uxmessentials.persistence.runtime.ColumnFit;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import org.jooq.Record;
 
@@ -51,7 +51,7 @@ final class MailRows {
         record.setId(assignedId)
                 .setRecipient(item.recipient().uuid().toString())
                 .setSender(item.sender().uuid().map(UUID::toString).orElse(null))
-                .setSenderName(fit(MAIL.SENDER_NAME, item.sender().name()))
+                .setSenderName(ColumnFit.name(MAIL.SENDER_NAME, item.sender().name()))
                 .setBody(item.body().value())
                 .setSentAt(item.sentAt().toEpochMilli())
                 .setIsRead(item.read() ? READ : UNREAD);
