@@ -41,7 +41,7 @@ public final class BusPermissionReads implements RemoteSyncListener {
     private final PlayerLookup localPlayers;
     private final Scheduler scheduler;
     private final Logger log;
-    private final ConcurrentMap<UUID, CompletableFuture<Answer>> waiting = new ConcurrentHashMap<>();
+    private final ConcurrentMap<UUID, Question> waiting = new ConcurrentHashMap<>();
 
     public BusPermissionReads(
             BusPublisher bus, Permissions live, PlayerLookup localPlayers, Scheduler scheduler, Logger log) {
@@ -59,7 +59,7 @@ public final class BusPermissionReads implements RemoteSyncListener {
         Objects.requireNonNull(server, "server");
         UUID query = UUID.randomUUID();
         CompletableFuture<Answer> answer = new CompletableFuture<>();
-        waiting.put(query, answer);
+        waiting.put(query, new Question(server, who.uuid(), node, answer));
         var unused = answer.whenComplete((done, failure) -> waiting.remove(query));
         try {
             scheduler.asyncAfter(WAIT, () -> {
@@ -86,10 +86,11 @@ public final class BusPermissionReads implements RemoteSyncListener {
             answer(frame);
             return;
         }
-        CompletableFuture<Answer> asked = waiting.get(frame.queryId());
-        if (asked == null) {
+        Question question = waiting.get(frame.queryId());
+        if (question == null || !question.answeredBy(frame)) {
             return;
         }
+        CompletableFuture<Answer> asked = question.answer();
         switch (frame.step()) {
             case PermissionQueryFrame.HELD -> asked.complete(Answer.HELD);
             case PermissionQueryFrame.NOT_HELD -> asked.complete(Answer.NOT_HELD);
@@ -121,6 +122,19 @@ public final class BusPermissionReads implements RemoteSyncListener {
     private void reply(PermissionQueryFrame question, String step) {
         bus.publish(new PermissionQueryFrame(
                 bus.serverId(), question.queryId(), question.originServer(), question.player(), question.node(), step));
+    }
+
+    /**
+     * One question waiting for its answer. An answer counts only from the backend asked, about the player and the node
+     * asked, so a frame that reuses a question's id cannot answer another question.
+     */
+    private record Question(String server, UUID player, String node, CompletableFuture<Answer> answer) {
+
+        boolean answeredBy(PermissionQueryFrame frame) {
+            return frame.originServer().equals(server)
+                    && frame.player().equals(player)
+                    && frame.node().equals(node);
+        }
     }
 
     private static String step(Optional<Boolean> read) {

@@ -1,9 +1,9 @@
 package com.uxplima.uxmessentials.shared.adapter.outbound.permission;
 
-import java.util.Optional;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 
+import com.uxplima.uxmessentials.shared.application.port.StoredPermissions.Answer;
 import org.jspecify.annotations.NullMarked;
 
 /**
@@ -25,10 +25,11 @@ interface NodeStore {
     interface Load {
 
         /**
-         * Whether the player is granted ({@code true}) or denied ({@code false}) the node by the stored data, or empty
-         * when the store sets nothing for it and the server's own default applies. It may load from the store's
-         * database and answer later.
+         * What this store grants: {@link Answer#HELD} when it grants the node, {@link Answer#NOT_HELD} when it grants
+         * nothing (a node it does not set, a denial, a player it holds no data for: never proof the node is not
+         * held elsewhere), {@link Answer#NO_SOURCE} when it cannot look this player up at all. A load that fails
+         * counts as {@link Answer#NO_ANSWER}. It may load from the store's database and answer later.
          */
-        CompletableFuture<Optional<Boolean>> run();
+        CompletableFuture<Answer> run();
     }
 }

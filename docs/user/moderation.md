@@ -75,10 +75,10 @@ template: a capped staff member's permanent ban becomes a timed ban of the cappe
 A player holding `uxmessentials.bypass.punishment` cannot be banned, tempbanned, muted, warned, kicked, jailed or
 frozen, by anyone: the command refuses and says so. The node defaults to operators. A holder is also left online by
 `/kickall` and by an IP ban on their address, may still log in from a banned address, and is not stopped in chat or by
-`muted-blocked-commands` while muted. The node is read on the player's own thread; for a player who is away, off the
-main thread from LuckPerms (unset means operators). Without LuckPerms, a player on another server is asked about over
-the network bus, and an offline one through the Vault permission plugin, or the operator list when there is none. With
-no answer (they left, a read was slow, or no bus answered) they count as exempt and the staff member is told why.
+`muted-blocked-commands` while muted. It is read on the player's own thread; for one on another server, from that
+server over the bus, then LuckPerms. For an offline player any grant counts: LuckPerms in any `server` or `world`
+context, the Vault permission plugin, or the default for an operator on this server's own list (child permissions
+too). With no answer (they left, a read was slow, nothing could read them) they count as exempt; staff are told why.
 
 ## Bans
 

@@ -18,15 +18,16 @@ public interface StoredPermissions {
 
     /** The answer to one stored read. */
     enum Answer {
-        /** The node is held. */
+        /** The node is held: a source grants it. */
         HELD,
-        /** The node is not held. */
+        /** The node is not held: every source that could grant it was read, and none did. */
         NOT_HELD,
         /** A source exists but did not answer (the storage failed or was slow); asking again may work. */
         NO_ANSWER,
         /**
-         * Nothing on this server can read the node for this player: a permission plugin whose stored nodes cannot be
-         * read here, or a backend whose own grants this server cannot see. Asking again will not help.
+         * No source could answer, and asking again soon will not help: the player is on another backend that this
+         * server cannot ask (no bus) or that did not answer, with no shared storage to read instead, or a source
+         * cannot look the player up at all (one who never joined this server, for a provider that asks by name).
          */
         NO_SOURCE
     }
