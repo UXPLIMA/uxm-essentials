@@ -3115,10 +3115,22 @@ public final class PluginModule {
         }
         resources.onClose(wired::stop);
         resources.worldPhase().run("jail server claim", wired.jailServerAdoption());
-        // A mute or unmute issued here updates the in-memory mute of a connected player as it lands.
+        // A mute or unmute issued here updates the in-memory mute of a connected player as it lands. A ban issued here
+        // also removes the other spellings of the banned name it reaches, and a lift or a longer mute reaches the
+        // copies its sanction made on other spellings; both read storage, so they run on the async lane.
         subscribeUntilClose(ctx, resources, event -> {
             if (event instanceof com.uxplima.uxmessentials.moderation.domain.event.ModerationEvent moderation) {
                 wired.mutePolicy().onEvent(moderation);
+            }
+            if (event instanceof com.uxplima.uxmessentials.moderation.domain.event.PlayerTempbanned banned) {
+                ctx.kernel().scheduler().async(() -> wired.bans().onBanned(banned));
+            }
+            if (event instanceof com.uxplima.uxmessentials.moderation.domain.event.PlayerUnmuted
+                    || event instanceof com.uxplima.uxmessentials.moderation.domain.event.PlayerUnjailed
+                    || event instanceof com.uxplima.uxmessentials.moderation.domain.event.PlayerMuted) {
+                com.uxplima.uxmessentials.moderation.domain.event.ModerationEvent change =
+                        (com.uxplima.uxmessentials.moderation.domain.event.ModerationEvent) event;
+                ctx.kernel().scheduler().async(() -> wired.copies().onEvent(change));
             }
         });
         // Connected players' mutes are read again every minute, and after an import that stored sanctions, so a

@@ -207,11 +207,10 @@ jail {
 `/jails` lists both kinds. When both have the same name, the one made with `/setjail` wins. A config jail is removed
 by editing the file.
 
-`/togglejail` without a jail name uses `default-jail`, which can name a config jail or one made with `/setjail`.
-With `default-jail` empty (the default) it is refused, and the staff member is shown the jails `/jail` accepts, so
-nobody is sent to a jail no one chose. A jailed player is released without naming a jail. A `default-jail` that
-names no jail is refused the same way, saying the configured default does not exist, and the log warns about it at
-startup.
+`/togglejail` without a jail name uses `default-jail`, which can name a config jail or one made with `/setjail`. With
+`default-jail` empty (the default) it is refused, and the staff member is shown the jails `/jail` accepts, so nobody
+is sent to a jail no one chose. A jailed player is released without naming a jail. A `default-jail` that names no jail
+is refused the same way, saying the configured default does not exist, and the log warns about it at startup.
 
 ```
 default-jail = "spawnjail"
@@ -362,13 +361,13 @@ connects, before the server thread is involved. The decision follows a moment la
 are known, so a login never makes the server wait on the database. A login is never let in unchecked: when the read
 fails, or the decision finds no read for that connection (or one more than 30 seconds old), the player is refused with
 `moderation.login.unchecked`, which asks them to join again, and a line is written to the log.
+On an offline-mode server (no online-mode proxy in front) each spelling of a name is its own account, so `Steve` and `STEVE` log in with two uuids. A ban, a mute or a jail on one follows the player into another spelling: the login is refused with the banned account's ban screen, and a mute or a jail is copied onto the account once its login is allowed, so every server holds it and it runs out when the original does. A copied mute reads "inherited from" the original holder in its reason and in `/mutehistory`. Lifting the original (`/unmute`, `/unjail`, a served sentence, the menu or the API) lifts the copies it made, and a longer mute reaches them; lifting a copy lifts that copy alone, for good. A copy is never copied on, so it cannot come back to the account it came from. Bans are not copied: the login reads the original ban, so `/unban` frees every spelling. By default (`case-variant-sanctions = "newer-or-address"`) a sanction reaches an account with no trace from before it was issued (a completed join, the name list, the server's own player file) and any account that ever connected from an address the sanctioned one used, however old; `"newer"` leaves out the address, `"all"` reaches every spelling. Only an address that tells people apart counts: never loopback (Geyser without Floodgate), private, link-local or carrier-grade NAT addresses, nor one more than `case-variant-address.busy-after` (3) accounts used, nor one listed in `case-variant-address.ignore`, where your proxy's public address belongs. An account already playing under its own spelling from elsewhere is somebody else. A refused login creates no seen row. When a ban lands, the spellings it reaches that are connected at that moment are kicked too, on every server. With `refuse-name-case-variants = true` a new account whose name only differs in case from one the server already knows is refused too, sanction or not, with `moderation.login.name-variant`, which names the spelling to use; accounts that already joined keep joining. With authenticated logins a name has one owner and none of this applies.
 
 ## Kick screens and appeals
 
 The plugin has no appeal system. The ban, IP ban, kick and lockdown screens are messages (`moderation.ban.kick`,
 `moderation.tempban.kick`, `moderation.banip.kick`, `moderation.kick.kicked`, `moderation.lockdown.kick`) in
-`messages/messages_<language>.conf`. Add your appeal link or Discord invite there, in both `moderation.ban.kick`
-(permanent bans) and `moderation.tempban.kick` (timed bans).
+`messages/messages_<language>.conf`. Add your appeal link or Discord invite there, in both `moderation.ban.kick` (permanent bans) and `moderation.tempban.kick` (timed bans).
 
 ## On a network
 
@@ -397,3 +396,5 @@ mutes, warnings and jails over from EssentialsX and LiteBans.
 | `templates` | `{}` | The `/punish` templates. |
 | `discord-notify` | `false` | Sends punishment lines to the Discord bridge. |
 | `censor-ip-addresses` | `false` | Masks the address in `/seenip`. |
+| `refuse-name-case-variants` | `false` | Offline mode: refuses a new account named as a case variant of a known one. |
+| `case-variant-sanctions` | `"newer-or-address"` | Offline mode: which other spellings a sanction reaches: `newer`, `newer-or-address` or `all`. |
