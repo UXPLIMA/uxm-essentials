@@ -3,6 +3,7 @@ package com.uxplima.uxmessentials.scenario;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import java.math.BigDecimal;
+import java.util.List;
 import java.util.UUID;
 
 import org.bukkit.Location;
@@ -94,6 +95,30 @@ class PlayerFlowScenarioTest {
                 .asString()
                 .contains("Rhys")
                 .doesNotContain("second");
+        assertThat(running.problems()).isEmpty();
+    }
+
+    @Test
+    void aStaffCommandReachesAnOfflinePlayerAndTellsTheStaffWhenNoPlayerHasTheName() {
+        ScenarioPlayer staff = running.join("Stella");
+        staff.setOp(true);
+        ScenarioPlayer away = running.join("Quinn");
+        running.quit(away);
+        RunningPlugin.said(staff);
+
+        running.run(staff, "home admin Nobody list");
+        List<String> miss = RunningPlugin.said(staff);
+        assertThat(miss)
+                .as("the staff member hears no player has the name")
+                .singleElement()
+                .asString()
+                .contains("Nobody");
+
+        running.run(staff, "home admin Quinn list");
+        assertThat(RunningPlugin.said(staff))
+                .as("the offline player is found, off the tick")
+                .isNotEmpty()
+                .doesNotContain(miss.getFirst().replace("Nobody", "Quinn"));
         assertThat(running.problems()).isEmpty();
     }
 
