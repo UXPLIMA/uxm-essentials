@@ -273,6 +273,9 @@ public final class VerificationController implements KeypadActions {
                 return;
             }
             sessions.clear(ref.uuid());
+            // A forced re-verify can land while a prompt is already up; with nothing left to prove it must go too,
+            // or it would sit there asking for an answer nothing waits on.
+            keypad.closeIfAsking(ref);
             return;
         }
         boolean totpEnabled = registration.totpEnabled();

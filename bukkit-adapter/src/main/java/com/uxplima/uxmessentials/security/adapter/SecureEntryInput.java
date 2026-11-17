@@ -4,6 +4,7 @@ import java.text.Normalizer;
 import java.util.Map;
 import java.util.Objects;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.function.BooleanSupplier;
 import java.util.function.Consumer;
 import java.util.regex.Pattern;
 
@@ -99,7 +100,13 @@ public final class SecureEntryInput {
      * Exactly one of {@code onSubmit} (with the typed line) or {@code onCancel} runs, on the player's own thread.
      */
     public void prompt(
-            Player player, PlayerRef viewer, String key, String label, Consumer<String> onSubmit, Runnable onCancel) {
+            Player player,
+            PlayerRef viewer,
+            String key,
+            String label,
+            Consumer<String> onSubmit,
+            Runnable onCancel,
+            BooleanSupplier current) {
         Objects.requireNonNull(player, "player");
         Objects.requireNonNull(viewer, "viewer");
         Objects.requireNonNull(key, "key");
@@ -121,16 +128,23 @@ public final class SecureEntryInput {
         anvil.open(
                 player,
                 promptItem,
-                result -> scheduler.onEntity(viewer, () -> settle(player, result, onSubmit, onCancel)));
+                result -> scheduler.onEntity(viewer, () -> settle(player, result, onSubmit, onCancel, current)));
     }
 
-    /** The anvil's answer, under the same cancel words and the same "cancelled" line the shared seam uses. */
-    private void settle(Player player, AnvilResult result, Consumer<String> onSubmit, Runnable onCancel) {
+    /**
+     * The anvil's answer, under the same cancel words and the same "cancelled" line the shared seam uses. The line is
+     * only for a player who closed the prompt themselves: one taken away on purpose (verified elsewhere, replaced by
+     * the next question) ends quietly.
+     */
+    private void settle(
+            Player player, AnvilResult result, Consumer<String> onSubmit, Runnable onCancel, BooleanSupplier current) {
         if (result instanceof AnvilResult.Submitted submitted && !settings.isCancel(submitted.text())) {
             onSubmit.accept(submitted.text());
             return;
         }
-        player.sendMessage(guiText.text(player, TextInput.CANCELLED_KEY));
+        if (current.getAsBoolean()) {
+            player.sendMessage(guiText.text(player, TextInput.CANCELLED_KEY));
+        }
         onCancel.run();
     }
 

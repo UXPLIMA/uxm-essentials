@@ -1,6 +1,7 @@
 package com.uxplima.uxmessentials.security.adapter;
 
 import java.util.Objects;
+import java.util.function.BooleanSupplier;
 import java.util.function.Consumer;
 
 import org.bukkit.entity.Player;
@@ -40,7 +41,13 @@ public final class TextInputPinPrompt implements PinEntryPrompt {
     }
 
     @Override
-    public void prompt(Player player, PlayerRef viewer, Step step, Consumer<String> onSubmit, Runnable onCancel) {
+    public void prompt(
+            Player player,
+            PlayerRef viewer,
+            Step step,
+            Consumer<String> onSubmit,
+            Runnable onCancel,
+            BooleanSupplier current) {
         Objects.requireNonNull(step, "step");
         switch (step) {
             case VERIFY ->
@@ -50,7 +57,8 @@ public final class TextInputPinPrompt implements PinEntryPrompt {
                         VERIFY_KEY,
                         SecurityMessageKey.SECURITY_VERIFY_ENTRY_PROMPT.key(),
                         onSubmit,
-                        onCancel);
+                        onCancel,
+                        current);
             case CREATE ->
                 input.prompt(
                         player,
@@ -58,7 +66,8 @@ public final class TextInputPinPrompt implements PinEntryPrompt {
                         CREATE_KEY,
                         SecurityMessageKey.SECURITY_PIN_CREATE_ENTRY.key(),
                         onSubmit,
-                        onCancel);
+                        onCancel,
+                        current);
             case CONFIRM ->
                 input.prompt(
                         player,
@@ -66,7 +75,8 @@ public final class TextInputPinPrompt implements PinEntryPrompt {
                         CREATE_KEY,
                         SecurityMessageKey.SECURITY_PIN_CONFIRM_ENTRY.key(),
                         onSubmit,
-                        onCancel);
+                        onCancel,
+                        current);
         }
     }
 }

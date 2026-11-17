@@ -97,6 +97,7 @@ public final class PinKeypadView {
     private final Menus menus;
     private final PinEntryPrompt typed;
     private final Predicate<UUID> frozen;
+    private final Predicate<UUID> wanted;
     private final Messages messages;
     private final VerificationFeedback feedback;
     private final Scheduler scheduler;
@@ -144,11 +145,13 @@ public final class PinKeypadView {
     /**
      * @param typed which players type their entry instead of tapping the window, and how they are asked
      * @param frozen whether a player is still held by the join freeze, so a close of their entry has to ask again
+     * @param wanted whether any flow still waits on an entry from a player: the join freeze or a pending re-auth
      */
     public PinKeypadView(
             Menus menus,
             PinEntryPrompt typed,
             Predicate<UUID> frozen,
+            Predicate<UUID> wanted,
             Messages messages,
             VerificationFeedback feedback,
             Scheduler scheduler,
@@ -156,6 +159,7 @@ public final class PinKeypadView {
         this.menus = Objects.requireNonNull(menus, "menus");
         this.typed = Objects.requireNonNull(typed, "typed");
         this.frozen = Objects.requireNonNull(frozen, "frozen");
+        this.wanted = Objects.requireNonNull(wanted, "wanted");
         this.messages = Objects.requireNonNull(messages, "messages");
         this.feedback = Objects.requireNonNull(feedback, "feedback");
         this.scheduler = Objects.requireNonNull(scheduler, "scheduler");
@@ -273,10 +277,22 @@ public final class PinKeypadView {
 
     /**
      * Whether {@code viewer} is being asked for a PIN or code right now: a keypad window or a typed prompt is up, or
-     * one is about to be asked again after a refused or dismissed entry.
+     * one is about to be asked again after a refused or dismissed entry. Tracking that no flow waits on any more (the
+     * freeze was lifted under an open prompt) does not count, so it cannot hold the player's chat.
      */
     public boolean isEntering(UUID viewer) {
-        return open.containsKey(Objects.requireNonNull(viewer, "viewer"));
+        Objects.requireNonNull(viewer, "viewer");
+        return open.containsKey(viewer) && wanted.test(viewer);
+    }
+
+    /**
+     * Close {@code viewer}'s keypad or prompt if this view has one up for them, and otherwise leave whatever they have
+     * open alone: for a caller that cannot know whether the player was being asked at all.
+     */
+    public void closeIfAsking(PlayerRef viewer) {
+        if (open.containsKey(Objects.requireNonNull(viewer, "viewer").uuid())) {
+            closeFor(viewer);
+        }
     }
 
     /** Close every open keypad and drop all tracking, so a module disable leaves no locked window. */
@@ -400,7 +416,8 @@ public final class PinKeypadView {
                 tracked.viewer(),
                 stepOf(tracked),
                 entered -> typedSubmitted(player, tracked.viewer(), token, entered),
-                () -> typedClosed(id, token));
+                () -> typedClosed(id, token),
+                () -> Long.valueOf(token).equals(typing.get(id)));
     }
 
     private void typedSubmitted(Player player, PlayerRef viewer, long token, String entered) {

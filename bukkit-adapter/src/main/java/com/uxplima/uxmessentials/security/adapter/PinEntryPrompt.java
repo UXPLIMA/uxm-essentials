@@ -1,5 +1,6 @@
 package com.uxplima.uxmessentials.security.adapter;
 
+import java.util.function.BooleanSupplier;
 import java.util.function.Consumer;
 
 import org.bukkit.entity.Player;
@@ -34,7 +35,14 @@ public interface PinEntryPrompt {
 
     /**
      * Ask {@code player} for one entry. Exactly one of {@code onSubmit} (with the typed line) or {@code onCancel} runs,
-     * on the player's own region thread.
+     * on the player's own region thread. {@code current} says whether the prompt is still the one the player is meant
+     * to answer, so a prompt taken away on purpose ends without telling the player they cancelled it.
      */
-    void prompt(Player player, PlayerRef viewer, Step step, Consumer<String> onSubmit, Runnable onCancel);
+    void prompt(
+            Player player,
+            PlayerRef viewer,
+            Step step,
+            Consumer<String> onSubmit,
+            Runnable onCancel,
+            BooleanSupplier current);
 }

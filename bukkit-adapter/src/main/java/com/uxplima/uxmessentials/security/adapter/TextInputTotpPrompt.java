@@ -37,6 +37,7 @@ public final class TextInputTotpPrompt implements TotpPrompt {
                 INPUT_KEY,
                 SecurityMessageKey.SECURITY_VERIFY_TOTP_PROMPT.key(),
                 typed -> onSubmit.accept(SecureEntryInput.normalise(typed)),
-                onCancel);
+                onCancel,
+                () -> true);
     }
 }

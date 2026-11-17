@@ -149,6 +149,7 @@ public final class SecurityWiring {
                 menus,
                 new TextInputPinPrompt(entryInput),
                 sessions::isPending,
+                id -> sessions.isPending(id) || reauthSessions.isPending(id),
                 kernel.messages(),
                 feedback,
                 kernel.scheduler(),

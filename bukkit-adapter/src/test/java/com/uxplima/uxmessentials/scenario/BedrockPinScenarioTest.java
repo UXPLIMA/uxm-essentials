@@ -229,15 +229,32 @@ class BedrockPinScenarioTest {
         running.console("security force Reese");
         assertThat(asked(player)).isTrue();
         player.addAttachment(running.plugin, "uxmessentials.security.pin.required", true);
+        said(player);
 
         running.console("security reset Reese all");
 
+        assertThat(said(player)).noneMatch(line -> line.contains("input cancelled"));
         assertThat(asked(player)).isTrue();
         assertThat(question(player)).contains(CREATE_PROMPT);
         type(player, OTHER_PIN);
         assertThat(awaitAsked(player)).isTrue();
         type(player, OTHER_PIN);
         assertThat(said(player)).anyMatch(line -> line.contains("pin set."));
+    }
+
+    @Test
+    void aPromptLeftWithNothingToProveIsTakenAwayAndNoLongerHoldsChat() {
+        ScenarioPlayer player = bedrockPlayerWithPin("Nell");
+        running.console("security force Nell");
+        assertThat(asked(player)).isTrue();
+
+        running.console("security reset Nell all");
+
+        assertThat(asked(player)).isFalse();
+        said(player);
+        running.chat(player, "hello");
+        assertThat(said(player)).noneMatch(line -> line.contains("verify your account first"));
+        assertThat(otherProblems()).isEmpty();
     }
 
     @Test
