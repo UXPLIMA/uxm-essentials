@@ -652,7 +652,7 @@ public final class DestinationPermissions {
                         VAULTS),
                 PermissionSpec.of(
                         VAULT_OTHERS,
-                        "/vault <player> [n]: open and audit another player's vault (audit-logged).",
+                        "/vault <player> [n]: open and audit another player's vault, offline too (audit-logged).",
                         PermissionDefault.OP,
                         VAULTS),
                 PermissionSpec.of(

@@ -179,6 +179,7 @@ import com.uxplima.uxmessentials.shared.adapter.inbound.command.GateBinding;
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.GuiRootBinding;
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.LocaleBinding;
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.LocalizedCommandVisibilityListener;
+import com.uxplima.uxmessentials.shared.adapter.inbound.command.PlayerArgument;
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.UsageBinding;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.EntityListLayout;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.GuiLayouts;
@@ -210,6 +211,7 @@ import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.vocab.Requireme
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.vocab.SoundActions;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.vocab.StringConditions;
 import com.uxplima.uxmessentials.shared.adapter.inbound.ip.IpHistoryRecorder;
+import com.uxplima.uxmessentials.shared.adapter.inbound.ip.RelaySetup;
 import com.uxplima.uxmessentials.shared.adapter.inbound.lookup.NameCaseEvidenceListener;
 import com.uxplima.uxmessentials.shared.adapter.inbound.lookup.OnlinePlayerIndexListener;
 import com.uxplima.uxmessentials.shared.adapter.inbound.lookup.PlayerNameRecordingListener;
@@ -225,6 +227,7 @@ import com.uxplima.uxmessentials.shared.adapter.outbound.api.ActionContexts;
 import com.uxplima.uxmessentials.shared.adapter.outbound.api.BukkitEventBridge;
 import com.uxplima.uxmessentials.shared.adapter.outbound.api.EventBridgeRegistry;
 import com.uxplima.uxmessentials.shared.adapter.outbound.api.EventBridges;
+import com.uxplima.uxmessentials.shared.adapter.outbound.api.PlayerQueries;
 import com.uxplima.uxmessentials.shared.adapter.outbound.api.QueryContexts;
 import com.uxplima.uxmessentials.shared.adapter.outbound.bus.Bus;
 import com.uxplima.uxmessentials.shared.adapter.outbound.bus.BusWiring;
@@ -276,10 +279,13 @@ import com.uxplima.uxmessentials.shared.adapter.outbound.papi.StoreScoreboardPla
 import com.uxplima.uxmessentials.shared.adapter.outbound.papi.VillagersPlaceholders;
 import com.uxplima.uxmessentials.shared.adapter.outbound.playerdata.CachingPlayerDataStore;
 import com.uxplima.uxmessentials.shared.adapter.outbound.protocol.ViaVersionClientProtocol;
+import com.uxplima.uxmessentials.shared.adapter.outbound.skin.HeadTextures;
 import com.uxplima.uxmessentials.shared.adapter.outbound.style.EngineTheme;
 import com.uxplima.uxmessentials.shared.adapter.outbound.style.StyleTags;
 import com.uxplima.uxmessentials.shared.adapter.outbound.team.PlayerTeamCoordinator;
 import com.uxplima.uxmessentials.shared.adapter.outbound.update.UpdateCheckSettings;
+import com.uxplima.uxmessentials.shared.application.RelayAddresses;
+import com.uxplima.uxmessentials.shared.application.RelayFilteredIpHistory;
 import com.uxplima.uxmessentials.shared.application.command.CommandCatalog;
 import com.uxplima.uxmessentials.shared.application.command.CommandCatalogRenderer;
 import com.uxplima.uxmessentials.shared.application.command.CommandDefinition;
@@ -312,6 +318,7 @@ import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmessentials.shared.domain.message.SharedMessageKey;
 import com.uxplima.uxmessentials.skin.adapter.SkinWiring;
 import com.uxplima.uxmessentials.skin.adapter.outbound.api.SkinQueries;
+import com.uxplima.uxmessentials.skin.domain.PlayerSkin;
 import com.uxplima.uxmessentials.staff.adapter.StaffWiring;
 import com.uxplima.uxmessentials.survival.adapter.SurvivalWiring;
 import com.uxplima.uxmessentials.survival.application.port.SurvivalSales;
@@ -558,6 +565,9 @@ public final class PluginModule {
                 kernel.scheduler(),
                 kernel.log());
         resources.onClose(networkPresence::stop);
+        // A typed player argument is matched through the lookup's name rules and, for a player not here, the roster.
+        PlayerArgument.bind(kernel.playerLookup(), networkPresence.presence());
+        resources.onClose(PlayerArgument::unbind);
         resources.addListener(new NetworkPresenceListener(networkPresence.track()));
         for (Player online : plugin.getServer().getOnlinePlayers()) {
             networkPresence
@@ -632,7 +642,8 @@ public final class PluginModule {
                 new EngineMenuApi(menuBindings, menuItemRenderer, runtimeIcons),
                 queries,
                 actions,
-                new CommandFeedback(kernel.messages()));
+                new CommandFeedback(kernel.messages()),
+                new PlayerQueries(kernel.playerLookup(), kernel.scheduler()));
         plugin.getServer()
                 .getServicesManager()
                 .register(UxmEssentialsApi.class, devApi, plugin, ServicePriority.Normal);
@@ -1233,9 +1244,11 @@ public final class PluginModule {
         }
         Path keyFile = plugin.getDataFolder().toPath().resolve("modules/security/secret.key");
         IpHashing tokens = new IpHashing(SecurityKeyFile.loadOrCreate(keyFile));
-        IpHistoryStore store = IpHistoryStores.jooq(persistence);
+        RelayAddresses relays = RelayAddresses.of(config.getStringList("relay-addresses", List.of()), kernel.log());
+        RelaySetup.report(plugin.getServer().getPluginManager(), relays, kernel.log());
+        IpHistoryStore store = new RelayFilteredIpHistory(IpHistoryStores.jooq(persistence), tokens, relays);
         IpHistoryRecorder recorder =
-                new IpHistoryRecorder(store, tokens, kernel.scheduler(), Clock.systemUTC(), moderation);
+                new IpHistoryRecorder(store, tokens, kernel.scheduler(), Clock.systemUTC(), moderation, relays);
         resources.addListener(recorder);
         kernel.scheduler().async(() -> {
             int moved = LegacyIpHistoryBackfill.run(persistence, tokens, moderation);
@@ -1243,11 +1256,15 @@ public final class PluginModule {
                 kernel.log().info("folded {} legacy address rows into the shared ip history", moved);
             }
         });
-        return new IpCapture(store, tokens, recorder);
+        return new IpCapture(store, tokens, recorder, relays);
     }
 
-    /** The kernel IP-history seam handed to the two contexts that read it. */
-    private record IpCapture(IpHistoryStore store, IpTokens tokens, IpHistoryRecorder recorder) {}
+    /**
+     * The kernel IP-history seam handed to the two contexts that read it. The store already leaves the relay addresses
+     * out; the relays travel with it for the reads that see an address before any row does.
+     */
+    private record IpCapture(
+            IpHistoryStore store, IpTokens tokens, IpHistoryRecorder recorder, RelayAddresses relays) {}
 
     private static PlaceholderContexts wireModules(
             JavaPlugin plugin,
@@ -1288,6 +1305,7 @@ public final class PluginModule {
         links.networkClaims = networkClaims;
         links.dailyRewards = networkClaims.map(claims -> ClaimLedgers.dailyRewards(persistence));
         links.claimLedger = ClaimLedgers.claims(persistence);
+        links.kitResets = ClaimLedgers.kitResets(persistence);
         links.livePeers = livePeers;
         links.proxyAnswering = () -> busHealth
                 .proxy()
@@ -1311,6 +1329,11 @@ public final class PluginModule {
                     plugin, kernel.scheduler(), presenceTrack);
         }
         links.presenceTrack = presenceTrack;
+        // Whether a joining player is new to the whole network, read during the login from the shared name index.
+        links.firstJoins = new com.uxplima.uxmessentials.shared.application.FirstJoins(
+                PlayerNameRepositories.known(persistence), kernel.log());
+        resources.addListener(new com.uxplima.uxmessentials.shared.adapter.inbound.lookup.FirstJoinListener(
+                links.firstJoins, links.networked, kernel.playerLookup()::isOnline));
         // Install uxmLib's single menu listener once, before any GUI-using module (vaults, itemworld) wires,
         // and tear it down on disable so a reload re-installs cleanly (the static install state is reset).
         Guis.install(plugin);
@@ -1764,7 +1787,7 @@ public final class PluginModule {
         } else if (module.id().equals(ModuleId.of("villagers"))) {
             wireVillagers(plugin, ctx, resources, links, guiRegistry, menus, menuBindings);
         } else if (module.id().equals(ModuleId.of("invrollback"))) {
-            wireInvrollback(plugin, ctx, persistence, resources, links, guiRegistry, menus, menuBindings);
+            wireInvrollback(plugin, ctx, persistence, resources, links, bus, guiRegistry, menus, menuBindings);
         } else if (module.id().equals(ModuleId.of("guard"))) {
             wireGuard(plugin, ctx, persistence, resources, links, bus, guiRegistry, menus, menuBindings);
         } else if (module.id().equals(ModuleId.of("servertweaks"))) {
@@ -1806,6 +1829,9 @@ public final class PluginModule {
                 new SkinQueries(wired.repository(), ctx.kernel().scheduler()));
         // A HUD that shows what somebody chose reads the same cache, so a scoreboard refresh costs no query.
         links.placeholders.skin(new RepositorySkinPlaceholders(wired.repository()));
+        // A head drawn by /skull wears the stored skin, as its owner does on joining.
+        links.storedSkins = account -> wired.repository().find(account).map(PlayerSkin::texture);
+        resources.onClose(() -> links.storedSkins = HeadTextures.StoredSkins.none());
     }
 
     private static void wireServerTweaks(
@@ -1894,6 +1920,7 @@ public final class PluginModule {
             Persistence persistence,
             CloseableResources resources,
             ContextLinks links,
+            Bus bus,
             ManagementGuiRegistry guiRegistry,
             Menus menus,
             MenuBindings menuBindings) {
@@ -1908,7 +1935,12 @@ public final class PluginModule {
         // state is the repeating retention sweep, cancelled through the Wired stop hook so a disable/reload strands no
         // scheduled work; a disabled module wires none of this.
         InvrollbackWiring.Wired wired = InvrollbackWiring.wire(
-                ctx, persistence, menus, menuBindings, plugin.getDataFolder().toPath());
+                ctx,
+                persistence,
+                bus,
+                menus,
+                menuBindings,
+                plugin.getDataFolder().toPath());
         wired.listeners().forEach(resources::addListener);
         wired.commands().forEach(resources::addCommand);
         resources.onClose(wired.stop());
@@ -2025,6 +2057,7 @@ public final class PluginModule {
                 ipCapture.store(),
                 ipCapture.tokens(),
                 ipCapture.recorder(),
+                ipCapture.relays(),
                 new SecurityWiring.Network(links.networked, bus, links.presence, links.proxyAnswering));
         wired.commands().forEach(resources::addCommand);
         wired.listeners().forEach(resources::addListener);
@@ -2797,6 +2830,8 @@ public final class PluginModule {
                 Optional.ofNullable(links.kitEconomy),
                 links.networkClaims,
                 Objects.requireNonNull(links.claimLedger, "claimLedger"),
+                Objects.requireNonNull(links.firstJoins, "firstJoins"),
+                Objects.requireNonNull(links.kitResets, "kitResets"),
                 guiLayouts,
                 textInput,
                 menus,
@@ -3111,6 +3146,7 @@ public final class PluginModule {
                 plugin.getDataFolder().toPath(),
                 ipCapture.store(),
                 ipCapture.tokens(),
+                ipCapture.relays(),
                 links.presence,
                 seenVisibility(links, persistence));
         wired.commands().forEach(resources::addCommand);
@@ -3212,8 +3248,17 @@ public final class PluginModule {
         // and dropped with the wiring on module stop. /repair /repairall /hat /more are item commands, so itemworld
         // owns them rather than playerstate, and the two modules never double-register. The utilities
         // hub, the /recipe grid, and the /entitycount tally render through the shared menu engine.
-        ItemworldWiring.Wired wired =
-                ItemworldWiring.wire(plugin, ctx, links.auditChannel, guiLayouts, textInput, menus, menuBindings);
+        // /skull draws a head from the skin the skin module stores, read through the link at the moment it asks:
+        // skin is wired after itemworld.
+        ItemworldWiring.Wired wired = ItemworldWiring.wire(
+                plugin,
+                ctx,
+                links.auditChannel,
+                guiLayouts,
+                textInput,
+                menus,
+                menuBindings,
+                account -> links.storedSkins.of(account));
         wired.commands().forEach(resources::addCommand);
         wired.listeners().forEach(resources::addListener);
         // Write back any still-open in-inventory shulker view before the module stops, so no edit is lost on disable.
@@ -3364,6 +3409,11 @@ public final class PluginModule {
                     wired.levels()));
         }
         links.vanishNetwork = wired.network();
+        // A typed player name never tells a sender which server a player they may not see is on.
+        PlayerArgument.bindVisibility(new com.uxplima.uxmessentials.vanish.adapter.outbound.VanishArgumentVisibility(
+                wired.levels(),
+                wired.network(),
+                wired.network() != com.uxplima.uxmessentials.vanish.application.port.NetworkVanishStore.empty()));
         links.queries.register(
                 UxmVanishQuery.class,
                 new VanishQueries(
@@ -3453,6 +3503,8 @@ public final class PluginModule {
                 announcerSettingsStore,
                 com.uxplima.uxmessentials.persistence.settings.SettingsStores.switches(persistence),
                 bus,
+                new CommunicationWiring.Network(
+                        links.presence, links.networked, Objects.requireNonNull(links.firstJoins, "firstJoins")),
                 engineTheme(resources),
                 guiLayouts,
                 textInput,
@@ -4010,6 +4062,8 @@ public final class PluginModule {
 
     /** Cross-context handles captured during wiring so a dependent context reaches its prerequisite. */
     private static final class ContextLinks {
+        // The stored skins of the skin module, for a head drawn from a texture; none while that module is off.
+        private volatile HeadTextures.StoredSkins storedSkins = HeadTextures.StoredSkins.none();
         // The peer backends live by their heartbeats; a cross-server trade invite waits for each to answer.
         private java.util.function.Supplier<java.util.Set<String>> livePeers = java.util.Set::of;
         // Whether the uxmEssentials proxy plugin answers on the bus now, which is when it can confirm a switch.
@@ -4022,6 +4076,8 @@ public final class PluginModule {
         // What this backend announces of its players; vanish tells it when someone vanishes or reappears.
         private com.uxplima.uxmessentials.shared.application.networkpresence.@org.jspecify.annotations.Nullable TrackNetworkPresence
                 presenceTrack;
+        // Whether a joining player is new to the network, for the first-join lines and kits; set before any module.
+        private com.uxplima.uxmessentials.shared.application.@org.jspecify.annotations.Nullable FirstJoins firstJoins;
         // The shared target picker, built and registered at enable before any module wires; moderation and the
         // economy admin GUI open it rather than each building one of their own.
         private com.uxplima.uxmessentials.shared.adapter.inbound.gui.@org.jspecify.annotations.Nullable PlayerPickerView
@@ -4052,6 +4108,9 @@ public final class PluginModule {
         // for a player (an import's) into their PDC as they join.
         private com.uxplima.uxmessentials.shared.application.port.@org.jspecify.annotations.Nullable PlayerClaimLedger
                 claimLedger;
+        // The kit resets a single server keeps for a player who was offline, applied as they next join.
+        private com.uxplima.uxmessentials.kits.application.port.@org.jspecify.annotations.Nullable PendingKitResets
+                kitResets;
         private @org.jspecify.annotations.Nullable HomeEconomy homeEconomy;
         private com.uxplima.uxmessentials.vaults.application.port.@org.jspecify.annotations.Nullable VaultEconomy
                 vaultEconomy;

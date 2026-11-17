@@ -1,7 +1,9 @@
 package com.uxplima.uxmessentials.persistence.invrollback;
 
+import java.time.Clock;
 import java.util.Objects;
 
+import com.uxplima.uxmessentials.invrollback.application.port.PendingRestores;
 import com.uxplima.uxmessentials.invrollback.application.port.SnapshotRepository;
 import com.uxplima.uxmessentials.persistence.runtime.Persistence;
 import org.jspecify.annotations.NullMarked;
@@ -22,5 +24,11 @@ public final class SnapshotRepositories {
     public static SnapshotRepository jooq(Persistence persistence) {
         Objects.requireNonNull(persistence, "persistence");
         return new JooqSnapshotRepository(persistence.dsl());
+    }
+
+    /** The inventory restores kept for players who were not online, over the shared persistence DSL. */
+    public static PendingRestores pendingRestores(Persistence persistence) {
+        Objects.requireNonNull(persistence, "persistence");
+        return new JooqPendingRestores(persistence.dsl(), Clock.systemUTC());
     }
 }

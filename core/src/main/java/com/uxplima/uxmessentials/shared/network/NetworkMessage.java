@@ -56,7 +56,9 @@ public sealed interface NetworkMessage
                 ProxyConnectionFrame,
                 PlayerSkinChanged,
                 PlayerSettingsChanged,
+                MailArrivedFrame,
                 RankActionsKept,
+                InventoryRestoreKept,
                 BroadcastFrame {
 
     /** The {@code server-id} of the backend that produced this frame; the loop sentinel keys on it. */
@@ -108,7 +110,9 @@ public sealed interface NetworkMessage
         PROXY_CONNECTION(35),
         PLAYER_SKIN_CHANGED(36),
         PLAYER_SETTINGS_CHANGED(37),
+        MAIL_ARRIVED(38),
         RANK_ACTIONS_KEPT(39),
+        INVENTORY_RESTORE_KEPT(40),
         BROADCAST(43);
 
         private final byte wireTag;

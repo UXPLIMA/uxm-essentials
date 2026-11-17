@@ -22,6 +22,7 @@ import com.uxplima.uxmessentials.kits.adapter.outbound.ConfigurateKitRepository;
 import com.uxplima.uxmessentials.kits.application.port.KitRepository;
 import com.uxplima.uxmessentials.messaging.adapter.MessagingSettings;
 import com.uxplima.uxmessentials.messaging.application.port.MailRepository;
+import com.uxplima.uxmessentials.migration.AccountNames;
 import com.uxplima.uxmessentials.migration.BackupSnapshot;
 import com.uxplima.uxmessentials.migration.BlacklistedWorldSkip;
 import com.uxplima.uxmessentials.migration.ImportData;
@@ -53,6 +54,7 @@ import com.uxplima.uxmessentials.persistence.economy.WalletRepositories;
 import com.uxplima.uxmessentials.persistence.holograms.HologramRepositories;
 import com.uxplima.uxmessentials.persistence.homes.HomeRepositories;
 import com.uxplima.uxmessentials.persistence.ledger.ClaimLedgers;
+import com.uxplima.uxmessentials.persistence.lookup.JooqPlayerNameRepository;
 import com.uxplima.uxmessentials.persistence.messaging.MessagingStores;
 import com.uxplima.uxmessentials.persistence.moderation.ModerationStores;
 import com.uxplima.uxmessentials.persistence.playerwarps.PlayerWarpRepositories;
@@ -140,7 +142,7 @@ public final class MigrationWiring {
         Objects.requireNonNull(targets, "targets");
         Objects.requireNonNull(publisher, "publisher");
         Objects.requireNonNull(worldScope, "worldScope");
-        SourceRegistry registry = sourceRegistry(plugin, migrationConfig, economyConfig, log);
+        SourceRegistry registry = sourceRegistry(plugin, persistence, migrationConfig, economyConfig, log);
         ImportData importData = new ImportData(audit(auditChannel), backup(plugin, log), log);
         Writers writers = writers(
                 targets,
@@ -154,21 +156,28 @@ public final class MigrationWiring {
     }
 
     private static SourceRegistry sourceRegistry(
-            Plugin plugin, ConfigStore migrationConfig, ConfigStore economyConfig, Logger log) {
+            Plugin plugin,
+            Persistence persistence,
+            ConfigStore migrationConfig,
+            ConfigStore economyConfig,
+            Logger log) {
         WorldNameResolver worlds = new BukkitWorldNameResolver(plugin.getServer());
         Currency defaultCurrency = new EconomyConfig(economyConfig).currencies().defaultCurrency();
+        // The live feeds also ask about the accounts that only ever played on another server sharing the database.
+        JooqPlayerNameRepository names = new JooqPlayerNameRepository(persistence.dsl());
+        FeedAccounts accounts = new FeedAccounts(plugin.getServer(), () -> names.loadRecent(Integer.MAX_VALUE));
         List<Convert> built = new ArrayList<>();
         built.add(new EssentialsXConvert(worlds, log));
         built.add(new LiveBalanceConvert(
                 SourceId.of("vault"),
                 "Vault",
                 "the live Vault economy provider",
-                new VaultBalanceFeed(plugin, defaultCurrency)));
+                new VaultBalanceFeed(plugin, defaultCurrency, accounts)));
         built.add(new LiveBalanceConvert(
                 SourceId.of("playerpoints"),
                 "PlayerPoints",
                 "the live PlayerPoints plugin",
-                new PlayerPointsBalanceFeed(plugin, log)));
+                new PlayerPointsBalanceFeed(plugin, accounts, log)));
         built.add(new LiteBansConvert(liteBansConfig(plugin, migrationConfig), log));
         built.add(new DecentHologramsConvert(worlds, decentHologramsDirectory(plugin)));
         built.add(new FancyHologramsConvert(worlds, fancyHologramsFile(plugin)));
@@ -280,10 +289,19 @@ public final class MigrationWiring {
                 holograms,
                 worldRegistry,
                 playerWarps,
+                ports.accounts(),
                 ports.clock(),
                 ports.log());
         RecordWriter dryRun = new DryRunRecordWriter(
-                users, warps, ports.moderation(), kits, holograms, worldRegistry, playerWarps, ports.clock());
+                users,
+                warps,
+                ports.moderation(),
+                kits,
+                holograms,
+                worldRegistry,
+                playerWarps,
+                ports.accounts(),
+                ports.clock());
         // Both writers hold back a warp in a barred world the same way, so a dry run reports what a live run skips.
         return new Writers(
                 new AnnouncingRecordWriter(
@@ -321,6 +339,7 @@ public final class MigrationWiring {
                 // Read on every record from the live config, which a reload swaps whole, so it is safe off the tick.
                 () -> WarpsWiring.worldBlacklist(warpsConfig),
                 () -> PlayerwarpsWiring.worldBlacklist(playerwarpsConfig),
+                new IndexAccountNames(new JooqPlayerNameRepository(persistence.dsl()), System::nanoTime),
                 clock,
                 log);
     }
@@ -460,6 +479,7 @@ public final class MigrationWiring {
             Currency defaultCurrency,
             Supplier<WorldBlacklist> warpWorlds,
             Supplier<WorldBlacklist> playerWarpWorlds,
+            AccountNames accounts,
             Clock clock,
             Logger log) {}
 

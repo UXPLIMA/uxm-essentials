@@ -8,6 +8,7 @@ import com.uxplima.uxmessentials.shared.application.port.DomainEventPublisher;
 import com.uxplima.uxmessentials.shared.application.port.SkinTextures;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmessentials.shared.domain.SkinTexture;
+import com.uxplima.uxmessentials.skin.application.port.BedrockSkins;
 import com.uxplima.uxmessentials.skin.application.port.SkinRepository;
 import com.uxplima.uxmessentials.skin.application.port.SkinUploads;
 import com.uxplima.uxmessentials.skin.application.port.SkinView;
@@ -29,6 +30,8 @@ public final class UpdateSkin {
 
     private final SkinRepository repository;
     private final SkinTextures textures;
+    private final NamedSkins names;
+    private final BedrockSkins bedrock;
     private final SkinUploads uploads;
     private final SkinView view;
     private final DomainEventPublisher events;
@@ -37,12 +40,16 @@ public final class UpdateSkin {
     public UpdateSkin(
             SkinRepository repository,
             SkinTextures textures,
+            NamedSkins names,
+            BedrockSkins bedrock,
             SkinUploads uploads,
             SkinView view,
             DomainEventPublisher events,
             Clock clock) {
         this.repository = Objects.requireNonNull(repository, "repository");
         this.textures = Objects.requireNonNull(textures, "textures");
+        this.names = Objects.requireNonNull(names, "names");
+        this.bedrock = Objects.requireNonNull(bedrock, "bedrock");
         this.uploads = Objects.requireNonNull(uploads, "uploads");
         this.view = Objects.requireNonNull(view, "view");
         this.events = Objects.requireNonNull(events, "events");
@@ -57,7 +64,7 @@ public final class UpdateSkin {
             return Outcome.NOTHING_STORED;
         }
         PlayerSkin skin = stored.get();
-        Optional<SkinTexture> fresh = resolve(skin);
+        Optional<SkinTexture> fresh = resolve(target, skin);
         if (fresh.isEmpty()) {
             return Outcome.LOOKUP_FAILED;
         }
@@ -69,17 +76,17 @@ public final class UpdateSkin {
     }
 
     /** The source resolved again, past whatever was cached for it. */
-    private Optional<SkinTexture> resolve(PlayerSkin skin) {
+    private Optional<SkinTexture> resolve(PlayerRef target, PlayerSkin skin) {
         return switch (skin.source()) {
             case SkinSource.ByName name -> {
                 textures.purge(name.username());
-                yield textures.fetchNow(name.username());
+                yield names.byName(name.username());
             }
             case SkinSource.ByUrl url -> uploads.fromUrl(url.url(), skin.model());
             case SkinSource.ByFile file -> uploads.fromFile(file.fileName(), skin.model());
-            // A Bedrock skin is refreshed by the join path, which owns that source; a pool entry is not the
-            // player's own choice to refresh.
-            case SkinSource.Bedrock ignored -> Optional.empty();
+            // The Bedrock skin the player wears now, read by the account they are connected under.
+            case SkinSource.Bedrock ignored -> bedrock.byPlayer(target.uuid());
+            // A pool entry is not the player's own choice to refresh.
             case SkinSource.Fallback ignored -> Optional.empty();
         };
     }

@@ -2,6 +2,8 @@ package com.uxplima.uxmessentials.migration.convert.litebans.parse;
 
 import java.sql.ResultSet;
 import java.sql.SQLException;
+import java.sql.Timestamp;
+import java.time.Instant;
 import java.util.Optional;
 
 import com.uxplima.uxmessentials.migration.convert.jdbc.RowMapper;
@@ -30,6 +32,17 @@ public final class LiteBansRowReaders {
     /** Reader for a {@code litebans_warnings} row, which carries the extra {@code warned} BIT column. */
     public static RowMapper<LiteBansRow> warning() {
         return row -> read(row, Optional.of(row.getBoolean("warned")));
+    }
+
+    /** Reader for a {@code litebans_history} row: one login, the account and the name it logged in under. */
+    public static RowMapper<LiteBansHistoryRow> history() {
+        return row -> {
+            @Nullable Timestamp date = row.getTimestamp("date");
+            return new LiteBansHistoryRow(
+                    stringOrEmpty(row.getString("uuid")),
+                    row.getString("name"),
+                    date == null ? Instant.EPOCH : date.toInstant());
+        };
     }
 
     private static LiteBansRow read(ResultSet row, Optional<Boolean> warned) throws SQLException {

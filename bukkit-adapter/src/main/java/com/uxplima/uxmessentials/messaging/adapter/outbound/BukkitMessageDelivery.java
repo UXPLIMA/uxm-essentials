@@ -50,11 +50,13 @@ public final class BukkitMessageDelivery implements MessageDelivery {
     }
 
     @Override
-    public void notifyNewMail(PlayerRef recipient, MailItem item) {
-        send(
-                recipient,
-                MessagingMessageKey.MAIL_NEW_NOTIFY,
-                Map.of("player", item.sender().name()));
+    public void notifyNewMail(PlayerRef recipient, String senderName) {
+        send(recipient, MessagingMessageKey.MAIL_NEW_NOTIFY, Map.of("player", senderName));
+    }
+
+    @Override
+    public void notifyUnreadMail(PlayerRef recipient, long unread) {
+        send(recipient, MessagingMessageKey.MAIL_UNREAD_JOIN, Map.of("count", Long.toString(unread)));
     }
 
     @Override

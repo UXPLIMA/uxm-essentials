@@ -2,7 +2,7 @@
 
 The command, permission and placeholder pages this one points to are generated from the plugin's own catalogues, so they list what the build registers.
 
-Contents: [Commands](#commands) · [Permissions](#permissions) · [Placeholders](#placeholders) · [Boards](#boards) · [Files](#files)
+Contents: [Commands](#commands) · [Permissions](#permissions) · [Placeholders](#placeholders) · [Boards](#boards) · [REST add-on](#rest-add-on) · [Files](#files)
 
 ## Commands
 
@@ -36,12 +36,28 @@ The periods are `alltime`, `monthly`, `weekly` and `daily`. `playtime`, `trades`
 |---|---|
 | `top_<board>_<period>_<n>_name` | The name at place n, or the word for nobody. |
 | `top_<board>_<period>_<n>_value` | The value at place n as the board shows it (a time as `1d 2h 3m`, a balance with its symbol, a count), or the word for none. |
-| `top_<board>_<period>_<n>_head` | The player at place n for a `<head:...>` tag: their name, or their uuid when an account cannot have that name; the `leaderboard.empty-head` for a place nobody holds. |
+| `top_<board>_<period>_<n>_head` | The player at place n for a `<head:...>` tag: their name, or their uuid when an account cannot have that name. An offline-mode or Bedrock account, which Mojang would draw as a stranger who owns the name, and a place nobody holds read the `leaderboard.empty-head`. |
 | `rank_<board>_<period>` | The reader's own place, or the word for none. |
 | `value_<board>_<period>` | The reader's own value. |
 | `resets_<period>` | The time until a period starts again, in the reader's words (`4d 1h`, `1h 30m`, `12m`), or the word for none for `alltime`. |
 
 The words come from the `board.*` lines of the messages files. The `economy_baltop_*`, `baltop_position`, `votes_top_*` and `votes_position_*` keys in [placeholders.md](placeholders.md) answer as well.
+
+## REST add-on
+
+Every player route of the REST add-on takes a uuid. A web store or a bot that only holds a typed name finds the uuid
+with `GET /api/v1/players/by-name/{name}` (a token with the read scope). It resolves the name the way a command does:
+players online here or on another server sharing the database, players who are offline, and Bedrock players under
+their prefixed name. Send a `#` prefix as `%23`.
+
+| Answer | When |
+|---|---|
+| `200`, `match` is `found` | One account plays under the name. `player` holds its `player-id` and `player-name`, and `candidates` holds the same account. |
+| `200`, `match` is `ambiguous` | On an offline-mode server, `Steve` and `steve` are two accounts. A name that matches several only in case, and none exactly, picks none: `player` is null and `candidates` lists every account it could mean. |
+| `404` | Nobody has played under the name. |
+| `400` | The name is blank. |
+
+A plugin asks the same question with `UxmEssentialsApi.players().byName(name)`.
 
 ## Files
 

@@ -24,6 +24,7 @@ import com.uxplima.uxmessentials.api.query.UxmModerationQuery;
 import com.uxplima.uxmessentials.api.query.UxmNpcQuery;
 import com.uxplima.uxmessentials.api.query.UxmPlayerStateQuery;
 import com.uxplima.uxmessentials.api.query.UxmPlayerWarpsQuery;
+import com.uxplima.uxmessentials.api.query.UxmPlayersQuery;
 import com.uxplima.uxmessentials.api.query.UxmPlaytimeQuery;
 import com.uxplima.uxmessentials.api.query.UxmPresenceQuery;
 import com.uxplima.uxmessentials.api.query.UxmRanksQuery;
@@ -153,6 +154,31 @@ public interface UxmEssentialsApi {
      *     worse than no second half at all
      */
     UxmActions actions(Plugin plugin, String actingFor);
+
+    /**
+     * Finding an account by name, for a consumer that holds a name and needs the uuid every other call takes.
+     *
+     * <p>Always there, unlike the module queries below: it reads the server's own record of who has played. Ask it
+     * rather than Mojang, which knows neither an offline-mode account nor a Bedrock one.
+     *
+     * <p>A default method, so a class that implements this interface itself, such as a test double, still compiles.
+     * The plugin overrides it; the default has no record of names to read, so it says so rather than answer nobody.
+     *
+     * <pre>{@code
+     * api.players().byName("Steve").thenAccept(match -> {
+     *     switch (match) {
+     *         case UxmPlayerMatch.Found found -> pay(found.account().playerId());
+     *         case UxmPlayerMatch.Ambiguous several -> askWhichOf(several.candidates());
+     *         case UxmPlayerMatch.Unknown nobody -> tellNobodyByThatName();
+     *     }
+     * });
+     * }</pre>
+     *
+     * @throws UnsupportedOperationException from an implementation that does not override this method
+     */
+    default UxmPlayersQuery players() {
+        throw new UnsupportedOperationException("this implementation of the API cannot look players up by name");
+    }
 
     /**
      * Reading a player's homes, or empty when the homes module is switched off.

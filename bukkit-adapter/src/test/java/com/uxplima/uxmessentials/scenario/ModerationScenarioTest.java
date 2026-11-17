@@ -113,6 +113,24 @@ class ModerationScenarioTest {
     }
 
     @Test
+    void anIpBanOnTheAddressGeyserHandsEveryBedrockPlayerIsRefusedAndKicksNobody() {
+        InetSocketAddress geyser = new InetSocketAddress(InetAddress.ofLiteral("127.0.0.1"), 25565);
+        ScenarioPlayer first = new ScenarioPlayer(running.server, ".AlexBE");
+        first.setAddress(geyser);
+        ScenarioPlayer second = new ScenarioPlayer(running.server, ".SamBE");
+        second.setAddress(geyser);
+        running.server.addPlayer(first);
+        running.server.addPlayer(second);
+        running.settle();
+
+        running.run(moderator, "banip .AlexBE");
+
+        assertThat(first.isOnline()).as("the shared address is not banned").isTrue();
+        assertThat(second.isOnline()).as("nor is anybody else behind it").isTrue();
+        assertThat(running.problems()).isEmpty();
+    }
+
+    @Test
     void aLockdownTurnsAPlayerAwayAtLoginAndLetsAStaffMemberWithTheBypassIn() {
         running.run(moderator, "lockdown on");
         try {

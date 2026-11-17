@@ -1,8 +1,6 @@
 package com.uxplima.uxmessentials.homes.adapter.inbound.command;
 
-import java.util.Map;
 import java.util.Objects;
-import java.util.Optional;
 
 import org.bukkit.entity.Player;
 
@@ -22,11 +20,11 @@ import com.uxplima.uxmessentials.homes.domain.HomesMessageKey;
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandFeedback;
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandRegistration;
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandSuggestions;
+import com.uxplima.uxmessentials.shared.adapter.inbound.command.OffTickNames;
 import com.uxplima.uxmessentials.shared.adapter.outbound.BukkitRefs;
 import com.uxplima.uxmessentials.shared.application.permission.DestinationPermissions;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
 import com.uxplima.uxmessentials.shared.application.port.Scheduler;
-import com.uxplima.uxmessentials.shared.domain.NameMatch;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmessentials.shared.domain.Position;
 import com.uxplima.uxmlib.command.Args;
@@ -54,8 +52,9 @@ import org.jspecify.annotations.NullMarked;
  * <p>Per-subcommand permissions are enforced by a {@code Gate} on each node, so only
  * {@code home} is a command-catalog id; the subcommands are literals inside the tree. Each subcommand keeps
  * its prior behaviour: targets resolve via the offline-capable
- * {@link com.uxplima.uxmessentials.shared.application.port.PlayerLookup#findByName} (only {@code admin tp}
- * needs the actor online), and repository I/O runs off the tick thread via the injected {@link Scheduler}.
+ * {@link com.uxplima.uxmessentials.shared.application.port.PlayerLookup#matchByName} on the async lane, so the
+ * owner of the homes may be offline or on another server, and repository I/O runs off the tick thread via the injected
+ * {@link Scheduler}.
  */
 @NullMarked
 public final class HomeCommand extends HomeCommandSupport implements CommandRegistration {
@@ -67,10 +66,12 @@ public final class HomeCommand extends HomeCommandSupport implements CommandRegi
     private static final String SETSERVER_PERMISSION = DestinationPermissions.HOME_SETSERVER;
 
     private final Scheduler scheduler;
+    private final OffTickNames names;
 
     public HomeCommand(HomeServices services, Messages messages, Scheduler scheduler) {
         super(services, messages);
         this.scheduler = Objects.requireNonNull(scheduler, "scheduler");
+        this.names = new OffTickNames(services.players(), scheduler, feedback);
     }
 
     @Override
@@ -157,14 +158,7 @@ public final class HomeCommand extends HomeCommandSupport implements CommandRegi
         }
         PlayerRef actor = ref(sender);
         String name = ctx.getArgument("player", String.class);
-        NameMatch ownerMatch = services.players().matchByName(name);
-        Optional<PlayerRef> owner = ownerMatch.player();
-        if (owner.isEmpty()) {
-            feedback.send(sender, ownerMatch.miss(HomesMessageKey.HOME_ADMIN_TARGET_UNKNOWN, Map.of("player", name)));
-            return Command.SINGLE_SUCCESS;
-        }
-        PlayerRef resolved = owner.get();
-        scheduler.async(() -> services.visitHome().visit(actor, resolved, slot));
+        resolveOffTick(sender, name, resolved -> services.visitHome().visit(actor, resolved, slot));
         return Command.SINGLE_SUCCESS;
     }
 
@@ -184,14 +178,7 @@ public final class HomeCommand extends HomeCommandSupport implements CommandRegi
         }
         PlayerRef owner = ref(sender);
         String name = ctx.getArgument("player", String.class);
-        NameMatch invitedMatch = services.players().matchByName(name);
-        Optional<PlayerRef> invited = invitedMatch.player();
-        if (invited.isEmpty()) {
-            feedback.send(sender, invitedMatch.miss(HomesMessageKey.HOME_ADMIN_TARGET_UNKNOWN, Map.of("player", name)));
-            return Command.SINGLE_SUCCESS;
-        }
-        PlayerRef resolved = invited.get();
-        scheduler.async(() -> services.inviteToHome().invite(owner, slot, resolved));
+        resolveOffTick(sender, name, resolved -> services.inviteToHome().invite(owner, slot, resolved));
         return Command.SINGLE_SUCCESS;
     }
 
@@ -202,14 +189,7 @@ public final class HomeCommand extends HomeCommandSupport implements CommandRegi
         }
         PlayerRef owner = ref(sender);
         String name = ctx.getArgument("player", String.class);
-        NameMatch invitedMatch = services.players().matchByName(name);
-        Optional<PlayerRef> invited = invitedMatch.player();
-        if (invited.isEmpty()) {
-            feedback.send(sender, invitedMatch.miss(HomesMessageKey.HOME_ADMIN_TARGET_UNKNOWN, Map.of("player", name)));
-            return Command.SINGLE_SUCCESS;
-        }
-        PlayerRef resolved = invited.get();
-        scheduler.async(() -> services.uninviteFromHome().uninvite(owner, slot, resolved));
+        resolveOffTick(sender, name, resolved -> services.uninviteFromHome().uninvite(owner, slot, resolved));
         return Command.SINGLE_SUCCESS;
     }
 
@@ -222,8 +202,8 @@ public final class HomeCommand extends HomeCommandSupport implements CommandRegi
     }
 
     private int runAdminTeleport(CommandContext<CommandSourceStack> ctx) {
-        // tp requires the actor to be online: the actor teleports.
-        return dispatchOnlineTarget(ctx, target -> services.homeAdmin().teleport(refOf(ctx), target, slotArg(ctx)));
+        // The actor travels, so only the actor must be here; the home's owner may be offline or on another server.
+        return dispatchOfflineTarget(ctx, target -> services.homeAdmin().teleport(refOf(ctx), target, slotArg(ctx)));
     }
 
     private int runAdminSetWithSlot(CommandContext<CommandSourceStack> ctx) {
@@ -244,15 +224,7 @@ public final class HomeCommand extends HomeCommandSupport implements CommandRegi
         Position at = BukkitRefs.toPosition(Objects.requireNonNull(sender.getLocation(), "location"));
         PlayerRef actor = ref(sender);
         String name = ctx.getArgument("player", String.class);
-        NameMatch resolvedMatch = services.players().matchByName(name);
-        Optional<PlayerRef> resolved = resolvedMatch.player();
-        if (resolved.isEmpty()) {
-            feedback.send(
-                    sender, resolvedMatch.miss(HomesMessageKey.HOME_ADMIN_TARGET_UNKNOWN, Map.of("player", name)));
-            return Command.SINGLE_SUCCESS;
-        }
-        PlayerRef target = resolved.get();
-        scheduler.async(() -> {
+        resolveOffTick(sender, name, target -> {
             HomeSet set = services.repository().load(target);
             // First slot index not occupied by the target, 0 when empty, otherwise max+1.
             java.util.OptionalInt maxOpt =
@@ -273,15 +245,7 @@ public final class HomeCommand extends HomeCommandSupport implements CommandRegi
         Position at = BukkitRefs.toPosition(Objects.requireNonNull(sender.getLocation(), "location"));
         PlayerRef actor = ref(sender);
         String name = ctx.getArgument("player", String.class);
-        NameMatch resolvedMatch = services.players().matchByName(name);
-        Optional<PlayerRef> resolved = resolvedMatch.player();
-        if (resolved.isEmpty()) {
-            feedback.send(
-                    sender, resolvedMatch.miss(HomesMessageKey.HOME_ADMIN_TARGET_UNKNOWN, Map.of("player", name)));
-            return Command.SINGLE_SUCCESS;
-        }
-        PlayerRef target = resolved.get();
-        scheduler.async(() -> services.homeAdmin().setHome(actor, target, slot, at));
+        resolveOffTick(sender, name, target -> services.homeAdmin().setHome(actor, target, slot, at));
         return Command.SINGLE_SUCCESS;
     }
 
@@ -292,15 +256,7 @@ public final class HomeCommand extends HomeCommandSupport implements CommandRegi
         }
         PlayerRef actor = ref(sender);
         String name = ctx.getArgument("player", String.class);
-        NameMatch resolvedMatch = services.players().matchByName(name);
-        Optional<PlayerRef> resolved = resolvedMatch.player();
-        if (resolved.isEmpty()) {
-            feedback.send(
-                    sender, resolvedMatch.miss(HomesMessageKey.HOME_ADMIN_TARGET_UNKNOWN, Map.of("player", name)));
-            return Command.SINGLE_SUCCESS;
-        }
-        PlayerRef target = resolved.get();
-        scheduler.async(() -> services.homeAdmin().clearAll(actor, target));
+        resolveOffTick(sender, name, target -> services.homeAdmin().clearAll(actor, target));
         return Command.SINGLE_SUCCESS;
     }
 
@@ -312,21 +268,13 @@ public final class HomeCommand extends HomeCommandSupport implements CommandRegi
         PlayerRef actor = ref(sender);
         HomeSlot slot = slotArg(ctx);
         String name = ctx.getArgument("player", String.class);
-        NameMatch resolvedMatch = services.players().matchByName(name);
-        Optional<PlayerRef> resolved = resolvedMatch.player();
-        if (resolved.isEmpty()) {
-            feedback.send(
-                    sender, resolvedMatch.miss(HomesMessageKey.HOME_ADMIN_TARGET_UNKNOWN, Map.of("player", name)));
-            return Command.SINGLE_SUCCESS;
-        }
-        PlayerRef target = resolved.get();
-        scheduler.async(() -> services.homeAdmin().info(actor, target, slot));
+        resolveOffTick(sender, name, target -> services.homeAdmin().info(actor, target, slot));
         return Command.SINGLE_SUCCESS;
     }
 
     /**
-     * Resolve target via {@link com.uxplima.uxmessentials.shared.application.port.PlayerLookup#findByName}
-     * (offline-capable) then execute {@code verb} on the async thread. Used by the admin verbs that do not
+     * Resolve target via {@link com.uxplima.uxmessentials.shared.application.port.PlayerLookup#matchByName}
+     * (offline-capable) and execute {@code verb}, both on the async thread. Used by the admin verbs that do not
      * need the sender to be online at the destination.
      */
     private int dispatchOfflineTarget(
@@ -336,36 +284,12 @@ public final class HomeCommand extends HomeCommandSupport implements CommandRegi
             return 0;
         }
         String name = ctx.getArgument("player", String.class);
-        NameMatch resolvedMatch = services.players().matchByName(name);
-        Optional<PlayerRef> resolved = resolvedMatch.player();
-        if (resolved.isEmpty()) {
-            feedback.send(
-                    sender, resolvedMatch.miss(HomesMessageKey.HOME_ADMIN_TARGET_UNKNOWN, Map.of("player", name)));
-            return Command.SINGLE_SUCCESS;
-        }
-        PlayerRef target = resolved.get();
-        scheduler.async(() -> verb.accept(target));
+        resolveOffTick(sender, name, verb);
         return Command.SINGLE_SUCCESS;
     }
 
-    /**
-     * Resolve target online-only (for verbs like {@code tp} where the actor is the one moving).
-     */
-    private int dispatchOnlineTarget(
-            CommandContext<CommandSourceStack> ctx, java.util.function.Consumer<PlayerRef> verb) {
-        Player sender = player(ctx);
-        if (sender == null) {
-            return 0;
-        }
-        String name = ctx.getArgument("player", String.class);
-        NameMatch targetMatch = services.players().matchOnlineByName(name);
-        Optional<PlayerRef> target = targetMatch.player();
-        if (target.isEmpty()) {
-            feedback.send(sender, targetMatch.miss(HomesMessageKey.HOME_ADMIN_TARGET_UNKNOWN, Map.of("player", name)));
-            return Command.SINGLE_SUCCESS;
-        }
-        scheduler.async(() -> verb.accept(target.get()));
-        return Command.SINGLE_SUCCESS;
+    private void resolveOffTick(Player sender, String name, java.util.function.Consumer<PlayerRef> then) {
+        names.resolve(sender, name, HomesMessageKey.HOME_ADMIN_TARGET_UNKNOWN, then);
     }
 
     private PlayerRef refOf(CommandContext<CommandSourceStack> ctx) {

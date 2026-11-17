@@ -14,6 +14,7 @@ import org.bukkit.plugin.Plugin;
 
 import com.uxplima.uxmessentials.messaging.adapter.inbound.command.MessagingCommands;
 import com.uxplima.uxmessentials.messaging.adapter.inbound.gui.MessagingGuiViews;
+import com.uxplima.uxmessentials.messaging.adapter.inbound.listener.UnreadMailListener;
 import com.uxplima.uxmessentials.messaging.adapter.outbound.BukkitMessageDelivery;
 import com.uxplima.uxmessentials.messaging.adapter.outbound.BukkitStaffAudience;
 import com.uxplima.uxmessentials.messaging.adapter.outbound.BusMessagingNetwork;
@@ -36,6 +37,7 @@ import com.uxplima.uxmessentials.messaging.application.SharedConversations;
 import com.uxplima.uxmessentials.messaging.application.SharedSocialSpy;
 import com.uxplima.uxmessentials.messaging.application.SocialSpy;
 import com.uxplima.uxmessentials.messaging.application.Unignore;
+import com.uxplima.uxmessentials.messaging.application.UnreadMailNotice;
 import com.uxplima.uxmessentials.messaging.application.port.AfkStatus;
 import com.uxplima.uxmessentials.messaging.application.port.IgnoreStore;
 import com.uxplima.uxmessentials.messaging.application.port.MailRepository;
@@ -150,8 +152,17 @@ public final class MessagingWiring {
                         stores.switches(),
                         Map.of(
                                 "msg-toggle-off", MessagingSwitches.MESSAGES,
-                                "reply-toggle-off", MessagingSwitches.REPLIES)));
-        network.bind(services.relay(), services.helpOp());
+                                "reply-toggle-off", MessagingSwitches.REPLIES)),
+                // Mail left while a player was away, on any backend, is announced as they join; the count is read
+                // off the tick.
+                new UnreadMailListener(
+                        new UnreadMailNotice(
+                                stores.mail(),
+                                new BukkitMessageDelivery(kernel.messages(), kernel.messageSink()),
+                                kernel.log(),
+                                presence),
+                        kernel.scheduler()));
+        network.bind(services.relay(), services.helpOp(), services.sendMail());
         bus.registry().register(network::onFrame);
         MailExpirySweep sweep = new MailExpirySweep(
                 kernel.scheduler(),
@@ -215,8 +226,8 @@ public final class MessagingWiring {
             Clock clock) {
         Notifier notifier = new Notifier(kernel.messages(), kernel.messageSink());
         MessageDelivery delivery = new BukkitMessageDelivery(kernel.messages(), kernel.messageSink());
-        SendMail sendMail =
-                new SendMail(stores.mail(), stores.ignores(), delivery, mute, notifier, kernel.events(), clock);
+        SendMail sendMail = new SendMail(
+                stores.mail(), stores.ignores(), delivery, network, mute, notifier, kernel.events(), clock);
         SendMessage sendMessage = new SendMessage(
                 delivery,
                 stores.ignores(),
@@ -252,7 +263,8 @@ public final class MessagingWiring {
                         notifier,
                         settings.replyTtl(),
                         clock,
-                        relay),
+                        relay,
+                        kernel.scheduler()),
                 sendMail,
                 new SendMailToAll(stores.mail(), clock),
                 new ReadMail(stores.mail(), delivery, notifier),
@@ -340,7 +352,8 @@ public final class MessagingWiring {
      * flag the sweep observes.
      *
      * @param commands the Brigadier command registrations to publish
-     * @param listeners the login and join listeners that bring in each player's shared settings
+     * @param listeners the login and join listeners that bring in each player's shared settings, and the one
+     *     that tells a player about mail they have not read
      * @param expirySweep the self-rescheduling mail-expiry sweep, armed by the caller
      * @param stores the constructed stores, for the published query and placeholders
      * @param mutePolicy the rebindable mute gate the moderation context fills in when it wires

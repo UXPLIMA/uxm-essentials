@@ -1,7 +1,10 @@
 package com.uxplima.uxmessentials.migration.convert.litebans.map;
 
 import java.time.Instant;
+import java.util.Objects;
 import java.util.Optional;
+import java.util.UUID;
+import java.util.function.Function;
 
 import com.uxplima.uxmessentials.migration.ImportRecord;
 import com.uxplima.uxmessentials.migration.convert.litebans.parse.LiteBansRow;
@@ -25,9 +28,16 @@ import org.jspecify.annotations.NullMarked;
 @NullMarked
 public final class LiteBansMuteMapper {
 
+    private final Function<UUID, Optional<String>> names;
+
+    /** @param names the name LiteBans last saw each account under, empty for an account it never saw log in */
+    public LiteBansMuteMapper(Function<UUID, Optional<String>> names) {
+        this.names = Objects.requireNonNull(names, "names");
+    }
+
     /** Map a mutes-table row to a moderation record, or empty when the target is a sentinel. */
     public Optional<ImportRecord> map(LiteBansRow row) {
-        Optional<PlayerRef> target = LiteBansActors.target(row);
+        Optional<PlayerRef> target = LiteBansActors.target(row, names);
         if (target.isEmpty()) {
             return Optional.empty();
         }

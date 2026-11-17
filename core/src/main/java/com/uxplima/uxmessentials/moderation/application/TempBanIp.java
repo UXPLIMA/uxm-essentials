@@ -88,6 +88,11 @@ public final class TempBanIp {
         Objects.requireNonNull(target, "target");
         Objects.requireNonNull(rawDuration, "rawDuration");
         Objects.requireNonNull(reason, "reason");
+        if (ipAlts.isRelay(target.ip())) {
+            // Every player behind Geyser or a proxy arrives from a relay, so its ban would bar them all.
+            notifier.send(actor, ModerationMessageKey.BANIP_SHARED_ADDRESS, Map.of("ip", target.ip()));
+            return Result.err(ModerationError.SHARED_ADDRESS);
+        }
         Optional<Duration> span = SanctionDuration.parse(rawDuration).duration();
         if (span.isEmpty()) {
             // A tempbanip must be timed: a permanent or malformed input is BAD_DURATION (use /banip for permanent).

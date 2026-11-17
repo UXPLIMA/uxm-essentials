@@ -57,9 +57,9 @@ backup.
 
 | Source | Imports | Reads from |
 |---|---|---|
-| `essentialsx` | homes, balances, mail, warps, kits, mutes, jail sentences | `plugins/<source-path>/`: `userdata/`, `warps/`, `kits.yml` |
-| `litebans` | bans, IP bans, mutes, warnings | the `litebans` database, or an H2 file under `plugins/LiteBans/` |
-| `axplayerwarps` | player warps | the `axplayerwarps` database, or an H2 file under `plugins/AxPlayerWarps/` |
+| `essentialsx` | homes, balances, mail, warps, kits, mutes, jail sentences, player names | `plugins/<source-path>/`: `userdata/`, `warps/`, `kits.yml` |
+| `litebans` | bans, IP bans, mutes, warnings, player names | the `litebans` database, or an H2 file under `plugins/LiteBans/` |
+| `axplayerwarps` | player warps, player names | the `axplayerwarps` database, or an H2 file under `plugins/AxPlayerWarps/` |
 | `athelionplayerwarps` | player warps | `plugins/PlayerWarps/data.yml` (the `data-file` key) |
 | `olzieplayerwarps` | player warps | the `olzieplayerwarps` database, or a SQLite file under `plugins/PlayerWarps/data/` |
 | `decentholograms` | holograms | `plugins/DecentHolograms/holograms/*.yml` |
@@ -67,6 +67,16 @@ backup.
 | `multiverse` | worlds | `plugins/Multiverse-Core/worlds.yml` |
 | `vault` | balances | the Vault economy running now |
 | `playerpoints` | balances | the PlayerPoints plugin running now |
+
+## Player names
+
+EssentialsX, LiteBans and AxPlayerWarps know the name each player last played under. The import adds every such
+account to the server's name list, so commands, the economy and the menus find a player by name before they ever
+join this server, on any server sharing the database. A name already in the list is kept, and a value that is not a
+player name (too long, or with characters a name cannot have) is left out. EssentialsX names a player by
+`last-account-name` in their file, or by `usermap.csv` when the file has none; a player in `usermap.csv` without a
+file gets their name and nothing else. LiteBans names each player by their latest login in its history table, and
+its bans, mutes and warnings name their player the same way. Athelion and Olzie store no names.
 
 ## EssentialsX
 
@@ -205,7 +215,8 @@ start when `auto-load-registered` is on in `modules/worlds/config.conf` and the 
 
 ## Vault and PlayerPoints balances
 
-Both sources read the plugin while it runs, for every player this server has seen. A player with a balance above
+Both sources read the plugin while it runs, for every player this server has seen and every player in the shared
+name list, each under the name they play under. A player with a balance above
 zero gets that balance in the default currency; one PlayerPoints point is one unit. If the registered Vault economy
 is uxmEssentials itself, there is nothing to read and the run imports nothing. To keep PlayerPoints as its own
 currency instead of copying it, see the `backend` key in [economy.md](economy.md).
@@ -258,7 +269,7 @@ server log:
 | Line | When |
 |---|---|
 | `event=migration_import_start` | At the start: who ran it, the source, `dry_run`, the source path and the backup folder name. |
-| `event=migration_import_<kind>` | One per record: `user`, `warp`, `player_warp`, `kit`, `jail`, `mute`, `ban`, `ip_ban`, `warn`, `hologram`, `world`. |
+| `event=migration_import_<kind>` | One per record: `account`, `user`, `warp`, `player_warp`, `kit`, `jail`, `mute`, `ban`, `ip_ban`, `warn`, `hologram`, `world`. |
 | `event=migration_import_finish` | At the end, with the counts and `duration_ms`. |
 
 Each record line has `ok=`, and every one but the `jail` and `mute` lines has `conflict=` (`written`, `skipped`,
@@ -268,7 +279,7 @@ Each record line has `ok=`, and every one but the `jail` and `mute` lines has `c
 `kit_claims_written` and `kit_claims_kept` (already recorded). `partial` means some of the player's parts were kept
 back. A `warp` or `player_warp` line with `conflict=skipped held_back=world_blacklist world=<name>` is a warp in a
 world its module's `world-blacklist` names: it is not written, and a dry run reports it the same way. Such a warp
-counts in `skipped`. The finish line counts `users`, `warps`, `kits`, `jails`, `mutes`, `bans`, `ip_bans`, `warns`, `skipped`,
+counts in `skipped`. An `account` line is `written` for a name added to the list and `skipped` for one it already held. The finish line counts `accounts`, `users`, `warps`, `kits`, `jails`, `mutes`, `bans`, `ip_bans`, `warns`, `skipped`,
 `partial` and `failed`; player warps, holograms and worlds appear only on their own record lines. One record that
 fails is counted and the run goes on. A run that cannot continue logs `migration import failed for source <source>`.
 

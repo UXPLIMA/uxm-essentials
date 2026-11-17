@@ -58,7 +58,8 @@ holds for every other cooldown and for the economy's daily login reward. A playe
 in; in the rare case the database has not answered by the time they claim a kit, the claim is refused with a
 "still loading" line and works a moment later. The first time a player joins a server with the network on, what
 that server already knew about them is carried into the database, and the stricter value wins. A `first-join` kit
-that is also `one-time` is handed out once across the network, not once per server.
+is handed out only on a player's first join to the network: a player who moves to a server they never played on
+is not new there. One that is also `one-time` is handed out once across the network, not once per server.
 
 Some limits to know:
 
@@ -82,7 +83,7 @@ Some limits to know:
 | `/kit create <name>` | `uxmessentials.kit.edit` | operators | Makes a kit from your inventory. |
 | `/kit del <name>` | `uxmessentials.kit.edit` | operators | Deletes a kit. |
 | `/kit editor [name [save]]` | `uxmessentials.kit.edit` | operators | Edits kits in a menu. |
-| `/kit reset <player> [kit]` | `uxmessentials.kit.reset` | operators | Clears a player's claims and cooldowns, for one kit or all. |
+| `/kit reset <player> [kit]` | `uxmessentials.kit.reset` | operators | Clears a player's claims and cooldowns, for one kit or all. A player who is offline gets the reset when they next join. |
 
 `uxmessentials.bypass.cooldown.kit` skips cooldowns and lets a one-time kit be claimed again.
 `uxmessentials.kit.cooldown.<seconds>` caps every kit's wait for its holder: a kit set longer waits the node's

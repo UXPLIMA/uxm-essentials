@@ -10,7 +10,6 @@ import org.bukkit.entity.Player;
 
 import io.papermc.paper.command.brigadier.CommandSourceStack;
 import io.papermc.paper.command.brigadier.Commands;
-import io.papermc.paper.command.brigadier.argument.ArgumentTypes;
 import io.papermc.paper.command.brigadier.argument.resolvers.selector.PlayerSelectorArgumentResolver;
 
 import com.mojang.brigadier.Command;
@@ -21,11 +20,13 @@ import com.mojang.brigadier.tree.LiteralCommandNode;
 import com.uxplima.uxmessentials.moderation.domain.ModerationMessageKey;
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandRegistration;
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandSuggestions;
+import com.uxplima.uxmessentials.shared.adapter.inbound.command.PlayerArgument;
 import com.uxplima.uxmessentials.shared.application.permission.EnforcementPermissions;
 import com.uxplima.uxmessentials.shared.application.port.MessageSink;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
 import com.uxplima.uxmessentials.shared.application.port.Scheduler;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
+import com.uxplima.uxmessentials.shared.domain.message.MessageLine;
 import com.uxplima.uxmlib.command.Gate;
 import com.uxplima.uxmlib.command.Sender;
 import org.jspecify.annotations.NullMarked;
@@ -63,7 +64,7 @@ public final class SudoCommand implements CommandRegistration {
     public LiteralCommandNode<CommandSourceStack> build() {
         return Commands.literal("sudo")
                 .requires(Gate.permission(PERMISSION))
-                .then(Commands.argument(PLAYER_ARG, ArgumentTypes.player())
+                .then(Commands.argument(PLAYER_ARG, PlayerArgument.player())
                         .suggests(CommandSuggestions.singlePlayerTarget())
                         .then(Commands.argument(COMMAND_ARG, StringArgumentType.greedyString())
                                 .executes(this::run)))
@@ -84,7 +85,8 @@ public final class SudoCommand implements CommandRegistration {
         PlayerRef actor = actor(ctx);
         Optional<Player> target = resolveTarget(ctx);
         if (target.isEmpty()) {
-            send(actor, ModerationMessageKey.UNKNOWN_TARGET, Map.of("player", playerToken(ctx)));
+            MessageLine miss = PlayerArgument.miss(ctx, PLAYER_ARG, ModerationMessageKey.UNKNOWN_TARGET);
+            sink.deliver(actor, messages.resolve(actor, miss.key(), miss.args()));
             return 0;
         }
         Player resolved = target.get();
@@ -110,19 +112,13 @@ public final class SudoCommand implements CommandRegistration {
         return command.startsWith("/") ? command.substring(1) : command;
     }
 
-    /** The exact text the actor typed for the player argument, for the not-found feedback line. */
-    private static String playerToken(CommandContext<CommandSourceStack> ctx) {
-        return ctx.getNodes().stream()
-                .filter(node -> PLAYER_ARG.equals(node.getNode().getName()))
-                .findFirst()
-                .map(node -> node.getRange().get(ctx.getInput()))
-                .orElse(ctx.getInput());
-    }
-
-    private static Optional<Player> resolveTarget(CommandContext<CommandSourceStack> ctx)
-            throws CommandSyntaxException {
-        PlayerSelectorArgumentResolver resolver = ctx.getArgument(PLAYER_ARG, PlayerSelectorArgumentResolver.class);
-        List<Player> resolved = resolver.resolve(ctx.getSource());
-        return resolved.isEmpty() ? Optional.empty() : Optional.of(resolved.get(0));
+    private static Optional<Player> resolveTarget(CommandContext<CommandSourceStack> ctx) {
+        try {
+            PlayerSelectorArgumentResolver resolver = ctx.getArgument(PLAYER_ARG, PlayerSelectorArgumentResolver.class);
+            List<Player> resolved = resolver.resolve(ctx.getSource());
+            return resolved.isEmpty() ? Optional.empty() : Optional.of(resolved.get(0));
+        } catch (CommandSyntaxException unmatched) {
+            return Optional.empty();
+        }
     }
 }

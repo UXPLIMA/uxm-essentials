@@ -195,9 +195,10 @@ shared: each backend reads its own `config.conf` and module files, so keep them 
 | Worlds | Managed worlds and settings, per server | `/worlds tp` and `/worlds spawn` to another server | `worlds` `cross-server.enabled` |
 | Teleport | Pending moves | `/tpa`, `/tpahere`, staff `/tp` and `/tphere` | `teleport` `cross-server.enabled` |
 | Moderation | Bans, mutes, warnings, IP bans, jails, history | A ban or IP ban kicks everywhere; a jail sends the player to the jail's server; a freeze holds everywhere | none |
-| Messaging | Mail, ignore lists, message and reply toggles, social spy, the `/reply` partner | `/msg`, `/reply`, `/helpop`, social spy; staff chat in the staff module | none |
+| Messaging | Mail, ignore lists, message and reply toggles, social spy, the `/reply` partner | `/msg`, `/reply`, `/helpop`, social spy, new-mail notices; staff chat in the staff module | none |
 | Vanish | Vanish state | Hidden on every server | `vanish` `cross-server` |
-| Kits | One-time claims and cooldowns | none | none |
+| Kits | One-time claims and cooldowns | First-join kits only on a player's first join to the network | none |
+| Communication | none | `/broadcast` reaches every server; no join or quit line or MOTD for a move between servers; first-join welcome once per network | `server-switch` in `communication` `join-quit.conf` |
 | Ranks | Each player's rank and prestige | none | none |
 | Vaults | Vault contents | none | none |
 | Security | Wrong PINs and codes, lockouts, proofs to carry | A lockout holds everywhere; a proof carries across a switch | `security` `join-verification.switch-grace-seconds` |
@@ -266,14 +267,13 @@ used on whichever server holds the player, when that server has its world. Detai
 
 ### Messages, presence and vanish
 
-Every backend knows which server each online player is on, from what the others announce with their heartbeats. With
-the network on, `/msg` and `/reply` reach a player on another server; that server applies the recipient's own message
+Every backend knows which server each online player is on, from what the others announce with their heartbeats. With the
+network on, `/msg` and `/reply` reach a player on another server; that server applies the recipient's own message
 toggle, reply setting, ignore list and vanish. A spy holding `uxmessentials.msg.socialspy` sees every private message
 once, on any server; message switches and the `/reply` partner follow the player. `/helpop` and staff chat reach the
 staff of every server with the sender's server in the line. `/seen` reports a player elsewhere as online. Tab
-completion, `/list`, `/staff`, `/stafflist` (a click teleports there with teleport's `cross-server` on),
-`staff_online`, the player pickers, `/realname`, `/whois` and `/mail sendall` take in every server's players, and
-`/broadcast` reaches every server.
+completion, `/list`, `/staff`, `/stafflist` (a click teleports with teleport's `cross-server` on), `staff_online`,
+pickers, `/realname`, `/whois` and `/mail sendall` take in every server's players.
 
 A vanished player is hidden on every server only with `cross-server = true` in `modules/vanish/config.conf` on every
 backend. The lists above hide them either way from a viewer whose see level is lower, and a player listed by a server on
@@ -358,7 +358,7 @@ same everywhere so transaction times agree.
 
 ## What does not cross servers
 
-- Public chat, join and quit lines, the tab list and scoreboards: each server shows its own; use a proxy chat plugin.
+- Public chat, the tab list, scoreboards, and join and quit lines apart from moves: each server shows its own.
 - AFK state, `/back`, `/rtp`, `/spawn` and respawns: they stay on the server the player is on.
 - `/kick` and `/freeze` of a player on another server, and `/invsee` or `/endersee` of one.
 - Warps, homes, player warps, worlds and teleports to another server while their `cross-server` switch is off.

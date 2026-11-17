@@ -60,6 +60,12 @@ public enum ModerationError {
      */
     LONGER_BAN_RUNNING(ModerationMessageKey.BAN_ALREADY_LONGER),
 
+    /**
+     * The address is a relay every player behind Geyser or a proxy shares, so an IP ban on it would bar them all. The
+     * refusal names the address, so the use case sends it with its placeholders itself.
+     */
+    SHARED_ADDRESS(ModerationMessageKey.BANIP_SHARED_ADDRESS),
+
     /** The {@code /punish} template name is not configured under {@code moderation.conf} {@code templates}. */
     UNKNOWN_TEMPLATE(ModerationMessageKey.TEMPLATE_UNKNOWN);
 

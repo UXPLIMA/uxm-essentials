@@ -18,6 +18,15 @@ counts as staff; upgrade every server of the network in the same window.
 spy stays on across a relog, and shows nothing without its node. A server still on an older release keeps its own
 copy and does not see the shared one, so upgrade every server of the network in the same window.
 
+## Server switches show no join or quit line
+
+On a network, a player moving between servers no longer shows a join or quit line (vanilla or custom) on either
+server and is not sent the MOTD or the unread-mail line again; a quit line waits three seconds to tell a move from
+leaving. The first-join
+welcome and `first-join` kits come only on a player's first join to the network. To keep the earlier lines, set
+`server-switch { hide = false }` in `modules/communication/join-quit.conf`; `count = NETWORK` makes `{count}` count
+the whole network.
+
 ## Offline mode: names match as spelled
 
 On an offline-mode server, or a network whose proxy runs in offline mode, `Steve` and `steve` are now two players: a
@@ -131,6 +140,14 @@ player's next join, where it used to lose them. See [trade.md](trade.md#items-ke
 
 The update adds the `rank_pending_actions` table; nothing needs editing. Rank actions now take `{uuid}`: hand a
 permission plugin `{uuid}` rather than `{player}`, as `ranks.conf` shows.
+
+## Inventory restores wait for a player who is not here
+
+The update adds the `inv_pending_restores` table; nothing needs editing. A restore staff choose in `/invrestore` for
+a player who is offline, or on another server, is now kept and put on the player as they next join, or at once by
+the server they are on, with the same safety snapshot first. It used to answer that the player was not online.
+Upgrade every server that shares the database in the same window: an older server neither applies a kept restore nor
+announces one.
 
 ## Velocity bus frames need a shared secret
 

@@ -263,6 +263,8 @@ public final class ModerationActions implements UxmModerationActions {
             case NOT_BANNED -> UxmFailure.of(UxmFailure.NOT_FOUND, "that player is not banned");
             case NOT_JAILED -> UxmFailure.of(UxmFailure.NOT_FOUND, "that player is not jailed");
             case UNKNOWN_TARGET -> UxmFailure.of(UxmFailure.NOT_FOUND, "the server has never seen that player");
+            case SHARED_ADDRESS ->
+                UxmFailure.of(UxmFailure.REFUSED, "that address is shared by every player behind geyser or a proxy");
             default ->
                 UxmFailure.of(
                         UxmFailure.REFUSED,

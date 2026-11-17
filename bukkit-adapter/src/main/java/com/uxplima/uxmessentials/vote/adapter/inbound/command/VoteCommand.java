@@ -4,7 +4,6 @@ import java.time.Instant;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
-import java.util.Optional;
 import java.util.function.Supplier;
 
 import org.bukkit.command.CommandSender;
@@ -21,9 +20,9 @@ import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandFeedback;
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandRegistration;
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandSuggestions;
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.ListDisplayMode;
+import com.uxplima.uxmessentials.shared.adapter.inbound.command.OffTickNames;
 import com.uxplima.uxmessentials.shared.adapter.outbound.BukkitRefs;
 import com.uxplima.uxmessentials.shared.application.permission.EconomyPermissions;
-import com.uxplima.uxmessentials.shared.domain.NameMatch;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmessentials.vote.adapter.VoteServices;
 import com.uxplima.uxmessentials.vote.domain.Vote;
@@ -72,11 +71,13 @@ public final class VoteCommand implements CommandRegistration {
 
     private final VoteServices services;
     private final CommandFeedback feedback;
+    private final OffTickNames names;
     private final Supplier<ListDisplayMode> displayMode;
 
     public VoteCommand(VoteServices services, Supplier<ListDisplayMode> displayMode) {
         this.services = Objects.requireNonNull(services, "services");
         this.feedback = new CommandFeedback(services.messages());
+        this.names = new OffTickNames(services.playerLookup(), services.scheduler(), feedback);
         this.displayMode = Objects.requireNonNull(displayMode, "displayMode");
     }
 
@@ -202,14 +203,11 @@ public final class VoteCommand implements CommandRegistration {
         }
         PlayerRef viewer = BukkitRefs.toRef(sender);
         String name = ctx.getArgument("player", String.class);
-        NameMatch match = services.playerLookup().matchByName(name);
-        Optional<PlayerRef> target = match.player();
-        if (target.isEmpty()) {
-            feedback.send(sender, match.miss(VoteMessageKey.VOTE_TOTAL_UNKNOWN, Map.of("player", name)));
-            return Command.SINGLE_SUCCESS;
-        }
-        PlayerRef resolved = target.get();
-        services.scheduler().async(() -> services.showVoteTotals().show(viewer, resolved));
+        names.resolve(
+                sender,
+                name,
+                VoteMessageKey.VOTE_TOTAL_UNKNOWN,
+                resolved -> services.showVoteTotals().show(viewer, resolved));
         return Command.SINGLE_SUCCESS;
     }
 
@@ -230,14 +228,11 @@ public final class VoteCommand implements CommandRegistration {
         }
         PlayerRef viewer = BukkitRefs.toRef(sender);
         String name = ctx.getArgument("player", String.class);
-        NameMatch match = services.playerLookup().matchByName(name);
-        Optional<PlayerRef> target = match.player();
-        if (target.isEmpty()) {
-            feedback.send(sender, match.miss(VoteMessageKey.VOTE_TOTAL_UNKNOWN, Map.of("player", name)));
-            return Command.SINGLE_SUCCESS;
-        }
-        PlayerRef resolved = target.get();
-        services.scheduler().async(() -> services.showVoteStreak().show(viewer, resolved));
+        names.resolve(
+                sender,
+                name,
+                VoteMessageKey.VOTE_TOTAL_UNKNOWN,
+                resolved -> services.showVoteStreak().show(viewer, resolved));
         return Command.SINGLE_SUCCESS;
     }
 
@@ -327,14 +322,11 @@ public final class VoteCommand implements CommandRegistration {
         CommandSender sender = Sender.audience(ctx.getSource());
         PlayerRef actor = CommandFeedback.refOf(sender);
         String name = ctx.getArgument("player", String.class);
-        NameMatch match = services.playerLookup().matchByName(name);
-        Optional<PlayerRef> target = match.player();
-        if (target.isEmpty()) {
-            feedback.send(sender, match.miss(VoteMessageKey.VOTE_TOTAL_UNKNOWN, Map.of("player", name)));
-            return Command.SINGLE_SUCCESS;
-        }
-        PlayerRef resolved = target.get();
-        services.scheduler().async(() -> services.giveVote().give(actor, resolved, amount));
+        names.resolve(
+                sender,
+                name,
+                VoteMessageKey.VOTE_TOTAL_UNKNOWN,
+                resolved -> services.giveVote().give(actor, resolved, amount));
         return Command.SINGLE_SUCCESS;
     }
 
@@ -342,14 +334,11 @@ public final class VoteCommand implements CommandRegistration {
         CommandSender sender = Sender.audience(ctx.getSource());
         PlayerRef actor = CommandFeedback.refOf(sender);
         String name = ctx.getArgument("player", String.class);
-        NameMatch match = services.playerLookup().matchByName(name);
-        Optional<PlayerRef> target = match.player();
-        if (target.isEmpty()) {
-            feedback.send(sender, match.miss(VoteMessageKey.VOTE_TOTAL_UNKNOWN, Map.of("player", name)));
-            return Command.SINGLE_SUCCESS;
-        }
-        PlayerRef resolved = target.get();
-        services.scheduler().async(() -> services.resetVoterTotals().reset(actor, resolved));
+        names.resolve(
+                sender,
+                name,
+                VoteMessageKey.VOTE_TOTAL_UNKNOWN,
+                resolved -> services.resetVoterTotals().reset(actor, resolved));
         return Command.SINGLE_SUCCESS;
     }
 
