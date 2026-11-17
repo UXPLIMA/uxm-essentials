@@ -426,6 +426,8 @@ public final class VerificationController implements KeypadActions {
         feedback.failure(viewer, outcome.remaining());
         if (reopenOnFailure) {
             reopenKeypad(player, viewer);
+        } else {
+            keypad.retry(player, viewer);
         }
     }
 

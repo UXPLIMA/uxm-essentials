@@ -179,6 +179,8 @@ public final class ReauthController implements KeypadActions {
         notify(viewer, SecurityMessageKey.SECURITY_REAUTH_FAILED);
         if (reopenOnFailure) {
             reopenKeypad(player, viewer);
+        } else {
+            keypad.retry(player, viewer);
         }
     }
 

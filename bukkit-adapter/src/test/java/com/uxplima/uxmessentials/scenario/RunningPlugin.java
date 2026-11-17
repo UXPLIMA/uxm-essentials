@@ -12,6 +12,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.concurrent.CompletableFuture;
+import java.util.function.Consumer;
 import java.util.logging.Handler;
 import java.util.logging.Level;
 import java.util.logging.LogRecord;
@@ -122,7 +123,16 @@ final class RunningPlugin implements AutoCloseable {
 
     /** A player joining through pre-login, login and join, standing on the ground in the world. */
     ScenarioPlayer join(String name) {
+        return join(name, player -> {});
+    }
+
+    /**
+     * A player joining as above, with {@code beforeJoin} run on them first: what the server already knows of a player
+     * as they arrive, such as a permission or the client they connect from.
+     */
+    ScenarioPlayer join(String name, Consumer<ScenarioPlayer> beforeJoin) {
         ScenarioPlayer player = new ScenarioPlayer(server, name);
+        beforeJoin.accept(player);
         player.setLocation(world.getSpawnLocation());
         server.addPlayer(player);
         settle();

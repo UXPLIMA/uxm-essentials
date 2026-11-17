@@ -1987,6 +1987,7 @@ public final class PluginModule {
                 ctx,
                 persistence,
                 textInput,
+                Objects.requireNonNullElse(resources.bedrock(), BedrockDetector.NONE),
                 menus,
                 menuBindings,
                 lockoutBan,

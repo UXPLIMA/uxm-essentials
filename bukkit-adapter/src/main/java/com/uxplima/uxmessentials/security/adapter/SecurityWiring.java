@@ -46,6 +46,7 @@ import com.uxplima.uxmessentials.shared.application.module.KernelPorts;
 import com.uxplima.uxmessentials.shared.application.module.ModuleContext;
 import com.uxplima.uxmessentials.shared.application.port.IpHistoryStore;
 import com.uxplima.uxmessentials.shared.application.port.IpTokens;
+import com.uxplima.uxmlib.bedrock.BedrockDetector;
 import com.uxplima.uxmlib.gui.input.TextInput;
 import com.uxplima.uxmlib.menu.Menus;
 import com.uxplima.uxmlib.menu.binding.MenuBindings;
@@ -70,6 +71,7 @@ public final class SecurityWiring {
             ModuleContext ctx,
             Persistence persistence,
             TextInput textInput,
+            BedrockDetector bedrock,
             Menus menus,
             MenuBindings menuBindings,
             LockoutBan lockoutBan,
@@ -81,6 +83,7 @@ public final class SecurityWiring {
         Objects.requireNonNull(ctx, "ctx");
         Objects.requireNonNull(persistence, "persistence");
         Objects.requireNonNull(textInput, "textInput");
+        Objects.requireNonNull(bedrock, "bedrock");
         Objects.requireNonNull(menus, "menus");
         Objects.requireNonNull(menuBindings, "menuBindings");
         Objects.requireNonNull(lockoutBan, "lockoutBan");
@@ -142,7 +145,15 @@ public final class SecurityWiring {
         // both flows feel the same. The keypad plays the tap sound itself; the controller plays the outcomes.
         VerificationFeedback feedback =
                 new VerificationFeedback(config.feedback(), kernel.scheduler(), kernel.messages(), kernel.log());
-        PinKeypadView keypad = new PinKeypadView(menus, kernel.messages(), feedback, kernel.scheduler());
+        // A Bedrock player is shown menus as forms, which cannot carry a pad that redraws after each tap, so they
+        // type the whole entry into one text prompt instead; a Java player keeps the pad.
+        PinKeypadView keypad = new PinKeypadView(
+                menus,
+                new TextInputPinPrompt(textInput, bedrock),
+                sessions::isPending,
+                kernel.messages(),
+                feedback,
+                kernel.scheduler());
         FreezeGameMode freezeGameMode =
                 new FreezeGameMode(plugin, config.joinVerification().spectator());
         // The module's own two teleports (into the holding area and back out) announce themselves here, because the
@@ -281,7 +292,7 @@ public final class SecurityWiring {
                                 .isPresent(),
                         kernel.messages(),
                         kernel.messageSink()),
-                new PinKeypadWindowListener(menus, keypad, sessions),
+                new PinKeypadWindowListener(menus, keypad),
                 new ReauthCommandListener(
                         opProtection.enabled(), opProtection.policy(), reauthState, reauthController, clock),
                 new SecurityGuardListener(clientGuard, brands));

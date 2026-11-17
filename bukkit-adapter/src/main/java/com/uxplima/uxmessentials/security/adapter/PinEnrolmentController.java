@@ -121,7 +121,7 @@ public final class PinEnrolmentController implements KeypadActions {
         }
         sessions.rememberFirst(viewer.uuid(), candidate);
         notify(viewer, SecurityMessageKey.SECURITY_PIN_CREATE_CONFIRM);
-        keypad.ensureCreateOpen(player, viewer);
+        keypad.ensureCreateOpen(player, viewer, true);
     }
 
     /** The second entry. Only a match writes anything; a mismatch costs the attempt and starts over. */
@@ -157,11 +157,12 @@ public final class PinEnrolmentController implements KeypadActions {
     /**
      * Put the player back at the first step, still held until they produce a PIN. The submit that brought them here
      * already emptied the entry and redrew the pad, so the window they are looking at is the fresh one; it is only
-     * reopened if they are somehow no longer at it.
+     * reopened if they are somehow no longer at it. A player who types their entry has no pad to keep, so they are
+     * asked for a fresh first entry.
      */
     private void restart(Player player, PlayerRef viewer) {
         sessions.restart(viewer.uuid());
-        keypad.ensureCreateOpen(player, viewer);
+        keypad.ensureCreateOpen(player, viewer, false);
     }
 
     /** The refusal for {@code candidate} before it is ever stored, or null when the policy accepts it. */
