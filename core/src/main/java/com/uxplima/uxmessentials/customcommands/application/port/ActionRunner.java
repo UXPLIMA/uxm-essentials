@@ -16,8 +16,7 @@ public interface ActionRunner {
 
     /**
      * Run every step of {@code chain} for {@code actor}, resolving argument tokens from {@code arguments}: a step that
-     * runs a command line from {@link ChainArguments#forLine} only, every other step from
-     * {@link ChainArguments#typed()}.
+     * shows text from {@link ChainArguments#typed()}, every other step from {@link ChainArguments#forLine} only.
      */
     void run(PlayerRef actor, ActionChain chain, ChainArguments arguments);
 }

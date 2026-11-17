@@ -3,15 +3,17 @@
 What an operator edits when a release renames something an operator's own files or permission grants depend on, or
 needs a setting it did not need before.
 
-## Custom command arguments in command lines
+## Custom command arguments in actions
 
-A value a player types for a custom command now goes into a command line only when it fits what the argument allows
-there; a run that does not fit is refused with a message and runs nothing. In a `console`, `console-random`,
-`command-as-op` or `command-op` action every value, `%args%` included, must be one word: no spaces, no `@` selector,
-none of `{ } [ ] " ' \`, and no `%`. In a `command`, `command-random` or `commandevent` action, which the player runs
-as themselves, a `rest` argument and `%args%` may also hold spaces, so an `alias` keeps working. A command whose
-console line takes several words, such as `console:ban %arg_target% %arg_reason%`, needs `in-commands = "text"` on
-that argument:
+A value a player types for a custom command now goes into an action only when it fits what the argument allows there;
+a run that does not fit is refused with a message and runs nothing. Text actions (`broadcast`, `message`,
+`message-to`, `whisper`, `title`, `action-bar`, `toast`, `broadcast-json`, `broadcast-legacy`) show the value as
+words and take anything. In what the player runs or says as themselves (`command`, `command-random`, `commandevent`,
+`chat`), a `rest` argument and `%args%` may also hold spaces, so an `alias` keeps working. Every other action, such as
+`console`, `command-as-op`, `give`, `give-points`, `meta-set` or `connect`, takes each value, `%args%` included, as one
+word: no spaces, no `@` selector, none of `{ } [ ] " ' \`, and no `%`. An argument that has to hold several words
+there, such as the reason in `console:ban %arg_target% %arg_reason%`, needs `in-commands = "text"`, and still takes no
+line break or `%`:
 
 ```hocon
 arguments = [

@@ -31,7 +31,8 @@ class CustomCommandArgumentsScenarioTest {
             actions = ["console:herald gift-for-%arg_target%"]
             """;
 
-    // The same line written with the menu engine's own token, which the engine fills after our expansion.
+    // The same line with the menu engine's own token, which the engine fills after our expansion, and a space after
+    // the colon the way people write it.
     private static final String PRESENT = """
             command {
               name = "present"
@@ -41,7 +42,7 @@ class CustomCommandArgumentsScenarioTest {
             arguments = [
               { name = "target", type = player }
             ]
-            actions = ["console:herald present-for-%argument_target%"]
+            actions = ["console: herald present-for-%argument_target%"]
             """;
 
     // A JSON line with the typed value inside a string.

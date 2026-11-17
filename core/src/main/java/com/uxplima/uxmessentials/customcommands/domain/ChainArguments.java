@@ -7,9 +7,9 @@ import com.uxplima.uxmessentials.customcommands.domain.CommandLineArguments.Line
 
 /**
  * The values a run hands its action chain. {@code typed} is every argument as the player typed it, for actions that
- * show it as text or take it as a setting. {@code forPlayerLines} and {@code forPrivilegedLines} hold only the values
- * that may go into a command line the player runs, or the console or an operator runs (see
- * {@link CommandLineArguments}); a command line is never given anything else.
+ * show it as text. {@code forPlayerLines} and {@code forPrivilegedLines} hold only the values that may go into what the
+ * player runs or says as themselves, or into every other action (see {@link CommandLineArguments}); those actions are
+ * never given anything else.
  */
 public record ChainArguments(
         Map<String, String> typed, Map<String, String> forPlayerLines, Map<String, String> forPrivilegedLines) {
@@ -20,7 +20,7 @@ public record ChainArguments(
         forPrivilegedLines = Map.copyOf(Objects.requireNonNull(forPrivilegedLines, "forPrivilegedLines"));
     }
 
-    /** {@code typed} for a run of {@code command}, with its command lines limited to what its arguments allow there. */
+    /** {@code typed} for a run of {@code command}, with its actions limited to what its arguments allow there. */
     public static ChainArguments of(CustomCommand command, Map<String, String> typed) {
         return new ChainArguments(
                 typed,
@@ -28,7 +28,7 @@ public record ChainArguments(
                 CommandLineArguments.fitFor(Line.PRIVILEGED, command, typed));
     }
 
-    /** The values a command line run by {@code line} may use. */
+    /** The values an action acted on by {@code line} may use. */
     public Map<String, String> forLine(Line line) {
         return switch (line) {
             case PLAYER -> forPlayerLines;

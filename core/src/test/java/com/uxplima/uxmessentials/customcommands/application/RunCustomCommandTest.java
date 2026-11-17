@@ -150,7 +150,7 @@ class RunCustomCommandTest {
 
         RunOutcome outcome = runner.run(giving(), ALEX, false, Map.of("target", "@a", "args", "@a"));
 
-        assertThat(outcome).isEqualTo(new RunOutcome.ArgumentRefused("target"));
+        assertThat(outcome).isEqualTo(new RunOutcome.ArgumentRefused("target", false));
         assertThat(feedback.reported).containsExactly(outcome);
         assertThat(actions.runs).isZero();
         assertThat(purse.charged).isZero();

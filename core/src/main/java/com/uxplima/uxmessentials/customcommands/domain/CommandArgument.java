@@ -8,8 +8,8 @@ import java.util.Optional;
  * {@code %arg_<name>%}), the kind that decides how it is read, and three modifiers. {@code optional} lets a
  * trailing argument be left off, {@code rest} makes a final text argument capture the remaining input including
  * spaces, and the numeric bounds turn an out-of-range number into a syntax error before any action runs.
- * {@code textInCommands} lets the value into a console or operator command line as text rather than as a single word
- * (see {@link CommandLineArguments}).
+ * {@code textInCommands} lets the value into an action that acts with the plugin's authority as text rather than as
+ * a single word (see {@link CommandLineArguments}).
  *
  * <p>The record validates only what is true of a single argument. Rules that involve the whole list (optional
  * arguments must be trailing, a rest capture must be last) belong to {@link ArgumentList}, because a file is

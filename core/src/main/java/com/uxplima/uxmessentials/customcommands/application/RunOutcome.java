@@ -41,10 +41,10 @@ public sealed interface RunOutcome {
     }
 
     /**
-     * A value the actor typed for {@code argument} would go into a command line although it is not what that argument
-     * allows there, so nothing ran.
+     * A value the actor typed for {@code argument} would go into an action although it is not what that argument allows
+     * there, so nothing ran. {@code text} tells an argument held to the text rule from one held to a single word.
      */
-    record ArgumentRefused(String argument) implements RunOutcome {
+    record ArgumentRefused(String argument, boolean text) implements RunOutcome {
 
         public ArgumentRefused {
             Objects.requireNonNull(argument, "argument");

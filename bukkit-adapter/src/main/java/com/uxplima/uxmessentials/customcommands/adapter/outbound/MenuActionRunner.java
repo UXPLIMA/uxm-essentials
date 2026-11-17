@@ -109,7 +109,7 @@ public final class MenuActionRunner implements ActionRunner {
         }
         for (ActionStep step : chain.steps()) {
             Map<String, String> source = sourceFor(head(step.token()), arguments);
-            String token = expand(step.token(), source);
+            String token = withoutLeadingSpace(expand(step.token(), source));
             // The engine fills %argument_<name>% and %<name>% in the step from the values it is handed, so it is
             // handed them made ready for this step exactly as expand made its own.
             Map<String, String> values = forStep(head(step.token()), source);
@@ -185,6 +185,17 @@ public final class MenuActionRunner implements ActionRunner {
         return command.startsWith("/") ? command.substring(1) : command;
     }
 
+    /**
+     * {@code token} with the spaces after its colon removed: {@code console: say hi} is written for readability, and the
+     * engine hands an action everything after the colon, so the console would otherwise be asked to run {@code " say"}.
+     */
+    private static String withoutLeadingSpace(String token) {
+        int colon = token.indexOf(':');
+        return colon < 0
+                ? token
+                : token.substring(0, colon + 1) + token.substring(colon + 1).stripLeading();
+    }
+
     /** The value of an action token: everything after the first colon, or the empty string when it carries none. */
     private static String value(String token) {
         int colon = token.indexOf(':');
@@ -219,8 +230,8 @@ public final class MenuActionRunner implements ActionRunner {
     }
 
     /**
-     * The values a step with this {@code head} may use. A command line gets only those that passed the command's
-     * argument rules, so neither expand nor the engine can put any other typed value into a line the console runs.
+     * The values a step with this {@code head} may use. An action that acts on its value gets only those that passed
+     * the command's argument rules, so neither expand nor the engine can put any other typed value into it.
      */
     private static Map<String, String> sourceFor(String head, ChainArguments arguments) {
         return CommandLineArguments.lineOf(head).map(arguments::forLine).orElseGet(arguments::typed);

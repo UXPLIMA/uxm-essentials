@@ -30,7 +30,7 @@ import org.jspecify.annotations.Nullable;
 
 /**
  * Runs one operator-defined command through its gates, in the order the design fixes: sender kind, permission,
- * arguments going into command lines, chain depth, requirements, cooldown, warmup, cost, actions. Each gate produces
+ * arguments going into actions, chain depth, requirements, cooldown, warmup, cost, actions. Each gate produces
  * its own {@link RunOutcome}, and every outcome is reported through the feedback port exactly once, so the lines a
  * player reads and the order the gates run in can never drift apart.
  *
@@ -129,9 +129,13 @@ public final class RunCustomCommand {
             return report(actor, command, refused);
         }
         // Checked before anything is spent or run, so a refused value never leaves a chain half done.
-        Optional<String> unfit = CommandLineArguments.refused(command, arguments);
+        Optional<CommandLineArguments.Refusal> unfit = CommandLineArguments.refused(command, arguments);
         if (unfit.isPresent()) {
-            return report(actor, command, new RunOutcome.ArgumentRefused(unfit.get()));
+            return report(
+                    actor,
+                    command,
+                    new RunOutcome.ArgumentRefused(
+                            unfit.get().argument(), unfit.get().text()));
         }
         if (!depth.enter(actor.uuid())) {
             log.warn(
