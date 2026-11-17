@@ -13,10 +13,14 @@ Whether a target holds `uxmessentials.bypass.punishment` is read where the answe
   joins, leaves, and, with LuckPerms, whenever their permissions change, in `moderation_exempt_seen`.
 - For a player whose server did not answer, only a grant counts: anything else refuses the sanction, since that
   server's own operator list and permission plugin are not read here.
-- LuckPerms cannot tell for a player its storage never saw (storage not shared with the server they played on), nor
-  Vault for a player who never joined this server, since Vault asks by name. Then the record decides: a player some
-  server recorded, with no recorded grant, is not exempt. One no server recorded cannot be sanctioned from here; do it
-  from a server they played on.
+- An account that never joined (named by its uuid, or by its name on an offline-mode server) is read in LuckPerms
+  for the nodes an admin gave its uuid (`/lp user <uuid> permission set ...`), like any stored player. With no nodes
+  of its own it is read for what the `default` group grants, the group it joins into; the operator list counts too. A player who played only where another LuckPerms storage holds their grants
+  reads the same way, so share that storage, or let the record below speak for them.
+- Vault cannot tell for a player who never joined this server, since Vault asks by name. Then the record decides: a
+  player some server recorded, with no recorded grant, is not exempt. One no server recorded cannot be sanctioned from
+  here; do it from a server they played on, or install LuckPerms. Without LuckPerms or a Vault permission plugin, the
+  operator list and the record decide.
 
 The record is only as fresh as the player's last visit. An exemption granted while they are offline, in a permission
 store this server does not share, is not seen here until they join the server that has it; a grant removed while they

@@ -7,7 +7,10 @@ import java.util.concurrent.CompletableFuture;
 
 import net.luckperms.api.LuckPerms;
 import net.luckperms.api.LuckPermsProvider;
-import net.luckperms.api.model.user.User;
+import net.luckperms.api.model.PermissionHolder;
+import net.luckperms.api.model.group.Group;
+import net.luckperms.api.node.Node;
+import net.luckperms.api.node.types.InheritanceNode;
 import net.luckperms.api.query.QueryOptions;
 import net.luckperms.api.util.Tristate;
 import org.jspecify.annotations.NullMarked;
@@ -39,14 +42,37 @@ final class LuckPermsUsers implements LuckPermsNodeStore.Users {
                 .thenApply(user -> grants(user, node));
     }
 
-    /** Whether {@code user} holds {@code node} in any context, directly, through a group, or through a wildcard. */
-    private static boolean grants(User user, String node) {
+    @Override
+    public CompletableFuture<Boolean> holdsOwnNodes(UUID player) {
+        return luckPerms
+                .getUserManager()
+                .loadUser(Objects.requireNonNull(player, "player"))
+                .thenApply(user -> user.getNodes().stream().anyMatch(held -> !joinedIntoDefault(held)));
+    }
+
+    /** The membership of the {@code default} group LuckPerms adds to every user it loads. */
+    private static boolean joinedIntoDefault(Node held) {
+        return held instanceof InheritanceNode parent && parent.getGroupName().equals("default");
+    }
+
+    @Override
+    public CompletableFuture<Boolean> grantsNewcomers(String node) {
+        Objects.requireNonNull(node, "node");
+        // The default group is always loaded, so this reads memory; it still answers as a future like the user reads.
+        Group joinedInto = luckPerms.getGroupManager().getGroup("default");
+        return CompletableFuture.completedFuture(joinedInto != null && grants(joinedInto, node));
+    }
+
+    /**
+     * Whether {@code holder} holds {@code node} in any context, directly, through a group, or through a wildcard.
+     */
+    private static boolean grants(PermissionHolder holder, String node) {
         QueryOptions everywhere = QueryOptions.nonContextual();
-        if (user.getCachedData().getPermissionData(everywhere).checkPermission(node) == Tristate.TRUE) {
+        if (holder.getCachedData().getPermissionData(everywhere).checkPermission(node) == Tristate.TRUE) {
             return true;
         }
         // A denial in one context can hide a grant in another from the merged answer; any grant counts.
-        return user.resolveInheritedNodes(everywhere).stream()
+        return holder.resolveInheritedNodes(everywhere).stream()
                 .anyMatch(held -> held.getKey().equals(node) && held.getValue());
     }
 }
