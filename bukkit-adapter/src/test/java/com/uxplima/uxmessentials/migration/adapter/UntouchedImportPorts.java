@@ -13,7 +13,9 @@ import com.uxplima.uxmessentials.homes.domain.HomeSlot;
 import com.uxplima.uxmessentials.kits.application.port.KitRepository;
 import com.uxplima.uxmessentials.kits.domain.KitDefinition;
 import com.uxplima.uxmessentials.kits.domain.KitId;
+import com.uxplima.uxmessentials.migration.AccountNames;
 import com.uxplima.uxmessentials.migration.PlayerWarpRecordWriter;
+import com.uxplima.uxmessentials.migration.convert.map.ImportedAccount;
 import com.uxplima.uxmessentials.moderation.application.port.ModerationRepository;
 import com.uxplima.uxmessentials.moderation.domain.BanEntry;
 import com.uxplima.uxmessentials.moderation.domain.IpBan;
@@ -449,6 +451,19 @@ final class UntouchedImportPorts {
     }
 
     /** The kit claim table, which an import of players without kit claims never reads or writes. */
+    static final class Accounts implements AccountNames {
+
+        @Override
+        public boolean record(ImportedAccount account) {
+            throw touched();
+        }
+
+        @Override
+        public boolean holds(ImportedAccount account) {
+            throw touched();
+        }
+    }
+
     static final class KitClaims implements PlayerClaimLedger {
 
         @Override

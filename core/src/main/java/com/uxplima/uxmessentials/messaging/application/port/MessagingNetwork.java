@@ -2,11 +2,13 @@ package com.uxplima.uxmessentials.messaging.application.port;
 
 import com.uxplima.uxmessentials.messaging.application.RemoteAnswer;
 import com.uxplima.uxmessentials.messaging.application.RemoteHelpOp;
+import com.uxplima.uxmessentials.messaging.application.RemoteMail;
 import com.uxplima.uxmessentials.messaging.application.RemoteMessage;
 
 /**
  * Carries the messaging context's traffic to the other backends of a network: a private message to the backend its
- * target is on, that backend's answer, and a help request for the staff everywhere. A port because it crosses a
+ * target is on, that backend's answer, a help request for the staff everywhere, and the notice that mail arrived for a
+ * player who may be on another backend. A port because it crosses a
  * platform boundary (the cross-server bus) and is the seam the multi-backend tests drive with a fake.
  *
  * <p>Sending is fire-and-forget: a bus with no path to peers discards the traffic, so a message waiting for its
@@ -30,6 +32,11 @@ public interface MessagingNetwork {
         public void raise(RemoteHelpOp helpOp) {
             // No peers to reach.
         }
+
+        @Override
+        public void announce(RemoteMail mail) {
+            // No peers to reach.
+        }
     };
 
     /** Send {@code message} toward the backend its target is on. */
@@ -40,4 +47,7 @@ public interface MessagingNetwork {
 
     /** Show {@code helpOp} to the staff on every other backend. */
     void raise(RemoteHelpOp helpOp);
+
+    /** Tell the recipient of {@code mail}, wherever they are online, that it arrived. */
+    void announce(RemoteMail mail);
 }

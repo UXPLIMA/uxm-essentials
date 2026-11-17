@@ -32,6 +32,7 @@ import com.uxplima.uxmessentials.shared.adapter.inbound.gui.GuiLayout;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.GuiLayouts;
 import com.uxplima.uxmessentials.shared.adapter.outbound.log.AuditChannel;
 import com.uxplima.uxmessentials.shared.adapter.outbound.papi.ItemworldPlaceholders;
+import com.uxplima.uxmessentials.shared.adapter.outbound.skin.HeadTextures;
 import com.uxplima.uxmessentials.shared.application.module.KernelPorts;
 import com.uxplima.uxmessentials.shared.application.module.ModuleContext;
 import com.uxplima.uxmlib.gui.input.TextInput;
@@ -60,7 +61,10 @@ public final class ItemworldWiring {
 
     private ItemworldWiring() {}
 
-    /** Build the itemworld adapters from {@code ctx}, ready to register with the plugin. */
+    /**
+     * Build the itemworld adapters from {@code ctx}, ready to register with the plugin. {@code storedSkins} reads the
+     * skin module's stored skins at the moment {@code /skull} asks, so a module wired later still answers.
+     */
     public static Wired wire(
             Plugin plugin,
             ModuleContext ctx,
@@ -68,18 +72,21 @@ public final class ItemworldWiring {
             GuiLayouts guiLayouts,
             TextInput textInput,
             Menus menus,
-            MenuBindings menuBindings) {
+            MenuBindings menuBindings,
+            HeadTextures.StoredSkins storedSkins) {
         Objects.requireNonNull(plugin, "plugin");
         Objects.requireNonNull(ctx, "ctx");
         Objects.requireNonNull(guiLayouts, "guiLayouts");
         Objects.requireNonNull(textInput, "textInput");
         Objects.requireNonNull(menus, "menus");
         Objects.requireNonNull(menuBindings, "menuBindings");
+        Objects.requireNonNull(storedSkins, "storedSkins");
         KernelPorts kernel = ctx.kernel();
         ItemworldConfig config = ItemworldConfig.from(ctx.config());
         ItemworldAudit audit = new LoggingItemworldAudit(auditChannel.logger(), config);
         GuiLayout disposalLayout = guiLayouts.load("itemworld", "disposal", GuiLayout.storageDefault(DISPOSAL_ROWS));
-        ItemworldServices services = new ItemworldServices(kernel, audit, config, disposalLayout);
+        HeadTextures heads = new HeadTextures(kernel.playerLookup(), storedSkins, kernel.skins());
+        ItemworldServices services = new ItemworldServices(kernel, audit, config, disposalLayout, heads);
 
         PowertoolPolicy powertoolPolicy = new PowertoolPolicy();
         PurgePolicy purgePolicy = new PurgePolicy(config);

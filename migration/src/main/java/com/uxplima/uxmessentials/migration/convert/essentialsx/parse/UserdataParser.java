@@ -40,8 +40,12 @@ public final class UserdataParser {
     }
 
     private EssXUserdata parse(UUID uuid, ConfigurationNode root) {
-        String name =
-                root.node("lastAccountName").getString(root.node("nickname").getString(uuid.toString()));
+        // The nickname is what other players saw, often coloured or spaced; it is not a name anybody logs in under,
+        // so a file without lastAccountName is named by its uuid until the plan finds the account's name elsewhere.
+        String name = nonBlank(root.node("lastAccountName").getString()).orElse(uuid.toString());
+        ConfigurationNode timestamps = root.node("timestamps");
+        long lastSeen = Math.max(
+                timestamps.node("logout").getLong(0L), timestamps.node("login").getLong(0L));
         return new EssXUserdata(
                 uuid,
                 name,
@@ -49,7 +53,8 @@ public final class UserdataParser {
                 balance(root),
                 mail(root.node("mail")),
                 jailMute.parseUser(root),
-                kitTimestamps(root.node("timestamps", "kits")));
+                kitTimestamps(timestamps.node("kits")),
+                epochMillis(lastSeen));
     }
 
     private Map<String, Long> kitTimestamps(ConfigurationNode kitsNode) {

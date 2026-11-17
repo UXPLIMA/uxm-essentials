@@ -21,6 +21,7 @@ import com.uxplima.uxmessentials.shared.application.module.KernelPorts;
 import com.uxplima.uxmessentials.shared.application.module.ModuleContext;
 import com.uxplima.uxmessentials.skin.adapter.inbound.command.SkinCommand;
 import com.uxplima.uxmessentials.skin.adapter.inbound.listener.SkinLoginListener;
+import com.uxplima.uxmessentials.skin.adapter.outbound.FloodgateLinks;
 import com.uxplima.uxmessentials.skin.adapter.outbound.GeyserBedrockSkins;
 import com.uxplima.uxmessentials.skin.adapter.outbound.MineSkinUploads;
 import com.uxplima.uxmessentials.skin.adapter.outbound.PaperSkinView;
@@ -29,6 +30,7 @@ import com.uxplima.uxmessentials.skin.application.ClearSkin;
 import com.uxplima.uxmessentials.skin.application.DescribeSkin;
 import com.uxplima.uxmessentials.skin.application.DressLogin;
 import com.uxplima.uxmessentials.skin.application.DropSkin;
+import com.uxplima.uxmessentials.skin.application.NamedSkins;
 import com.uxplima.uxmessentials.skin.application.PurgeSkinCache;
 import com.uxplima.uxmessentials.skin.application.SetSkin;
 import com.uxplima.uxmessentials.skin.application.SkinConfig;
@@ -96,12 +98,15 @@ public final class SkinWiring {
                 new HttpClientFetcher(kernel.log()),
                 kernel.log(),
                 config.bedrockRetries(),
-                () -> config.bedrockSource() && !"none".equals(bedrock.backend()));
+                () -> config.bedrockSource() && !"none".equals(bedrock.backend()),
+                FloodgateLinks.of(server));
 
         DressLogin dressLogin = new DressLogin(repository, kernel.skins(), bedrockSkins, config, kernel.log());
+        NamedSkins names = new NamedSkins(kernel.playerLookup(), dressLogin, kernel.skins());
         SetSkin setSkin = new SetSkin(
                 repository,
                 kernel.skins(),
+                names,
                 uploads,
                 view,
                 kernel.permissions(),
@@ -112,8 +117,8 @@ public final class SkinWiring {
         SkinCommand command = new SkinCommand(
                 setSkin,
                 new ClearSkin(repository, dressLogin, view, kernel.events(), clock),
-                new UpdateSkin(repository, kernel.skins(), uploads, view, kernel.events(), clock),
-                new DropSkin(repository),
+                new UpdateSkin(repository, kernel.skins(), names, bedrockSkins, uploads, view, kernel.events(), clock),
+                new DropSkin(repository, dressLogin, view, kernel.playerLookup()),
                 new DescribeSkin(repository),
                 new PurgeSkinCache(kernel.skins()),
                 kernel.playerLookup(),

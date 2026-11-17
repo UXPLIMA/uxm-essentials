@@ -2,6 +2,8 @@ package com.uxplima.uxmessentials.shared.adapter.outbound.papi;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import java.nio.charset.StandardCharsets;
+import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.OptionalInt;
@@ -33,13 +35,29 @@ class BoardPlaceholdersTest {
     };
 
     private final BoardPlaceholders boards = new BoardPlaceholders(
-            PlaceholderContexts.builder().economy(new Balances()).build(), WORDS);
+            PlaceholderContexts.builder().economy(new Balances(LEADER)).build(), WORDS);
 
     @Test
     void aPlaceAnswersItsNameValueAndHead() {
         assertThat(boards.resolve(READER, "top_balance_alltime_1_name")).contains("Leader");
         assertThat(boards.resolve(READER, "top_balance_alltime_1_value")).contains(MoneyFormat.withSymbol(HELD));
         assertThat(boards.resolve(READER, "top_balance_alltime_1_head")).contains("Leader");
+    }
+
+    @Test
+    void aHolderMojangWouldDrawAsAStrangerGetsThePlainHead() {
+        PlayerRef offlineMode =
+                new PlayerRef(UUID.nameUUIDFromBytes("OfflinePlayer:Notch".getBytes(StandardCharsets.UTF_8)), "Notch");
+        PlayerRef floodgate = new PlayerRef(new UUID(0L, 0x0009_0000_1234L), "BE_Steve");
+
+        for (PlayerRef holder : List.of(offlineMode, floodgate)) {
+            BoardPlaceholders board = new BoardPlaceholders(
+                    PlaceholderContexts.builder().economy(new Balances(holder)).build(), WORDS);
+
+            assertThat(board.resolve(READER, "top_balance_alltime_1_head"))
+                    .as(holder.name())
+                    .contains(BoardPlaceholders.EMPTY_HEAD);
+        }
     }
 
     @Test
@@ -80,14 +98,20 @@ class BoardPlaceholdersTest {
     /** One leader holding 1200 coins. */
     private static final class Balances implements EconomyPlaceholders {
 
+        private final PlayerRef leader;
+
+        Balances(PlayerRef leader) {
+            this.leader = leader;
+        }
+
         @Override
         public Money balance(PlayerRef who) {
-            return who.equals(LEADER) ? HELD : Money.of(COINS, 0);
+            return who.equals(leader) ? HELD : Money.of(COINS, 0);
         }
 
         @Override
         public String formatted(PlayerRef who) {
-            return who.equals(LEADER) ? "1200" : "0";
+            return who.equals(leader) ? "1200" : "0";
         }
 
         @Override
@@ -97,7 +121,7 @@ class BoardPlaceholdersTest {
 
         @Override
         public OptionalInt baltopPosition(PlayerRef who) {
-            return who.equals(LEADER) ? OptionalInt.of(1) : OptionalInt.empty();
+            return who.equals(leader) ? OptionalInt.of(1) : OptionalInt.empty();
         }
 
         @Override
@@ -117,7 +141,7 @@ class BoardPlaceholdersTest {
 
         @Override
         public Optional<BaltopRow> baltopRow(Currency currency, int rank) {
-            return rank == 1 ? Optional.of(new BaltopRow(LEADER, HELD)) : Optional.empty();
+            return rank == 1 ? Optional.of(new BaltopRow(leader, HELD)) : Optional.empty();
         }
     }
 }
