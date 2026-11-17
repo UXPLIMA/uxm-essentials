@@ -22,8 +22,8 @@ import com.uxplima.uxmessentials.shared.domain.Unit;
  *
  * <p>This clears the persisted one-time mark held in PDC; it does not touch the cooldown clock, which expires
  * on its own. Resetting the one-time state is the operator's tool to let a player re-take a consumed
- * starter or donor kit. The target is addressed by {@link PlayerRef}; an offline target has no PDC to clear,
- * so the reset no-ops at the store while still reporting success to the operator.
+ * starter or donor kit. The target is addressed by {@link PlayerRef}, so a target who is offline is reached too: the
+ * claim store keeps the reset and applies it as they next join.
  */
 public final class KitReset {
 

@@ -1287,6 +1287,7 @@ public final class PluginModule {
         links.networkClaims = networkClaims;
         links.dailyRewards = networkClaims.map(claims -> ClaimLedgers.dailyRewards(persistence));
         links.claimLedger = ClaimLedgers.claims(persistence);
+        links.kitResets = ClaimLedgers.kitResets(persistence);
         links.livePeers = livePeers;
         links.proxyAnswering = () -> busHealth
                 .proxy()
@@ -2776,6 +2777,7 @@ public final class PluginModule {
                 Optional.ofNullable(links.kitEconomy),
                 links.networkClaims,
                 Objects.requireNonNull(links.claimLedger, "claimLedger"),
+                Objects.requireNonNull(links.kitResets, "kitResets"),
                 guiLayouts,
                 textInput,
                 menus,
@@ -4013,6 +4015,9 @@ public final class PluginModule {
         // for a player (an import's) into their PDC as they join.
         private com.uxplima.uxmessentials.shared.application.port.@org.jspecify.annotations.Nullable PlayerClaimLedger
                 claimLedger;
+        // The kit resets a single server keeps for a player who was offline, applied as they next join.
+        private com.uxplima.uxmessentials.kits.application.port.@org.jspecify.annotations.Nullable PendingKitResets
+                kitResets;
         private @org.jspecify.annotations.Nullable HomeEconomy homeEconomy;
         private com.uxplima.uxmessentials.vaults.application.port.@org.jspecify.annotations.Nullable VaultEconomy
                 vaultEconomy;
