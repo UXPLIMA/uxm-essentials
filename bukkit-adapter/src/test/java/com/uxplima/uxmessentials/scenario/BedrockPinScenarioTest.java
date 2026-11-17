@@ -23,7 +23,8 @@ import io.papermc.paper.event.player.AsyncChatEvent;
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.serializer.plain.PlainTextComponentSerializer;
 
-import org.geysermc.geyser.api.GeyserApi;
+import com.uxplima.uxmlib.bedrock.BedrockMenuChoice;
+import org.geysermc.cumulus.form.impl.FormDefinitions;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Tag;
@@ -35,9 +36,10 @@ import org.mockbukkit.mockbukkit.MockBukkit;
  * Players proving, creating and re-proving a PIN. The keypad window redraws itself after every tap, which a Bedrock
  * form cannot do, so a Bedrock player types the whole entry into one prompt instead; a Java player keeps the keypad.
  *
- * <p>The server runs Geyser without Floodgate, so there is no form screen and the prompt is the operator's mode for the
- * input point. Anvil is the default and the one a Geyser-only server ships with, so that is what these players type
- * into, while the verify point is set to chat: chat is refused for a PIN, so it must open as an anvil all the same.
+ * <p>The server runs Geyser without Floodgate. Geyser sends a Bedrock player forms, and one who keeps them answers the
+ * PIN in a form. Most players here chose chest menus over forms, so their prompt is the operator's mode for the input
+ * point. Anvil is the default and the one a Geyser-only server ships with, so that is what they type into, while the
+ * verify point is set to chat: chat is refused for a PIN, so it must open as an anvil all the same.
  */
 @Tag("integration")
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)
@@ -71,11 +73,13 @@ class BedrockPinScenarioTest {
 
     private static final int SUBMIT_SLOT = 33;
 
+    private static final GeyserServer GEYSER = GeyserServer.installed();
+
     private RunningPlugin running;
 
     @BeforeAll
     void start() {
-        GeyserApi.reset();
+        GEYSER.reset();
         running = RunningPlugin.start(Map.of("text-input.conf", TEXT_INPUT));
         MockBukkit.createMockPlugin("Geyser-Spigot");
     }
@@ -83,7 +87,7 @@ class BedrockPinScenarioTest {
     @AfterAll
     void stop() {
         running.close();
-        GeyserApi.reset();
+        GEYSER.reset();
     }
 
     @Test
@@ -133,7 +137,7 @@ class BedrockPinScenarioTest {
     @Test
     void aBedrockPlayerTheServerRequiresAPinFromCreatesOneByTypingItTwice() {
         ScenarioPlayer player = running.join("Cleo", joining -> {
-            GeyserApi.connect(joining.getUniqueId());
+            bedrockOnChests(joining);
             joining.addAttachment(running.plugin, "uxmessentials.security.pin.required", true);
         });
 
@@ -152,7 +156,7 @@ class BedrockPinScenarioTest {
     @Test
     void digitsFromAnotherScriptNeitherSlipPastTheBlockedListNorMakeAPinTheKeypadCannotEnter() {
         ScenarioPlayer player = running.join("Faye", joining -> {
-            GeyserApi.connect(joining.getUniqueId());
+            bedrockOnChests(joining);
             joining.addAttachment(running.plugin, "uxmessentials.security.pin.required", true);
         });
         said(player);
@@ -260,12 +264,13 @@ class BedrockPinScenarioTest {
     @Test
     void aBedrockCreateSessionLeftByAQuitCannotTakeTheNextVerificationsEntriesAsANewPin() {
         ScenarioPlayer first = running.join("Stella", joining -> {
-            GeyserApi.connect(joining.getUniqueId());
+            bedrockOnChests(joining);
             joining.addAttachment(running.plugin, "uxmessentials.security.pin.required", true);
         });
         assertThat(asked(first)).isTrue();
         running.quit(first);
-        ScenarioPlayer player = running.join("Stella");
+        // MockBukkit keeps no player data between joins, so the returning player makes the same choice again.
+        ScenarioPlayer player = running.join("Stella", BedrockPinScenarioTest::bedrockOnChests);
         running.run(player, "pin set " + PIN);
         running.console("security force Stella");
         said(player);
@@ -303,7 +308,7 @@ class BedrockPinScenarioTest {
     @Test
     void aPlayerWhoNeverCreatesTheRequiredPinIsLetGoByTheEntryTimeout() {
         ScenarioPlayer player = running.join("Tess", joining -> {
-            GeyserApi.connect(joining.getUniqueId());
+            bedrockOnChests(joining);
             joining.addAttachment(running.plugin, "uxmessentials.security.pin.required", true);
         });
         assertThat(asked(player)).isTrue();
@@ -333,6 +338,25 @@ class BedrockPinScenarioTest {
     }
 
     @Test
+    void aBedrockPlayerWhoKeepsFormsAnswersTheirPinInAForm() throws Exception {
+        ScenarioPlayer player = running.join("Fern", joining -> GEYSER.connect(joining.getUniqueId()));
+        running.run(player, "pin set " + PIN);
+        said(player);
+        int before = GEYSER.sent().size();
+
+        running.console("security force Fern");
+
+        List<GeyserServer.Sent> sent = GEYSER.sent();
+        assertThat(sent).hasSize(before + 1);
+        GeyserServer.Sent form = sent.getLast();
+        assertThat(form.player()).isEqualTo(player.getUniqueId());
+        assertThat(asked(player)).isFalse();
+        FormDefinitions.instance().definitionFor(form.form()).handleFormResponse(form.form(), "[\"" + PIN + "\"]");
+        running.settle();
+        assertThat(said(player)).anyMatch(line -> line.contains("verified. welcome back."));
+    }
+
+    @Test
     void aJavaPlayerStillTapsTheKeypad() {
         ScenarioPlayer player = running.join("Jade");
         running.run(player, "pin set " + PIN);
@@ -344,8 +368,14 @@ class BedrockPinScenarioTest {
         assertThat(said(player)).anyMatch(line -> line.contains("verified. welcome back."));
     }
 
+    /** Make {@code joining} a Bedrock player through Geyser who chose chest menus over forms. */
+    private static void bedrockOnChests(ScenarioPlayer joining) {
+        GEYSER.connect(joining.getUniqueId());
+        BedrockMenuChoice.onServer().write(joining, true);
+    }
+
     private ScenarioPlayer bedrockPlayerWithPin(String name) {
-        ScenarioPlayer player = running.join(name, joining -> GeyserApi.connect(joining.getUniqueId()));
+        ScenarioPlayer player = running.join(name, BedrockPinScenarioTest::bedrockOnChests);
         running.run(player, "pin set " + PIN);
         said(player);
         return player;

@@ -71,7 +71,7 @@ public final class MenuVocabulary {
                 "message",
                 ctx -> ctx.player()
                         .sendMessage(
-                                StyledText.render(HudText.lineFor(ctx.player().getUniqueId(), ctx.arg()))));
+                                StyledText.render(HudText.lineFor(ctx.player().getUniqueId(), ctx.textArg()))));
         bindings.action("sound", MenuVocabulary::playSound);
     }
 

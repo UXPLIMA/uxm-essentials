@@ -155,13 +155,16 @@ public final class MenuActionRunner implements ActionRunner {
                 continue;
             }
             Ref ref = Ref.parse(token);
+            // An action that shows text escapes what was typed when the engine fills it, so it is handed the values
+            // as typed; escaping them here as well would show the escapes.
+            Map<String, String> engine = STYLED_TEXT_HEADS.contains(head) ? source : values;
             // The engine spends a live player, so an action for somebody who has left is dropped rather than run
             // against a name, the same as the engine does when its own lookup misses.
             if (step.offset().isZero()) {
-                LivePlayers.of(actor).ifPresent(live -> menus.execute(live, ref, values));
+                LivePlayers.of(actor).ifPresent(live -> menus.execute(live, ref, engine));
             } else {
                 scheduler.asyncAfter(
-                        step.offset(), () -> LivePlayers.of(actor).ifPresent(live -> menus.execute(live, ref, values)));
+                        step.offset(), () -> LivePlayers.of(actor).ifPresent(live -> menus.execute(live, ref, engine)));
             }
         }
     }

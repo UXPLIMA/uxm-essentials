@@ -27,6 +27,8 @@ miniplaceholders = "3.2.0"
 squaremap = "1.3.13"
 dynmap = "3.7-beta-6"
 floodgate = "2.2.5-SNAPSHOT"
+geyser-base = "1.0.3"
+cumulus = "1.1.2"
 jakarta-xml-bind = "4.0.0"
 paperweight = "2.0.0-beta.22"
 
@@ -63,6 +65,8 @@ squaremap-api = { module = "xyz.jpenilla:squaremap-api", version.ref = "squarema
 dynmap-api = { module = "us.dynmap:dynmap-api", version.ref = "dynmap" }
 dynmap-core-api = { module = "us.dynmap:DynmapCoreAPI", version.ref = "dynmap" }
 floodgate-api = { module = "org.geysermc.floodgate:api", version.ref = "floodgate" }
+geyser-base-api = { module = "org.geysermc.api:base-api", version.ref = "geyser-base" }
+cumulus = { module = "org.geysermc.cumulus:cumulus", version.ref = "cumulus" }
 jakarta-xml-bind = { module = "jakarta.xml.bind:jakarta.xml.bind-api", version.ref = "jakarta-xml-bind" }
 
 [bundles]
