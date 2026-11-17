@@ -36,7 +36,7 @@ class JooqPlayerNameRepositoryTest {
         int added = names.addMissing(List.of(
                 new PlayerName(ALEX, "OldAlex", 100L),
                 new PlayerName(BEDROCK, ".BedrockGamer123", 100L),
-                new PlayerName(new UUID(0L, 3L), "a_name_longer_than_sixteen", 100L)));
+                new PlayerName(new UUID(0L, 3L), "x".repeat(65), 100L)));
 
         assertThat(added).isEqualTo(1);
         assertThat(names.count()).isEqualTo(2);
@@ -44,6 +44,20 @@ class JooqPlayerNameRepositoryTest {
                 .extracting(PlayerName::name)
                 .containsExactlyInAnyOrder("Alex", ".BedrockGamer123");
         assertThat(names.knownUuids()).containsExactlyInAnyOrder(ALEX, BEDROCK);
+    }
+
+    @Test
+    void aFloodgateNameLongerThanAJavaOneIsKeptWholeAndAUuidStandingInForANameIsNeverStored() {
+        String floodgate = ".Twenty_Char_Gamer_1";
+        UUID nameless = new UUID(0L, 6L);
+        names.upsert(new PlayerName(BEDROCK, floodgate, 100L));
+        names.upsert(new PlayerName(nameless, nameless.toString(), 100L));
+        names.addMissing(List.of(new PlayerName(new UUID(0L, 7L), new UUID(0L, 7L).toString(), 100L)));
+
+        assertThat(names.byUuid(BEDROCK)).contains(new PlayerName(BEDROCK, floodgate, 100L));
+        assertThat(names.underName(floodgate.toLowerCase(java.util.Locale.ROOT), 10))
+                .hasSize(1);
+        assertThat(names.knownUuids()).containsExactly(BEDROCK);
     }
 
     @Test

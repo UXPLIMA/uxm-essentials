@@ -41,6 +41,8 @@ import com.uxplima.uxmessentials.shared.adapter.outbound.style.StyledText;
 import com.uxplima.uxmessentials.shared.application.permission.ContentPermissions;
 import com.uxplima.uxmessentials.shared.application.port.MessageSink;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
+import com.uxplima.uxmessentials.shared.application.port.PlayerLookup;
+import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmessentials.shared.domain.message.MessageKey;
 import org.jspecify.annotations.Nullable;
 
@@ -98,6 +100,7 @@ public final class GuardRuntime {
     private final Clock clock;
     private final Consumer<String> audit;
     private final GuardStore store;
+    private final PlayerLookup players;
     private final org.bukkit.plugin.Plugin plugin;
     private final com.uxplima.uxmessentials.shared.application.port.Scheduler scheduler;
     private volatile GuardStats stats;
@@ -117,7 +120,8 @@ public final class GuardRuntime {
             Messages messages,
             MessageSink sink,
             Clock clock,
-            Consumer<String> audit) {
+            Consumer<String> audit,
+            PlayerLookup players) {
         this.plugin = Objects.requireNonNull(plugin, "plugin");
         this.scheduler = Objects.requireNonNull(scheduler, "scheduler");
         this.service = Objects.requireNonNull(service, "service");
@@ -126,6 +130,7 @@ public final class GuardRuntime {
         this.sink = Objects.requireNonNull(sink, "sink");
         this.clock = Objects.requireNonNull(clock, "clock");
         this.audit = Objects.requireNonNull(audit, "audit");
+        this.players = Objects.requireNonNull(players, "players");
         this.stats = new GuardStats(service.tree());
     }
 
@@ -133,7 +138,10 @@ public final class GuardRuntime {
         return plugin;
     }
 
-    /** Logged denials, newest first, after writing what is still buffered; read on the async lane. */
+    /**
+     * Logged denials, newest first, after writing what is still buffered; read on the async lane. A player is asked
+     * for by name and read by the account the name resolves to there, so case variants of a name stay apart.
+     */
     public java.util.concurrent.CompletableFuture<List<GuardStore.Denial>> denials(
             @Nullable String player, @Nullable String region, int offset, int limit) {
         java.util.concurrent.CompletableFuture<List<GuardStore.Denial>> future =
@@ -141,7 +149,11 @@ public final class GuardRuntime {
         scheduler.async(() -> {
             try {
                 flushLog();
-                future.complete(store.denials(player, region, offset, limit));
+                GuardStore.DenialPlayer whose = player == null
+                        ? null
+                        : new GuardStore.DenialPlayer(
+                                players.matchByName(player).player().map(PlayerRef::uuid), player);
+                future.complete(store.denials(whose, region, offset, limit));
             } catch (RuntimeException failure) {
                 future.completeExceptionally(failure);
             }
@@ -468,7 +480,15 @@ public final class GuardRuntime {
         alertIfRepeated(player, region, now);
         if (config().denialLog().enabled()) {
             pendingLog.add(new GuardStore.Denial(
-                    clock.instant(), player.getName(), index.world(), x, y, z, region, action.value()));
+                    clock.instant(),
+                    Optional.of(player.getUniqueId()),
+                    player.getName(),
+                    index.world(),
+                    x,
+                    y,
+                    z,
+                    region,
+                    action.value()));
         }
     }
 

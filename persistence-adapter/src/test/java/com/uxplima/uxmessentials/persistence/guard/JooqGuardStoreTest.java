@@ -9,6 +9,7 @@ import java.util.ArrayList;
 import java.util.EnumMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
 
@@ -138,15 +139,40 @@ class JooqGuardStoreTest {
         Instant old = Instant.parse("2029-01-01T00:00:00Z");
         Instant recent = Instant.parse("2030-01-01T00:00:00Z");
         store.logDenials(List.of(
-                new GuardStore.Denial(old, "Alex", "world", 1, 2, 3, "spawn", "break"),
-                new GuardStore.Denial(recent, "Sam", "world", 4, 5, 6, "spawn", "place")));
+                new GuardStore.Denial(old, Optional.empty(), "Alex", "world", 1, 2, 3, "spawn", "break"),
+                new GuardStore.Denial(recent, Optional.empty(), "Sam", "world", 4, 5, 6, "spawn", "place")));
 
-        assertThat(store.denials("Sam", null, 0, 10))
+        assertThat(store.denials(new GuardStore.DenialPlayer(Optional.empty(), "Sam"), null, 0, 10))
                 .extracting(GuardStore.Denial::action)
                 .containsExactly("place");
         store.pruneDenials(Instant.parse("2029-06-01T00:00:00Z"));
         assertThat(store.denials(null, null, 0, 10))
                 .extracting(GuardStore.Denial::player)
                 .containsExactly("Sam");
+    }
+
+    @Test
+    void twoAccountsWhoseNamesDifferOnlyInCaseKeepTheirOwnDenialsAndALongBedrockNameIsKeptWhole() {
+        UUID steve = UUID.fromString("00000000-0000-0000-0000-00000000005e");
+        UUID lowerSteve = UUID.fromString("00000000-0000-0000-0000-00000000005f");
+        UUID bedrock = UUID.fromString("00000000-0000-0000-0009-01f2a3b4c5d6");
+        String floodgate = ".Twenty_Char_Gamer_1";
+        Instant at = Instant.parse("2030-01-01T00:00:00Z");
+        store.logDenials(List.of(
+                new GuardStore.Denial(at, Optional.of(steve), "Steve", "world", 1, 2, 3, "spawn", "break"),
+                new GuardStore.Denial(at, Optional.of(lowerSteve), "steve", "world", 1, 2, 3, "spawn", "place"),
+                new GuardStore.Denial(at, Optional.empty(), "Steve", "world", 1, 2, 3, "spawn", "use"),
+                new GuardStore.Denial(at, Optional.of(bedrock), floodgate, "world", 1, 2, 3, "spawn", "break")));
+
+        assertThat(store.denials(new GuardStore.DenialPlayer(Optional.of(steve), "Steve"), null, 0, 10))
+                .as("the account's own, and the one logged by name before accounts were kept")
+                .extracting(GuardStore.Denial::action)
+                .containsExactlyInAnyOrder("break", "use");
+        assertThat(store.denials(new GuardStore.DenialPlayer(Optional.of(bedrock), floodgate), null, 0, 10))
+                .singleElement()
+                .satisfies(denial -> {
+                    assertThat(denial.player()).isEqualTo(floodgate);
+                    assertThat(denial.playerId()).contains(bedrock);
+                });
     }
 }

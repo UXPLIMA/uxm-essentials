@@ -94,7 +94,7 @@ public final class JailGuiFlow {
         return new PlayerPickerView.Request(
                 ModerationMessageKey.MOD_GUI_JAIL_HUB_TITLE,
                 target -> openChooser(viewer, viewerRef, target),
-                name -> services.targets().resolve(name),
+                name -> services.targets().resolveOrNeverJoined(name),
                 ModerationMessageKey.UNKNOWN_TARGET,
                 footers.buttons());
     }

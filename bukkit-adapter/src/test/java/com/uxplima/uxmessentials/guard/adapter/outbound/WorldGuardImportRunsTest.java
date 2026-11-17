@@ -205,7 +205,7 @@ class WorldGuardImportRunsTest {
         }
 
         @Override
-        public List<Denial> denials(@Nullable String player, @Nullable String region, int offset, int limit) {
+        public List<Denial> denials(@Nullable DenialPlayer player, @Nullable String region, int offset, int limit) {
             throw new AssertionError("the import reached the store");
         }
 

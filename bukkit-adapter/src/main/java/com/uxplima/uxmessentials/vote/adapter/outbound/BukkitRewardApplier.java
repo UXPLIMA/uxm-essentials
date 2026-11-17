@@ -1,6 +1,7 @@
 package com.uxplima.uxmessentials.vote.adapter.outbound;
 
 import java.time.Instant;
+import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
@@ -94,24 +95,46 @@ public final class BukkitRewardApplier implements RewardApplier {
         }
     }
 
+    @Override
+    public void queueAll(PlayerRef voter, List<RewardGrant> grants, Runnable afterQueued) {
+        Objects.requireNonNull(voter, "voter");
+        Objects.requireNonNull(afterQueued, "afterQueued");
+        List<RewardGrant> safeGrants = List.copyOf(grants);
+        // One async hop stores every grant in order and only then runs afterQueued, so whatever it starts sees all
+        // the rows. It runs even when a write failed: the rows already stored are still worth paying out now.
+        scheduler.async(() -> {
+            try {
+                safeGrants.forEach(grant -> store(voter, grant));
+            } finally {
+                afterQueued.run();
+            }
+        });
+    }
+
     private void queueOffline(PlayerRef voter, RewardGrant grant) {
+        if (grant.commands().isEmpty()) {
+            return;
+        }
+        // The count probe and the enqueue are both DB reads/writes, so they share one async hop.
+        scheduler.async(() -> store(voter, grant));
+    }
+
+    /** Store the commands of {@code grant} for an absent voter; runs off the tick. */
+    private void store(PlayerRef voter, RewardGrant grant) {
         // Only the commands are durable for an offline voter; the {player} token stays raw so the join-time
         // drain substitutes it then. Skip messages/broadcasts/items: there is no viewer and no inventory.
         if (grant.commands().isEmpty()) {
             return;
         }
-        // The count probe and the enqueue are both DB reads/writes, so they share one async hop. A capped
-        // queue at or over its limit drops only this batch's offline reward; the vote itself still counted.
-        scheduler.async(() -> {
-            if (offlineLimit > 0 && repository.queuedCount(voter) >= offlineLimit) {
-                log.debug(
-                        "event=vote_offline_reward_capped player={} limit={}",
-                        voter.name(),
-                        Integer.toString(offlineLimit));
-                return;
-            }
-            repository.enqueue(new QueuedReward(voter, grant.commands(), Instant.now()));
-        });
+        // A capped queue at or over its limit drops only this batch's offline reward; the vote itself still counted.
+        if (offlineLimit > 0 && repository.queuedCount(voter) >= offlineLimit) {
+            log.debug(
+                    "event=vote_offline_reward_capped player={} limit={}",
+                    voter.name(),
+                    Integer.toString(offlineLimit));
+            return;
+        }
+        repository.enqueue(new QueuedReward(voter, grant.commands(), Instant.now()));
     }
 
     private void applyOnline(PlayerRef voter, RewardGrant grant) {
