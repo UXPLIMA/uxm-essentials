@@ -26,6 +26,7 @@ import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandRegistrat
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.ManagementGuiEntry;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.ManagementGuiRegistry;
 import com.uxplima.uxmessentials.shared.adapter.outbound.bus.Bus;
+import com.uxplima.uxmessentials.shared.adapter.outbound.bus.StaffActions;
 import com.uxplima.uxmessentials.shared.adapter.outbound.event.InProcessDomainEventPublisher;
 import com.uxplima.uxmessentials.shared.adapter.outbound.lookup.VisibleNetwork;
 import com.uxplima.uxmessentials.shared.application.message.Notifier;
@@ -205,22 +206,27 @@ public final class StaffWiring {
         // The hub entry opens the same online-staff roster /stafflist opens, under the same node.
         guiRegistry.register(new ManagementGuiEntry(
                 "staff", StaffMessageKey.STAFF_LIST_TITLE, Material.SHIELD, STAFF_LIST_PERMISSION, staffList::open));
-        List<CommandRegistration> commands = List.of(
-                new StaffModeCommand(
-                        services,
-                        kernel.messages(),
-                        kernel.scheduler(),
-                        kernel.playerLookup(),
-                        () -> running.get() && adopted.get()),
-                new StaffChatCommand(services, kernel.messages()),
-                staffList);
+        // /staffmode on a player on another backend is carried there, where their inventory is held.
+        StaffActions staffActions = new StaffActions(bus.publisher());
+        StaffModeCommand staffMode = new StaffModeCommand(
+                services,
+                kernel.messages(),
+                kernel.scheduler(),
+                kernel.playerLookup(),
+                () -> running.get() && adopted.get(),
+                network,
+                staffActions);
+        bus.registry().register(staffMode.listener());
+        List<CommandRegistration> commands =
+                List.of(staffMode, new StaffChatCommand(services, kernel.messages()), staffList);
         List<Listener> listeners = List.of(
                 new StaffModeListener(services, gadgetItems, followService, actions),
                 new StaffJoinListener(services, repository, kernel.scheduler()));
 
         // Roster alerts are wired (and unsubscribed on stop) by StaffAlertWiring; they exist only when messaging is
         // enabled, and RecoverStaffLoadout publishes no toggle event, so a crash recovery on join never alerts.
-        @Nullable Consumer<DomainEvent> alertSubscriber = StaffAlertWiring.subscribe(seams, settings, kernel, events);
+        @Nullable Consumer<DomainEvent> alertSubscriber =
+                StaffAlertWiring.subscribe(seams, settings, kernel, events, bus, running::get);
         return new Wired(
                 commands, listeners, services, followService, kernel.scheduler(), running, events, alertSubscriber);
     }

@@ -19,9 +19,8 @@ import com.uxplima.uxmessentials.shared.domain.Unit;
  * and ends only with {@code /unfreeze}, a restart or a module reload. The exempt target cannot be frozen.
  *
  * <p>On a network both go through {@link NetworkFreeze}, which announces them: every backend holds the freeze, so a
- * switch of server does not escape it, and an unfreeze anywhere lifts it everywhere. A freeze on a target connected to
- * another backend is refused with that backend's name before anything is written: this backend cannot pin them. An
- * unfreeze always runs here, since lifting a freeze is safe wherever it is asked for.
+ * switch of server does not escape it, and an unfreeze anywhere lifts it everywhere. A target connected to another
+ * backend is frozen there when the announcement arrives, and the proxy keeps them on that backend.
  */
 public final class Freeze {
 
@@ -29,7 +28,6 @@ public final class Freeze {
     private final ModerationGuard guard;
     private final Notifier notifier;
     private final ModerationAudit audit;
-    private final LiveTargetCheck live;
 
     public Freeze(
             NetworkFreeze freezes,
@@ -41,16 +39,13 @@ public final class Freeze {
         this.guard = Objects.requireNonNull(guard, "guard");
         this.notifier = Objects.requireNonNull(notifier, "notifier");
         this.audit = Objects.requireNonNull(audit, "audit");
-        this.live = new LiveTargetCheck(presence, this.notifier);
+        Objects.requireNonNull(presence, "presence");
     }
 
     /** Freeze {@code target}, or refuse an exempt target. */
     public Result<Unit, ModerationError> freeze(PlayerRef actor, PlayerRef target) {
         Objects.requireNonNull(actor, "actor");
         Objects.requireNonNull(target, "target");
-        if (live.refusedElsewhere(actor, target)) {
-            return Result.err(ModerationError.TARGET_ELSEWHERE);
-        }
         if (guard.isExempt(target)) {
             audit.froze(actor, target, true, false);
             notifier.send(actor, ModerationError.TARGET_EXEMPT.messageKey());

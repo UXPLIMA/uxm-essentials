@@ -12,7 +12,7 @@ import io.papermc.paper.command.brigadier.Commands;
 import com.mojang.brigadier.Command;
 import com.mojang.brigadier.context.CommandContext;
 import com.mojang.brigadier.tree.LiteralCommandNode;
-import com.uxplima.uxmessentials.security.adapter.ClientBrandRegistry;
+import com.uxplima.uxmessentials.security.adapter.NetworkClientBrands;
 import com.uxplima.uxmessentials.security.domain.SecurityMessageKey;
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandRegistration;
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandSuggestions;
@@ -42,11 +42,11 @@ public final class ClientInfoCommand extends SecurityCommandSupport implements C
     /** The staff permission to inspect a player's reported client brand. */
     public static final String PERMISSION = EnforcementPermissions.SECURITY_CLIENTINFO;
 
-    private final ClientBrandRegistry registry;
+    private final NetworkClientBrands registry;
     private final PlayerLookup lookup;
 
     public ClientInfoCommand(
-            ClientBrandRegistry registry,
+            NetworkClientBrands registry,
             PlayerLookup lookup,
             Scheduler scheduler,
             Messages messages,
@@ -85,7 +85,11 @@ public final class ClientInfoCommand extends SecurityCommandSupport implements C
             return;
         }
         PlayerRef found = target.get();
-        Optional<String> brand = registry.brandOf(found.uuid());
+        // A player on another backend is asked about there; the answer arrives off the tick like this read.
+        var unused = registry.brandOf(found).thenAccept(brand -> tell(sender, found, brand));
+    }
+
+    private void tell(CommandSender sender, PlayerRef found, Optional<String> brand) {
         if (brand.isEmpty()) {
             notifySender(sender, SecurityMessageKey.SECURITY_CLIENT_UNKNOWN, Map.of("player", found.name()));
             return;

@@ -43,6 +43,7 @@ import com.uxplima.uxmessentials.moderation.adapter.outbound.StoredNameHolders;
 import com.uxplima.uxmessentials.moderation.adapter.outbound.api.ModerationApiWrites;
 import com.uxplima.uxmessentials.moderation.application.AddressFilter;
 import com.uxplima.uxmessentials.moderation.application.ApplyRemoteJail;
+import com.uxplima.uxmessentials.moderation.application.ApplyRemoteKick;
 import com.uxplima.uxmessentials.moderation.application.Ban;
 import com.uxplima.uxmessentials.moderation.application.BanIp;
 import com.uxplima.uxmessentials.moderation.application.CaseVariantAddresses;
@@ -247,6 +248,10 @@ public final class ModerationWiring {
                 new Notifier(kernel.messages(), kernel.messageSink()),
                 clock);
         bus.registry().register(ModerationSync.freezeListener(freezes::changedElsewhere));
+        // A kick staff issued on another backend for a player connected here is carried out here.
+        ApplyRemoteKick remoteKick =
+                new ApplyRemoteKick(sanctions, presence, new Notifier(kernel.messages(), kernel.messageSink()));
+        bus.registry().register(ModerationSync.kickListener(bus.publisher().serverId(), remoteKick::onKick));
         if (networked) {
             // This start dropped every freeze held here, so the proxy forgets the ones it kept for this server. The
             // bus starts on the first global tick, after every module is wired, and a task queued from that tick
@@ -627,7 +632,7 @@ public final class ModerationWiring {
                 settings.addressStrictness(),
                 ipHistory,
                 clock);
-        Kick kick = new Kick(sanctionPort, guard, notifier, audit, history, broadcast, presence);
+        Kick kick = new Kick(sanctionPort, guard, notifier, audit, history, broadcast, presence, sync);
         // /punish resolves a configured template to a preset reason + duration and dispatches to the same
         // audited ban/tempban use cases above, so no punish logic is duplicated.
         Punish punish = new Punish(new ResolveTemplate(settings.templates()), ban, tempBan, notifier);

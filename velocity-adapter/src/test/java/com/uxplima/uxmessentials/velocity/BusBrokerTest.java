@@ -109,6 +109,19 @@ class BusBrokerTest {
     }
 
     @Test
+    void aPlayerStaffFrozeFromAnotherBackendIsKeptOnTheServerTheyAreOn() {
+        UUID steve = new UUID(3L, 4L);
+        byte[] freeze = NetworkMessageCodec.encode(
+                new FreezeChanged("lobby-1", new UUID(5L, 6L), steve, "Steve", true, 1_000L, "survival-1"));
+
+        broker.relay(fromLobby(freeze));
+
+        assertThat(freezes.frozenOn(steve)).contains("survival-1");
+        assertThat(FrozenServerSwitch.decide(freezes.frozenOn(steve), "lobby-1", true))
+                .isInstanceOf(FrozenServerSwitch.Decision.Refuse.class);
+    }
+
+    @Test
     void aRestartOfTheServerThatFrozeAPlayerLetsThemMoveAndARestartElsewhereDoesNot() {
         UUID steve = new UUID(3L, 4L);
         UUID alex = new UUID(9L, 10L);

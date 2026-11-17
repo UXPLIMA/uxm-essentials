@@ -48,6 +48,8 @@ import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandRegistrat
 import com.uxplima.uxmessentials.shared.adapter.inbound.ip.IpHistoryRecorder;
 import com.uxplima.uxmessentials.shared.adapter.outbound.action.ServerConnector;
 import com.uxplima.uxmessentials.shared.adapter.outbound.bus.Bus;
+import com.uxplima.uxmessentials.shared.adapter.outbound.bus.RemoteSyncListener;
+import com.uxplima.uxmessentials.shared.adapter.outbound.bus.StaffActions;
 import com.uxplima.uxmessentials.shared.application.RelayAddresses;
 import com.uxplima.uxmessentials.shared.application.module.KernelPorts;
 import com.uxplima.uxmessentials.shared.application.module.ModuleContext;
@@ -134,8 +136,15 @@ public final class SecurityWiring {
         // holders and mirrors it to the log, and the client guard. Each guard self-gates on its own config flag;
         // the /ipalts and /clientinfo staff reads are published alongside the enrolment verbs.
         ClientBrandRegistry brands = new ClientBrandRegistry();
+        StaffActions staffActions = new StaffActions(network.bus().publisher());
         SecurityStaffNotifier staffNotifier = new SecurityStaffNotifier(
-                plugin.getServer(), kernel.scheduler(), kernel.messages(), kernel.messageSink(), kernel.log());
+                plugin.getServer(),
+                kernel.scheduler(),
+                kernel.messages(),
+                kernel.messageSink(),
+                kernel.log(),
+                staffActions);
+        network.bus().registry().register(staffNotifier.listener());
         IpGuardController ipGuardController = new IpGuardController(
                 ipHistory,
                 config.ipGuard(),
@@ -268,6 +277,17 @@ public final class SecurityWiring {
         // it, for a player who has lost their authenticator or forgotten their PIN.
         ForceReverification forceReverification = new ForceReverification(repository, trustStore, verifiedSessions);
         ResetFactors resetFactors = new ResetFactors(repository, trustStore, verifiedSessions);
+        // Their live half reaches a target on another backend: the backend holding the player carries it out.
+        NetworkVerification networkVerification = new NetworkVerification(controller, network.presence(), staffActions);
+        for (RemoteSyncListener listener : networkVerification.listeners()) {
+            network.bus().registry().register(listener);
+        }
+        // /clientinfo on a player on another backend asks that backend, which holds the brand their client reported.
+        NetworkClientBrands clientBrands =
+                new NetworkClientBrands(brands, network.presence(), staffActions, kernel.scheduler());
+        for (RemoteSyncListener listener : clientBrands.listeners()) {
+            network.bus().registry().register(listener);
+        }
 
         List<CommandRegistration> commands = List.of(
                 new TwoFactorCommand(
@@ -295,7 +315,7 @@ public final class SecurityWiring {
                         repository,
                         forceReverification,
                         resetFactors,
-                        controller,
+                        networkVerification,
                         carry,
                         kernel.playerLookup(),
                         kernel.log(),
@@ -305,7 +325,11 @@ public final class SecurityWiring {
                 new IpAltsCommand(
                         findAlts, kernel.playerLookup(), kernel.scheduler(), kernel.messages(), kernel.messageSink()),
                 new ClientInfoCommand(
-                        brands, kernel.playerLookup(), kernel.scheduler(), kernel.messages(), kernel.messageSink()));
+                        clientBrands,
+                        kernel.playerLookup(),
+                        kernel.scheduler(),
+                        kernel.messages(),
+                        kernel.messageSink()));
 
         // Op-command protection: a re-auth controller sharing the same keypad, a router that sends each
         // keypad submission to whichever flow the player is in, and the command listener that blocks a protected

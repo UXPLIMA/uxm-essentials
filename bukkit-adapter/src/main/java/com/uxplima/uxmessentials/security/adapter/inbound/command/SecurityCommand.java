@@ -15,7 +15,7 @@ import io.papermc.paper.command.brigadier.Commands;
 import com.mojang.brigadier.Command;
 import com.mojang.brigadier.context.CommandContext;
 import com.mojang.brigadier.tree.LiteralCommandNode;
-import com.uxplima.uxmessentials.security.adapter.VerificationController;
+import com.uxplima.uxmessentials.security.adapter.NetworkVerification;
 import com.uxplima.uxmessentials.security.application.FactorScope;
 import com.uxplima.uxmessentials.security.application.ForceReverification;
 import com.uxplima.uxmessentials.security.application.ForceReverification.ForceResult;
@@ -77,7 +77,7 @@ public final class SecurityCommand extends SecurityCommandSupport implements Com
     private final TwoFactorRepository repository;
     private final ForceReverification forceReverification;
     private final ResetFactors resetFactors;
-    private final VerificationController verification;
+    private final NetworkVerification verification;
     private final SessionCarry carry;
     private final PlayerLookup lookup;
     private final Logger log;
@@ -86,7 +86,7 @@ public final class SecurityCommand extends SecurityCommandSupport implements Com
             TwoFactorRepository repository,
             ForceReverification forceReverification,
             ResetFactors resetFactors,
-            VerificationController verification,
+            NetworkVerification verification,
             SessionCarry carry,
             PlayerLookup lookup,
             Logger log,
@@ -169,14 +169,15 @@ public final class SecurityCommand extends SecurityCommandSupport implements Com
     private int force(CommandContext<CommandSourceStack> ctx) {
         CommandSender sender = Sender.audience(ctx.getSource());
         String name = ctx.getArgument("player", String.class);
+        String operator = sender.getName();
         scheduler.async(() -> onTarget(sender, name, target -> {
             if (forceReverification.force(target.uuid()) == ForceResult.NOT_ENROLLED) {
                 notifySender(
                         sender, SecurityMessageKey.SECURITY_ADMIN_FORCE_NOT_ENROLLED, Map.of("player", target.name()));
                 return;
             }
-            // The trust is revoked (next join re-verifies); if the target is online now, freeze them immediately.
-            verification.forceReverify(target);
+            // The trust is revoked (next join re-verifies); a target online on any backend is frozen there now.
+            verification.forceReverify(target, operator);
             notifySender(sender, SecurityMessageKey.SECURITY_ADMIN_FORCE_DONE, Map.of("player", target.name()));
         }));
         return Command.SINGLE_SUCCESS;
@@ -207,6 +208,7 @@ public final class SecurityCommand extends SecurityCommandSupport implements Com
         CommandSender sender = Sender.audience(ctx.getSource());
         String name = ctx.getArgument("player", String.class);
         String scopeName = scope.name().toLowerCase(Locale.ROOT);
+        String operator = sender.getName();
         scheduler.async(() -> onTarget(sender, name, target -> {
             Map<String, String> placeholders = Map.of("player", target.name(), "factor", scopeName);
             if (resetFactors.reset(target.uuid(), scope) == ResetResult.NOTHING_TO_RESET) {
@@ -215,14 +217,10 @@ public final class SecurityCommand extends SecurityCommandSupport implements Com
             }
             // Staff removing someone's second factor without proving it is an auditable event, so it always lands in
             // the log with who did it, to whom, and how much was cleared.
-            log.info(
-                    "event=security_factor_reset operator={} target={} scope={}",
-                    sender.getName(),
-                    target.name(),
-                    scopeName);
-            // A target who is online right now has just had their second factor taken away underneath them. What that
-            // should mean for the session they are standing in is the operator's call, not ours.
-            verification.onAccessRevoked(target);
+            log.info("event=security_factor_reset operator={} target={} scope={}", operator, target.name(), scopeName);
+            // A target who is online right now, on any backend, has just had their second factor taken away underneath
+            // them. What that should mean for the session they are standing in is the operator's call, not ours.
+            verification.onAccessRevoked(target, operator);
             notifySender(sender, SecurityMessageKey.SECURITY_ADMIN_RESET_DONE, placeholders);
         }));
         return Command.SINGLE_SUCCESS;
