@@ -180,6 +180,13 @@ the server they are on, with the same safety snapshot first. It used to answer t
 Upgrade every server that shares the database in the same window: an older server neither applies a kept restore nor
 announces one.
 
+## /pay reaches players who are not online
+
+The update adds the `player_notices` table; nothing needs editing. `/pay` now pays a player who is offline or on
+another server, where it used to answer that the player was unknown. The receiver's own `/paytoggle`, the minimum
+and the confirm threshold apply as before. The line telling them they were paid waits in that table until they are
+next online.
+
 ## Velocity bus frames need a shared secret
 
 A network on `network.transport = "velocity"` or `"both"` now signs every frame it sends through the proxy, so a

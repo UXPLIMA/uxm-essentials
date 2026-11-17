@@ -60,6 +60,7 @@ class MariadbItemColumnsTest {
             "npc.display_name",
             "npc.skin_signature",
             "npc.skin_texture",
+            "player_notices.args",
             "player_skins.texture_sign",
             "player_skins.texture_value",
             "rank_pending_actions.action_line",

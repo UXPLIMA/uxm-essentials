@@ -41,6 +41,17 @@ public final class Notifier {
         send(viewer, line.key(), line.args());
     }
 
+    /**
+     * Resolve and deliver {@code line}, running {@code unreached} instead when it cannot reach {@code viewer}, as
+     * {@link MessageSink#deliver(PlayerRef, String, Runnable)} says.
+     */
+    public void send(PlayerRef viewer, MessageLine line, Runnable unreached) {
+        Objects.requireNonNull(viewer, "viewer");
+        Objects.requireNonNull(line, "line");
+        Objects.requireNonNull(unreached, "unreached");
+        sink.deliver(viewer, messages.resolve(viewer, line.key(), line.args()), unreached);
+    }
+
     /** Resolve and deliver {@code key} with no placeholders. */
     public void send(PlayerRef viewer, MessageKey key) {
         send(viewer, key, Map.of());

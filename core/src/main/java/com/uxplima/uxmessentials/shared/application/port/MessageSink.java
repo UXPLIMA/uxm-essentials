@@ -15,4 +15,14 @@ public interface MessageSink {
 
     /** Deliver an already-resolved MiniMessage source string to {@code viewer}. */
     void deliver(PlayerRef viewer, String renderedText);
+
+    /**
+     * {@link #deliver(PlayerRef, String)}, running {@code unreached} instead when the line cannot reach the viewer: they
+     * are not in the world here (still logging in, or gone) by the time it would be shown. For a line that must not be
+     * lost, so the caller can keep it. {@code unreached} may run on any thread. The default cannot tell and never runs
+     * it.
+     */
+    default void deliver(PlayerRef viewer, String renderedText, Runnable unreached) {
+        deliver(viewer, renderedText);
+    }
 }
