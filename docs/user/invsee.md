@@ -9,7 +9,13 @@ an operator can tell what happened when a message or a console line says an edit
 When the player is online on this server, the window shows their live inventory and the close applies to it.
 When they are not, the window reads their saved data from `players/data/<uuid>.dat` in the world folder, and the
 close writes the file. A player who joins while a staff member has their offline window open gets the edit on
-their live inventory instead.
+their live inventory instead. A player online on another server of the network is not opened: the command names
+the server they are on, since the file here is not what they carry now. A player vanished from the staff member
+opens as an offline player would.
+
+`/copyinv`, `/endercopy` and `/enderclear` reach the same saved data for a player who is not online here, with
+the same refusals. A container that was written by an older server version, or holds an item this server cannot
+read, is left as it is.
 
 The inventory window is editable with `uxmessentials.invsee.modify`; without it the window is view only. The
 ender chest window is always editable. Either way the window opens view only when:

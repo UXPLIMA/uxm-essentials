@@ -2912,7 +2912,9 @@ public final class PluginModule {
                         .find(com.uxplima.uxmessentials.api.query.UxmGuardQuery.class)
                         .flatMap(guard -> guard.behaviour(player.getUniqueId(), behaviour))
                         .filter("deny"::equals)
-                        .isPresent());
+                        .isPresent(),
+                links.presence,
+                PlayerArgument::mayLocate);
         wired.commands().forEach(resources::addCommand);
         wired.listeners().forEach(resources::addListener);
         wired.startBackgroundWork();
@@ -2935,6 +2937,11 @@ public final class PluginModule {
                         source));
         // Captured for staff (wired last), which binds its EXAMINE gadget to this /invsee open use case.
         links.staffOpenContainer = wired.services().openContainer();
+        // The item commands that copy or clear a container reach offline players through the same storage, which
+        // counts only while this module tracks who is joining.
+        links.offlineStorage = wired.offlineStorage();
+        resources.onClose(() -> links.offlineStorage =
+                com.uxplima.uxmessentials.playerstate.adapter.outbound.OfflinePlayerStorage.unavailable());
         // Captured so presence (wired later) rebinds the playtime sampler's AFK seam to its live store, so the
         // sampler splits active vs AFK seconds. Until then, or when presence is disabled, it counts all active.
         links.playtimeAfkStatus = wired.afkStatus();
@@ -3258,7 +3265,10 @@ public final class PluginModule {
                 textInput,
                 menus,
                 menuBindings,
-                account -> links.storedSkins.of(account));
+                account -> links.storedSkins.of(account),
+                links.presence,
+                PlayerArgument::mayLocate,
+                () -> links.offlineStorage);
         wired.commands().forEach(resources::addCommand);
         wired.listeners().forEach(resources::addListener);
         // Write back any still-open in-inventory shulker view before the module stops, so no edit is lost on disable.
@@ -4062,6 +4072,9 @@ public final class PluginModule {
 
     /** Cross-context handles captured during wiring so a dependent context reaches its prerequisite. */
     private static final class ContextLinks {
+        // The stored containers of players not on this server, while the playerstate module tracks their logins.
+        private volatile com.uxplima.uxmessentials.playerstate.adapter.outbound.OfflinePlayerStorage offlineStorage =
+                com.uxplima.uxmessentials.playerstate.adapter.outbound.OfflinePlayerStorage.unavailable();
         // The stored skins of the skin module, for a head drawn from a texture; none while that module is off.
         private volatile HeadTextures.StoredSkins storedSkins = HeadTextures.StoredSkins.none();
         // The peer backends live by their heartbeats; a cross-server trade invite waits for each to answer.

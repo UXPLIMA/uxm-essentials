@@ -1,7 +1,5 @@
 package com.uxplima.uxmessentials.playerstate.adapter.inbound.command;
 
-import java.util.Optional;
-
 import org.bukkit.entity.Player;
 
 import io.papermc.paper.command.brigadier.CommandSourceStack;
@@ -22,7 +20,7 @@ import org.jspecify.annotations.NullMarked;
 /**
  * {@code /endersee [player]} ({@code uxmessentials.endersee.use}): open a view of another player's ender chest in
  * your own screen, gated for a named target by the shared {@code uxmessentials.endersee.others} (or the cross-cutting {@code uxmessentials.playerstate.others}) node. The
- * target may be online (the live ender chest) or offline (read from their stored player data); the
+ * target may be online here (the live ender chest), on another server (the command names it) or offline (read from their stored player data); the
  * {@code OpenContainer} use case owns the open and the viewer confirmation, and the adapter routes by online
  * state.
  */
@@ -62,11 +60,8 @@ public final class EnderseeCommand extends PlayerstateCommandSupport implements 
         if (sender == null) {
             return 0;
         }
-        Optional<PlayerRef> target = resolveStorageTarget(ctx, sender);
-        if (target.isEmpty()) {
-            return 0;
-        }
-        services.openContainer().openEnderChest(ref(sender), target.get());
+        PlayerRef viewer = ref(sender);
+        resolveStorageTarget(ctx, sender, target -> services.openContainer().openEnderChest(viewer, target));
         return Command.SINGLE_SUCCESS;
     }
 }

@@ -2,8 +2,10 @@ package com.uxplima.uxmessentials.itemworld.adapter;
 
 import java.util.Objects;
 
+import com.uxplima.uxmessentials.itemworld.adapter.outbound.OfflineContainers;
 import com.uxplima.uxmessentials.itemworld.application.ItemworldConfig;
 import com.uxplima.uxmessentials.itemworld.application.port.ItemworldAudit;
+import com.uxplima.uxmessentials.shared.adapter.inbound.command.NetworkTargets;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.GuiLayout;
 import com.uxplima.uxmessentials.shared.adapter.outbound.skin.HeadTextures;
 import com.uxplima.uxmessentials.shared.application.module.KernelPorts;
@@ -26,6 +28,8 @@ import org.jspecify.annotations.NullMarked;
  * @param config the live, immutable {@code itemworld.conf} view (sub-feature-group + per-command gate, caps)
  * @param disposalLayout the externalised {@code /disposal} window layout (its row count) loaded once at wire time
  * @param heads the textures {@code /skull} draws a head with
+ * @param targets the off-tick, network-wide resolution for the verbs that name a player who may be offline
+ * @param offline the stored containers of players not on this server, for the verbs that copy or clear one
  */
 @NullMarked
 public record ItemworldServices(
@@ -33,7 +37,9 @@ public record ItemworldServices(
         ItemworldAudit audit,
         ItemworldConfig config,
         GuiLayout disposalLayout,
-        HeadTextures heads) {
+        HeadTextures heads,
+        NetworkTargets targets,
+        OfflineContainers offline) {
 
     public ItemworldServices {
         Objects.requireNonNull(kernel, "kernel");
@@ -41,5 +47,7 @@ public record ItemworldServices(
         Objects.requireNonNull(config, "config");
         Objects.requireNonNull(disposalLayout, "disposalLayout");
         Objects.requireNonNull(heads, "heads");
+        Objects.requireNonNull(targets, "targets");
+        Objects.requireNonNull(offline, "offline");
     }
 }
