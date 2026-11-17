@@ -141,6 +141,7 @@ public enum SecurityMessageKey implements MessageKey {
     // names somebody who is not on the list.
     SECURITY_OPERATORS_NOT_ALLOWED("security.operators.not-allowed"),
     SECURITY_OPERATORS_REFUSED("security.operators.refused"),
+    SECURITY_OPERATORS_OTHER_SPELLING("security.operators.other-spelling"),
 
     // IP/alt guard: the /alts header/entry/empty lines shown to staff, the staff notice raised when a
     // joining player shares an IP with other accounts, and the kick shown when an IP is over the account cap.

@@ -6,6 +6,7 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.UUID;
+import java.util.function.Supplier;
 
 import org.bukkit.OfflinePlayer;
 import org.bukkit.Server;
@@ -34,7 +35,10 @@ import org.jspecify.annotations.Nullable;
  * tick after any command runs and every few seconds besides. The list is swapped whole on reload.
  *
  * <p>On an offline-mode server a listed name matches only as spelled ({@link OperatorList}), and the server's user
- * cache, which matches any case, may vouch for a uuid only when the name it holds is the one typed.
+ * cache, which matches any case, may vouch for a uuid only when the name it holds is the one typed. An {@code /op}
+ * whose name an online player has only in another case is refused whether or not the list is on: the server finds
+ * the player by name in any case, so it would make that other account the operator. The name case is asked on every
+ * check, since a server can turn out to be offline-mode while it runs.
  */
 @NullMarked
 public final class OperatorLock {
@@ -50,7 +54,7 @@ public final class OperatorLock {
     private final Messages messages;
     private final MessageSink sink;
     private final Logger log;
-    private final NameCase names;
+    private final Supplier<NameCase> names;
     private volatile OperatorList list;
 
     public OperatorLock(
@@ -59,7 +63,7 @@ public final class OperatorLock {
             Messages messages,
             MessageSink sink,
             Logger log,
-            NameCase names,
+            Supplier<NameCase> names,
             OperatorList list) {
         this.server = Objects.requireNonNull(server, "server");
         this.scheduler = Objects.requireNonNull(scheduler, "scheduler");
@@ -81,7 +85,9 @@ public final class OperatorLock {
      */
     public boolean enforce(Player player) {
         OperatorList current = list;
-        if (!current.enabled() || !player.isOp() || current.permits(player.getUniqueId(), player.getName(), names)) {
+        if (!current.enabled()
+                || !player.isOp()
+                || current.permits(player.getUniqueId(), player.getName(), names.get())) {
             return false;
         }
         player.setOp(false);
@@ -100,15 +106,25 @@ public final class OperatorLock {
      * told why. A selector such as {@code @a} is refused outright, since it can name anybody.
      */
     public boolean refuses(CommandSender sender, String command) {
-        OperatorList current = list;
-        if (!current.enabled()) {
-            return false;
-        }
         Optional<String> target = opTarget(command);
-        if (target.isEmpty() || (!target.get().startsWith("@") && permitted(current, target.get()))) {
+        if (target.isEmpty()) {
             return false;
         }
         PlayerRef who = CommandFeedback.refOf(sender);
+        Optional<String> otherSpelling = onlineInAnotherCase(target.get());
+        if (otherSpelling.isPresent()) {
+            sink.deliver(
+                    who,
+                    messages.resolve(
+                            who,
+                            SecurityMessageKey.SECURITY_OPERATORS_OTHER_SPELLING,
+                            Map.of("player", target.get(), "online", otherSpelling.get())));
+            return true;
+        }
+        OperatorList current = list;
+        if (!current.enabled() || (!target.get().startsWith("@") && permitted(current, target.get()))) {
+            return false;
+        }
         sink.deliver(
                 who,
                 messages.resolve(who, SecurityMessageKey.SECURITY_OPERATORS_REFUSED, Map.of("player", target.get())));
@@ -138,14 +154,28 @@ public final class OperatorLock {
         }
     }
 
+    /**
+     * On an offline-mode server, the spelling of the online player the server's own {@code /op} would pick for
+     * {@code name} when it is not the one typed. The server looks a name up in any case, so it would make that other
+     * account the operator.
+     */
+    private Optional<String> onlineInAnotherCase(String name) {
+        if (name.startsWith("@") || names.get() != NameCase.SENSITIVE) {
+            return Optional.empty();
+        }
+        Player online = server.getPlayerExact(name);
+        return online == null || online.getName().equals(name) ? Optional.empty() : Optional.of(online.getName());
+    }
+
     private boolean permitted(OperatorList current, String name) {
+        NameCase nameCase = names.get();
         OfflinePlayer known = server.getOfflinePlayerIfCached(name);
         @Nullable UUID id = known == null ? null : known.getUniqueId();
-        if (names == NameCase.SENSITIVE && known != null && !name.equals(known.getName())) {
+        if (nameCase == NameCase.SENSITIVE && known != null && !name.equals(known.getName())) {
             // The cache matched another spelling, which is another account here.
             id = null;
         }
-        return current.permits(id, name, names);
+        return current.permits(id, name, nameCase);
     }
 
     /** The player an {@code /op} or {@code /namespace:op} command names, or empty for any other command. */
