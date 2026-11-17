@@ -46,6 +46,18 @@ public enum CustomCommandsMessageKey implements MessageKey {
     /** Gate 8: the command has a price, its currency backend is missing and the operator chose to refuse it. */
     CUSTOMCOMMAND_COST_UNAVAILABLE("customcommand.cost-unavailable"),
 
+    /**
+     * Gate 3: a typed value would go into an action as a single word, and it is not one; {@code {argument}} is the
+     * declared argument's name.
+     */
+    CUSTOMCOMMAND_ARGUMENT_REFUSED("customcommand.argument-refused"),
+
+    /**
+     * Gate 3: a typed value would go into an action as text, and it breaks the line or holds a {@code %};
+     * {@code {argument}} is the declared argument's name.
+     */
+    CUSTOMCOMMAND_ARGUMENT_REFUSED_TEXT("customcommand.argument-refused-text"),
+
     /** Header for the command listing; {@code {count}} is how many definitions loaded. */
     CUSTOMCOMMAND_LIST_HEADER("customcommand.list.header"),
 

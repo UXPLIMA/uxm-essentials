@@ -3,6 +3,7 @@ package com.uxplima.uxmessentials.customcommands.application;
 import java.time.Duration;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Optional;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicBoolean;
@@ -12,7 +13,9 @@ import com.uxplima.uxmessentials.customcommands.application.port.ActionRunner;
 import com.uxplima.uxmessentials.customcommands.application.port.CommandFee;
 import com.uxplima.uxmessentials.customcommands.application.port.RequirementCheck;
 import com.uxplima.uxmessentials.customcommands.application.port.RunFeedback;
+import com.uxplima.uxmessentials.customcommands.domain.ChainArguments;
 import com.uxplima.uxmessentials.customcommands.domain.ChainDepth;
+import com.uxplima.uxmessentials.customcommands.domain.CommandLineArguments;
 import com.uxplima.uxmessentials.customcommands.domain.CustomCommand;
 import com.uxplima.uxmessentials.customcommands.domain.CustomCommandId;
 import com.uxplima.uxmessentials.shared.application.ledger.CooldownTiers;
@@ -27,9 +30,9 @@ import org.jspecify.annotations.Nullable;
 
 /**
  * Runs one operator-defined command through its gates, in the order the design fixes: sender kind, permission,
- * chain depth, requirements, cooldown, warmup, cost, actions. Each gate produces its own {@link RunOutcome}, and
- * every outcome is reported through the feedback port exactly once, so the lines a player reads and the order the
- * gates run in can never drift apart.
+ * arguments going into actions, chain depth, requirements, cooldown, warmup, cost, actions. Each gate produces
+ * its own {@link RunOutcome}, and every outcome is reported through the feedback port exactly once, so the lines a
+ * player reads and the order the gates run in can never drift apart.
  *
  * <p>The cost is charged after the warmup completes, never before, so a warmup a player walks out of costs nothing
  * and no refund path is needed. The cooldown is stamped at the same moment the chain starts, so a run that was
@@ -125,6 +128,15 @@ public final class RunCustomCommand {
         if (refused != null) {
             return report(actor, command, refused);
         }
+        // Checked before anything is spent or run, so a refused value never leaves a chain half done.
+        Optional<CommandLineArguments.Refusal> unfit = CommandLineArguments.refused(command, arguments);
+        if (unfit.isPresent()) {
+            return report(
+                    actor,
+                    command,
+                    new RunOutcome.ArgumentRefused(
+                            unfit.get().argument(), unfit.get().text()));
+        }
         if (!depth.enter(actor.uuid())) {
             log.warn(
                     "custom command '{}' called itself past the allowed depth",
@@ -204,7 +216,7 @@ public final class RunCustomCommand {
             CustomCommand command, PlayerRef actor, Map<String, String> arguments, boolean dry) {
         if (!requirements.passes(actor, command.requirements(), arguments)) {
             if (!dry && !command.requirementDeny().isEmpty()) {
-                actions.run(actor, command.requirementDeny(), arguments);
+                actions.run(actor, command.requirementDeny(), ChainArguments.of(command, arguments));
             }
             return new RunOutcome.RequirementsFailed();
         }
@@ -315,7 +327,7 @@ public final class RunCustomCommand {
         if (waits(command, actor)) {
             cooldowns.stampLabel(actor, cooldownLabel(command.id()), command.cooldown());
         }
-        actions.run(actor, command.actions(), arguments);
+        actions.run(actor, command.actions(), ChainArguments.of(command, arguments));
         return new RunOutcome.Ok();
     }
 

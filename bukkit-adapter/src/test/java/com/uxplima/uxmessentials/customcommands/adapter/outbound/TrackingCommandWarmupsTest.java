@@ -21,6 +21,7 @@ import com.uxplima.uxmessentials.customcommands.application.port.ActionRunner;
 import com.uxplima.uxmessentials.customcommands.application.port.CommandFee;
 import com.uxplima.uxmessentials.customcommands.application.port.RunFeedback;
 import com.uxplima.uxmessentials.customcommands.domain.ActionChain;
+import com.uxplima.uxmessentials.customcommands.domain.ChainArguments;
 import com.uxplima.uxmessentials.customcommands.domain.ChainDepth;
 import com.uxplima.uxmessentials.customcommands.domain.CommandLiteral;
 import com.uxplima.uxmessentials.customcommands.domain.CustomCommand;
@@ -378,7 +379,7 @@ class TrackingCommandWarmupsTest {
         private int runs;
 
         @Override
-        public void run(PlayerRef actor, ActionChain chain, Map<String, String> arguments) {
+        public void run(PlayerRef actor, ActionChain chain, ChainArguments arguments) {
             runs++;
         }
     }

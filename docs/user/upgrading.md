@@ -3,6 +3,25 @@
 What an operator edits when a release renames something an operator's own files or permission grants depend on, or
 needs a setting it did not need before.
 
+## Custom command arguments in actions
+
+A value a player types for a custom command now goes into an action only when it fits what the argument allows there;
+a run that does not fit is refused with a message and runs nothing. Text actions (`broadcast`, `message`,
+`message-to`, `whisper`, `title`, `action-bar`, `toast`, `broadcast-json`, `broadcast-legacy`) show the value as
+words and take anything. In what the player runs or says as themselves (`command`, `command-random`, `commandevent`,
+`chat`), a `rest` argument and `%args%` may also hold spaces, so an `alias` keeps working. Every other action, such as
+`console`, `command-as-op`, `give`, `give-points`, `meta-set` or `connect`, takes each value, `%args%` included, as one
+word: no spaces, no `@` selector, none of `{ } [ ] " ' \`, and no `%`. An argument that has to hold several words
+there, such as the reason in `console:ban %arg_target% %arg_reason%`, needs `in-commands = "text"`, and still takes no
+line break or `%`:
+
+```hocon
+arguments = [
+  { name = "target", type = player }
+  { name = "reason", type = rest, in-commands = "text" }
+]
+```
+
 ## Text players write is shown as written
 
 A tag in text a player wrote is now shown as the words, never as styling or a click: a display name, a renamed weapon

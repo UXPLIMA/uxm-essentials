@@ -116,6 +116,9 @@ public final class CustomCommandWriter {
             if (argument.max().isPresent()) {
                 row.node("max").set(argument.max().get());
             }
+            if (argument.textInCommands()) {
+                row.node("in-commands").set("text");
+            }
         }
     }
 

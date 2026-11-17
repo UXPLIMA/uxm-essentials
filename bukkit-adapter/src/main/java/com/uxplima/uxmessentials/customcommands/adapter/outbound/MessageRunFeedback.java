@@ -43,6 +43,13 @@ public final class MessageRunFeedback implements RunFeedback {
             case RunOutcome.Ok ignored -> {}
             case RunOutcome.ConsoleDenied ignored -> send(who, CustomCommandsMessageKey.CUSTOMCOMMAND_CONSOLE_DENIED);
             case RunOutcome.NoPermission ignored -> denyPermission(who, command);
+            case RunOutcome.ArgumentRefused refused ->
+                send(
+                        who,
+                        refused.text()
+                                ? CustomCommandsMessageKey.CUSTOMCOMMAND_ARGUMENT_REFUSED_TEXT
+                                : CustomCommandsMessageKey.CUSTOMCOMMAND_ARGUMENT_REFUSED,
+                        Map.of("argument", refused.argument()));
             case RunOutcome.DepthExceeded ignored -> send(who, CustomCommandsMessageKey.CUSTOMCOMMAND_DEPTH_EXCEEDED);
             case RunOutcome.RequirementsFailed ignored -> requirementsFailed(who, command);
             case RunOutcome.OnCooldown onCooldown ->

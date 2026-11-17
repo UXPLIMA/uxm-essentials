@@ -8,6 +8,7 @@ import java.time.Duration;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Optional;
 import java.util.regex.Matcher;
 
@@ -15,7 +16,11 @@ import com.uxplima.uxmessentials.customcommands.application.port.ActionRunner;
 import com.uxplima.uxmessentials.customcommands.application.port.CommandFee;
 import com.uxplima.uxmessentials.customcommands.application.port.RunFeedback;
 import com.uxplima.uxmessentials.customcommands.domain.ActionChain;
+import com.uxplima.uxmessentials.customcommands.domain.ActionStep;
+import com.uxplima.uxmessentials.customcommands.domain.ArgumentKind;
+import com.uxplima.uxmessentials.customcommands.domain.ChainArguments;
 import com.uxplima.uxmessentials.customcommands.domain.ChainDepth;
+import com.uxplima.uxmessentials.customcommands.domain.CommandArgument;
 import com.uxplima.uxmessentials.customcommands.domain.CommandLiteral;
 import com.uxplima.uxmessentials.customcommands.domain.CustomCommand;
 import com.uxplima.uxmessentials.customcommands.domain.CustomCommandId;
@@ -31,6 +36,7 @@ import com.uxplima.uxmessentials.testing.FakePermissions;
 import com.uxplima.uxmessentials.testing.MemoryClaimLedger;
 import com.uxplima.uxmessentials.testing.QueuedScheduler;
 import com.uxplima.uxmessentials.testing.RecordingLogger;
+import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.Test;
 
 class RunCustomCommandTest {
@@ -139,6 +145,48 @@ class RunCustomCommandTest {
     }
 
     @Test
+    void aSelectorTypedForAConsoleLineIsRefusedBeforeAnythingIsSpentOrRun() {
+        RunCustomCommand runner = runner(FeeBackendPolicy.ALLOW);
+
+        RunOutcome outcome = runner.run(giving(), ALEX, false, Map.of("target", "@a", "args", "@a"));
+
+        assertThat(outcome).isEqualTo(new RunOutcome.ArgumentRefused("target", false));
+        assertThat(feedback.reported).containsExactly(outcome);
+        assertThat(actions.runs).isZero();
+        assertThat(purse.charged).isZero();
+        assertThat(runner.run(giving(), ALEX, false, Map.of("target", "Steve", "args", "Steve")))
+                .isInstanceOf(RunOutcome.Ok.class);
+    }
+
+    @Test
+    void aChainIsHandedOnlyTheValuesItsCommandLinesAllow() {
+        runner(FeeBackendPolicy.ALLOW).run(giving(), ALEX, false, Map.of("target", "Steve", "args", "Steve x"));
+
+        ChainArguments handed = Objects.requireNonNull(actions.last, "no chain ran");
+        assertThat(handed.typed()).containsEntry("args", "Steve x");
+        assertThat(handed.forPrivilegedLines()).containsOnly(Map.entry("target", "Steve"));
+    }
+
+    /** A priced command that gives the named player a diamond from the console. */
+    private static CustomCommand giving() {
+        return new CustomCommand(
+                CustomCommandId.of("gift"),
+                CommandLiteral.of("gift"),
+                Optional.empty(),
+                Optional.empty(),
+                true,
+                "",
+                Optional.empty(),
+                Duration.ZERO,
+                Duration.ZERO,
+                PRICE,
+                List.of(CommandArgument.of("target", ArgumentKind.PLAYER)),
+                List.of(),
+                ActionChain.empty(),
+                new ActionChain(List.of(ActionStep.now("console: give %arg_target% diamond 1")), List.of()));
+    }
+
+    @Test
     void denyStillChargesWhenTheBackendAnswers() {
         RunOutcome outcome = run(runner(FeeBackendPolicy.DENY));
 
@@ -215,9 +263,12 @@ class RunCustomCommandTest {
     private static final class Actions implements ActionRunner {
         int runs;
 
+        @Nullable ChainArguments last;
+
         @Override
-        public void run(PlayerRef actor, ActionChain chain, Map<String, String> arguments) {
+        public void run(PlayerRef actor, ActionChain chain, ChainArguments arguments) {
             runs++;
+            last = arguments;
         }
     }
 
