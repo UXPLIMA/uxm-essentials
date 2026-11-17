@@ -120,10 +120,9 @@ network {
   at most once a minute, and the doctor reads `REFUSED`. Keep every backend on the same secret and release, and their
   clocks in time. A client sending forged frames shows the same way.
 - The signed time also stops a captured frame from being replayed later. Within the 60 seconds, private messages,
-  staff chat, helpop, teleport requests, jails, presence, world changes, vote parties and votes paid on another
-  server carry an id and act once, trade signals are settled by the shared escrow, and a repeated cache update is
-  harmless. A vanish change carries no order, so without the proxy plugin a client could hold one back or repeat it
-  within that time.
+  staff chat, helpop, teleport requests, jails, presence, world changes, votes and vote parties carry an id and act
+  once, trade signals are settled by the shared escrow, and a repeated cache update is harmless. A vanish change
+  carries no order, so without the proxy plugin a client could hold one back or repeat it within that time.
 - Signing proves who sent a frame; it does not hide what a frame says. Without the proxy plugin, or on a backend
   players can join directly, the client carrying the frames can read them: private messages, staff chat, helpop and
   IP bans among them. Install the proxy plugin to keep them private.
