@@ -142,8 +142,11 @@ public final class IndexedPlayerLookup implements PlayerLookup {
             return NameMatch.ambiguous(typed, candidates.values());
         }
         if (!mayReadStore) {
-            // One account in another case, or none, and the store that would settle it cannot be read here.
-            return NameMatch.unknown();
+            // The store cannot be read here, but the index knows from memory whether the name has other holders: a
+            // lone account under a name nobody else holds is the one meant.
+            return candidates.size() == 1 && !index.shared(typed)
+                    ? NameMatch.found(candidates.values().iterator().next())
+                    : NameMatch.unknown();
         }
         for (PlayerRef stored : index.storedUnder(typed)) {
             candidates.putIfAbsent(stored.uuid(), stored);

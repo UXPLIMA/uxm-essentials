@@ -554,9 +554,10 @@ public final class PluginModule {
         // Who is connected, for the lookup port's online answers. The players already online are seeded here, on
         // the enable thread, so a plugin reload does not forget them.
         resources.addListener(new OnlinePlayerIndexListener(wiredKernel.online()));
+        // Only a completed join is evidence of an offline-mode network, never the players a reload finds online: a
+        // fake player another plugin keeps in the list carries a version 3 uuid on any server.
         resources.addListener(new NameCaseEvidenceListener(wiredKernel.nameCase()));
         for (Player online : plugin.getServer().getOnlinePlayers()) {
-            wiredKernel.nameCase().observe(online.getUniqueId(), online.getName());
             wiredKernel
                     .online()
                     .joined(com.uxplima.uxmessentials.shared.adapter.outbound.BukkitRefs.toRef(online), online);

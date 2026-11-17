@@ -31,6 +31,9 @@ class NetworkPresenceTest {
 
     private final MutableClock clock = new MutableClock(Instant.parse("2026-11-15T12:00:00Z"));
     private NameCase nameCase = NameCase.INSENSITIVE;
+    /** The lower-cased names more than one account holds, as the name index would answer. */
+    private final java.util.Set<String> sharedNames = new java.util.HashSet<>(java.util.Set.of("steve"));
+
     private final Backend lobby = new Backend("lobby-1");
     private final Backend survival = new Backend("survival-1");
 
@@ -56,6 +59,17 @@ class NetworkPresenceTest {
         assertThat(lobby.roster.findByName("steve")).contains(new OnlinePlayer(lowerSteve, "lobby-1"));
         assertThat(lobby.roster.findByName("STEVE")).isEmpty();
         assertThat(lobby.roster.matchByName("STEVE")).isInstanceOf(NameMatch.Ambiguous.class);
+    }
+
+    @Test
+    void offlineModeALonePlayerOnlineUnderANameNobodyElseHoldsIsFoundInAnyCase() {
+        nameCase = NameCase.SENSITIVE;
+        sharedNames.clear();
+        PlayerRef lowerSteve = new PlayerRef(UUID.randomUUID(), "steve");
+        lobby.track.joined(lowerSteve);
+        lobby.out.deliverAll(survival.track);
+
+        assertThat(survival.roster.findByName("Steve")).contains(new OnlinePlayer(lowerSteve, "lobby-1"));
     }
 
     @Test
@@ -347,7 +361,12 @@ class NetworkPresenceTest {
 
         Backend(String name) {
             this.out = new Outbox(name);
-            this.roster = new NetworkRoster(name, clock, LIVENESS, () -> nameCase);
+            this.roster = new NetworkRoster(
+                    name,
+                    clock,
+                    LIVENESS,
+                    () -> nameCase,
+                    wanted -> sharedNames.contains(wanted.toLowerCase(java.util.Locale.ROOT)));
             this.track = new TrackNetworkPresence(roster, out, names, clock);
         }
     }

@@ -24,8 +24,9 @@ how many rows were copied, and tables that already hold rows are left alone.
 
 A proxy in offline mode (a cracked network) makes `Steve` and `steve` two players, but a backend reads the proxy's
 mode from Paper's proxy settings, which default to online. With `lookup.name-case = "auto"` (the default) the first
-offline-mode login corrects that and logs `event=name_case_detected`; set `lookup.name-case = "sensitive"` in
-`config.conf` on every backend to have it right from the first login.
+offline-mode join corrects that, logs the warning `event=name_case_detected` and keeps it in `name-case.state` in the
+plugin folder, so the next start is right before anybody joins. Set `lookup.name-case = "sensitive"` in `config.conf`
+on every backend to have it right from the first join; `"insensitive"` forgets a kept switch.
 
 Every `network` key is read on start. A change needs a restart.
 

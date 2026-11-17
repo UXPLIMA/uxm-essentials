@@ -59,15 +59,19 @@ own name index (every account seen on any server of the database), then the serv
 server `Steve` and `steve` are two accounts with two uuids and Paper lets both play at once, so the indexes keep every
 account under a lower-cased name. A spelling that matches one account exactly is that account; a name several
 accounts hold only in other cases is answered with `command.ambiguous-player`, which lists the spellings, and never
-with one of them. A name one account holds in another case is that account only when the name store confirms nobody
-else holds it, since the memory keeps only the most recently seen names; the store is read off the tick only, so on
-the tick such a name answers unknown. The user cache matches any case and is held to the exact spelling. Online
-mode keeps one owner per name, the one seen last. Network presence follows the same rule, without the store.
+with one of them. A name one account holds in another case is that account only when nobody else holds it. Off the
+tick the name store confirms that, since the memory keeps only the most recently seen names. On the tick the index
+answers from the lower-cased names with more than one holder, read from the store at warm-up
+(`PlayerNameRepository.sharedNames`) and kept current as names are recorded and learned. The user cache matches any
+case and is held to the exact spelling. Online mode keeps one owner per name, the one seen last. Network presence
+follows the same rule, with the same shared names.
 
 Which mode applies is `LiveNameCase`, read on every question. `lookup.name-case` forces it; on `auto` it starts from
-the server's own report (`ServerNameCase`) and switches to sensitive at the first login with a version 3 (name
-derived) uuid, because a backend behind an offline-mode proxy still reports Paper's online proxy defaults.
-`NameCaseEvidenceListener` feeds it at pre-login, ahead of the login checks. The server's own by-name methods
+the server's own report (`ServerNameCase`) and switches to sensitive at the first completed join with a version 3
+(name derived) uuid, because a backend behind an offline-mode proxy still reports Paper's online proxy defaults.
+`NameCaseEvidenceListener` feeds it from `PlayerJoinEvent`, so a refused login and a fake player are no evidence, and a
+server with `online-mode=true` itself never switches. The switch is kept in `name-case.state` (`NameCaseStateFile`)
+and read at the next start; `insensitive` deletes it. The server's own by-name methods
 (`getPlayerExact`, `getOfflinePlayerIfCached`) match in any case and keep one entry per lower-cased name, so they
 cannot tell case variants apart; `OnlineByName` resolves a connected player through the lookup instead.
 
