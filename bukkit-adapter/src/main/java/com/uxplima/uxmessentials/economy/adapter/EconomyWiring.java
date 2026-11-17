@@ -250,11 +250,11 @@ public final class EconomyWiring {
                 sweptItems,
                 pendingCredits,
                 handOver,
-                new com.uxplima.uxmessentials.economy.adapter.outbound.ServerKnownPlayers(
+                new com.uxplima.uxmessentials.shared.adapter.outbound.lookup.ServerKnownPlayers(
                         plugin.getServer(),
                         kernel.scheduler(),
                         new com.uxplima.uxmessentials.persistence.lookup.JooqPlayerNameRepository(persistence.dsl()),
-                        kernel.log()));
+                        kernel.log())::recordAll);
         return assemble(
                 plugin,
                 ctx,

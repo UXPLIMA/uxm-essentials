@@ -112,6 +112,10 @@ public final class IndexedPlayerLookup implements PlayerLookup {
                 return NameMatch.found(connected.getLast());
             }
             List<PlayerRef> known = index.byName(name);
+            if (known.isEmpty() && mayReadStore) {
+                // Memory holds a window of accounts; the store holds every account any backend has seen.
+                known = index.storedUnder(name);
+            }
             return known.isEmpty() ? NameMatch.of(offline.byName(name)) : NameMatch.found(known.getFirst());
         }
         String typed = name.strip();
@@ -175,7 +179,13 @@ public final class IndexedPlayerLookup implements PlayerLookup {
     public Optional<PlayerRef> findByUuid(UUID uuid) {
         Objects.requireNonNull(uuid, "uuid");
         Optional<PlayerRef> connected = online.byUuid(uuid);
-        return connected.isPresent() ? connected : offline.byUuid(uuid);
+        if (connected.isPresent()) {
+            return connected;
+        }
+        // The index carries the name the account last joined under on any backend, which is newer than or equal to
+        // what this server's own profile cache remembers.
+        Optional<PlayerRef> known = onTick.getAsBoolean() ? index.byUuid(uuid) : index.storedByUuid(uuid);
+        return known.isPresent() ? known : offline.byUuid(uuid);
     }
 
     @Override
