@@ -8,15 +8,12 @@ import java.util.Optional;
 import com.uxplima.uxmessentials.messaging.application.port.AfkStatus;
 import com.uxplima.uxmessentials.messaging.application.port.ConversationStore;
 import com.uxplima.uxmessentials.messaging.application.port.IgnoreStore;
-import com.uxplima.uxmessentials.messaging.application.port.MailRepository;
 import com.uxplima.uxmessentials.messaging.application.port.MessageDelivery;
 import com.uxplima.uxmessentials.messaging.application.port.MessageToggleStore;
 import com.uxplima.uxmessentials.messaging.application.port.MutePolicy;
 import com.uxplima.uxmessentials.messaging.application.port.SocialSpyStore;
 import com.uxplima.uxmessentials.messaging.domain.IgnoreChannel;
 import com.uxplima.uxmessentials.messaging.domain.LastConversation;
-import com.uxplima.uxmessentials.messaging.domain.MailItem;
-import com.uxplima.uxmessentials.messaging.domain.MailSender;
 import com.uxplima.uxmessentials.messaging.domain.MessageBody;
 import com.uxplima.uxmessentials.messaging.domain.MessagingError;
 import com.uxplima.uxmessentials.messaging.domain.MessagingMessageKey;
@@ -47,9 +44,9 @@ import com.uxplima.uxmessentials.shared.domain.Unit;
  * only on a genuine delivery, never on a silently-dropped ignore: telling the sender "they're AFK" there
  * would leak that the (ignoring) target is online, breaking the ignore-is-not-observable contract.
  * <strong>Offline → mail fallback:</strong> when the caller reports the target is offline and the
- * {@code offlineToMail} policy is on, the message is stored as durable mail (the {@link MailRepository}
- * append path {@link SendMail} uses) and the sender is told it became mail; with the policy off the existing
- * {@code TARGET_OFFLINE} rejection stands.
+ * {@code offlineToMail} policy is on, the message is left as mail through {@link SendMail}, which drops it when
+ * the target ignores the sender, and the sender is told it became mail either way; with the policy off the
+ * existing {@code TARGET_OFFLINE} rejection stands.
  *
  * <p><strong>Vanish privacy is untouched.</strong> A vanished target the sender cannot see is routed by the
  * command adapter ({@code MsgCommand}) through the same {@code targetOnline=false} offline path as a genuinely
@@ -71,7 +68,7 @@ public final class SendMessage {
     private final SocialSpyStore socialSpy;
     private final MutePolicy mute;
     private final AfkStatus afk;
-    private final MailRepository mail;
+    private final SendMail mail;
     private final boolean offlineToMail;
     private final Notifier notifier;
     private final DomainEventPublisher events;
@@ -85,7 +82,7 @@ public final class SendMessage {
             SocialSpyStore socialSpy,
             MutePolicy mute,
             AfkStatus afk,
-            MailRepository mail,
+            SendMail mail,
             boolean offlineToMail,
             Notifier notifier,
             DomainEventPublisher events,
@@ -141,8 +138,8 @@ public final class SendMessage {
         if (!offlineToMail) {
             return reject(sender, MessagingError.TARGET_OFFLINE);
         }
-        mail.append(MailItem.compose(target, MailSender.player(sender), body, clock.instant()));
         notifier.send(sender, MessagingMessageKey.MSG_SENT_TO_MAIL, Map.of("player", target.name()));
+        mail.fromMessage(sender, target, body);
         return Result.ok();
     }
 
