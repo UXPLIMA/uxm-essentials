@@ -3,6 +3,8 @@ package com.uxplima.uxmessentials.shared.network;
 import java.util.Objects;
 import java.util.UUID;
 
+import com.uxplima.uxmessentials.shared.domain.PresenceTraits;
+
 /**
  * A player joined or left the origin backend. Presence has no shared table, so like {@link VanishStateChanged} this
  * frame carries the value itself: the player, the name they are connected under, and whether they are now online
@@ -20,15 +22,25 @@ import java.util.UUID;
  * @param player the player who joined or left
  * @param playerName the name the player is connected under
  * @param online {@code true} for a join, {@code false} for a quit
+ * @param traits how deep the player is hidden and whether they are staff; a join is sent again when they change. On
+ *     the wire they follow every other field, so an older peer reads the frame without them, and a frame from an
+ *     older peer decodes with {@link PresenceTraits#UNKNOWN}
  */
 public record PresenceChanged(
-        String originServer, long session, long sequence, UUID player, String playerName, boolean online)
+        String originServer,
+        long session,
+        long sequence,
+        UUID player,
+        String playerName,
+        boolean online,
+        PresenceTraits traits)
         implements NetworkMessage {
 
     public PresenceChanged {
         Objects.requireNonNull(originServer, "originServer");
         Objects.requireNonNull(player, "player");
         Objects.requireNonNull(playerName, "playerName");
+        Objects.requireNonNull(traits, "traits");
     }
 
     @Override

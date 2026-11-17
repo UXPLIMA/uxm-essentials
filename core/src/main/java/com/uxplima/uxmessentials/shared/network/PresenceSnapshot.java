@@ -5,6 +5,8 @@ import java.util.List;
 import java.util.Objects;
 import java.util.UUID;
 
+import com.uxplima.uxmessentials.shared.domain.PresenceTraits;
+
 /**
  * One part of the roster of the origin backend: every player connected to it, sent with each heartbeat and when the
  * origin starts. It is what repairs a peer's presence view after a lost {@link PresenceChanged} or a peer restart:
@@ -46,8 +48,8 @@ public record PresenceSnapshot(
     /** What a part costs before its first member: version, tag, the numbers and the member count. */
     private static final int FIXED_BYTES = 1 + 1 + Long.BYTES + Long.BYTES + 1 + Integer.BYTES * 3;
 
-    /** What a member costs besides its name: the two longs of its account id. */
-    private static final int MEMBER_BYTES = Long.BYTES * 2;
+    /** What a member costs besides its name: the two longs of its account id, and its traits. */
+    private static final int MEMBER_BYTES = Long.BYTES * 2 + NetworkMessageCodec.TRAITS_BYTES;
 
     public PresenceSnapshot {
         Objects.requireNonNull(originServer, "originServer");
@@ -103,12 +105,16 @@ public record PresenceSnapshot(
      *
      * @param player the player's account id
      * @param name the name the player is connected under
+     * @param traits how deep the player is hidden and whether they are staff; on the wire every member's traits follow
+     *     the last member, so an older peer reads the roster without them, and a roster from an older peer decodes
+     *     with {@link PresenceTraits#UNKNOWN}
      */
-    public record Member(UUID player, String name) {
+    public record Member(UUID player, String name, PresenceTraits traits) {
 
         public Member {
             Objects.requireNonNull(player, "player");
             Objects.requireNonNull(name, "name");
+            Objects.requireNonNull(traits, "traits");
         }
     }
 }

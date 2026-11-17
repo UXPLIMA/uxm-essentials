@@ -15,8 +15,10 @@ import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
 
+import com.uxplima.uxmessentials.shared.application.port.NetworkPresence;
 import com.uxplima.uxmessentials.shared.application.port.PlayerLookup;
 import com.uxplima.uxmessentials.shared.application.port.WorldLookup;
+import com.uxplima.uxmessentials.shared.domain.OnlinePlayer;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmessentials.shared.domain.Position;
 import com.uxplima.uxmessentials.shared.domain.WorldRef;
@@ -31,6 +33,7 @@ import com.uxplima.uxmessentials.testing.MutableClock;
 import com.uxplima.uxmessentials.testing.QueuedScheduler;
 import com.uxplima.uxmessentials.testing.QuietLog;
 import com.uxplima.uxmessentials.testing.RecordingNotifier;
+import org.assertj.core.groups.Tuple;
 import org.junit.jupiter.api.Test;
 
 /**
@@ -45,6 +48,7 @@ class OfflineTeleportTest {
     private final SavedData saved = new SavedData();
     private final Relocations relocations = new Relocations();
     private final Players players = new Players();
+    private final Roster roster = new Roster();
     private final Hidden hidden = new Hidden();
     private final Moves moves = new Moves();
     private final QueuedScheduler scheduler = new QueuedScheduler();
@@ -58,6 +62,7 @@ class OfflineTeleportTest {
                 saved,
                 relocations,
                 players,
+                roster,
                 new Worlds(),
                 hidden,
                 who -> jailed,
@@ -202,6 +207,39 @@ class OfflineTeleportTest {
         assertThat(saved.reads).isZero();
         assertThat(relocations.stored).isEmpty();
         assertThat(notifier.keys()).containsExactly("teleport.tpoffline.online", "teleport.tpoffline.online");
+    }
+
+    @Test
+    void aPlayerOnlineOnAnotherServerIsNamedWithItAndNeitherReadNorStored() {
+        saved.spots.put(SAM.uuid(), LogoutPositions.SavedSpot.inWorld(WORLD.uid(), 0, 64, 0, 0f, 0f));
+        roster.online.put(SAM.uuid(), new OnlinePlayer(SAM, "lobby"));
+
+        offline.goTo(ALEX, "Sam");
+        offline.bring(ALEX, "Sam", HERE);
+        scheduler.runAll();
+
+        assertThat(saved.reads).isZero();
+        assertThat(relocations.stored).isEmpty();
+        assertThat(notifier.sent())
+                .extracting(RecordingNotifier.Sent::key, RecordingNotifier.Sent::placeholders)
+                .containsExactly(
+                        Tuple.tuple("teleport.tpoffline.elsewhere", Map.of("player", "Sam", "server", "lobby")),
+                        Tuple.tuple("teleport.tpoffline.elsewhere", Map.of("player", "Sam", "server", "lobby")));
+    }
+
+    @Test
+    void aPlayerVanishedOnAnotherServerIsHandledAsOfflineForStaffWhoCannotSeeThem() {
+        saved.spots.put(SAM.uuid(), LogoutPositions.SavedSpot.inWorld(WORLD.uid(), 1.5, 64, 1.5, 0f, 0f));
+        roster.online.put(SAM.uuid(), new OnlinePlayer(SAM, "lobby"));
+        hidden.elsewhere.add(SAM);
+
+        offline.goTo(ALEX, "Sam");
+        offline.bring(ALEX, "Sam", HERE);
+        scheduler.runAll();
+
+        assertThat(moves.moved).containsExactly(new Move(ALEX, at(1.5, 64, 1.5, 0f, 0f)));
+        assertThat(relocations.stored).hasSize(1);
+        assertThat(notifier.keys()).containsExactly("teleport.tp.done", "teleport.tpoffline.moved");
     }
 
     @Test
@@ -464,6 +502,7 @@ class OfflineTeleportTest {
     private static final class Hidden implements RequestVisibility {
 
         final Set<PlayerRef> fromAlex = new HashSet<>();
+        final Set<PlayerRef> elsewhere = new HashSet<>();
 
         @Override
         public int seeLevel(PlayerRef viewer) {
@@ -477,7 +516,42 @@ class OfflineTeleportTest {
 
         @Override
         public boolean hiddenElsewhere(PlayerRef target, int viewerSeeLevel) {
-            return false;
+            return elsewhere.contains(target);
+        }
+    }
+
+    /** Who is online on which server of the network; this one is {@code survival}. */
+    private static final class Roster implements NetworkPresence {
+
+        final Map<UUID, OnlinePlayer> online = new HashMap<>();
+
+        @Override
+        public String localServer() {
+            return SURVIVAL;
+        }
+
+        @Override
+        public Optional<OnlinePlayer> find(UUID player) {
+            return Optional.ofNullable(online.get(player));
+        }
+
+        @Override
+        public Optional<OnlinePlayer> findByName(String name) {
+            return online.values().stream()
+                    .filter(player -> player.player().name().equalsIgnoreCase(name))
+                    .findFirst();
+        }
+
+        @Override
+        public List<OnlinePlayer> onServer(String server) {
+            return online.values().stream()
+                    .filter(player -> player.server().equals(server))
+                    .toList();
+        }
+
+        @Override
+        public List<OnlinePlayer> online() {
+            return List.copyOf(online.values());
         }
     }
 

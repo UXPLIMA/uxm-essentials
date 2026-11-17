@@ -59,6 +59,7 @@ public sealed interface NetworkMessage
                 MailArrivedFrame,
                 RankActionsKept,
                 InventoryRestoreKept,
+                BroadcastFrame,
                 PlayerNoticesKept {
 
     /** The {@code server-id} of the backend that produced this frame; the loop sentinel keys on it. */
@@ -113,6 +114,7 @@ public sealed interface NetworkMessage
         MAIL_ARRIVED(38),
         RANK_ACTIONS_KEPT(39),
         INVENTORY_RESTORE_KEPT(40),
+        BROADCAST(43),
         PLAYER_NOTICES_KEPT(46);
 
         private final byte wireTag;

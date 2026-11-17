@@ -5,6 +5,7 @@ import java.util.List;
 import com.uxplima.uxmessentials.presence.adapter.PresenceServices;
 import com.uxplima.uxmessentials.presence.adapter.inbound.gui.OnlinePlayerListView;
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandRegistration;
+import com.uxplima.uxmessentials.shared.adapter.outbound.lookup.VisibleNetwork;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
 import com.uxplima.uxmessentials.shared.application.port.PlayerLookup;
 import com.uxplima.uxmessentials.shared.application.port.Scheduler;
@@ -31,14 +32,15 @@ public final class PresenceCommands {
             Messages messages,
             Scheduler scheduler,
             @Nullable OnlinePlayerListView listView,
-            PlayerLookup players) {
+            PlayerLookup players,
+            VisibleNetwork network) {
         return List.of(
                 new AfkCommand(services, messages, scheduler),
-                new ListCommand(services, messages, scheduler, listView),
-                new RealnameCommand(services, messages, scheduler),
+                new ListCommand(services, messages, scheduler, listView, network),
+                new RealnameCommand(services, messages, scheduler, network),
                 new NickCommand(services, messages, scheduler, players),
-                new WhoisCommand(services, messages, scheduler),
+                new WhoisCommand(services, messages, scheduler, network),
                 new GcCommand(services, messages, scheduler),
-                new StaffCommand(services, messages, scheduler));
+                new StaffCommand(services, messages, scheduler, network));
     }
 }

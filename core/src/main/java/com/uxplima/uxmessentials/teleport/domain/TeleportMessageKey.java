@@ -108,6 +108,7 @@ public enum TeleportMessageKey implements MessageKey {
     TP_TOGGLED_OFF("teleport.tp.toggled-off"),
     // /tpoffline reads the logout position this server saved; /tpofflinehere stores a move for the next join
     TPOFFLINE_ONLINE("teleport.tpoffline.online"),
+    TPOFFLINE_ELSEWHERE("teleport.tpoffline.elsewhere"),
     TPOFFLINE_UNKNOWN("teleport.tpoffline.unknown"),
     TPOFFLINE_WORLD_MISSING("teleport.tpoffline.world-missing"),
     TPOFFLINE_MOVED("teleport.tpoffline.moved"),

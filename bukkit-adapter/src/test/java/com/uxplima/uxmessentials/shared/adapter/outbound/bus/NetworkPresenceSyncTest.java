@@ -17,12 +17,16 @@ import com.uxplima.uxmessentials.shared.application.port.PlayerNameIndex;
 import com.uxplima.uxmessentials.shared.domain.NameCase;
 import com.uxplima.uxmessentials.shared.domain.OnlinePlayer;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
+import com.uxplima.uxmessentials.shared.domain.PresenceTraits;
 import com.uxplima.uxmessentials.shared.network.BusChannel;
 import com.uxplima.uxmessentials.shared.network.NetworkMessage;
 import com.uxplima.uxmessentials.shared.network.NetworkMessageCodec;
 import org.junit.jupiter.api.Test;
 
-/** Joins, quits and rosters on one backend reach another backend's presence through the bus wire format. */
+/**
+ * Joins, quits and rosters on one backend reach another backend's presence through the bus wire format, with what
+ * that backend says of each player: how deep they are hidden and whether they are staff.
+ */
 class NetworkPresenceSyncTest {
 
     private static final Clock CLOCK = Clock.fixed(Instant.parse("2026-11-15T12:00:00Z"), ZoneOffset.UTC);
@@ -60,6 +64,33 @@ class NetworkPresenceSyncTest {
 
         lobby.left(STEVE);
         assertThat(survival.find(STEVE.uuid())).isEmpty();
+    }
+
+    @Test
+    void aPlayersTraitsCrossTheBusWithTheJoinAndAgainWhenTheyChange() {
+        PresenceTraits[] current = {PresenceTraits.PLAIN};
+        lobby.readTraitsWith(player -> current[0]);
+        lobby.joined(STEVE);
+        assertThat(survival.traits(STEVE.uuid())).contains(PresenceTraits.PLAIN);
+
+        current[0] = new PresenceTraits(2, true);
+        lobby.retrait(STEVE.uuid());
+
+        assertThat(survival.traits(STEVE.uuid())).contains(new PresenceTraits(2, true));
+        assertThat(survival.find(STEVE.uuid())).contains(new OnlinePlayer(STEVE, "lobby-1"));
+    }
+
+    @Test
+    void aRosterCarriesTheTraitsAJoinMissed() {
+        PresenceTraits[] current = {new PresenceTraits(1, false)};
+        lobby.readTraitsWith(player -> current[0]);
+        lobbyToSurvival.down = true;
+        lobby.joined(STEVE);
+        lobbyToSurvival.down = false;
+
+        lobby.announce(false);
+
+        assertThat(survival.traits(STEVE.uuid())).contains(new PresenceTraits(1, false));
     }
 
     @Test

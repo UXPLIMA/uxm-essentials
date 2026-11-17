@@ -209,6 +209,24 @@ final class RunningPlugin implements AutoCloseable {
         return lines;
     }
 
+    /**
+     * What the player was told since the last call, folded to plain lower-case letters: the shipped catalog writes its
+     * lines in small capitals, which a test would otherwise have to spell the same way.
+     */
+    static List<String> saidPlain(ScenarioPlayer player) {
+        String smallCapitals = "ᴀʙᴄᴅᴇꜰɢʜɪᴊᴋʟᴍɴᴏᴘǫʀꜱᴛᴜᴠᴡxʏᴢ";
+        return said(player).stream()
+                .map(line -> {
+                    StringBuilder folded = new StringBuilder(line.length());
+                    line.codePoints().forEach(point -> {
+                        int index = smallCapitals.indexOf(point);
+                        folded.append(index < 0 ? Character.toString(point) : Character.toString('a' + index));
+                    });
+                    return folded.toString();
+                })
+                .toList();
+    }
+
     /** A chat line as the server raises it: asynchronously, on a chat thread, seen by everyone online. */
     AsyncChatEvent chat(ScenarioPlayer speaker, String line) {
         Component message = Component.text(line);

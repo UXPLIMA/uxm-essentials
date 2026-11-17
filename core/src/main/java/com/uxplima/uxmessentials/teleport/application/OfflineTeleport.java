@@ -11,10 +11,12 @@ import java.util.function.Consumer;
 
 import com.uxplima.uxmessentials.shared.application.message.Notifier;
 import com.uxplima.uxmessentials.shared.application.port.Logger;
+import com.uxplima.uxmessentials.shared.application.port.NetworkPresence;
 import com.uxplima.uxmessentials.shared.application.port.PlayerLookup;
 import com.uxplima.uxmessentials.shared.application.port.Scheduler;
 import com.uxplima.uxmessentials.shared.application.port.WorldLookup;
 import com.uxplima.uxmessentials.shared.domain.NameMatch;
+import com.uxplima.uxmessentials.shared.domain.OnlinePlayer;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmessentials.shared.domain.Position;
 import com.uxplima.uxmessentials.shared.domain.WorldRef;
@@ -45,8 +47,10 @@ import org.jspecify.annotations.Nullable;
  * request asks.
  *
  * <p>A player online here whom the staff member can see is refused: their saved data is stale while they play, and
- * they can be moved directly. A player the staff member may not see because of vanish is handled exactly as if they
- * were offline, so no answer gives them away.
+ * they can be moved directly. So is a player online on another server, who is named with that server, since a
+ * position saved here is out of date and a relocation would wait for a join that may not come. A player the staff
+ * member may not see because of vanish, here or there, is handled exactly as if they were offline, so no answer gives
+ * them away.
  */
 public final class OfflineTeleport {
 
@@ -56,6 +60,7 @@ public final class OfflineTeleport {
     private final LogoutPositions positions;
     private final PendingRelocations relocations;
     private final PlayerLookup players;
+    private final NetworkPresence presence;
     private final WorldLookup worlds;
     private final RequestVisibility visibility;
     private final JailGate jail;
@@ -78,6 +83,7 @@ public final class OfflineTeleport {
             LogoutPositions positions,
             PendingRelocations relocations,
             PlayerLookup players,
+            NetworkPresence presence,
             WorldLookup worlds,
             RequestVisibility visibility,
             JailGate jail,
@@ -90,6 +96,7 @@ public final class OfflineTeleport {
         this.positions = Objects.requireNonNull(positions, "positions");
         this.relocations = Objects.requireNonNull(relocations, "relocations");
         this.players = Objects.requireNonNull(players, "players");
+        this.presence = Objects.requireNonNull(presence, "presence");
         this.worlds = Objects.requireNonNull(worlds, "worlds");
         this.visibility = Objects.requireNonNull(visibility, "visibility");
         this.jail = Objects.requireNonNull(jail, "jail");
@@ -293,7 +300,35 @@ public final class OfflineTeleport {
         Objects.requireNonNull(name, "name");
         scheduler.async(() -> {
             NameMatch match = players.matchByName(name);
-            scheduler.onEntity(actor, () -> offline(actor, name, match).ifPresent(then));
+            scheduler.onEntity(
+                    actor, () -> offline(actor, name, match).ifPresent(target -> notElsewhere(actor, target, then)));
+        });
+    }
+
+    /**
+     * Run {@code then} with {@code target} unless they are online on another server the actor may know of; then the
+     * actor is told which. Whether they are hidden there is read from the shared vanish rows, off the tick.
+     */
+    private void notElsewhere(PlayerRef actor, PlayerRef target, Consumer<PlayerRef> then) {
+        Optional<OnlinePlayer> away =
+                presence.find(target.uuid()).filter(online -> !online.server().equals(presence.localServer()));
+        if (away.isEmpty()) {
+            then.accept(target);
+            return;
+        }
+        int seeLevel = visibility.seeLevel(actor);
+        scheduler.async(() -> {
+            boolean hidden = visibility.hiddenElsewhere(target, seeLevel);
+            scheduler.onEntity(actor, () -> {
+                if (hidden) {
+                    then.accept(target);
+                } else {
+                    notifier.send(
+                            actor,
+                            TeleportMessageKey.TPOFFLINE_ELSEWHERE,
+                            Map.of("player", target.name(), "server", away.get().server()));
+                }
+            });
         });
     }
 

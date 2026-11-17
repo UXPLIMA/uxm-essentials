@@ -18,6 +18,7 @@ import com.uxplima.uxmessentials.guard.domain.Verdict;
 import com.uxplima.uxmessentials.guard.domain.engine.RegionSet;
 import com.uxplima.uxmessentials.guard.domain.engine.WorldIndex;
 import com.uxplima.uxmessentials.shared.adapter.outbound.papi.RegionsPlaceholders;
+import com.uxplima.uxmessentials.shared.application.port.PlayerLookup;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import org.jspecify.annotations.Nullable;
 
@@ -30,10 +31,16 @@ public final class GuardRegionsPlaceholders implements RegionsPlaceholders {
 
     private final Server server;
     private final GuardService service;
+    private final PlayerLookup players;
 
-    public GuardRegionsPlaceholders(Server server, GuardService service) {
+    /**
+     * @param players names the owners and members: from memory on a tick thread, from the database off it, so a member
+     *     who never joined this server is still named
+     */
+    public GuardRegionsPlaceholders(Server server, GuardService service, PlayerLookup players) {
         this.server = Objects.requireNonNull(server, "server");
         this.service = Objects.requireNonNull(service, "service");
+        this.players = Objects.requireNonNull(players, "players");
     }
 
     @Override
@@ -48,8 +55,7 @@ public final class GuardRegionsPlaceholders implements RegionsPlaceholders {
             List<String> owners = new ArrayList<>();
             List<String> members = new ArrayList<>();
             region.roles().forEach((id, role) -> {
-                String name = Optional.ofNullable(server.getOfflinePlayer(id).getName())
-                        .orElse(id.toString());
+                String name = players.findByUuid(id).map(PlayerRef::name).orElse(id.toString());
                 if (role.equals(RoleName.OWNER)) {
                     owners.add(name);
                 } else {

@@ -24,6 +24,11 @@ public final class MutableStaffTeleport implements StaffTeleport {
         return Objects.requireNonNull(delegate.get(), "delegate").teleportTo(staff, target);
     }
 
+    @Override
+    public boolean teleportElsewhere(PlayerRef staff, String target) {
+        return Objects.requireNonNull(delegate.get(), "delegate").teleportElsewhere(staff, target);
+    }
+
     /** Rebind to the real teleport-provided teleport; called once when the teleport context is enabled. */
     public void bind(StaffTeleport real) {
         delegate.set(Objects.requireNonNull(real, "real"));

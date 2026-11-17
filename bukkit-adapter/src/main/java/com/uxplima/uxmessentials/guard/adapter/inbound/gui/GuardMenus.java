@@ -18,9 +18,7 @@ import java.util.function.BiConsumer;
 import java.util.function.Function;
 import java.util.function.UnaryOperator;
 
-import org.bukkit.Bukkit;
 import org.bukkit.Location;
-import org.bukkit.OfflinePlayer;
 import org.bukkit.entity.Player;
 
 import com.uxplima.uxmessentials.guard.adapter.inbound.command.GuardCommand;
@@ -45,7 +43,6 @@ import com.uxplima.uxmessentials.shared.adapter.outbound.style.StyledText;
 import com.uxplima.uxmessentials.shared.application.permission.ContentPermissions;
 import com.uxplima.uxmessentials.shared.application.port.Logger;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
-import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmessentials.shared.domain.message.SharedMessageKey;
 import com.uxplima.uxmlib.menu.Menus;
 import com.uxplima.uxmlib.menu.binding.MenuBindings;
@@ -487,18 +484,14 @@ public final class GuardMenus {
         });
         bindings.action("guard-role-add", ctx -> {
             RolesView view = ctx.subject(RolesView.class);
-            String name = ctx.arg().strip();
-            Optional<PlayerRef> named = command.player(ctx.player(), name);
-            if (named.isEmpty()) {
-                openRoles(ctx.player(), view.key());
-                return;
-            }
-            PlayerRef target = named.get();
-            if (roleCycle(ctx.player(), view.key()).isEmpty()) {
-                feedback.send(ctx.player(), GuardMessageKey.ERROR_NOT_MANAGER);
-                return;
-            }
-            setRole(ctx.player(), view.key(), target.uuid(), target.name(), RoleName.MEMBER);
+            Player player = ctx.player();
+            command.player(player, ctx.arg().strip(), () -> openRoles(player, view.key()), target -> {
+                if (roleCycle(player, view.key()).isEmpty()) {
+                    feedback.send(player, GuardMessageKey.ERROR_NOT_MANAGER);
+                    return;
+                }
+                setRole(player, view.key(), target.uuid(), target.name(), RoleName.MEMBER);
+            });
         });
         bindings.action("guard:roles-back", ctx -> {
             RegionKey key = ctx.subject(RolesView.class).key();
@@ -736,16 +729,15 @@ public final class GuardMenus {
             feedback.send(player, GuardMessageKey.ERROR_NOT_MANAGER);
             return;
         }
-        List<RoleRow> rows = new ArrayList<>();
-        region.get().roles().forEach((id, role) -> {
-            OfflinePlayer offline = Bukkit.getOfflinePlayer(id);
-            rows.add(new RoleRow(
-                    id, offline.getName() == null ? id.toString().substring(0, 8) : offline.getName(), role));
+        Map<UUID, RoleName> roles = Map.copyOf(region.get().roles());
+        command.memberNames(player, roles.keySet(), named -> {
+            List<RoleRow> rows = new ArrayList<>();
+            roles.forEach((id, role) -> rows.add(new RoleRow(id, named.getOrDefault(id, id.toString()), role)));
+            rows.sort(Comparator.comparingInt((RoleRow r) ->
+                            RoleName.BUILT_IN.indexOf(r.role()) < 0 ? 9 : RoleName.BUILT_IN.indexOf(r.role()))
+                    .thenComparing(RoleRow::name, String.CASE_INSENSITIVE_ORDER));
+            open(player, ROLES, new RolesView(key, rows));
         });
-        rows.sort(Comparator.comparingInt((RoleRow r) ->
-                        RoleName.BUILT_IN.indexOf(r.role()) < 0 ? 9 : RoleName.BUILT_IN.indexOf(r.role()))
-                .thenComparing(RoleRow::name, String.CASE_INSENSITIVE_ORDER));
-        open(player, ROLES, new RolesView(key, rows));
     }
 
     private void openHistory(Player player, RegionKey key) {

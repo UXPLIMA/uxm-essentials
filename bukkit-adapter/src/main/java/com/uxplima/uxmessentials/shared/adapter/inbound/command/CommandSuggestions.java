@@ -2,9 +2,11 @@ package com.uxplima.uxmessentials.shared.adapter.inbound.command;
 
 import java.util.ArrayList;
 import java.util.Collection;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Locale;
 import java.util.Objects;
+import java.util.Set;
 import java.util.concurrent.CompletableFuture;
 import java.util.function.Function;
 import java.util.function.Supplier;
@@ -22,6 +24,7 @@ import com.mojang.brigadier.suggestion.SuggestionProvider;
 import com.mojang.brigadier.suggestion.Suggestions;
 import com.mojang.brigadier.suggestion.SuggestionsBuilder;
 import com.uxplima.uxmessentials.shared.adapter.outbound.BukkitRefs;
+import com.uxplima.uxmessentials.shared.adapter.outbound.lookup.VisibleNetwork;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmlib.command.Args;
 import com.uxplima.uxmlib.command.Sender;
@@ -40,11 +43,35 @@ import org.jspecify.annotations.Nullable;
  * {@link #playerTargets()} and {@link #singlePlayerTarget()} complete a Mojang player-selector argument with
  * only the selectors that argument can actually resolve (plus online names), never an entity selector the
  * parser would reject.
+ *
+ * <p>On a network, {@link #onlinePlayers()} also offers the players on the other backends the sender may see, since
+ * those arguments take any name. A selector argument resolves players on this backend only, so it offers only them.
  */
 @NullMarked
 public final class CommandSuggestions {
 
+    /** The other backends' players, set once the network is wired; none until then and after the plugin stops. */
+    private static volatile VisibleNetwork network = VisibleNetwork.NONE;
+
     private CommandSuggestions() {}
+
+    /** Offer the players {@code players} names on the other backends too; {@link VisibleNetwork#NONE} stops it. */
+    public static void network(VisibleNetwork players) {
+        network = Objects.requireNonNull(players, "players");
+    }
+
+    /**
+     * The names of the players {@code sender} may see on this backend and on the others, each name once, this
+     * backend's first.
+     */
+    public static List<String> visibleNetworkNames(@Nullable CommandSender sender) {
+        Set<String> names = new LinkedHashSet<>();
+        for (Player online : visibleOnlinePlayers(sender)) {
+            names.add(online.getName());
+        }
+        names.addAll(network.namesElsewhere(sender));
+        return List.copyOf(names);
+    }
 
     /**
      * The online players {@code sender} is allowed to see. When the sender is a player, the roster is filtered
@@ -66,10 +93,10 @@ public final class CommandSuggestions {
     }
 
     /**
-     * Suggests the names of every online player the sender may see, prefix-filtered (case-insensitively) by the
-     * partial token the sender has typed. Used for player-target arguments that keep a string type because they
-     * must also accept offline names: the suggestion only surfaces online matches, but the argument still parses
-     * anything typed.
+     * Suggests the names of every online player the sender may see, on this backend and on the others of the network,
+     * prefix-filtered (case-insensitively) by the partial token the sender has typed. Used for player-target arguments
+     * that keep a string type because they must also accept offline names: the suggestion only surfaces online
+     * matches, but the argument still parses anything typed.
      */
     public static SuggestionProvider<CommandSourceStack> onlinePlayers() {
         // Brigadier resolves suggestions while the player types, off any region tick thread, so an onGlobal hop is
@@ -78,8 +105,7 @@ public final class CommandSuggestions {
         // roster that shifts mid-keystroke at worst offers or omits one stale name for that keystroke, harmless.
         return (ctx, builder) -> {
             String prefix = builder.getRemaining().toLowerCase(Locale.ROOT);
-            for (Player online : visibleOnlinePlayers(Sender.audience(ctx.getSource()))) {
-                String name = online.getName();
+            for (String name : visibleNetworkNames(Sender.audience(ctx.getSource()))) {
                 if (matches(name, prefix)) {
                     builder.suggest(name);
                 }

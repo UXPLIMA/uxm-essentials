@@ -3,6 +3,14 @@
 What an operator edits when a release renames something an operator's own files or permission grants depend on, or
 needs a setting it did not need before.
 
+## Lists name the players of every server
+
+On a network, tab completion, `/list`, `/staff`, `/stafflist`, `staff_online`, the player pickers, `/realname`,
+`/whois` and `/mail sendall` now take in the players of every server, and `/broadcast` reaches every server. Each server
+announces how deep its players are vanished and whether they are staff. A server still on an older release announces
+neither, so until it is upgraded its players are listed only to viewers who see every vanish level, and none of them
+counts as staff; upgrade every server of the network in the same window.
+
 ## Messaging switches follow the player
 
 `/msgtoggle`, `/rtoggle`, `/broadcasttoggle`, `/socialspy` and the `/reply` partner are kept in three new tables
