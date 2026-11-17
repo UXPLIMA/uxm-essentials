@@ -25,10 +25,10 @@ import com.uxplima.uxmlib.menu.runtime.MenuActionContext;
  *
  * <p>Command dispatch reuses the shared {@link ClickCommandRunner} the npc/holograms click chains already run
  * through, in particular the temporary-op grant/perform/revoke of {@link ClickCommandRunner#runAsPlayerOp}, so the
- * elevation logic is not reimplemented here. The two elevated actions ({@code command-as-op} and {@code
- * console-random}) are gated behind the same {@code custommenus.allow-console} flag as {@link MenuVocabulary}'s
- * {@code console} action: menu-driven privileged dispatch stays opt-in, and when the flag is off the action warns
- * through the operator {@code log} and does nothing. The player-level actions ({@code chat-as-player}, {@code
+ * elevation logic is not reimplemented here. The two elevated actions are opt-in: {@code console-random} behind the
+ * same {@code custommenus.allow-console} flag as {@link MenuVocabulary}'s {@code console} action, and
+ * {@code command-as-op} behind {@code custommenus.allow-op}. When its flag is off the action warns through the operator
+ * {@code log} and does nothing. The player-level actions ({@code chat-as-player}, {@code
  * commandevent}, {@code command-random}) run as the viewer and carry no elevation, so they are ungated.
  *
  * <p>Every action is fail-soft through {@link #safe}: a blank or malformed argument, or a dispatch that throws,
@@ -44,13 +44,18 @@ public final class CommandActions {
     /**
      * Register the player/command actions into {@code bindings}. {@code commandRunner} is the shared dispatch seam
      * the elevated and player command actions run through (reusing its op grant/revoke); {@code allowConsole} gates
-     * the two elevated actions exactly as it gates {@link MenuVocabulary}'s {@code console} action; {@code log} is the
-     * operator console logger a fail-soft or disabled-gate action warns through. Left separate from
+     * {@code console-random} exactly as it gates {@link MenuVocabulary}'s {@code console} action, and {@code allowOp}
+     * gates {@code command-as-op}; {@code log} is the operator console logger a fail-soft or disabled-gate action warns
+     * through. Left separate from
      * {@link MenuVocabulary#registerActions} so that method's existing call-sites stay untouched, the composition
      * root calls both.
      */
     public static void register(
-            MenuBindings bindings, ClickCommandRunner commandRunner, boolean allowConsole, Logger log) {
+            MenuBindings bindings,
+            ClickCommandRunner commandRunner,
+            boolean allowConsole,
+            boolean allowOp,
+            Logger log) {
         Objects.requireNonNull(bindings, "bindings");
         Objects.requireNonNull(commandRunner, "commandRunner");
         Objects.requireNonNull(log, "log");
@@ -58,13 +63,14 @@ public final class CommandActions {
         bindings.action("chat-as-player", chat);
         bindings.action("chat", chat);
         Consumer<MenuActionContext> commandAsOp =
-                gated("command-as-op", allowConsole, log, ctx -> runAsOp(ctx, commandRunner));
+                gated("command-as-op", allowOp, "allow-op", log, ctx -> runAsOp(ctx, commandRunner));
         bindings.action("command-as-op", commandAsOp);
         bindings.action("command-op", commandAsOp);
         bindings.action("commandevent", safe("commandevent", log, CommandActions::commandEvent));
         bindings.action("command-random", safe("command-random", log, ctx -> commandRandom(ctx, commandRunner)));
         bindings.action(
-                "console-random", gated("console-random", allowConsole, log, ctx -> consoleRandom(ctx, commandRunner)));
+                "console-random",
+                gated("console-random", allowConsole, "allow-console", log, ctx -> consoleRandom(ctx, commandRunner)));
     }
 
     /**
@@ -83,18 +89,18 @@ public final class CommandActions {
     }
 
     /**
-     * Gate an elevated action behind {@code allowConsole}. When enabled the action runs fail-soft through
-     * {@link #safe}; when disabled it warns and does nothing, exactly like {@link MenuVocabulary}'s {@code console}
-     * action, so an operator who forgot the {@code custommenus.allow-console} flag sees why nothing happened. The
-     * decision is fixed at registration time, so a per-click branch never re-reads it.
+     * Gate an elevated action behind {@code allowed}, the value of the {@code custommenus} key {@code flag}. When
+     * enabled the action runs fail-soft through {@link #safe}; when disabled it warns and does nothing, exactly like
+     * {@link MenuVocabulary}'s {@code console} action, so an operator who forgot the flag sees why nothing happened.
+     * The decision is fixed at registration time, so a per-click branch never re-reads it.
      */
     private static Consumer<MenuActionContext> gated(
-            String action, boolean allowConsole, Logger log, Consumer<MenuActionContext> body) {
-        if (allowConsole) {
+            String action, boolean allowed, String flag, Logger log, Consumer<MenuActionContext> body) {
+        if (allowed) {
             return safe(action, log, body);
         }
-        return ctx -> log.warn(
-                "menu {} action is disabled (custommenus.allow-console=false); ignored: {}", action, ctx.arg());
+        return ctx ->
+                log.warn("menu {} action is disabled (custommenus.{}=false); ignored: {}", action, flag, ctx.arg());
     }
 
     /** Make the viewer speak {@code arg} into public chat so the chat pipeline (format, other plugins) sees it. */
@@ -153,7 +159,7 @@ public final class CommandActions {
     }
 
     /** The trimmed choice picked uniformly at random from {@code value}, or empty when it holds no candidate. */
-    private static String pickRandom(String value) {
+    public static String pickRandom(String value) {
         List<String> choices = choices(value);
         if (choices.isEmpty()) {
             return "";

@@ -769,6 +769,9 @@ public final class PluginModule {
         // this flag only governs the generic console action a disk-loaded menu can reference.
         boolean allowMenuConsole =
                 config.scoped(ModuleId.of("custommenus").configRoot()).getBoolean("allow-console", false);
+        // command-as-op used to ride on allow-console, so a file without its own allow-op keeps that answer.
+        boolean allowMenuOp =
+                config.scoped(ModuleId.of("custommenus").configRoot()).getBoolean("allow-op", allowMenuConsole);
         // The proxy connect seam shares the one BungeeCord/Velocity channel (npc and holograms build their own over
         // the same plugin-scoped channel; Paper drops them all on disable). Built once here as a local so the movement
         // slice's connect action is handed it directly, and also exposed on resources.serverConnector() for any other
@@ -819,9 +822,10 @@ public final class PluginModule {
         // The player/command slice (chat-as-player, command-as-op, commandevent, command/console-random) registers
         // alongside the generic actions; like the messaging slice it has its own entry point so the MenuVocabulary
         // signature stays untouched. It reuses the same stateless click-command runner npc/holograms build, so the
-        // temporary-op elevation is not reimplemented here; its two elevated actions honour the same allow-console
-        // gate as the generic console action.
-        CommandActions.register(menuBindings, new BukkitClickCommandRunner(), allowMenuConsole, kernel.log());
+        // temporary-op elevation is not reimplemented here; console-random honours the same allow-console gate as
+        // the generic console action, and command-as-op its own allow-op.
+        CommandActions.register(
+                menuBindings, new BukkitClickCommandRunner(), allowMenuConsole, allowMenuOp, kernel.log());
         // The movement slice (teleport within this server, connect to another proxy backend) registers alongside the
         // generic actions; like the other slices it has its own entry point so the MenuVocabulary signature stays
         // untouched. It teleports through Paper's Folia-safe teleportAsync and reaches the proxy through the shared
