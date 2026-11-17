@@ -2,10 +2,14 @@ package com.uxplima.uxmessentials.messaging.adapter;
 
 import java.time.Clock;
 import java.util.List;
+import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.UUID;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.function.Consumer;
 
+import org.bukkit.event.Listener;
 import org.bukkit.plugin.Plugin;
 
 import com.uxplima.uxmessentials.messaging.adapter.inbound.command.MessagingCommands;
@@ -13,16 +17,13 @@ import com.uxplima.uxmessentials.messaging.adapter.inbound.gui.MessagingGuiViews
 import com.uxplima.uxmessentials.messaging.adapter.outbound.BukkitMessageDelivery;
 import com.uxplima.uxmessentials.messaging.adapter.outbound.BukkitStaffAudience;
 import com.uxplima.uxmessentials.messaging.adapter.outbound.BusMessagingNetwork;
-import com.uxplima.uxmessentials.messaging.adapter.outbound.InMemoryConversationStore;
-import com.uxplima.uxmessentials.messaging.adapter.outbound.InMemorySocialSpyStore;
 import com.uxplima.uxmessentials.messaging.adapter.outbound.MailExpirySweep;
-import com.uxplima.uxmessentials.messaging.adapter.outbound.PdcMessageToggleStore;
-import com.uxplima.uxmessentials.messaging.adapter.outbound.PdcReplyRoutingStore;
 import com.uxplima.uxmessentials.messaging.adapter.outbound.api.MessagingApiWrites;
 import com.uxplima.uxmessentials.messaging.application.ClearMail;
 import com.uxplima.uxmessentials.messaging.application.HelpOp;
 import com.uxplima.uxmessentials.messaging.application.Ignore;
 import com.uxplima.uxmessentials.messaging.application.ListIgnores;
+import com.uxplima.uxmessentials.messaging.application.MessagingSwitches;
 import com.uxplima.uxmessentials.messaging.application.MsgToggle;
 import com.uxplima.uxmessentials.messaging.application.ReadMail;
 import com.uxplima.uxmessentials.messaging.application.RelayPrivateMessage;
@@ -31,28 +32,38 @@ import com.uxplima.uxmessentials.messaging.application.ReplyToggle;
 import com.uxplima.uxmessentials.messaging.application.SendMail;
 import com.uxplima.uxmessentials.messaging.application.SendMailToAll;
 import com.uxplima.uxmessentials.messaging.application.SendMessage;
+import com.uxplima.uxmessentials.messaging.application.SharedConversations;
+import com.uxplima.uxmessentials.messaging.application.SharedSocialSpy;
 import com.uxplima.uxmessentials.messaging.application.SocialSpy;
 import com.uxplima.uxmessentials.messaging.application.Unignore;
 import com.uxplima.uxmessentials.messaging.application.port.AfkStatus;
 import com.uxplima.uxmessentials.messaging.application.port.IgnoreStore;
 import com.uxplima.uxmessentials.messaging.application.port.MailRepository;
 import com.uxplima.uxmessentials.messaging.application.port.MessageDelivery;
+import com.uxplima.uxmessentials.messaging.application.port.MessageToggleStore;
 import com.uxplima.uxmessentials.messaging.application.port.MutePolicy;
+import com.uxplima.uxmessentials.messaging.application.port.ReplyRoutingStore;
 import com.uxplima.uxmessentials.messaging.application.port.VanishVisibility;
 import com.uxplima.uxmessentials.persistence.messaging.CachedIgnoreStore;
 import com.uxplima.uxmessentials.persistence.messaging.MessagingStores;
 import com.uxplima.uxmessentials.persistence.runtime.Persistence;
+import com.uxplima.uxmessentials.persistence.settings.SettingsStores;
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandRegistration;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.GuiLayouts;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.GuiText;
+import com.uxplima.uxmessentials.shared.adapter.inbound.settings.HeldSettingsListener;
+import com.uxplima.uxmessentials.shared.adapter.inbound.settings.LegacySwitches;
 import com.uxplima.uxmessentials.shared.adapter.outbound.bus.Bus;
 import com.uxplima.uxmessentials.shared.adapter.outbound.bus.IgnoreSync;
+import com.uxplima.uxmessentials.shared.adapter.outbound.bus.PlayerSettingsSync;
 import com.uxplima.uxmessentials.shared.adapter.outbound.chat.UxmChatStepBack;
 import com.uxplima.uxmessentials.shared.adapter.outbound.papi.StoresMessagingPlaceholders;
 import com.uxplima.uxmessentials.shared.application.message.Notifier;
 import com.uxplima.uxmessentials.shared.application.module.KernelPorts;
 import com.uxplima.uxmessentials.shared.application.module.ModuleContext;
 import com.uxplima.uxmessentials.shared.application.port.NetworkPresence;
+import com.uxplima.uxmessentials.shared.application.settings.HeldSettings;
+import com.uxplima.uxmessentials.shared.application.settings.PlayerSwitches;
 import com.uxplima.uxmlib.gui.input.TextInput;
 import com.uxplima.uxmlib.menu.Menus;
 import com.uxplima.uxmlib.menu.binding.MenuBindings;
@@ -72,7 +83,8 @@ import org.jspecify.annotations.NullMarked;
  * and the AFK status is a {@link MutableAfkStatus} bound to {@code AfkStatus.NEVER} until the presence context
  * lands and rebinds it (presence wires after messaging, so the binding arrives through the rebindable holder).
  * The mail repository is the plain jOOQ adapter; the ignore store is the Caffeine-cached jOOQ adapter; the
- * reply, socialspy, and toggle stores are in-memory/PDC (transient session state).
+ * reply partner, socialspy and toggle stores hold the settings every backend shares for the players online here,
+ * read at login and announced on the bus when they change.
  */
 @NullMarked
 public final class MessagingWiring {
@@ -108,7 +120,7 @@ public final class MessagingWiring {
         KernelPorts kernel = ctx.kernel();
         MessagingSettings settings = new MessagingSettings(ctx.config());
         AtomicBoolean running = new AtomicBoolean(true);
-        Stores stores = stores(plugin, persistence, bus);
+        Stores stores = stores(kernel, persistence, bus);
         // The mute gate forwards to NEVER until the moderation context lands and rebinds it (soft couple). If
         // a real policy is already available it is bound up front; otherwise moderation binds it on wire.
         MutableMutePolicy mutePolicy = new MutableMutePolicy();
@@ -124,6 +136,18 @@ public final class MessagingWiring {
         UxmChatStepBack chat = new UxmChatStepBack(plugin.getServer());
         MessagingServices services = assemble(
                 kernel, settings, stores, mutePolicy, afkStatus, vanish, network, presence, chat, Clock.systemUTC());
+        HeldSettingsListener heldSettings = new HeldSettingsListener(stores.held());
+        heldSettings.adoptOnline(plugin.getServer().getOnlinePlayers(), kernel.scheduler());
+        // An earlier version kept these two switches in the player's data on each server; they move to the shared
+        // switches as each player next joins.
+        List<Listener> listeners = List.of(
+                heldSettings,
+                new LegacySwitches(
+                        plugin,
+                        stores.switches(),
+                        Map.of(
+                                "msg-toggle-off", MessagingSwitches.MESSAGES,
+                                "reply-toggle-off", MessagingSwitches.REPLIES)));
         network.bind(services.relay(), services.helpOp());
         bus.registry().register(network::onFrame);
         MailExpirySweep sweep = new MailExpirySweep(
@@ -157,7 +181,15 @@ public final class MessagingWiring {
         List<CommandRegistration> commands =
                 MessagingCommands.all(services, kernel.messages(), kernel.messageSink(), views);
         return new Wired(
-                commands, sweep, stores, mutePolicy, afkStatus, running, views, MessagingApiWrites.of(services));
+                commands,
+                listeners,
+                sweep,
+                stores,
+                mutePolicy,
+                afkStatus,
+                running,
+                views,
+                MessagingApiWrites.of(services));
     }
 
     private static MessagingServices assemble(
@@ -181,6 +213,7 @@ public final class MessagingWiring {
                 stores.conversations(),
                 stores.toggles(),
                 stores.socialSpy(),
+                network,
                 mute,
                 afk,
                 sendMail,
@@ -235,7 +268,7 @@ public final class MessagingWiring {
                 kernel.scheduler());
     }
 
-    private static Stores stores(Plugin plugin, Persistence persistence, Bus bus) {
+    private static Stores stores(KernelPorts kernel, Persistence persistence, Bus bus) {
         // The concrete cache is what the cross-server listener invalidates per owner; the broadcasting decorator
         // wraps that same cache so a local /ignore or /unignore announces it to peers (the player-warps seam,
         // copied for the ignore list). The /msg delivery path reads this same cache, so the loop closes.
@@ -243,35 +276,62 @@ public final class MessagingWiring {
         bus.registry().register(IgnoreSync.listener(cachedIgnores));
         bus.registry().registerPlayerCacheDrop(cachedIgnores::invalidateAll);
         IgnoreStore ignores = IgnoreSync.store(cachedIgnores, bus.publisher());
+        // The switches, the watched players and the reply partner are shared through the database, held for the
+        // players online here, and announced when a switch or a watched player changes.
+        Consumer<UUID> announce = PlayerSettingsSync.announcer(bus.publisher());
+        PlayerSwitches switches = new PlayerSwitches(
+                MessagingSwitches.NAMES,
+                SettingsStores.switches(persistence),
+                kernel.scheduler(),
+                kernel.log(),
+                announce);
+        MessagingSwitches named = new MessagingSwitches(switches);
+        SharedSocialSpy socialSpy = new SharedSocialSpy(
+                switches,
+                MessagingStores.spyTargets(persistence),
+                kernel.playerLookup(),
+                kernel.permissions(),
+                kernel.scheduler(),
+                kernel.log(),
+                announce);
+        SharedConversations conversations =
+                new SharedConversations(MessagingStores.replyPartners(persistence), kernel.scheduler(), kernel.log());
+        HeldSettings held = HeldSettings.of(switches, socialSpy, conversations);
+        PlayerSettingsSync.register(bus.registry(), held);
         return new Stores(
                 MessagingStores.mail(persistence),
                 ignores,
-                new InMemoryConversationStore(),
-                new PdcMessageToggleStore(plugin),
-                new PdcReplyRoutingStore(plugin),
-                new InMemorySocialSpyStore());
+                conversations,
+                named.messages(),
+                named.replies(),
+                socialSpy,
+                switches,
+                held);
     }
 
     /**
-     * The constructed stores, held so the wiring's stop hook can drain the transient ones and so bootstrap can
-     * build the published messaging query over the very same mail, ignore and toggle stores the commands use.
+     * The constructed stores, held so bootstrap can build the published messaging query over the very same mail,
+     * ignore and toggle stores the commands use, and so the login listener reads the shared settings into them.
      */
     public record Stores(
             MailRepository mail,
             IgnoreStore ignores,
-            InMemoryConversationStore conversations,
-            PdcMessageToggleStore toggles,
-            PdcReplyRoutingStore replyRouting,
-            InMemorySocialSpyStore socialSpy) {}
+            SharedConversations conversations,
+            MessageToggleStore toggles,
+            ReplyRoutingStore replyRouting,
+            SharedSocialSpy socialSpy,
+            PlayerSwitches switches,
+            HeldSettings held) {}
 
     /**
      * Everything the messaging module contributes once wired: the Brigadier commands, the self-rescheduling
-     * mail-expiry sweep, the transient stores (cleared on stop), and the {@code running} flag the sweep
-     * observes.
+     * mail-expiry sweep, the listeners that read the shared settings at login, the stores, and the {@code running}
+     * flag the sweep observes.
      *
      * @param commands the Brigadier command registrations to publish
+     * @param listeners the login and join listeners that bring in each player's shared settings
      * @param expirySweep the self-rescheduling mail-expiry sweep, armed by the caller
-     * @param stores the constructed stores, for the stop-time drain of the transient ones
+     * @param stores the constructed stores, for the published query and placeholders
      * @param mutePolicy the rebindable mute gate the moderation context fills in when it wires
      * @param afkStatus the rebindable AFK status the presence context fills in when it wires
      * @param running the flag flipped false on stop so the sweep exits
@@ -279,6 +339,7 @@ public final class MessagingWiring {
      */
     public record Wired(
             List<CommandRegistration> commands,
+            List<Listener> listeners,
             MailExpirySweep expirySweep,
             Stores stores,
             MutableMutePolicy mutePolicy,
@@ -289,6 +350,7 @@ public final class MessagingWiring {
 
         public Wired {
             commands = List.copyOf(commands);
+            listeners = List.copyOf(listeners);
             Objects.requireNonNull(expirySweep, "expirySweep");
             Objects.requireNonNull(stores, "stores");
             Objects.requireNonNull(mutePolicy, "mutePolicy");
@@ -313,11 +375,9 @@ public final class MessagingWiring {
                     stores.mail(), stores.conversations(), stores.toggles(), stores.socialSpy(), stores.ignores());
         }
 
-        /** Stop the sweep and drop the transient session stores. */
+        /** Stop the sweep. */
         public void stop() {
             running.set(false);
-            stores.conversations().clear();
-            stores.socialSpy().clear();
         }
     }
 }

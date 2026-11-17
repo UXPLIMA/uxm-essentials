@@ -3,6 +3,15 @@
 What an operator edits when a release renames something an operator's own files or permission grants depend on, or
 needs a setting it did not need before.
 
+## Messaging switches follow the player
+
+`/msgtoggle`, `/rtoggle`, `/broadcasttoggle`, `/socialspy` (with the players watched) and who `/reply` answers are
+now kept in the database and follow a player to every server of the network. Social spy stays on across a relog and
+a restart until the staff member turns it off; it shows nothing to anyone who no longer holds
+`uxmessentials.msg.socialspy`. A switch an older release kept on one server is taken over the next time the player
+joins that server. The update adds three tables: `player_switches`, `messaging_spy_targets` and
+`messaging_reply_partners`.
+
 ## A PIN is ASCII digits only
 
 A PIN is now made of the ten digits 0 to 9 and nothing else, because that is all the keypad can enter. An older

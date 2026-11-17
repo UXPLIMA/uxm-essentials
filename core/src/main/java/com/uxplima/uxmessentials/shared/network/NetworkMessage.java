@@ -53,7 +53,8 @@ public sealed interface NetworkMessage
                 FreezeReset,
                 AllBalancesChanged,
                 PermissionQueryFrame,
-                ProxyConnectionFrame {
+                ProxyConnectionFrame,
+                PlayerSettingsChanged {
 
     /** The {@code server-id} of the backend that produced this frame; the loop sentinel keys on it. */
     String originServer();
@@ -101,7 +102,8 @@ public sealed interface NetworkMessage
         FREEZE_RESET(32),
         ALL_BALANCES_CHANGED(33),
         PERMISSION_QUERY(34),
-        PROXY_CONNECTION(35);
+        PROXY_CONNECTION(35),
+        PLAYER_SETTINGS_CHANGED(37);
 
         private final byte wireTag;
 

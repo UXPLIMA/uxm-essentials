@@ -195,7 +195,7 @@ shared: each backend reads its own `config.conf` and module files, so keep them 
 | Worlds | Managed worlds and settings, per server | `/worlds tp` and `/worlds spawn` to another server | `worlds` `cross-server.enabled` |
 | Teleport | Pending moves | `/tpa`, `/tpahere`, staff `/tp` and `/tphere` | `teleport` `cross-server.enabled` |
 | Moderation | Bans, mutes, warnings, IP bans, jails, history | A ban or IP ban kicks everywhere; a jail sends the player to the jail's server; a freeze holds everywhere | none |
-| Messaging | Mail, ignore lists | `/msg`, `/reply`, `/helpop`; staff chat in the staff module | none |
+| Messaging | Mail, ignore lists, message and reply toggles, social spy, the `/reply` partner | `/msg`, `/reply`, `/helpop`, social spy; staff chat in the staff module | none |
 | Vanish | Vanish state | Hidden on every server | `vanish` `cross-server` |
 | Kits | One-time claims and cooldowns | none | none |
 | Ranks | Each player's rank and prestige | none | none |
@@ -267,9 +267,10 @@ used on whichever server holds the player, when that server has its world. Detai
 
 Every backend knows which server each online player is on, from what the others announce with their heartbeats.
 With the network on, `/msg` and `/reply` reach a player on another server; that server applies the recipient's own
-message toggle, reply setting, ignore list and vanish, and social spies on every server see the message once.
-`/helpop` and staff chat reach the staff of every server with the sender's server in the line. `/seen` reports a
-player connected elsewhere as online there.
+message toggle, reply setting, ignore list and vanish. A spy holding `uxmessentials.msg.socialspy` sees every
+private message once, on any server. `/msgtoggle`, `/rtoggle`, `/broadcasttoggle`, `/socialspy` and who `/reply`
+answers follow the player to every server. `/helpop` and staff chat reach the staff of every server with the
+sender's server in the line. `/seen` reports a player connected elsewhere as online there.
 
 A vanished player is hidden on every server only with `cross-server = true` in `modules/vanish/config.conf` on
 every backend; a backend with it off shows them. Vanish is kept in the database, so a player switching servers stays

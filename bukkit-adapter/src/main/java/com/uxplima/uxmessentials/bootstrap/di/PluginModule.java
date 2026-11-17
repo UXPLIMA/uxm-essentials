@@ -1668,6 +1668,7 @@ public final class PluginModule {
                     persistence,
                     resources,
                     links,
+                    bus,
                     guiLayouts,
                     guiRegistry,
                     textInput,
@@ -2963,8 +2964,8 @@ public final class PluginModule {
             TextInput textInput,
             Menus menus,
             MenuBindings menuBindings) {
-        // messaging builds its jOOQ mail/ignore stores over persistence.dsl() and its transient reply /
-        // socialspy / toggle stores in-memory/PDC. The mute gate starts on MutePolicy.NEVER and is captured
+        // messaging builds its jOOQ mail/ignore stores over persistence.dsl() and its reply / socialspy / toggle
+        // stores over the settings every backend shares. The mute gate starts on MutePolicy.NEVER and is captured
         // here so moderation rebinds it when it lands; the vanish gate degrades to "fully visible" without
         // presence.
         // The management GUIs consume the SP0 framework: a GuiText over the shared catalog, the data-folder layout
@@ -2995,6 +2996,7 @@ public final class PluginModule {
                 menus,
                 menuBindings);
         wired.commands().forEach(resources::addCommand);
+        wired.listeners().forEach(resources::addListener);
         wired.startBackgroundWork();
         resources.onClose(wired::stop);
         links.mutePolicy = wired.mutePolicy();
@@ -3397,13 +3399,14 @@ public final class PluginModule {
             Persistence persistence,
             CloseableResources resources,
             ContextLinks links,
+            Bus bus,
             GuiLayouts guiLayouts,
             ManagementGuiRegistry guiRegistry,
             TextInput textInput,
             Menus menus,
             MenuBindings menuBindings) {
         // communication's only durable state is the DB-backed announcement set the /announce editor owns, built
-        // over persistence.dsl(); the per-player broadcast opt-out is PDC-backed (survives relog), the sequence
+        // over persistence.dsl(); the per-player broadcast opt-out is a switch every backend shares, the sequence
         // counters are transient, and the connection policies, file announcer schedule, and info pages are
         // config-authored content. The announcer rotates over the file config PLUS the enabled store set. It carries
         // no cross-context bridge, so nothing is captured for a later context. The announcer timer on the Scheduler
@@ -3419,6 +3422,8 @@ public final class PluginModule {
                 ctx,
                 announcementStore,
                 announcerSettingsStore,
+                com.uxplima.uxmessentials.persistence.settings.SettingsStores.switches(persistence),
+                bus,
                 engineTheme(resources),
                 guiLayouts,
                 textInput,
