@@ -64,7 +64,8 @@ at a player who refuses teleports with `/tptoggle` and tell you to use `/tpo` or
 stopped. A position keeps your facing. When uxmParkour is installed it owns `/jump`.
 
 `/tpoffline` reads the position this server saved in the player's data when they left it, so on a network it is
-where they left this server. Data saved before the server recorded the world uid falls back to its dimension. An
+where they left this server. Neither command acts on a player online on another server: it names the server, where
+`/tp` or `/tphere` reach them. A player vanished from you is handled as offline. Data saved before the server recorded the world uid falls back to its dimension. An
 ender pearl the player had in flight is saved with them and lands only after they join again, so the saved position
 does not include where it would have taken them.
 
