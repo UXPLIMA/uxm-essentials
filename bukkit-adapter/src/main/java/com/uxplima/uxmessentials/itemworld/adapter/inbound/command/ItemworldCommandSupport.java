@@ -1,14 +1,17 @@
 package com.uxplima.uxmessentials.itemworld.adapter.inbound.command;
 
+import java.util.Arrays;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.function.Function;
 import java.util.function.Predicate;
 import java.util.function.Supplier;
 import java.util.function.UnaryOperator;
 
+import org.bukkit.Bukkit;
 import org.bukkit.Keyed;
 import org.bukkit.Material;
 import org.bukkit.Registry;
@@ -16,6 +19,7 @@ import org.bukkit.TreeType;
 import org.bukkit.command.CommandSender;
 import org.bukkit.entity.EntityType;
 import org.bukkit.entity.Player;
+import org.bukkit.inventory.Inventory;
 import org.bukkit.inventory.ItemFlag;
 import org.bukkit.inventory.ItemStack;
 
@@ -28,8 +32,10 @@ import com.mojang.brigadier.builder.RequiredArgumentBuilder;
 import com.mojang.brigadier.context.CommandContext;
 import com.mojang.brigadier.suggestion.SuggestionProvider;
 import com.uxplima.uxmessentials.itemworld.adapter.ItemworldServices;
+import com.uxplima.uxmessentials.itemworld.adapter.outbound.OfflineContainers;
 import com.uxplima.uxmessentials.itemworld.domain.ItemworldMessageKey;
 import com.uxplima.uxmessentials.itemworld.domain.SubFeatureGroup;
+import com.uxplima.uxmessentials.playerstate.adapter.outbound.playerdata.ContainerLayout;
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandSuggestions;
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandUsage;
 import com.uxplima.uxmessentials.shared.adapter.outbound.BukkitRefs;
@@ -116,6 +122,57 @@ abstract class ItemworldCommandSupport {
             return Optional.empty();
         }
         return Optional.of(hand);
+    }
+
+    /**
+     * Replace {@code self}'s {@code container} with a copy of {@code name}'s, then tell them {@code done}. A player
+     * online here is read on their own region thread; one on another server is answered with that server; anyone else
+     * is read from the data this server stored for them, off the tick.
+     */
+    final void copyContainer(
+            CommandContext<CommandSourceStack> ctx,
+            Player self,
+            String name,
+            ContainerLayout layout,
+            Function<Player, Inventory> container,
+            MessageKey done) {
+        services.targets().resolveHere(ctx.getSource(), name, ItemworldMessageKey.UNKNOWN_TARGET, subject -> {
+            Map<String, String> args = Map.of("player", subject.name());
+            Player target = Bukkit.getPlayer(subject.uuid());
+            if (target != null) {
+                services.kernel().scheduler().onEntity(ref(target), () -> {
+                    // Read the target's container only on the target's own region thread; clone so the array that
+                    // crosses to the actor's thread shares no mutable ItemStack with the target's live container.
+                    @Nullable ItemStack[] contents = Arrays.stream(container.apply(target).getContents())
+                            .map(stack -> stack == null ? null : stack.clone())
+                            .toArray(ItemStack[]::new);
+                    paste(ctx, self, contents, container, done, args);
+                });
+                return;
+            }
+            services.kernel().scheduler().async(() -> {
+                OfflineContainers.Read read = services.offline().read(subject.uuid(), layout);
+                Optional<MessageKey> problem = read.outcome().problem();
+                if (problem.isPresent()) {
+                    reply(ctx, problem.get(), args);
+                    return;
+                }
+                paste(ctx, self, read.items(), container, done, args);
+            });
+        });
+    }
+
+    private void paste(
+            CommandContext<CommandSourceStack> ctx,
+            Player self,
+            @Nullable ItemStack[] contents,
+            Function<Player, Inventory> container,
+            MessageKey done,
+            Map<String, String> args) {
+        services.kernel().scheduler().onEntity(ref(self), () -> {
+            container.apply(self).setContents(contents);
+            reply(ctx, done, args);
+        });
     }
 
     /** A {@link PlayerRef} for the live player, for audit attribution and locale resolution. */

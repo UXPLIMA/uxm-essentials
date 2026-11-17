@@ -7,7 +7,6 @@ import java.util.Optional;
 import java.util.function.Supplier;
 
 import org.bukkit.command.CommandSender;
-import org.bukkit.entity.Player;
 
 import io.papermc.paper.command.brigadier.CommandSourceStack;
 import io.papermc.paper.command.brigadier.Commands;
@@ -21,10 +20,11 @@ import com.uxplima.uxmessentials.holograms.domain.HologramName;
 import com.uxplima.uxmessentials.holograms.domain.HologramsMessageKey;
 import com.uxplima.uxmessentials.holograms.domain.Visibility;
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandSuggestions;
-import com.uxplima.uxmessentials.shared.adapter.outbound.lookup.OnlineByName;
+import com.uxplima.uxmessentials.shared.adapter.inbound.command.OffTickNames;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
 import com.uxplima.uxmessentials.shared.application.port.PlayerLookup;
-import com.uxplima.uxmessentials.shared.domain.NameMatch;
+import com.uxplima.uxmessentials.shared.application.port.Scheduler;
+import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmlib.command.Args;
 import com.uxplima.uxmlib.command.Sender;
 import org.jspecify.annotations.NullMarked;
@@ -43,23 +43,25 @@ import org.jspecify.annotations.NullMarked;
  * <p>The permission node a {@code PERMISSION} hologram requires is the operator's own choice, so it is a dynamic
  * node, not a fixed plugin-declared one. The {@code /hologram} command as a whole stays gated by
  * {@code uxmessentials.hologram.use}; this only sets which node a viewer must hold to see one hologram. {@code
- * show}/{@code hide} resolve their target against the online roster (v1 is online-only; an offline name is
- * rejected with a not-found message) and tab-complete the online players.
+ * show}/{@code hide} and the blacklist name any account, online here, on another server or offline: the lists are
+ * kept by account and holograms are the same on every server. The name is settled off the tick, and the
+ * subcommands tab-complete the online players.
  */
 @NullMarked
 final class HologramVisibilityCommand extends HologramCommandSupport {
 
     private static final List<String> MODES = List.of("ALL", "PERMISSION", "MANUAL");
 
-    private final PlayerLookup players;
+    private final OffTickNames names;
 
     HologramVisibilityCommand(
             HologramServices services,
             Messages messages,
             Supplier<? extends Collection<String>> hologramNames,
-            PlayerLookup players) {
+            PlayerLookup players,
+            Scheduler scheduler) {
         super(services, messages, hologramNames);
-        this.players = java.util.Objects.requireNonNull(players, "players");
+        this.names = new OffTickNames(players, scheduler, feedback);
     }
 
     /** The visibility subcommand nodes the {@code /hologram} literal attaches. */
@@ -144,55 +146,41 @@ final class HologramVisibilityCommand extends HologramCommandSupport {
     }
 
     private int show(CommandContext<CommandSourceStack> ctx) {
-        CommandSender sender = Sender.audience(ctx.getSource());
-        Player target = onlineTarget(ctx, sender);
-        if (target == null) {
-            return 0;
-        }
-        services.viewers().show(actor(ctx), nameArg(ctx), ref(target));
-        return Command.SINGLE_SUCCESS;
+        return onTarget(ctx, (actor, name, target) -> services.viewers().show(actor, name, target));
     }
 
     private int hide(CommandContext<CommandSourceStack> ctx) {
-        CommandSender sender = Sender.audience(ctx.getSource());
-        Player target = onlineTarget(ctx, sender);
-        if (target == null) {
-            return 0;
-        }
-        services.viewers().hide(actor(ctx), nameArg(ctx), ref(target));
-        return Command.SINGLE_SUCCESS;
+        return onTarget(ctx, (actor, name, target) -> services.viewers().hide(actor, name, target));
     }
 
     private int blacklist(CommandContext<CommandSourceStack> ctx) {
-        CommandSender sender = Sender.audience(ctx.getSource());
-        Player target = onlineTarget(ctx, sender);
-        if (target == null) {
-            return 0;
-        }
-        services.blacklist().blacklist(actor(ctx), nameArg(ctx), ref(target));
-        return Command.SINGLE_SUCCESS;
+        return onTarget(ctx, (actor, name, target) -> services.blacklist().blacklist(actor, name, target));
     }
 
     private int unblacklist(CommandContext<CommandSourceStack> ctx) {
+        return onTarget(ctx, (actor, name, target) -> services.blacklist().unblacklist(actor, name, target));
+    }
+
+    /**
+     * Resolve the {@code player} argument to an account off the tick, then run {@code change} on the sender's own
+     * thread, where the hologram is shown or hidden. A name no account holds gets the not-found reply.
+     */
+    private int onTarget(CommandContext<CommandSourceStack> ctx, ViewerChange change) {
         CommandSender sender = Sender.audience(ctx.getSource());
-        Player target = onlineTarget(ctx, sender);
-        if (target == null) {
-            return 0;
-        }
-        services.blacklist().unblacklist(actor(ctx), nameArg(ctx), ref(target));
+        PlayerRef actor = actor(ctx);
+        HologramName name = nameArg(ctx);
+        names.resolve(
+                sender,
+                ctx.getArgument("player", String.class),
+                HologramsMessageKey.HOLOGRAM_PLAYER_NOT_FOUND,
+                target -> names.onSenderThread(sender, () -> change.apply(actor, name, target)));
         return Command.SINGLE_SUCCESS;
     }
 
-    /** Resolve the {@code player} argument to an online player, or send the not-found reply and return null. */
-    private @org.jspecify.annotations.Nullable Player onlineTarget(
-            CommandContext<CommandSourceStack> ctx, CommandSender sender) {
-        String name = ctx.getArgument("player", String.class);
-        NameMatch match = players.matchOnlineByName(name);
-        Player target = OnlineByName.player(match);
-        if (target == null) {
-            feedback.send(sender, match.miss(HologramsMessageKey.HOLOGRAM_PLAYER_NOT_FOUND, Map.of()));
-        }
-        return target;
+    /** One change to who sees a hologram. */
+    @FunctionalInterface
+    private interface ViewerChange {
+        void apply(PlayerRef actor, HologramName name, PlayerRef target);
     }
 
     private static Optional<Visibility.Mode> parseMode(String raw) {

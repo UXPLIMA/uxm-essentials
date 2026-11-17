@@ -153,7 +153,7 @@ public final class HologramCommand extends HologramCommandSupport implements Com
                 moveToNode(),
                 moveAtNode()));
         verbs.addAll(new HologramAppearanceCommand(services, messages, hologramNames).nodes());
-        verbs.addAll(new HologramVisibilityCommand(services, messages, hologramNames, players).nodes());
+        verbs.addAll(new HologramVisibilityCommand(services, messages, hologramNames, players, scheduler).nodes());
         verbs.addAll(new HologramModelCommand(services, messages, hologramNames, players).nodes());
         verbs.addAll(new HologramConvenienceCommand(services, messages, hologramNames).nodes());
         verbs.addAll(new HologramNpcCommand(services, messages, hologramNames, npcNames).nodes());

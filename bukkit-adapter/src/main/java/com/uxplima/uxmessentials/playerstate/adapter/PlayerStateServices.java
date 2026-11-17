@@ -29,6 +29,7 @@ import com.uxplima.uxmessentials.playerstate.application.ToggleFly;
 import com.uxplima.uxmessentials.playerstate.application.ToggleGlow;
 import com.uxplima.uxmessentials.playerstate.application.ToggleGod;
 import com.uxplima.uxmessentials.playerstate.application.ToggleNightVision;
+import com.uxplima.uxmessentials.shared.adapter.inbound.command.NetworkTargets;
 import com.uxplima.uxmessentials.shared.application.port.PlayerLookup;
 import org.jspecify.annotations.NullMarked;
 
@@ -66,6 +67,8 @@ import org.jspecify.annotations.NullMarked;
  * @param resetPlaytime {@code /playtime reset}
  * @param resetRest {@code /rest}
  * @param players name → ref resolution for the {@code .others} targets
+ * @param targets the off-tick, network-wide resolution for the verbs that name a player who may be offline or on
+ *     another server
  */
 @NullMarked
 public record PlayerStateServices(
@@ -96,7 +99,8 @@ public record PlayerStateServices(
         ShowPlaytime showPlaytime,
         ResetPlaytime resetPlaytime,
         ResetRest resetRest,
-        PlayerLookup players) {
+        PlayerLookup players,
+        NetworkTargets targets) {
 
     public PlayerStateServices {
         Objects.requireNonNull(toggleGod, "toggleGod");
@@ -127,5 +131,6 @@ public record PlayerStateServices(
         Objects.requireNonNull(resetPlaytime, "resetPlaytime");
         Objects.requireNonNull(resetRest, "resetRest");
         Objects.requireNonNull(players, "players");
+        Objects.requireNonNull(targets, "targets");
     }
 }

@@ -27,6 +27,7 @@ import com.uxplima.uxmessentials.shared.adapter.inbound.gui.ManagementGuiEntry;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.ManagementGuiRegistry;
 import com.uxplima.uxmessentials.shared.adapter.outbound.bus.Bus;
 import com.uxplima.uxmessentials.shared.adapter.outbound.event.InProcessDomainEventPublisher;
+import com.uxplima.uxmessentials.shared.adapter.outbound.lookup.VisibleNetwork;
 import com.uxplima.uxmessentials.shared.application.message.Notifier;
 import com.uxplima.uxmessentials.shared.application.module.KernelPorts;
 import com.uxplima.uxmessentials.shared.application.module.ModuleContext;
@@ -56,6 +57,7 @@ import com.uxplima.uxmessentials.staff.application.RecoverStaffLoadout;
 import com.uxplima.uxmessentials.staff.application.SendStaffChat;
 import com.uxplima.uxmessentials.staff.application.port.StaffLoadoutRepository;
 import com.uxplima.uxmessentials.staff.domain.StaffMessageKey;
+import com.uxplima.uxmessentials.teleport.application.CrossServerStaffTeleport;
 import com.uxplima.uxmessentials.teleport.application.TeleportEngine;
 import com.uxplima.uxmessentials.vanish.application.ToggleVanish;
 import com.uxplima.uxmlib.menu.Menus;
@@ -104,8 +106,10 @@ public final class StaffWiring {
             InProcessDomainEventPublisher events,
             ManagementGuiRegistry guiRegistry,
             Menus menus,
-            MenuBindings menuBindings) {
+            MenuBindings menuBindings,
+            VisibleNetwork network) {
         Objects.requireNonNull(plugin, "plugin");
+        Objects.requireNonNull(network, "network");
         Objects.requireNonNull(ctx, "ctx");
         Objects.requireNonNull(persistence, "persistence");
         Objects.requireNonNull(bus, "bus");
@@ -191,7 +195,13 @@ public final class StaffWiring {
                 notifier);
 
         StaffListCommand staffList = new StaffListCommand(
-                services, kernel.messages(), kernel.scheduler(), plugin.getServer(), kernel.messageSink(), playerMenu);
+                services,
+                kernel.messages(),
+                kernel.scheduler(),
+                plugin.getServer(),
+                kernel.messageSink(),
+                playerMenu,
+                network);
         // The hub entry opens the same online-staff roster /stafflist opens, under the same node.
         guiRegistry.register(new ManagementGuiEntry(
                 "staff", StaffMessageKey.STAFF_LIST_TITLE, Material.SHIELD, STAFF_LIST_PERMISSION, staffList::open));
@@ -262,8 +272,8 @@ public final class StaffWiring {
                         audience, kernel.messages(), kernel.messageSink(), settings.staffChatNode())));
         seams.moderationFreeze().ifPresent(m -> freeze.bind(new ModerationStaffFreeze(m.freeze(), m.sanctions())));
         seams.teleport()
-                .ifPresent(t ->
-                        teleport.bind(new TeleportStaffTeleport(t.engine(), plugin.getServer(), kernel.scheduler())));
+                .ifPresent(t -> teleport.bind(new TeleportStaffTeleport(
+                        t.engine(), t.crossServer(), plugin.getServer(), kernel.scheduler())));
     }
 
     /**
@@ -314,9 +324,10 @@ public final class StaffWiring {
     }
 
     /** The teleport handle the COMPASS gadget and {@code /stafflist} need: the admin-teleport engine. */
-    public record TeleportSeam(TeleportEngine engine) {
+    public record TeleportSeam(TeleportEngine engine, CrossServerStaffTeleport crossServer) {
         public TeleportSeam {
             Objects.requireNonNull(engine, "engine");
+            Objects.requireNonNull(crossServer, "crossServer");
         }
     }
 

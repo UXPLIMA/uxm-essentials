@@ -6,6 +6,7 @@ import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.UUID;
+import java.util.function.Consumer;
 import java.util.function.Function;
 
 import org.bukkit.Server;
@@ -94,7 +95,12 @@ public final class VanishWiring {
      * backends are running.
      */
     public static Wired wire(
-            Plugin plugin, ModuleContext ctx, Persistence persistence, Bus bus, NetworkPresence presence) {
+            Plugin plugin,
+            ModuleContext ctx,
+            Persistence persistence,
+            Bus bus,
+            NetworkPresence presence,
+            Consumer<UUID> vanishChanged) {
         Objects.requireNonNull(plugin, "plugin");
         Objects.requireNonNull(ctx, "ctx");
         Objects.requireNonNull(persistence, "persistence");
@@ -103,7 +109,9 @@ public final class VanishWiring {
         KernelPorts kernel = ctx.kernel();
         VanishConfig config = VanishConfig.from(ctx.config(), kernel.log());
 
-        InMemoryVanishStore store = new InMemoryVanishStore();
+        Objects.requireNonNull(vanishChanged, "vanishChanged");
+        // Every change is told on, so this backend's presence announces at once who the other backends may list.
+        InMemoryVanishStore store = new InMemoryVanishStore(vanishChanged);
         BukkitVanishLevelResolver levels = new BukkitVanishLevelResolver();
         BukkitVanishView view = new BukkitVanishView(plugin, kernel.scheduler(), levels);
         Notifier notifier = new Notifier(kernel.messages(), kernel.messageSink());

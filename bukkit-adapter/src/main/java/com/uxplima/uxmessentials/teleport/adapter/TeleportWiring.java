@@ -432,6 +432,7 @@ public final class TeleportWiring {
                         logoutPositions(kernel.log()),
                         relocations,
                         kernel.playerLookup(),
+                        crossServer.presence(),
                         kernel.worldLookup(),
                         crossServer.visibility(),
                         jailGate,

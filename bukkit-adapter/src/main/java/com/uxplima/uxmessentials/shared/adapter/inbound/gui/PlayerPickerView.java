@@ -1,6 +1,7 @@
 package com.uxplima.uxmessentials.shared.adapter.inbound.gui;
 
 import java.nio.file.Path;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -14,11 +15,13 @@ import org.bukkit.entity.Player;
 
 import com.uxplima.uxmessentials.shared.adapter.outbound.BukkitRefs;
 import com.uxplima.uxmessentials.shared.adapter.outbound.EngineLog;
+import com.uxplima.uxmessentials.shared.adapter.outbound.lookup.VisibleNetwork;
 import com.uxplima.uxmessentials.shared.application.port.Logger;
 import com.uxplima.uxmessentials.shared.application.port.MessageSink;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
 import com.uxplima.uxmessentials.shared.application.port.Scheduler;
 import com.uxplima.uxmessentials.shared.domain.NameMatch;
+import com.uxplima.uxmessentials.shared.domain.OnlinePlayer;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmessentials.shared.domain.message.GuiMessageKey;
 import com.uxplima.uxmessentials.shared.domain.message.MessageKey;
@@ -56,6 +59,9 @@ import org.jspecify.annotations.NullMarked;
  * {@code onSelect} the pick callback), and the offline-name button plus any footer buttons are the spec's fixed
  * {@link EntityListSpec.ExtraButton extra buttons}.
  *
+ * <p>On a network the grid also shows the players on the other backends the viewer may see ({@link VisibleNetwork}),
+ * after this backend's own.
+ *
  * <p>Folia: the online roster is enumerated on the global region thread (iterating
  * {@code Server.getOnlinePlayers()} off it is illegal) and snapshotted to plain {@link PlayerRef}s; the engine then
  * builds and opens the menu on the viewer's own entity region thread, where its clicks also run. The anvil resolver
@@ -77,15 +83,23 @@ public final class PlayerPickerView {
     private final Server server;
     private final Messages messages;
     private final MessageSink sink;
+    private final VisibleNetwork network;
 
     public PlayerPickerView(
-            Menus menus, Scheduler scheduler, TextInput textInput, Server server, Messages messages, MessageSink sink) {
+            Menus menus,
+            Scheduler scheduler,
+            TextInput textInput,
+            Server server,
+            Messages messages,
+            MessageSink sink,
+            VisibleNetwork network) {
         this.menus = Objects.requireNonNull(menus, "menus");
         this.scheduler = Objects.requireNonNull(scheduler, "scheduler");
         this.textInput = Objects.requireNonNull(textInput, "textInput");
         this.server = Objects.requireNonNull(server, "server");
         this.messages = Objects.requireNonNull(messages, "messages");
         this.sink = Objects.requireNonNull(sink, "sink");
+        this.network = Objects.requireNonNull(network, "network");
     }
 
     /**
@@ -153,11 +167,16 @@ public final class PlayerPickerView {
         scheduler.onGlobal(() -> {
             // Route the roster through the viewer's canSee graph so a vanished player the viewer may not see is
             // never offered as a pick target; the viewer always sees themselves (canSee-self is true).
-            List<PlayerRef> roster = server.getOnlinePlayers().stream()
+            List<PlayerRef> roster = new ArrayList<>(server.getOnlinePlayers().stream()
                     .filter(viewer::canSee)
                     .map(BukkitRefs::toRef)
-                    .toList();
-            menus.open(viewer, SPEC_ID, new Session(request, roster));
+                    .toList());
+            // The players on the other backends the viewer may see follow; what a pick does with them is the
+            // caller's, as it is for a typed offline name.
+            for (OnlinePlayer elsewhere : network.elsewhere(viewer)) {
+                roster.add(elsewhere.player());
+            }
+            menus.open(viewer, SPEC_ID, new Session(request, List.copyOf(roster)));
         });
     }
 

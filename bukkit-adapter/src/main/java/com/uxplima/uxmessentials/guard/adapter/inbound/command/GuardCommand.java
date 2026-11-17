@@ -5,6 +5,8 @@ import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collection;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -23,7 +25,6 @@ import java.util.function.UnaryOperator;
 import org.bukkit.Bukkit;
 import org.bukkit.Color;
 import org.bukkit.Location;
-import org.bukkit.OfflinePlayer;
 import org.bukkit.World;
 import org.bukkit.command.CommandSender;
 import org.bukkit.entity.Player;
@@ -68,12 +69,12 @@ import com.uxplima.uxmessentials.guard.domain.engine.RegionSet;
 import com.uxplima.uxmessentials.guard.domain.engine.WorldIndex;
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandFeedback;
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandRegistration;
+import com.uxplima.uxmessentials.shared.adapter.inbound.command.OffTickNames;
 import com.uxplima.uxmessentials.shared.adapter.outbound.BukkitRefs;
 import com.uxplima.uxmessentials.shared.adapter.outbound.style.StyledText;
 import com.uxplima.uxmessentials.shared.application.permission.ContentPermissions;
 import com.uxplima.uxmessentials.shared.application.port.PlayerLookup;
 import com.uxplima.uxmessentials.shared.application.port.Scheduler;
-import com.uxplima.uxmessentials.shared.domain.NameMatch;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmessentials.shared.domain.Result;
 import com.uxplima.uxmessentials.shared.domain.ServerScope;
@@ -104,6 +105,7 @@ public final class GuardCommand implements CommandRegistration {
     private final BiConsumer<Player, Runnable> onPlayer;
     private final Scheduler scheduler;
     private final PlayerLookup players;
+    private final OffTickNames names;
     private final boolean rgAlias;
 
     public GuardCommand(
@@ -133,6 +135,7 @@ public final class GuardCommand implements CommandRegistration {
         this.onPlayer = Objects.requireNonNull(onPlayer, "onPlayer");
         this.scheduler = Objects.requireNonNull(scheduler, "scheduler");
         this.players = Objects.requireNonNull(players, "players");
+        this.names = new OffTickNames(players, scheduler, feedback);
         this.rgAlias = rgAlias;
     }
 
@@ -444,11 +447,13 @@ public final class GuardCommand implements CommandRegistration {
             line(sender, GuardMessageKey.INFO_RULE, rule.toString());
         }
         r.behaviours().asMap().forEach((k, v) -> line(sender, k.key(), v));
-        Map<RoleName, List<String>> byRole = new LinkedHashMap<>();
-        r.roles()
-                .forEach((id, role) ->
-                        byRole.computeIfAbsent(role, x -> new ArrayList<>()).add(name(id)));
-        byRole.forEach((role, names) -> line(sender, role.value(), String.join(", ", names)));
+        Map<UUID, RoleName> roles = Map.copyOf(r.roles());
+        memberNames(sender, roles.keySet(), named -> {
+            Map<RoleName, List<String>> byRole = new LinkedHashMap<>();
+            roles.forEach((id, role) ->
+                    byRole.computeIfAbsent(role, x -> new ArrayList<>()).add(named.getOrDefault(id, id.toString())));
+            byRole.forEach((role, members) -> line(sender, role.value(), String.join(", ", members)));
+        });
     }
 
     private void list(CommandSender sender, String[] args) {
@@ -659,21 +664,20 @@ public final class GuardCommand implements CommandRegistration {
                     "Give or take a region role");
             return;
         }
-        Optional<PlayerRef> named = player(sender, args[1]);
-        if (named.isEmpty()) {
-            return;
-        }
-        PlayerRef target = named.get();
-        boolean clear = args[2].equalsIgnoreCase("clear") || args[2].equalsIgnoreCase("temizle");
+        player(sender, args[1], target -> roleChange(sender, key.get(), target, args[2], staff));
+    }
+
+    private void roleChange(CommandSender sender, RegionKey key, PlayerRef target, String typed, boolean staff) {
+        boolean clear = typed.equalsIgnoreCase("clear") || typed.equalsIgnoreCase("temizle");
         RoleName role;
         try {
-            role = clear ? null : RoleName.of(args[2]);
+            role = clear ? null : RoleName.of(typed);
         } catch (IllegalArgumentException invalid) {
-            feedback.send(sender, GuardMessageKey.ERROR_BAD_VALUE, Map.of("value", args[2]));
+            feedback.send(sender, GuardMessageKey.ERROR_BAD_VALUE, Map.of("value", typed));
             return;
         }
         if (!staff) {
-            Optional<Region> region = service.region(key.get());
+            Optional<Region> region = service.region(key);
             boolean manages = sender instanceof Player p
                     && region.flatMap(r -> r.roleOf(p.getUniqueId()))
                             .map(RoleName::manages)
@@ -688,12 +692,11 @@ public final class GuardCommand implements CommandRegistration {
             }
         }
         UUID id = target.uuid();
-        String name = target.name();
         Map<String, String> values =
-                Map.of("region", key.get().id().value(), "player", name, "role", role == null ? "-" : role.value());
+                Map.of("region", key.id().value(), "player", target.name(), "role", role == null ? "-" : role.value());
         edit(
                 sender,
-                key.get(),
+                key,
                 "role",
                 r -> r.withRole(id, role),
                 role == null ? GuardMessageKey.ROLE_CLEARED : GuardMessageKey.ROLE_SET,
@@ -1144,11 +1147,10 @@ public final class GuardCommand implements CommandRegistration {
             feedback.usage(sender, "guard test", "<player> <action> [region]", "Check a decision for anyone");
             return;
         }
-        Optional<PlayerRef> named = player(sender, args[0]);
-        if (named.isEmpty()) {
-            return;
-        }
-        PlayerRef target = named.get();
+        player(sender, args[0], target -> test(sender, target, args));
+    }
+
+    private void test(CommandSender sender, PlayerRef target, String[] args) {
         String world;
         int x;
         int y;
@@ -1806,21 +1808,46 @@ public final class GuardCommand implements CommandRegistration {
     }
 
     /**
-     * The player a typed name names, online or seen here before, or empty after telling {@code sender} why not: nobody
-     * by that name, or several offline-mode accounts that differ only in case and none spelled as typed. The server's
-     * own name lookups match in any case and would pick one of them.
+     * Run {@code then} on the sender's own thread with the account a typed name names: online here, on another server,
+     * or known only to the database, so the name is settled off the tick. Otherwise tell {@code sender} why not (nobody
+     * by that name, or several offline-mode accounts that differ only in case and none spelled as typed) and run
+     * {@code missed}. The server's own name lookups match in any case and would pick one of them.
      */
-    public Optional<PlayerRef> player(CommandSender sender, String name) {
-        NameMatch match = players.matchByName(name);
-        if (match.player().isEmpty()) {
-            feedback.send(sender, match.miss(GuardMessageKey.ERROR_UNKNOWN_PLAYER, Map.of("player", name)));
-        }
-        return match.player();
+    public void player(CommandSender sender, String name, Runnable missed, Consumer<PlayerRef> then) {
+        Objects.requireNonNull(missed, "missed");
+        Objects.requireNonNull(then, "then");
+        names.resolve(
+                sender,
+                name,
+                match -> {
+                    feedback.send(sender, match.miss(GuardMessageKey.ERROR_UNKNOWN_PLAYER, Map.of("player", name)));
+                    missed.run();
+                },
+                target -> names.onSenderThread(sender, () -> then.accept(target)));
     }
 
-    private static String name(UUID id) {
-        OfflinePlayer player = Bukkit.getOfflinePlayer(id);
-        return player.getName() == null ? id.toString().substring(0, 8) : player.getName();
+    private void player(CommandSender sender, String name, Consumer<PlayerRef> then) {
+        player(sender, name, () -> {}, then);
+    }
+
+    /**
+     * The name of every account in {@code ids}, handed to {@code then} on the sender's own thread. Read off the tick, so
+     * a member who never joined this server is named from the database, not shown as a UUID; one nobody has a name
+     * for is shown by the start of their UUID.
+     */
+    public void memberNames(CommandSender sender, Collection<UUID> ids, Consumer<Map<UUID, String>> then) {
+        List<UUID> wanted = List.copyOf(ids);
+        scheduler.async(() -> {
+            Map<UUID, String> named = new HashMap<>();
+            for (UUID id : wanted) {
+                named.put(
+                        id,
+                        players.findByUuid(id)
+                                .map(PlayerRef::name)
+                                .orElse(id.toString().substring(0, 8)));
+            }
+            names.onSenderThread(sender, () -> then.accept(named));
+        });
     }
 
     private static GuardSubject offlineSubject(UUID id) {

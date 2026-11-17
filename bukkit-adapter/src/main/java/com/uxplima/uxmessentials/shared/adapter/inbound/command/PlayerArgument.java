@@ -112,6 +112,14 @@ public final class PlayerArgument
     }
 
     /**
+     * Whether the sender of {@code source} may be told that {@code target} is online, and where, by the rule the vanish
+     * module bound; everyone may before it binds one. Memory only.
+     */
+    public static boolean mayLocate(CommandSourceStack source, PlayerRef target) {
+        return visibility.mayLocate(Objects.requireNonNull(source, "source"), Objects.requireNonNull(target, "target"));
+    }
+
+    /**
      * Forget what {@link #bind} and {@link #bindVisibility} bound, when the plugin that bound them stops: names then
      * match this server's list.
      */
@@ -186,6 +194,18 @@ public final class PlayerArgument
         Bound current = bound;
         Optional<String> name = name(ctx, argument);
         return current == null || name.isEmpty() ? Optional.empty() : elsewhere(current, ctx.getSource(), name.get());
+    }
+
+    /**
+     * The player online on another server whom {@code name} means, with that server, for a command that reads a name
+     * as a plain word; empty for a name nobody the sender of {@code source} may see holds elsewhere, or before the
+     * network roster is bound.
+     */
+    public static Optional<OnlinePlayer> elsewhere(CommandSourceStack source, String name) {
+        Objects.requireNonNull(source, "source");
+        Objects.requireNonNull(name, "name");
+        Bound current = bound;
+        return current == null ? Optional.empty() : elsewhere(current, source, name);
     }
 
     /**

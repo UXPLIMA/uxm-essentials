@@ -212,7 +212,11 @@ final class SocialPlaceholderKeys {
                         PlaceholderScope.SESSION,
                         STAFF),
                 PlaceholderSpec.of(
-                        "staff_online", "How many staff members are connected.", "3", PlaceholderScope.GLOBAL, STAFF),
+                        "staff_online",
+                        "How many staff members are connected, on every server of the network.",
+                        "3",
+                        PlaceholderScope.GLOBAL,
+                        STAFF),
                 PlaceholderSpec.of(
                         "staff_count",
                         "The same connected-staff count, under the spelling a config may prefer.",

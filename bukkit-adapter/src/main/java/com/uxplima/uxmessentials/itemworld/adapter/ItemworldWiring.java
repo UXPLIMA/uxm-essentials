@@ -2,6 +2,7 @@ package com.uxplima.uxmessentials.itemworld.adapter;
 
 import java.util.List;
 import java.util.Objects;
+import java.util.function.Supplier;
 
 import org.bukkit.Material;
 import org.bukkit.event.Listener;
@@ -19,6 +20,7 @@ import com.uxplima.uxmessentials.itemworld.adapter.inbound.gui.ShulkerBoxView;
 import com.uxplima.uxmessentials.itemworld.adapter.inbound.listener.PowertoolInteractListener;
 import com.uxplima.uxmessentials.itemworld.adapter.inbound.listener.UnlimitedPlacementListener;
 import com.uxplima.uxmessentials.itemworld.adapter.outbound.LoggingItemworldAudit;
+import com.uxplima.uxmessentials.itemworld.adapter.outbound.OfflineContainers;
 import com.uxplima.uxmessentials.itemworld.adapter.outbound.PdcPowertoolStore;
 import com.uxplima.uxmessentials.itemworld.adapter.outbound.PowertoolToggleStore;
 import com.uxplima.uxmessentials.itemworld.adapter.outbound.StoreItemworldPlaceholders;
@@ -27,7 +29,11 @@ import com.uxplima.uxmessentials.itemworld.application.ItemworldConfig;
 import com.uxplima.uxmessentials.itemworld.application.PowertoolPolicy;
 import com.uxplima.uxmessentials.itemworld.application.PurgePolicy;
 import com.uxplima.uxmessentials.itemworld.application.port.ItemworldAudit;
+import com.uxplima.uxmessentials.playerstate.adapter.outbound.OfflinePlayerStorage;
+import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandFeedback;
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandRegistration;
+import com.uxplima.uxmessentials.shared.adapter.inbound.command.NetworkTargets;
+import com.uxplima.uxmessentials.shared.adapter.inbound.command.PlayerArgument;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.GuiLayout;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.GuiLayouts;
 import com.uxplima.uxmessentials.shared.adapter.outbound.log.AuditChannel;
@@ -35,6 +41,7 @@ import com.uxplima.uxmessentials.shared.adapter.outbound.papi.ItemworldPlacehold
 import com.uxplima.uxmessentials.shared.adapter.outbound.skin.HeadTextures;
 import com.uxplima.uxmessentials.shared.application.module.KernelPorts;
 import com.uxplima.uxmessentials.shared.application.module.ModuleContext;
+import com.uxplima.uxmessentials.shared.application.port.NetworkPresence;
 import com.uxplima.uxmlib.gui.input.TextInput;
 import com.uxplima.uxmlib.menu.Menus;
 import com.uxplima.uxmlib.menu.binding.MenuBindings;
@@ -63,7 +70,8 @@ public final class ItemworldWiring {
 
     /**
      * Build the itemworld adapters from {@code ctx}, ready to register with the plugin. {@code storedSkins} reads the
-     * skin module's stored skins at the moment {@code /skull} asks, so a module wired later still answers.
+     * skin module's stored skins at the moment {@code /skull} asks, so a module wired later still answers;
+     * {@code offlineStorage} likewise reads the playerstate module's stored containers when a command asks.
      */
     public static Wired wire(
             Plugin plugin,
@@ -73,7 +81,10 @@ public final class ItemworldWiring {
             TextInput textInput,
             Menus menus,
             MenuBindings menuBindings,
-            HeadTextures.StoredSkins storedSkins) {
+            HeadTextures.StoredSkins storedSkins,
+            NetworkPresence presence,
+            PlayerArgument.Visibility visibility,
+            Supplier<OfflinePlayerStorage> offlineStorage) {
         Objects.requireNonNull(plugin, "plugin");
         Objects.requireNonNull(ctx, "ctx");
         Objects.requireNonNull(guiLayouts, "guiLayouts");
@@ -81,12 +92,22 @@ public final class ItemworldWiring {
         Objects.requireNonNull(menus, "menus");
         Objects.requireNonNull(menuBindings, "menuBindings");
         Objects.requireNonNull(storedSkins, "storedSkins");
+        Objects.requireNonNull(presence, "presence");
+        Objects.requireNonNull(visibility, "visibility");
+        Objects.requireNonNull(offlineStorage, "offlineStorage");
         KernelPorts kernel = ctx.kernel();
         ItemworldConfig config = ItemworldConfig.from(ctx.config());
         ItemworldAudit audit = new LoggingItemworldAudit(auditChannel.logger(), config);
         GuiLayout disposalLayout = guiLayouts.load("itemworld", "disposal", GuiLayout.storageDefault(DISPOSAL_ROWS));
         HeadTextures heads = new HeadTextures(kernel.playerLookup(), storedSkins, kernel.skins());
-        ItemworldServices services = new ItemworldServices(kernel, audit, config, disposalLayout, heads);
+        NetworkTargets targets = new NetworkTargets(
+                kernel.playerLookup(),
+                kernel.scheduler(),
+                presence,
+                visibility,
+                new CommandFeedback(kernel.messages()));
+        ItemworldServices services = new ItemworldServices(
+                kernel, audit, config, disposalLayout, heads, targets, new OfflineContainers(offlineStorage));
 
         PowertoolPolicy powertoolPolicy = new PowertoolPolicy();
         PurgePolicy purgePolicy = new PurgePolicy(config);
