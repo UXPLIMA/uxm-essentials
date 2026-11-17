@@ -10,6 +10,7 @@ import com.uxplima.uxmessentials.messaging.application.port.MailRepository;
 import com.uxplima.uxmessentials.messaging.application.port.MessageDelivery;
 import com.uxplima.uxmessentials.messaging.application.port.MutePolicy;
 import com.uxplima.uxmessentials.messaging.domain.IgnoreChannel;
+import com.uxplima.uxmessentials.messaging.domain.IgnoreList;
 import com.uxplima.uxmessentials.messaging.domain.MailItem;
 import com.uxplima.uxmessentials.messaging.domain.MailSender;
 import com.uxplima.uxmessentials.messaging.domain.MessageBody;
@@ -86,6 +87,19 @@ public final class SendMail {
         Objects.requireNonNull(recipient, "recipient");
         Objects.requireNonNull(body, "body");
         deposit(recipient, MailSender.system(senderName), body);
+    }
+
+    /**
+     * Leave a private message the recipient could not take live as mail from {@code sender}, who was gated and told
+     * already. The text was written as a message and lands as mail, so a recipient who ignores either from the sender
+     * gets nothing; the sender is not told, as with every ignore.
+     */
+    void fromMessage(PlayerRef sender, PlayerRef recipient, MessageBody body) {
+        IgnoreList ignored = ignores.load(recipient);
+        if (ignored.blocks(sender, IgnoreChannel.MESSAGE) || ignored.blocks(sender, IgnoreChannel.MAIL)) {
+            return;
+        }
+        deposit(recipient, MailSender.player(sender), body);
     }
 
     private Result<Unit, MessagingError> persist(PlayerRef sender, PlayerRef recipient, MessageBody body) {
