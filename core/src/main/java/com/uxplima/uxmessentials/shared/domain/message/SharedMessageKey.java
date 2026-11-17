@@ -149,6 +149,9 @@ public enum SharedMessageKey implements MessageKey {
     // The same refusal for a move the player did not ask for, a jail transfer or a staff teleport: it gives no advice
     // to try again, since there is nothing for them to retry.
     COMMON_HOP_BUSY_ORDERED("common.hop-busy-ordered"),
+    // Shown after the lines kept for a player who was away, when there were more of them than are shown at once: how
+    // many were left out, so a pile of them never floods the chat.
+    COMMON_NOTICES_MORE("common.notices-more"),
 
     // The words a leaderboard placeholder answers with, the same in every UXM plugin: the name of a place nobody holds,
     // the value of one and a rank the reader does not have, and the time until a period starts again.

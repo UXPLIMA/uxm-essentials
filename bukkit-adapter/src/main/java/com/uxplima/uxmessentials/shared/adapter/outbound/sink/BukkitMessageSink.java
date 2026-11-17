@@ -70,25 +70,44 @@ public final class BukkitMessageSink implements MessageSink {
     public void deliver(PlayerRef viewer, String renderedText) {
         Objects.requireNonNull(viewer, "viewer");
         Objects.requireNonNull(renderedText, "renderedText");
+        Component component = component(viewer, renderedText);
+        if (viewer.isSystem()) {
+            scheduler.onGlobal(() -> Bukkit.getConsoleSender().sendMessage(component));
+            return;
+        }
+        scheduler.onEntity(viewer, () -> sendTo(viewer, component, () -> {}));
+    }
+
+    @Override
+    public void deliver(PlayerRef viewer, String renderedText, Runnable unreached) {
+        Objects.requireNonNull(unreached, "unreached");
+        if (viewer.isSystem()) {
+            deliver(viewer, renderedText);
+            return;
+        }
+        Objects.requireNonNull(renderedText, "renderedText");
+        Component component = component(viewer, renderedText);
+        // A player still logging in has no entity yet and one quitting loses it; either way the line did not land.
+        scheduler.onEntity(viewer, () -> sendTo(viewer, component, unreached), unreached);
+    }
+
+    private Component component(PlayerRef viewer, String renderedText) {
         UnaryOperator<String> placeholders = preParse.apply(viewer.uuid());
         String expanded = placeholders.apply(renderedText);
         // The prefix is the operator's words too, and is read for the same viewer as the line it opens.
         TagResolver prefix = Placeholder.parsed("prefix", placeholders.apply(prefixTemplate));
         Optional<String> centred = ChatCentre.afterMarker(expanded);
-        Component component = centred.isPresent()
+        return centred.isPresent()
                 ? CenteredTextPadder.centred(StyledText.render(centred.get(), prefix))
                 : StyledText.render(expanded, prefix);
-        if (viewer.isSystem()) {
-            scheduler.onGlobal(() -> Bukkit.getConsoleSender().sendMessage(component));
-            return;
-        }
-        scheduler.onEntity(viewer, () -> sendTo(viewer, component));
     }
 
-    private void sendTo(PlayerRef viewer, Component component) {
+    private void sendTo(PlayerRef viewer, Component component, Runnable unreached) {
         Player player = Bukkit.getPlayer(viewer.uuid());
         if (player != null) {
             player.sendMessage(component);
+        } else {
+            unreached.run();
         }
     }
 }
