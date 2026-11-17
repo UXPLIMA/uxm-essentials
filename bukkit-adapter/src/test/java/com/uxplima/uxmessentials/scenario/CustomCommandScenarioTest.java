@@ -93,11 +93,11 @@ class CustomCommandScenarioTest {
     }
 
     @Test
-    void anEngineTokenTypedIntoABroadcastIsFilledWithWordsToo() {
+    void engineTokensTypedIntoABroadcastAreFilledWithWordsToo() {
         ScenarioPlayer mallory = running.join("Mallet");
         ScenarioPlayer reader = running.join("Reed");
 
-        running.run(mallory, "shout %argument_words% " + CLICK);
+        running.run(mallory, "shout %argument_words% %argument_args% " + CLICK);
         running.settle();
 
         List<Component> lines = heardBy(reader);
