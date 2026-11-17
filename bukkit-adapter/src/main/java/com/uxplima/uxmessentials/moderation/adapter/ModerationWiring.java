@@ -34,14 +34,20 @@ import com.uxplima.uxmessentials.moderation.adapter.outbound.ConfigJailDirectory
 import com.uxplima.uxmessentials.moderation.adapter.outbound.DiscordPunishmentAudit;
 import com.uxplima.uxmessentials.moderation.adapter.outbound.InMemoryCommandSpyStore;
 import com.uxplima.uxmessentials.moderation.adapter.outbound.JailServerAdoption;
+import com.uxplima.uxmessentials.moderation.adapter.outbound.KnownAccountTraces;
 import com.uxplima.uxmessentials.moderation.adapter.outbound.LoggingModerationAudit;
 import com.uxplima.uxmessentials.moderation.adapter.outbound.PermissionSanctionBroadcast;
 import com.uxplima.uxmessentials.moderation.adapter.outbound.PlayerLookupTargetResolver;
 import com.uxplima.uxmessentials.moderation.adapter.outbound.RecordedExemptions;
+import com.uxplima.uxmessentials.moderation.adapter.outbound.StoredNameHolders;
 import com.uxplima.uxmessentials.moderation.adapter.outbound.api.ModerationApiWrites;
+import com.uxplima.uxmessentials.moderation.application.AddressFilter;
 import com.uxplima.uxmessentials.moderation.application.ApplyRemoteJail;
 import com.uxplima.uxmessentials.moderation.application.Ban;
 import com.uxplima.uxmessentials.moderation.application.BanIp;
+import com.uxplima.uxmessentials.moderation.application.CaseVariantAddresses;
+import com.uxplima.uxmessentials.moderation.application.CaseVariantCopies;
+import com.uxplima.uxmessentials.moderation.application.CaseVariantSanctions;
 import com.uxplima.uxmessentials.moderation.application.CheckBan;
 import com.uxplima.uxmessentials.moderation.application.CheckMute;
 import com.uxplima.uxmessentials.moderation.application.ClearWarns;
@@ -99,6 +105,7 @@ import com.uxplima.uxmessentials.moderation.application.UnbanIp;
 import com.uxplima.uxmessentials.moderation.application.Unjail;
 import com.uxplima.uxmessentials.moderation.application.Unmute;
 import com.uxplima.uxmessentials.moderation.application.WarnEscalator;
+import com.uxplima.uxmessentials.moderation.application.port.CaseCopies;
 import com.uxplima.uxmessentials.moderation.application.port.ExemptionSightings;
 import com.uxplima.uxmessentials.moderation.application.port.FreezeSync;
 import com.uxplima.uxmessentials.moderation.application.port.JailLocationStore;
@@ -110,6 +117,7 @@ import com.uxplima.uxmessentials.moderation.application.port.SanctionHistory;
 import com.uxplima.uxmessentials.moderation.application.port.SanctionSync;
 import com.uxplima.uxmessentials.moderation.application.port.Sanctions;
 import com.uxplima.uxmessentials.moderation.application.port.SeenVisibility;
+import com.uxplima.uxmessentials.persistence.lookup.JooqPlayerNameRepository;
 import com.uxplima.uxmessentials.persistence.moderation.ModerationStores;
 import com.uxplima.uxmessentials.persistence.runtime.Persistence;
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandRegistration;
@@ -244,6 +252,22 @@ public final class ModerationWiring {
         }
         JailNetwork jailNetwork = jailNetwork(
                 plugin, kernel, bus, repository, jailLocations, sanctions, hops, networked, presence, clock);
+        // On an offline-mode server a ban, a mute and a jail follow their player into the other spellings of their
+        // name; with authenticated logins a case variant of a name is somebody else and nothing is read. The name
+        // case is asked live, since a proxy network can turn out to be offline-mode while the server runs.
+        CaseCopies caseCopies = ModerationStores.caseCopies(persistence);
+        JooqPlayerNameRepository storedNames = new JooqPlayerNameRepository(persistence.dsl());
+        CaseVariantSanctions caseVariants = new CaseVariantSanctions(
+                repository,
+                new StoredNameHolders(storedNames, kernel.playerLookup()::nameCase),
+                settings.caseVariantSanctions(),
+                caseCopies,
+                new KnownAccountTraces(repository, storedNames, plugin.getServer()),
+                new CaseVariantAddresses(
+                        ipHistory,
+                        ipTokens,
+                        AddressFilter.of(settings.caseVariantAddressIgnore(), kernel.log()),
+                        settings.caseVariantAddressBusyAfter()));
         // Each backend records what it sees of a player's exemption, so another can read it once they are offline.
         ExemptionSightings sightings = ModerationStores.exemptionSightings(persistence);
         ExemptionWatch exemptionWatch =
@@ -277,13 +301,15 @@ public final class ModerationWiring {
                 ipTokens,
                 presence,
                 seenVisibility,
+                caseVariants,
+                caseCopies,
                 stored,
                 clock);
         // The live kick: on a remote ban frame, re-evaluate the now-authoritative ban here and kick an online
         // target. Self-origin frames are dropped by the bus client before dispatch, so the local /ban (which
         // already kicked) never double-kicks; with the bus disabled this listener is never invoked.
         EnforceRemoteBan enforce = new EnforceRemoteBan(
-                repository, sanctions, new Notifier(kernel.messages(), kernel.messageSink()), clock);
+                repository, sanctions, new Notifier(kernel.messages(), kernel.messageSink()), clock, caseVariants);
         EnforceRemoteIpBan enforceIp = new EnforceRemoteIpBan(
                 repository, sanctions, guard, new Notifier(kernel.messages(), kernel.messageSink()), clock);
         // A connected player's mute is kept in memory for the checks on the server thread; a peer's change to it is
@@ -416,6 +442,8 @@ public final class ModerationWiring {
                 jailGate,
                 services.freeze(),
                 services.tempBan(),
+                enforce,
+                services.caseVariantCopies(),
                 repository,
                 sanctionHistory,
                 clock,
@@ -518,6 +546,8 @@ public final class ModerationWiring {
             IpTokens ipTokens,
             NetworkPresence presence,
             SeenVisibility seenVisibility,
+            CaseVariantSanctions caseVariants,
+            CaseCopies caseCopies,
             StoredPermissions stored,
             Clock clock) {
         // One alt lookup for every flow that asks "who else uses this address": the login audit, /banip,
@@ -531,6 +561,18 @@ public final class ModerationWiring {
         CombinedJailDirectory jails = new CombinedJailDirectory(new ConfigJailDirectory(settings), jailLocations);
         settings.defaultJail().ifPresent(name -> warnIfNoSuchJail(kernel, jails, name));
         Sanctions sanctionPort = sanctions;
+        // The mutes and jails copied onto other spellings of a name: given at login, lifted with their original.
+        CaseVariantCopies copies = new CaseVariantCopies(
+                repository,
+                caseCopies,
+                notifier,
+                history,
+                sanctionPort,
+                sync,
+                jailNetwork.sync(),
+                kernel.events(),
+                audit,
+                clock);
         Jail jail = new Jail(
                 repository,
                 jails,
@@ -664,7 +706,16 @@ public final class ModerationWiring {
                 .staffRollback(staffRollback)
                 .jailCountdown(new JailCountdown(
                         repository, sanctionPort, jailNetwork.transfer(), audit, kernel.events(), clock))
-                .loginEnforcement(new LoginEnforcement(repository, ipAlts, notifier, audit, clock))
+                .loginEnforcement(new LoginEnforcement(
+                        repository,
+                        ipAlts,
+                        notifier,
+                        audit,
+                        clock,
+                        caseVariants,
+                        copies::carryOver,
+                        settings.refuseNameCaseVariants()))
+                .caseVariantCopies(copies)
                 .lockdown(new Lockdown(repository, notifier, broadcast, audit))
                 .repository(repository)
                 .players(kernel.playerLookup())
@@ -830,6 +881,10 @@ public final class ModerationWiring {
      * @param repository the sanction-state read side the {@code moderation_ban_*}/{@code moderation_mute_*}/
      *     {@code moderation_warns} placeholders query (clock-gated through {@link #clock})
      * @param tempBan the tempban use case, lent to security so a verification lockout is an ordinary ban
+     * @param bans the live ban kick, which a ban issued here hands its event to so the other spellings of the banned
+     *     name connected here are removed too
+     * @param copies the mutes and jails copied onto other spellings, which a lift or a longer mute issued here hands
+     *     its event to so the copies follow their original
      * @param clock the clock the placeholder seam gates active ban/mute reads against
      * @param guiViews the management GUI views, whose active-punishments list the {@code /uxmess gui} hub opens
      * @param apiWrites the nine punishment use cases the published API runs, the very ones behind the commands
@@ -844,6 +899,8 @@ public final class ModerationWiring {
             RepositoryJailGate jailGate,
             Freeze freeze,
             TempBan tempBan,
+            EnforceRemoteBan bans,
+            CaseVariantCopies copies,
             ModerationRepository repository,
             SanctionHistory sanctionHistory,
             Clock clock,
@@ -861,6 +918,8 @@ public final class ModerationWiring {
             Objects.requireNonNull(jailGate, "jailGate");
             Objects.requireNonNull(freeze, "freeze");
             Objects.requireNonNull(tempBan, "tempBan");
+            Objects.requireNonNull(bans, "bans");
+            Objects.requireNonNull(copies, "copies");
             Objects.requireNonNull(repository, "repository");
             Objects.requireNonNull(sanctionHistory, "sanctionHistory");
             Objects.requireNonNull(clock, "clock");

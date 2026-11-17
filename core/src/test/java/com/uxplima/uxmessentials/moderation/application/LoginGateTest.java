@@ -74,15 +74,14 @@ class LoginGateTest {
     }
 
     @Test
-    void aPlayerWithoutBansIsLetInAndTheirLoginIsRecordedOffTheTick() {
+    void aPlayerWithoutBansIsLetInAndLeavesTheSeenRowToTheirJoin() {
         gate.preLogin(SAM, ADDRESS);
 
         assertThat(gate.login(SAM, ADDRESS, false, false).allowed()).isTrue();
-        assertThat(records.seen()).isEmpty();
-
         scheduler.runAll();
 
-        assertThat(records.seen()).containsExactly(SAM.uuid());
+        // The join writes the seen row; a login alone, allowed or refused, leaves no trace of the account.
+        assertThat(records.seen()).isEmpty();
     }
 
     @Test

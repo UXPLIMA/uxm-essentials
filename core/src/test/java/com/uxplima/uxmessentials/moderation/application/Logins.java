@@ -12,6 +12,9 @@ final class Logins {
         LoginEnforcement.Standing standing = login.read(who, ip);
         LoginEnforcement.Decision decision = login.decide(standing, hasBypass, exempt);
         login.record(standing, !decision.allowed());
+        if (decision.allowed()) {
+            login.carryOver(standing);
+        }
         return decision;
     }
 }

@@ -306,6 +306,15 @@ final class ModerationWrites {
         return update.where(MODERATION_SEEN.UUID.eq(key)).execute();
     }
 
+    /** Advance an existing seen row's last-seen and last address; a missing row stays missing. */
+    static int touchSeen(DSLContext dsl, PlayerRef who, @Nullable String ip, Instant at) {
+        var update = dsl.update(MODERATION_SEEN).set(MODERATION_SEEN.LAST_SEEN, at.toEpochMilli());
+        if (ip != null) {
+            update = update.set(MODERATION_SEEN.LAST_IP, ip);
+        }
+        return update.where(MODERATION_SEEN.UUID.eq(who.uuid().toString())).execute();
+    }
+
     static int ensureSeenRow(DSLContext dsl, PlayerRef target, Instant at) {
         String key = target.uuid().toString();
         if (dsl.fetchExists(MODERATION_SEEN, MODERATION_SEEN.UUID.eq(key))) {

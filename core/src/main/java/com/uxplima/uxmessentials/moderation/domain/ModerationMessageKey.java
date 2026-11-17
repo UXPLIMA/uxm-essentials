@@ -192,6 +192,7 @@ public enum ModerationMessageKey implements MessageKey {
     MOD_LOCKDOWN_ENABLED_SELF("moderation.lockdown.enabled-self"),
     MOD_LOCKDOWN_DISABLED_SELF("moderation.lockdown.disabled-self"),
     MOD_LOCKDOWN_KICK("moderation.lockdown.kick"),
+    MOD_LOGIN_NAME_VARIANT("moderation.login.name-variant"),
 
     // The login refusal when the ban check could not be made: storage failed at pre-login, or the login found no
     // pre-login read to decide on. It asks the player to join again rather than barring them.
@@ -220,6 +221,8 @@ public enum ModerationMessageKey implements MessageKey {
     // the reason stored with a ladder sanction: the warning count that tripped the step, and that warning's reason
     MOD_WARN_ESCALATION_REASON("moderation.warn-escalation-reason"),
     MOD_WARN_ESCALATION_REASON_BARE("moderation.warn-escalation-reason-bare"),
+    MOD_CASE_VARIANT_REASON("moderation.case-variant-reason"),
+    MOD_CASE_VARIANT_REASON_BARE("moderation.case-variant-reason-bare"),
 
     // shared moderation failures
     TARGET_EXEMPT("moderation.target-exempt"),

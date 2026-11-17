@@ -13,6 +13,7 @@ import com.uxplima.uxmessentials.shared.domain.DomainEvent;
  */
 public sealed interface ModerationEvent extends DomainEvent
         permits PlayerMuted,
+                MuteInherited,
                 PlayerUnmuted,
                 PlayerJailed,
                 PlayerUnjailed,
