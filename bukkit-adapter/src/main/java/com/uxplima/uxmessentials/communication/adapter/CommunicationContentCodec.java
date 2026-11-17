@@ -22,6 +22,7 @@ import com.uxplima.uxmessentials.communication.domain.JoinGroupPolicies;
 import com.uxplima.uxmessentials.communication.domain.MessagePolicy;
 import com.uxplima.uxmessentials.communication.domain.Ordering;
 import com.uxplima.uxmessentials.communication.domain.PolicyMode;
+import com.uxplima.uxmessentials.communication.domain.ServerSwitchPolicy;
 import com.uxplima.uxmessentials.shared.adapter.outbound.hud.ChannelDisplay;
 import com.uxplima.uxmessentials.shared.display.BroadcastChannel;
 import com.uxplima.uxmessentials.shared.display.ConditionParser;
@@ -94,7 +95,22 @@ final class CommunicationContentCodec {
                 // players with the motd; an operator who wants silence sets motd-on-join = false.
                 root.node("motd-on-join").getBoolean(true),
                 infoPages(root.node("info-pages")),
-                chat(root.node("chat")));
+                chat(root.node("chat")),
+                switches(root.node("server-switch")));
+    }
+
+    /**
+     * Parse the {@code server-switch} block; every key absent keeps {@link ServerSwitchPolicy#DEFAULT}, so a file
+     * from before the block hides moves between servers. A negative window counts as zero.
+     */
+    private static ServerSwitchPolicy switches(ConfigurationNode node) {
+        ServerSwitchPolicy fallback = ServerSwitchPolicy.DEFAULT;
+        long seconds = node.node("window-seconds").getLong(fallback.window().toSeconds());
+        return new ServerSwitchPolicy(
+                node.node("hide").getBoolean(fallback.hideSwitches()),
+                Duration.ofSeconds(Math.max(0L, seconds)),
+                "NETWORK"
+                        .equalsIgnoreCase(node.node("count").getString("SERVER").strip()));
     }
 
     /**

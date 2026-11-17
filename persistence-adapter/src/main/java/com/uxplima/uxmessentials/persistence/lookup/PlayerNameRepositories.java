@@ -3,6 +3,7 @@ package com.uxplima.uxmessentials.persistence.lookup;
 import java.util.Objects;
 
 import com.uxplima.uxmessentials.persistence.runtime.Persistence;
+import com.uxplima.uxmessentials.shared.application.port.KnownAccounts;
 import com.uxplima.uxmessentials.shared.application.port.PlayerNameRepository;
 import org.jspecify.annotations.NullMarked;
 
@@ -20,5 +21,11 @@ public final class PlayerNameRepositories {
     public static PlayerNameRepository jooq(Persistence persistence) {
         Objects.requireNonNull(persistence, "persistence");
         return new JooqPlayerNameRepository(persistence.dsl());
+    }
+
+    /** Whether an account joined a server of this database before, read from the same name index. */
+    public static KnownAccounts known(Persistence persistence) {
+        Objects.requireNonNull(persistence, "persistence");
+        return new JooqKnownAccounts(persistence.dsl());
     }
 }

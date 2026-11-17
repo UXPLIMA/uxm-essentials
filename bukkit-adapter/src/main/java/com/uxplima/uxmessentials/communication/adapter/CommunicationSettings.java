@@ -15,6 +15,7 @@ import com.uxplima.uxmessentials.communication.domain.DeathCausePolicies;
 import com.uxplima.uxmessentials.communication.domain.InfoPage;
 import com.uxplima.uxmessentials.communication.domain.JoinGroupPolicies;
 import com.uxplima.uxmessentials.communication.domain.MessagePolicy;
+import com.uxplima.uxmessentials.communication.domain.ServerSwitchPolicy;
 import com.uxplima.uxmessentials.shared.adapter.outbound.hud.ChannelDisplay;
 import com.uxplima.uxmessentials.shared.application.port.Logger;
 import org.jspecify.annotations.NullMarked;
@@ -110,6 +111,11 @@ public final class CommunicationSettings {
     /** The live public-chat format policy; read fresh by the chat renderer on each message. */
     public ChatFormatPolicy chatFormatPolicy() {
         return current().chat();
+    }
+
+    /** How the connection lines treat a move between servers; read fresh on each join and quit. */
+    public ServerSwitchPolicy serverSwitches() {
+        return current().switches();
     }
 
     /** The optional info-page name shown to a dying player when send-info-after-death is configured. */

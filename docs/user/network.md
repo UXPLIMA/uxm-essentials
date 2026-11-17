@@ -198,7 +198,8 @@ shared: each backend reads its own `config.conf` and module files, so keep them 
 | Moderation | Bans, mutes, warnings, IP bans, jails, history | A ban or IP ban kicks everywhere; a jail sends the player to the jail's server; a freeze holds everywhere | none |
 | Messaging | Mail, ignore lists, message and reply toggles, social spy, the `/reply` partner | `/msg`, `/reply`, `/helpop`, social spy; staff chat in the staff module | none |
 | Vanish | Vanish state | Hidden on every server | `vanish` `cross-server` |
-| Kits | One-time claims and cooldowns | none | none |
+| Kits | One-time claims and cooldowns | First-join kits only on a player's first join to the network | none |
+| Communication | none | No join or quit line or MOTD for a move between servers; first-join welcome once per network | `server-switch` in `communication` `join-quit.conf` |
 | Ranks | Each player's rank and prestige | none | none |
 | Vaults | Vault contents | none | none |
 | Security | Wrong PINs and codes, lockouts, proofs to carry | A lockout holds everywhere; a proof carries across a switch | `security` `join-verification.switch-grace-seconds` |
@@ -357,8 +358,7 @@ same everywhere so transaction times agree.
 
 ## What does not cross servers
 
-- Public chat, broadcasts, join and quit lines, the tab list, scoreboards and `/list`: each server shows its own.
-  Use a proxy chat plugin for network chat.
+- Public chat, broadcasts, the tab list, scoreboards and `/list`: each server shows its own; so do join and quit lines, apart from moves. Use a proxy chat plugin for network chat.
 - AFK state, `/back`, `/rtp`, `/spawn` and respawns: they stay on the server the player is on.
 - `/kick` and `/freeze` of a player on another server, and `/invsee` or `/endersee` of one.
 - Warps, homes, player warps, worlds and teleports to another server while their `cross-server` switch is off.

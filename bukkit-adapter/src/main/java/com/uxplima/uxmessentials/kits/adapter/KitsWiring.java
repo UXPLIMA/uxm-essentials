@@ -58,6 +58,7 @@ import com.uxplima.uxmessentials.shared.adapter.inbound.command.ListDisplayMode;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.GuiLayout;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.GuiLayouts;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.GuiText;
+import com.uxplima.uxmessentials.shared.application.FirstJoins;
 import com.uxplima.uxmessentials.shared.application.ledger.NetworkClaims;
 import com.uxplima.uxmessentials.shared.application.message.Notifier;
 import com.uxplima.uxmessentials.shared.application.module.KernelPorts;
@@ -103,6 +104,7 @@ public final class KitsWiring {
             Optional<KitEconomy> economy,
             Optional<NetworkClaims> networkClaims,
             PlayerClaimLedger ledger,
+            FirstJoins firstJoins,
             GuiLayouts guiLayouts,
             TextInput textInput,
             Menus menus,
@@ -112,6 +114,7 @@ public final class KitsWiring {
         Objects.requireNonNull(economy, "economy");
         Objects.requireNonNull(networkClaims, "networkClaims");
         Objects.requireNonNull(ledger, "ledger");
+        Objects.requireNonNull(firstJoins, "firstJoins");
         Objects.requireNonNull(guiLayouts, "guiLayouts");
         Objects.requireNonNull(textInput, "textInput");
         Objects.requireNonNull(menus, "menus");
@@ -243,8 +246,10 @@ public final class KitsWiring {
         List<Listener> listeners = new ArrayList<>(List.of(
                 new KitPreviewListener(),
                 new KitEditorListener(services.kitEditorView()),
-                new KitsJoinListener(new com.uxplima.uxmessentials.kits.application.GrantFirstJoinKits(
-                        repository, granter, access, kernel.log()))));
+                new KitsJoinListener(
+                        new com.uxplima.uxmessentials.kits.application.GrantFirstJoinKits(
+                                repository, granter, access, kernel.log()),
+                        firstJoins)));
         localClaims.ifPresent(local -> {
             LocalKitClaimsListener listener = new LocalKitClaimsListener(local);
             listeners.add(listener);

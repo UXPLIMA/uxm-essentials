@@ -150,6 +150,29 @@ public final class NetworkRoster implements NetworkPresence {
     }
 
     @Override
+    public Optional<String> cameFrom(UUID player, Duration within) {
+        Objects.requireNonNull(player, "player");
+        Objects.requireNonNull(within, "within");
+        long now = clock.millis();
+        @Nullable String latest = null;
+        long latestSince = Long.MIN_VALUE;
+        for (Map.Entry<String, Remote> entry : remotes.entrySet()) {
+            Remote remote = entry.getValue();
+            Entry member = remote.entries().get(player);
+            if (member == null || expired(remote, now)) {
+                continue;
+            }
+            // A tombstone's time is when this server heard the player left there.
+            boolean counts = member.present() || now - member.sinceMillis() <= within.toMillis();
+            if (counts && member.sinceMillis() >= latestSince) {
+                latest = entry.getKey();
+                latestSince = member.sinceMillis();
+            }
+        }
+        return Optional.ofNullable(latest);
+    }
+
+    @Override
     public Optional<OnlinePlayer> findByName(String name) {
         return resolve(name).found();
     }

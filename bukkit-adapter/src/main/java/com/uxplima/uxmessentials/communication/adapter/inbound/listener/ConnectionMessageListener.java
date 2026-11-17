@@ -2,8 +2,11 @@ package com.uxplima.uxmessentials.communication.adapter.inbound.listener;
 
 import java.util.List;
 import java.util.Objects;
+import java.util.UUID;
 import java.util.function.BooleanSupplier;
+import java.util.function.Predicate;
 
+import org.bukkit.Server;
 import org.bukkit.entity.Player;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.EventPriority;
@@ -20,9 +23,12 @@ import com.uxplima.uxmessentials.communication.adapter.outbound.ChatMetaSource;
 import com.uxplima.uxmessentials.communication.application.ResolveJoinMessage;
 import com.uxplima.uxmessentials.communication.application.ResolveQuitMessage;
 import com.uxplima.uxmessentials.communication.application.ResolvedMessage;
+import com.uxplima.uxmessentials.communication.application.ServerSwitches;
 import com.uxplima.uxmessentials.communication.domain.InfoPage;
 import com.uxplima.uxmessentials.communication.domain.PlaceholderBindings;
 import com.uxplima.uxmessentials.shared.adapter.outbound.BukkitRefs;
+import com.uxplima.uxmessentials.shared.application.FirstJoins;
+import com.uxplima.uxmessentials.shared.application.port.Scheduler;
 import org.jspecify.annotations.NullMarked;
 import org.jspecify.annotations.Nullable;
 
@@ -34,12 +40,17 @@ import org.jspecify.annotations.Nullable;
  * substituted. The templates are operator content, never {@code MessageKey}s.
  *
  * <p>The join line is chosen by the joiner's rank and history. The player's LuckPerms primary group picks a
- * per-group join template when the operator authored one (else the default join policy), and a player the server
- * has never seen before ({@code !hasPlayedBefore()}) is greeted with the first-join welcome instead, when a welcome
- * is authored, so every viewer sees the welcome rather than the ordinary join line. Both inputs flow into the pure
+ * per-group join template when the operator authored one (else the default join policy), and a player new to the
+ * whole network ({@link FirstJoins}) is greeted with the first-join welcome instead, when a welcome is authored, so
+ * every viewer sees the welcome rather than the ordinary join line. Both inputs flow into the pure
  * {@link ResolveJoinMessage}; this listener only reads them off the live event. The events fire on the
  * joining/quitting player's region thread, so reading the live player and setting the event component is
  * region-local, and the primary-group read is a non-blocking cached-meta lookup.
+ *
+ * <p>On a network a player moving between servers is not joining or leaving it: {@link ServerSwitches} tells the move
+ * apart, and with {@code server-switch.hide} on neither server shows a line and the joiner reads no MOTD. A quit line
+ * waits the switch window to learn whether the player arrived on another server, and is shown only when they did not;
+ * a vanished player's line is left to the vanish plugin that clears it.
  *
  * <p>A joining player is also sent their personal MOTD. The {@code motd} lines, rendered through the
  * {@link BukkitInfoSender} (which expands PlaceholderAPI per viewer), delivered only to the joiner and never
@@ -60,6 +71,10 @@ public final class ConnectionMessageListener implements Listener {
     private final CommunicationSettings settings;
     private final BukkitInfoSender infoSender;
     private final ChatMetaSource metaSource;
+    private final ServerSwitches switches;
+    private final FirstJoins firstJoins;
+    private final Scheduler scheduler;
+    private final Predicate<Player> vanished;
 
     public ConnectionMessageListener(
             ResolveJoinMessage resolveJoin,
@@ -67,25 +82,42 @@ public final class ConnectionMessageListener implements Listener {
             CommunicationSettings settings,
             BukkitInfoSender infoSender,
             ChatMetaSource metaSource,
-            BooleanSupplier leftToChat) {
+            BooleanSupplier leftToChat,
+            ServerSwitches switches,
+            FirstJoins firstJoins,
+            Scheduler scheduler,
+            Predicate<Player> vanished) {
         this.resolveJoin = Objects.requireNonNull(resolveJoin, "resolveJoin");
         this.resolveQuit = Objects.requireNonNull(resolveQuit, "resolveQuit");
         this.settings = Objects.requireNonNull(settings, "settings");
         this.infoSender = Objects.requireNonNull(infoSender, "infoSender");
         this.metaSource = Objects.requireNonNull(metaSource, "metaSource");
         this.leftToChat = Objects.requireNonNull(leftToChat, "leftToChat");
+        this.switches = Objects.requireNonNull(switches, "switches");
+        this.firstJoins = Objects.requireNonNull(firstJoins, "firstJoins");
+        this.scheduler = Objects.requireNonNull(scheduler, "scheduler");
+        this.vanished = Objects.requireNonNull(vanished, "vanished");
     }
 
     @EventHandler(priority = EventPriority.HIGH)
     public void onJoin(PlayerJoinEvent event) {
         Player player = event.getPlayer();
+        UUID id = player.getUniqueId();
+        boolean moved = switches.hidesJoin(id);
         if (leftToChat.getAsBoolean()) {
             // uxmChat writes the join line; the joiner's own MOTD is still this plugin's.
-            sendMotd(player);
+            if (!moved) {
+                sendMotd(player);
+            }
             return;
         }
-        PlaceholderBindings bindings = ConnectionPlaceholders.connection(player, onlineCount(player));
-        boolean firstJoin = !player.hasPlayedBefore();
+        if (moved) {
+            event.joinMessage(null);
+            return;
+        }
+        PlaceholderBindings bindings =
+                ConnectionPlaceholders.connection(player, switches.count(onlineCount(player), id, true));
+        boolean firstJoin = firstJoins.firstJoin(id, player.hasPlayedBefore());
         @Nullable String group = metaSource.metaFor(player.getUniqueId()).primaryGroup().orElse(null);
         apply(resolveJoin.resolve(firstJoin, group, bindings), event::joinMessage);
         sendMotd(player);
@@ -120,8 +152,34 @@ public final class ConnectionMessageListener implements Listener {
             return;
         }
         Player player = event.getPlayer();
-        PlaceholderBindings bindings = ConnectionPlaceholders.connection(player, onlineCount(player) - 1);
+        PlaceholderBindings bindings = ConnectionPlaceholders.connection(
+                player, switches.count(onlineCount(player) - 1, player.getUniqueId(), false));
         apply(resolveQuit.resolve(bindings), event::quitMessage);
+    }
+
+    /**
+     * Hold the quit line, vanilla or custom, until the switch window shows whether the player left the network or
+     * moved to another server of it, then show it on the global thread to everyone on this server, as the server would
+     * have. Taken late, after the custom line above, and never for a player hidden from someone here: a vanish plugin
+     * clears that line, and a held copy would bring it back.
+     */
+    @EventHandler(priority = EventPriority.HIGHEST)
+    public void holdQuit(PlayerQuitEvent event) {
+        if (leftToChat.getAsBoolean() || !switches.holdsQuit()) {
+            return;
+        }
+        @Nullable Component line = event.quitMessage();
+        if (line == null || vanished.test(event.getPlayer())) {
+            return;
+        }
+        event.quitMessage(null);
+        UUID id = event.getPlayer().getUniqueId();
+        Server server = event.getPlayer().getServer();
+        scheduler.laterGlobal(switches.quitWait(), () -> {
+            if (switches.showsHeldQuit(id)) {
+                server.sendMessage(line);
+            }
+        });
     }
 
     private static void apply(

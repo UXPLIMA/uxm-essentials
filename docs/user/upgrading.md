@@ -10,6 +10,14 @@ needs a setting it did not need before.
 spy stays on across a relog, and shows nothing without its node. A server still on an older release keeps its own
 copy and does not see the shared one, so upgrade every server of the network in the same window.
 
+## Server switches show no join or quit line
+
+On a network, a player moving between servers no longer shows a join or quit line (vanilla or custom) on either
+server and is not sent the MOTD again; a quit line waits three seconds to tell a move from leaving. The first-join
+welcome and `first-join` kits come only on a player's first join to the network. To keep the earlier lines, set
+`server-switch { hide = false }` in `modules/communication/join-quit.conf`; `count = NETWORK` makes `{count}` count
+the whole network.
+
 ## Offline mode: names match as spelled
 
 On an offline-mode server, or a network whose proxy runs in offline mode, `Steve` and `steve` are now two players: a
