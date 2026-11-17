@@ -207,6 +207,7 @@ shared: each backend reads its own `config.conf` and module files, so keep them 
 | Trade | Escrow | Two players on different servers trade | `trade` `cross-server` |
 | Vote | Party counter | A party pays players on every server | `voteparty.network-rewards` in `vote`, default on |
 | Playtime | Daily rows | Time on every server adds up | none |
+| Skin | Each player's chosen skin | A change is worn at once on the server the player is on | none |
 
 ### Cross-server moves
 
@@ -360,8 +361,7 @@ same everywhere so transaction times agree.
   Use a proxy chat plugin for network chat.
 - AFK state, `/back`, `/rtp`, `/spawn` and respawns: they stay on the server the player is on.
 - `/kick` and `/freeze` of a player on another server, and `/invsee` or `/endersee` of one.
-- Warps, homes, player warps, worlds and teleports to another server while that module's `cross-server` switch is
-  off.
+- Warps, homes, player warps, worlds and teleports to another server while their `cross-server` switch is off.
 - Settings files, message files and menus. Copy them to every backend that should behave the same.
 - Command control: configure the `commandcontrol` module on each backend; the proxy jar gates only proxy commands.
 
