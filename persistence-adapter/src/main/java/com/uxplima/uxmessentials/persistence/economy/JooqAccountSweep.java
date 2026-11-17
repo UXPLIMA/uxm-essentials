@@ -1,6 +1,8 @@
 package com.uxplima.uxmessentials.persistence.economy;
 
+import static com.uxplima.uxmessentials.persistence.jooq.tables.EconomyItemDeliveries.ECONOMY_ITEM_DELIVERIES;
 import static com.uxplima.uxmessentials.persistence.jooq.tables.EconomyOwners.ECONOMY_OWNERS;
+import static com.uxplima.uxmessentials.persistence.jooq.tables.EconomyPendingPhysicalTransactions.ECONOMY_PENDING_PHYSICAL_TRANSACTIONS;
 import static com.uxplima.uxmessentials.persistence.jooq.tables.EconomySweeps.ECONOMY_SWEEPS;
 import static com.uxplima.uxmessentials.persistence.jooq.tables.PlayerNames.PLAYER_NAMES;
 import static com.uxplima.uxmessentials.persistence.jooq.tables.Transactions.TRANSACTIONS;
@@ -8,6 +10,7 @@ import static com.uxplima.uxmessentials.persistence.jooq.tables.WalletBalances.W
 
 import java.math.BigDecimal;
 import java.time.Clock;
+import java.time.Duration;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -19,14 +22,15 @@ import java.util.Set;
 import java.util.UUID;
 import java.util.function.IntToLongFunction;
 
-import com.uxplima.uxmessentials.economy.application.NativeCurrencyBackend;
 import com.uxplima.uxmessentials.economy.application.port.AccountSweep;
+import com.uxplima.uxmessentials.economy.application.port.ItemDeliveryQueue;
 import com.uxplima.uxmessentials.economy.domain.Currency;
 import com.uxplima.uxmessentials.economy.domain.CurrencyId;
 import com.uxplima.uxmessentials.economy.domain.CurrencyRegistry;
 import com.uxplima.uxmessentials.economy.domain.EconomyReason;
 import com.uxplima.uxmessentials.economy.domain.Money;
 import com.uxplima.uxmessentials.economy.domain.SweepKind;
+import com.uxplima.uxmessentials.economy.domain.SweepMode;
 import com.uxplima.uxmessentials.economy.domain.SweepScope;
 import com.uxplima.uxmessentials.economy.domain.SweepState;
 import com.uxplima.uxmessentials.persistence.jooq.tables.records.EconomySweepsRecord;
@@ -48,9 +52,12 @@ import org.jspecify.annotations.NullMarked;
 import org.jspecify.annotations.Nullable;
 
 /**
- * The {@link AccountSweep} over the native ledger's tables, journalled in {@code economy_sweeps}.
+ * The {@link AccountSweep} journalled in {@code economy_sweeps}, for every {@link SweepMode}: a ledger sweep changes
+ * the wallet rows, an item sweep queues rows in {@code economy_item_deliveries}, and a provider sweep hands groups of
+ * players out to be paid through another plugin and settles what was done. Item and provider sweeps reach the players
+ * of {@code player_names}, the list every server writes at each join.
  *
- * <p>Each {@link #advance} is one short transaction over the next {@link #CHUNK} owners after the journal's cursor:
+ * <p>Each ledger {@link #advance} is one short transaction over the next {@link #CHUNK} owners after the journal's cursor:
  * lock the journal row, list the owners, lock them (an owner a wallet purge removed in between is counted as gone),
  * give each owner without a balance a zero one (it reads exactly like no row), lock the chunk's balances, decide from
  * the locked figures, write them with one {@code UPDATE}, write their ledger rows with one {@code INSERT}, and move the
@@ -78,6 +85,12 @@ public final class JooqAccountSweep implements AccountSweep {
     /** Owners per chunk: small enough that a chunk's locks last milliseconds, large enough to keep round trips few. */
     static final int CHUNK = 200;
 
+    /** Players per chunk handed to the other plugin: a few ticks of calls, and the most left uncertain by a stop. */
+    static final int PROVIDER_CHUNK = 50;
+
+    /** How long a chunk handed out to be paid counts as in its runner's hands before it is taken as abandoned. */
+    static final Duration STALE_AFTER = Duration.ofMinutes(10);
+
     /** Runs of a chunk the database may roll back to break a lock cycle before the failure is passed on. */
     private static final int ATTEMPTS = 3;
 
@@ -85,6 +98,9 @@ public final class JooqAccountSweep implements AccountSweep {
     private static final String DEBIT = "DEBIT";
     /** The states in which a sweep can still change accounts. */
     private static final List<String> UNFINISHED = List.of(SweepState.RUNNING.name(), SweepState.PAUSED.name());
+
+    /** The width of the journal's {@code actor_name} column. */
+    private static final int NAME_LENGTH = 64;
 
     /** The width of the journal's {@code last_error} column. */
     private static final int ERROR_LENGTH = 255;
@@ -95,6 +111,8 @@ public final class JooqAccountSweep implements AccountSweep {
     private final CurrencyRegistry currencies;
     private final Clock clock;
     private final Logger log;
+    private final String runner;
+    private final Duration staleAfter;
 
     /**
      * @param ledgerIds hands out the given number of consecutive ledger ids and returns the first, from the same
@@ -110,6 +128,29 @@ public final class JooqAccountSweep implements AccountSweep {
             CurrencyRegistry currencies,
             Clock clock,
             Logger log) {
+        this(
+                dsl,
+                ledgerIds,
+                windLedgerIds,
+                currencies,
+                clock,
+                log,
+                UUID.randomUUID().toString(),
+                STALE_AFTER);
+    }
+
+    /** Tests name the runner and shorten the window after which a handed-out chunk counts as abandoned. */
+    JooqAccountSweep(
+            DSLContext dsl,
+            IntToLongFunction ledgerIds,
+            Runnable windLedgerIds,
+            CurrencyRegistry currencies,
+            Clock clock,
+            Logger log,
+            String runner,
+            Duration staleAfter) {
+        this.runner = Objects.requireNonNull(runner, "runner");
+        this.staleAfter = Objects.requireNonNull(staleAfter, "staleAfter");
         this.dsl = Objects.requireNonNull(dsl, "dsl");
         this.ledgerIds = Objects.requireNonNull(ledgerIds, "ledgerIds");
         this.windLedgerIds = Objects.requireNonNull(windLedgerIds, "windLedgerIds");
@@ -118,35 +159,31 @@ public final class JooqAccountSweep implements AccountSweep {
         this.log = Objects.requireNonNull(log, "log");
     }
 
-    @Override
-    public boolean reaches(Currency currency) {
-        Objects.requireNonNull(currency, "currency");
-        // A physical currency's balance is the items in an inventory, and a foreign backend's is another plugin's.
-        return NativeCurrencyBackend.ID.equals(currency.backendId()) && !currency.isPhysical();
-    }
-
     /**
      * The journal's unique {@code active_currency} decides: the insert of a second unfinished sweep of a currency is
      * refused by the database itself, so two servers opening at once get one sweep between them.
      */
     @Override
     public Opening open(
-            SweepKind kind, SweepScope scope, Money amount, EconomyReason reason, PlayerRef actor, long at) {
+            SweepKind kind,
+            SweepScope scope,
+            SweepMode mode,
+            Money amount,
+            EconomyReason reason,
+            PlayerRef actor,
+            long at) {
         Objects.requireNonNull(kind, "kind");
         Objects.requireNonNull(scope, "scope");
+        Objects.requireNonNull(mode, "mode");
         Objects.requireNonNull(amount, "amount");
         Objects.requireNonNull(reason, "reason");
         Objects.requireNonNull(actor, "actor");
-        if (!reaches(amount.currency())) {
-            throw new IllegalArgumentException(
-                    "currency " + amount.currency().id().value() + " is not kept in this ledger's rows");
-        }
         if (kind == SweepKind.CREDIT && amount.amount().signum() <= 0) {
             throw new IllegalArgumentException("a sweep credits a positive amount: " + amount.amount());
         }
         String currencyId = amount.currency().id().value();
         for (int attempt = 1; ; attempt++) {
-            Sweep sweep = new Sweep(UUID.randomUUID().toString(), kind, scope, amount, reason, actor, at);
+            Sweep sweep = new Sweep(UUID.randomUUID().toString(), kind, scope, mode, amount, reason, actor, at);
             try {
                 Transactions.inTransaction(dsl, tx -> insert(tx, sweep));
                 return new Opened(sweep);
@@ -174,6 +211,7 @@ public final class JooqAccountSweep implements AccountSweep {
                 .set(ECONOMY_SWEEPS.ID, sweep.id())
                 .set(ECONOMY_SWEEPS.KIND, sweep.kind().name())
                 .set(ECONOMY_SWEEPS.SCOPE, sweep.scope().name())
+                .set(ECONOMY_SWEEPS.MODE, sweep.mode().name())
                 .set(ECONOMY_SWEEPS.CURRENCY, amount.currency().id().value())
                 .set(ECONOMY_SWEEPS.AMOUNT, amount.amount())
                 .set(ECONOMY_SWEEPS.REASON, sweep.reason().name())
@@ -184,6 +222,7 @@ public final class JooqAccountSweep implements AccountSweep {
                 .set(ECONOMY_SWEEPS.CHANGED, 0)
                 .set(ECONOMY_SWEEPS.SKIPPED, 0)
                 .set(ECONOMY_SWEEPS.GONE, 0)
+                .set(ECONOMY_SWEEPS.UNCERTAIN, 0)
                 .set(ECONOMY_SWEEPS.STATE, SweepState.RUNNING.name())
                 .set(ECONOMY_SWEEPS.ACTIVE_CURRENCY, amount.currency().id().value())
                 .execute();
@@ -260,6 +299,7 @@ public final class JooqAccountSweep implements AccountSweep {
                     row.getId(),
                     SweepKind.valueOf(row.getKind()),
                     SweepScope.valueOf(row.getScope()),
+                    SweepMode.valueOf(row.getMode()),
                     Money.of(currency.get(), row.getAmount()),
                     EconomyReason.valueOf(row.getReason()),
                     actor(row),
@@ -313,7 +353,7 @@ public final class JooqAccountSweep implements AccountSweep {
         return Transactions.inTransaction(dsl, tx -> {
             takeWriteLock(tx);
             EconomySweepsRecord journal = lockJournal(tx, id);
-            SweepOutcome total = new SweepOutcome(journal.getChanged(), journal.getSkipped(), journal.getGone());
+            SweepOutcome total = totals(journal);
             if (!SweepState.valueOf(journal.getState()).unfinished()) {
                 return new Step(total, List.of(), Progress.ENDED);
             }
@@ -324,7 +364,7 @@ public final class JooqAccountSweep implements AccountSweep {
                     .set(ECONOMY_SWEEPS.FINISHED_AT, clock.millis())
                     .where(ECONOMY_SWEEPS.ID.eq(id))
                     .execute();
-            return new Step(total, List.of(), Progress.FAILED, error);
+            return new Step(total, List.of(), List.of(), Progress.FAILED, error);
         });
     }
 
@@ -342,12 +382,13 @@ public final class JooqAccountSweep implements AccountSweep {
                 row.getId(),
                 SweepKind.valueOf(row.getKind()),
                 SweepScope.valueOf(row.getScope()),
+                SweepMode.valueOf(row.getMode()),
                 row.getCurrency(),
                 row.getAmount(),
                 EconomyReason.valueOf(row.getReason()),
                 actor(row),
                 SweepState.valueOf(row.getState()),
-                new SweepOutcome(row.getChanged(), row.getSkipped(), row.getGone()),
+                totals(row),
                 row.getStartedAt(),
                 row.getLastError());
     }
@@ -385,20 +426,199 @@ public final class JooqAccountSweep implements AccountSweep {
     private Step chunk(DSLContext tx, Sweep sweep, long firstId) {
         takeWriteLock(tx);
         EconomySweepsRecord journal = lockJournal(tx, sweep.id());
-        SweepOutcome total = new SweepOutcome(journal.getChanged(), journal.getSkipped(), journal.getGone());
+        SweepOutcome total = totals(journal);
         if (!SweepState.valueOf(journal.getState()).unfinished()) {
             return new Step(total, List.of(), Progress.ENDED);
         }
-        List<String> listed = nextOwners(tx, sweep.scope(), journal.getAfterOwner());
-        if (listed.isEmpty()) {
+        return switch (sweep.mode()) {
+            case LEDGER -> ledgerChunk(tx, sweep, journal, firstId);
+            case ITEMS -> itemsChunk(tx, sweep, journal);
+            case PROVIDER -> providerChunk(tx, sweep, journal);
+        };
+    }
+
+    /** Mark the sweep done, freeing its currency. */
+    private Step done(DSLContext tx, Sweep sweep, SweepOutcome total) {
+        tx.update(ECONOMY_SWEEPS)
+                .set(ECONOMY_SWEEPS.STATE, SweepState.DONE.name())
+                .setNull(ECONOMY_SWEEPS.ACTIVE_CURRENCY)
+                .setNull(ECONOMY_SWEEPS.LAST_ERROR)
+                .set(ECONOMY_SWEEPS.FINISHED_AT, clock.millis())
+                .where(ECONOMY_SWEEPS.ID.eq(sweep.id()))
+                .execute();
+        return new Step(total, List.of(), Progress.FINISHED);
+    }
+
+    /** Move the cursor past a chunk and add what it did, guarded on the cursor this chunk started from. */
+    private static void moveCursor(
+            DSLContext tx, Sweep sweep, EconomySweepsRecord journal, String last, SweepOutcome done) {
+        int moved = tx.update(ECONOMY_SWEEPS)
+                .set(ECONOMY_SWEEPS.AFTER_OWNER, last)
+                .set(ECONOMY_SWEEPS.CHANGED, ECONOMY_SWEEPS.CHANGED.plus(done.changed()))
+                .set(ECONOMY_SWEEPS.SKIPPED, ECONOMY_SWEEPS.SKIPPED.plus(done.skipped()))
+                .set(ECONOMY_SWEEPS.GONE, ECONOMY_SWEEPS.GONE.plus(done.gone()))
+                .set(ECONOMY_SWEEPS.UNCERTAIN, ECONOMY_SWEEPS.UNCERTAIN.plus(done.uncertain()))
+                .set(ECONOMY_SWEEPS.STATE, SweepState.RUNNING.name())
+                .setNull(ECONOMY_SWEEPS.LAST_ERROR)
+                .where(ECONOMY_SWEEPS.ID.eq(sweep.id()))
+                .and(ECONOMY_SWEEPS.AFTER_OWNER.eq(journal.getAfterOwner()))
+                .execute();
+        requireAll(moved, 1);
+    }
+
+    /**
+     * Queue one item delivery per player of the chunk. A reset first drops the deliveries of the currency still
+     * waiting for those players and the item credits queued for them while they were away, since the reset decides
+     * what they hold; its own delivery then sets the held amount when they are next online.
+     */
+    private Step itemsChunk(DSLContext tx, Sweep sweep, EconomySweepsRecord journal) {
+        SweepOutcome total = totals(journal);
+        List<PlayerRef> players = nextPlayers(tx, journal.getAfterOwner(), CHUNK);
+        if (players.isEmpty()) {
+            return done(tx, sweep, total);
+        }
+        String currencyId = sweep.amount().currency().id().value();
+        List<String> owners = new ArrayList<>(players.size());
+        for (PlayerRef player : players) {
+            owners.add(player.uuid().toString());
+        }
+        if (sweep.kind() == SweepKind.RESET) {
+            tx.deleteFrom(ECONOMY_ITEM_DELIVERIES)
+                    .where(ECONOMY_ITEM_DELIVERIES.CURRENCY.eq(currencyId))
+                    .and(ECONOMY_ITEM_DELIVERIES.OWNER.in(owners))
+                    .execute();
+            tx.deleteFrom(ECONOMY_PENDING_PHYSICAL_TRANSACTIONS)
+                    .where(ECONOMY_PENDING_PHYSICAL_TRANSACTIONS.CURRENCY.eq(currencyId))
+                    .and(ECONOMY_PENDING_PHYSICAL_TRANSACTIONS.PLAYER_UUID.in(owners))
+                    .execute();
+        }
+        String kind = sweep.kind() == SweepKind.CREDIT
+                ? ItemDeliveryQueue.Kind.GIVE.name()
+                : ItemDeliveryQueue.Kind.RESET.name();
+        long now = clock.millis();
+        var insert = tx.insertInto(
+                ECONOMY_ITEM_DELIVERIES,
+                ECONOMY_ITEM_DELIVERIES.ID,
+                ECONOMY_ITEM_DELIVERIES.SWEEP_ID,
+                ECONOMY_ITEM_DELIVERIES.OWNER,
+                ECONOMY_ITEM_DELIVERIES.CURRENCY,
+                ECONOMY_ITEM_DELIVERIES.KIND,
+                ECONOMY_ITEM_DELIVERIES.AMOUNT,
+                ECONOMY_ITEM_DELIVERIES.CREATED_AT,
+                ECONOMY_ITEM_DELIVERIES.HELD_BACK);
+        for (String owner : owners) {
+            insert = insert.values(
+                    UUID.randomUUID().toString(),
+                    sweep.id(),
+                    owner,
+                    currencyId,
+                    kind,
+                    sweep.amount().amount(),
+                    now,
+                    0);
+        }
+        insert.execute();
+        SweepOutcome done = new SweepOutcome(owners.size(), 0, 0);
+        moveCursor(tx, sweep, journal, owners.getLast(), done);
+        List<UUID> queued = new ArrayList<>(players.size());
+        for (PlayerRef player : players) {
+            queued.add(player.uuid());
+        }
+        return new Step(total.plus(done), queued, Progress.MORE);
+    }
+
+    /**
+     * Hand the next players out to be paid through the plugin that keeps the balances. A chunk another runner still
+     * has out, and has had out for less than the stale window, makes this step wait; one held longer, or held by this
+     * runner's earlier life, is counted as uncertain and logged, and the sweep goes on past it.
+     */
+    private Step providerChunk(DSLContext tx, Sweep sweep, EconomySweepsRecord journal) {
+        SweepOutcome total = totals(journal);
+        String pending = journal.getPendingOwners();
+        if (pending != null) {
+            Long pendingAt = journal.getPendingAt();
+            boolean fresh = pendingAt != null && clock.millis() - pendingAt < staleAfter.toMillis();
+            if (fresh && !runner.equals(journal.getPendingBy())) {
+                return new Step(total, List.of(), Progress.BUSY);
+            }
+            List<String> lost = List.of(pending.split(","));
+            log.error(
+                    "event=economy_sweep_uncertain id=" + sweep.id() + " players=" + lost.size() + " owners=" + pending
+                            + " (handed out to be paid and never settled; check these players' balances)",
+                    new IllegalStateException("sweep " + sweep.id() + " chunk abandoned"));
             tx.update(ECONOMY_SWEEPS)
-                    .set(ECONOMY_SWEEPS.STATE, SweepState.DONE.name())
-                    .setNull(ECONOMY_SWEEPS.ACTIVE_CURRENCY)
-                    .setNull(ECONOMY_SWEEPS.LAST_ERROR)
-                    .set(ECONOMY_SWEEPS.FINISHED_AT, clock.millis())
+                    .set(ECONOMY_SWEEPS.UNCERTAIN, ECONOMY_SWEEPS.UNCERTAIN.plus(lost.size()))
+                    .setNull(ECONOMY_SWEEPS.PENDING_OWNERS)
+                    .setNull(ECONOMY_SWEEPS.PENDING_BY)
+                    .setNull(ECONOMY_SWEEPS.PENDING_AT)
                     .where(ECONOMY_SWEEPS.ID.eq(sweep.id()))
                     .execute();
-            return new Step(total, List.of(), Progress.FINISHED);
+            total = total.plus(new SweepOutcome(0, 0, 0, lost.size()));
+        }
+        List<PlayerRef> players = nextPlayers(tx, journal.getAfterOwner(), PROVIDER_CHUNK);
+        if (players.isEmpty()) {
+            return done(tx, sweep, total);
+        }
+        List<String> owners = new ArrayList<>(players.size());
+        for (PlayerRef player : players) {
+            owners.add(player.uuid().toString());
+        }
+        int moved = tx.update(ECONOMY_SWEEPS)
+                .set(ECONOMY_SWEEPS.AFTER_OWNER, owners.getLast())
+                .set(ECONOMY_SWEEPS.PENDING_OWNERS, String.join(",", owners))
+                .set(ECONOMY_SWEEPS.PENDING_BY, runner)
+                .set(ECONOMY_SWEEPS.PENDING_AT, clock.millis())
+                .set(ECONOMY_SWEEPS.STATE, SweepState.RUNNING.name())
+                .setNull(ECONOMY_SWEEPS.LAST_ERROR)
+                .where(ECONOMY_SWEEPS.ID.eq(sweep.id()))
+                .and(ECONOMY_SWEEPS.AFTER_OWNER.eq(journal.getAfterOwner()))
+                .execute();
+        requireAll(moved, 1);
+        return new Step(total, List.of(), players, Progress.MORE, null);
+    }
+
+    @Override
+    public void settle(Sweep sweep, SweepOutcome done) {
+        Objects.requireNonNull(sweep, "sweep");
+        Objects.requireNonNull(done, "done");
+        Transactions.inTransaction(dsl, tx -> {
+            takeWriteLock(tx);
+            lockJournal(tx, sweep.id());
+            // Counted whatever the sweep's state: the calls were made, even if it was cancelled meanwhile.
+            return tx.update(ECONOMY_SWEEPS)
+                    .set(ECONOMY_SWEEPS.CHANGED, ECONOMY_SWEEPS.CHANGED.plus(done.changed()))
+                    .set(ECONOMY_SWEEPS.SKIPPED, ECONOMY_SWEEPS.SKIPPED.plus(done.skipped()))
+                    .set(ECONOMY_SWEEPS.GONE, ECONOMY_SWEEPS.GONE.plus(done.gone()))
+                    .set(ECONOMY_SWEEPS.UNCERTAIN, ECONOMY_SWEEPS.UNCERTAIN.plus(done.uncertain()))
+                    .setNull(ECONOMY_SWEEPS.PENDING_OWNERS)
+                    .setNull(ECONOMY_SWEEPS.PENDING_BY)
+                    .setNull(ECONOMY_SWEEPS.PENDING_AT)
+                    .where(ECONOMY_SWEEPS.ID.eq(sweep.id()))
+                    .and(ECONOMY_SWEEPS.PENDING_BY.eq(runner))
+                    .execute();
+        });
+    }
+
+    /** The next players after {@code after} in id order, from the list every server writes at each join. */
+    private static List<PlayerRef> nextPlayers(DSLContext tx, String after, int limit) {
+        return tx.select(PLAYER_NAMES.UUID, PLAYER_NAMES.NAME)
+                .from(PLAYER_NAMES)
+                .where(PLAYER_NAMES.UUID.gt(after))
+                .orderBy(PLAYER_NAMES.UUID)
+                .limit(limit)
+                .fetch(row -> new PlayerRef(UUID.fromString(row.value1()), row.value2()));
+    }
+
+    private static SweepOutcome totals(EconomySweepsRecord row) {
+        return new SweepOutcome(row.getChanged(), row.getSkipped(), row.getGone(), row.getUncertain());
+    }
+
+    /** One chunk of a ledger sweep: the balances and their ledger rows change in this transaction. */
+    private Step ledgerChunk(DSLContext tx, Sweep sweep, EconomySweepsRecord journal, long firstId) {
+        SweepOutcome total = totals(journal);
+        List<String> listed = nextOwners(tx, sweep.scope(), journal.getAfterOwner());
+        if (listed.isEmpty()) {
+            return done(tx, sweep, total);
         }
         List<String> owners = lockOwners(tx, listed);
         ChunkResult result = sweep.kind() == SweepKind.CREDIT
@@ -406,17 +626,7 @@ public final class JooqAccountSweep implements AccountSweep {
                 : reset(tx, owners, sweep.amount());
         writeLedger(tx, result.rows(), sweep, firstId);
         SweepOutcome done = new SweepOutcome(result.rows().size(), result.skipped(), listed.size() - owners.size());
-        int moved = tx.update(ECONOMY_SWEEPS)
-                .set(ECONOMY_SWEEPS.AFTER_OWNER, listed.getLast())
-                .set(ECONOMY_SWEEPS.CHANGED, ECONOMY_SWEEPS.CHANGED.plus(done.changed()))
-                .set(ECONOMY_SWEEPS.SKIPPED, ECONOMY_SWEEPS.SKIPPED.plus(done.skipped()))
-                .set(ECONOMY_SWEEPS.GONE, ECONOMY_SWEEPS.GONE.plus(done.gone()))
-                .set(ECONOMY_SWEEPS.STATE, SweepState.RUNNING.name())
-                .setNull(ECONOMY_SWEEPS.LAST_ERROR)
-                .where(ECONOMY_SWEEPS.ID.eq(sweep.id()))
-                .and(ECONOMY_SWEEPS.AFTER_OWNER.eq(journal.getAfterOwner()))
-                .execute();
-        requireAll(moved, 1);
+        moveCursor(tx, sweep, journal, listed.getLast(), done);
         List<UUID> changed = new ArrayList<>(result.rows().size());
         for (LedgerRow row : result.rows()) {
             changed.add(UUID.fromString(row.owner()));
@@ -625,7 +835,7 @@ public final class JooqAccountSweep implements AccountSweep {
     }
 
     private static String shortName(String name) {
-        return name.length() <= 16 ? name : name.substring(0, 16);
+        return name.length() <= NAME_LENGTH ? name : name.substring(0, NAME_LENGTH);
     }
 
     /** What one chunk decided: a ledger row per changed account, and how many it left out for the currency's limit. */

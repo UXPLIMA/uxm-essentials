@@ -16,6 +16,7 @@ import com.uxplima.uxmessentials.economy.domain.Currency;
 import com.uxplima.uxmessentials.economy.domain.EconomyReason;
 import com.uxplima.uxmessentials.economy.domain.Money;
 import com.uxplima.uxmessentials.economy.domain.SweepKind;
+import com.uxplima.uxmessentials.economy.domain.SweepMode;
 import com.uxplima.uxmessentials.economy.domain.SweepScope;
 import com.uxplima.uxmessentials.economy.domain.TransferError;
 import com.uxplima.uxmessentials.economy.domain.Wallet;
@@ -105,14 +106,20 @@ public final class WalletSync {
         }
 
         @Override
-        public boolean reaches(Currency currency) {
-            return delegate.reaches(currency);
+        public Opening open(
+                SweepKind kind,
+                SweepScope scope,
+                SweepMode mode,
+                Money amount,
+                EconomyReason reason,
+                PlayerRef actor,
+                long at) {
+            return delegate.open(kind, scope, mode, amount, reason, actor, at);
         }
 
         @Override
-        public Opening open(
-                SweepKind kind, SweepScope scope, Money amount, EconomyReason reason, PlayerRef actor, long at) {
-            return delegate.open(kind, scope, amount, reason, actor, at);
+        public void settle(Sweep sweep, SweepOutcome done) {
+            delegate.settle(sweep, done);
         }
 
         @Override

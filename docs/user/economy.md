@@ -81,41 +81,62 @@ and 1 flat tax sends 50, takes 6, and the receiver keeps 44. The tax is never mo
 
 ## Changing every balance
 
-`/eco giveall <amount> [currency]` and `/eco resetall --confirm [currency]` change the account of every player who
-has joined a server of this database: players who are offline and players on other servers of a network too.
-`resetall` puts each balance back to the currency's `starting` figure and asks for `--confirm` first.
+`/eco giveall <amount> [currency]` and `/eco resetall --confirm [currency]` change the balance of every player who
+has joined a server of this database: players who are offline, players on other servers of a network, and Bedrock
+players who join through Geyser and Floodgate (by the id and the prefixed name Floodgate gives them). Before it
+starts, the server adds the players it knows from its own player list. `resetall` puts each balance back to the
+currency's `starting` figure and asks for `--confirm` first.
 
 Other plugins can open accounts through Vault for things that are not players, such as a town's bank or a tax holding
-account. These are left alone unless `--all-accounts` ends the command: `/eco giveall 100 --all-accounts`,
-`/eco resetall --confirm coins --all-accounts`. The bulk screen of the `/eco` menu reaches players only.
+account. On this plugin's ledger these are left alone unless `--all-accounts` ends the command:
+`/eco giveall 100 --all-accounts`, `/eco resetall --confirm coins --all-accounts`. The bulk screen of the `/eco` menu
+reaches players only.
 
 `/eco giveall <amount> [currency] --online` gives the amount only to the players online on the server that runs it,
-one by one, the way a scheduled reward for being online wants. It replies with the number of players and fires the
-usual credit event for each of them.
+one by one, the way a scheduled reward for being online wants, whatever kind of currency it is. It replies with the
+number of players and fires the usual credit event for each of them.
 
-- The change runs in the background, a few hundred accounts at a time. Each step locks only its own accounts, for
-  a moment, so payments and other plugins' Vault calls carry on while it runs. The reply comes once it is done,
-  with the number of accounts changed. `giveall` leaves out an account the amount would take past `max-balance` and
+How the change reaches the players depends on where the currency's money is kept:
+
+- **This plugin's ledger** (the usual case): a few hundred accounts at a time, each step one short transaction that
+  changes the balances and writes their history lines together.
+- **An item currency**: each step queues one delivery per player. A player online on any server gets it at once,
+  the others when they next join any server; each delivery is handed over once, however many servers try. What does
+  not fit in the inventory is not dropped: it waits for the next join. A `resetall` sets the coins a player carries
+  in their inventory (the balance an item currency counts) to the starting figure when they are next online, and
+  drops the gives and the offline credits of that currency still waiting for them. Coins in chests and ender chests
+  are not part of the balance and are left alone.
+- **Another plugin keeps the money** (a Vault or Treasury economy provides the server's economy, or the currency's
+  `backend` is another plugin): each step hands up to fifty players to that plugin, one call per player. A Vault
+  economy is called on the server thread, ten players a tick; Treasury and the other backends off it. `resetall`
+  takes or adds the difference to the starting figure. These calls cannot be undone together, so they are made at
+  most once: a player whose call was under way when the server stopped, or whose call failed, is counted as
+  uncertain, named in the console (`event=economy_sweep_uncertain`) and not paid again. `--all-accounts` adds
+  nothing here, since the other plugin's accounts cannot be listed.
+
+- The change runs in the background and the reply comes once it is done, with the number of accounts changed.
+  Each step locks only its own accounts, for a moment, so payments and other plugins' calls carry on while it runs.
+  `giveall` leaves out an account the amount would take past `max-balance`, or one the other plugin refuses, and
   says how many it left out.
 - If the server stops or the database fails part way, the change pauses after the last finished step and tells you
   how far it got. It carries on by itself every minute, or when any server of the database starts again, and no
-  account is changed twice. An account opened while it runs (a player joining for the first time) is reached only
-  if it sorts after the accounts already done, so it may or may not get the change.
+  account is changed twice. A player who joins for the first time while it runs is reached only if they sort after
+  the players already done, so they may or may not get the change.
 - If the database refuses a step for good, for example a balance too large for its column, the change stops there
   and says how many accounts it changed; those keep the change. So does a change whose currency is removed from the
   configuration before it finishes.
-- Every changed account gets its own line in the transaction history; the audit log gets one line for the command.
-- The other servers of a network are told, drop the balances they held in memory, and show the new ones.
+- Every changed account gets its own line in the transaction history (an item delivery when it is handed over); the
+  audit log gets one line for the command.
+- The other servers of a network are told, drop the balances they held in memory, and hand item deliveries to their
+  players online.
 - A currency has one unfinished change at a time across every server of the database. Running the command again
   while one is running or paused is refused and names it, so a repeated command cannot pay everyone twice.
 - `/eco sweeps` lists the unfinished changes with their id, progress and last error; `/eco sweeps cancel <id>` stops
   one, and the accounts it already changed keep the change. The first eight characters of the id are enough.
-- A currency whose `backend` is another plugin, or whose balances are items, cannot be changed this way: the command
-  says so and changes nothing. Neither can any currency while another economy plugin (Treasury or Vault) provides
-  the server's economy and this plugin uses it; use that plugin's own command.
 
-When it is done, plugins hear `UxmBalanceSweepEvent` once, with what was done, the amount and the number of accounts,
-instead of a credit or debit event per account. The REST add-on streams it as `economy.balance-sweep`.
+When it is done, plugins hear `UxmBalanceSweepEvent` once, with what was done, the amount and the number of accounts.
+On the ledger and for items there is no credit or debit event per account; through another plugin each call fires
+the usual one. The REST add-on streams it as `economy.balance-sweep`.
 
 `/eco giverandom <amount> [currency]` gives the amount to one player online on this server.
 

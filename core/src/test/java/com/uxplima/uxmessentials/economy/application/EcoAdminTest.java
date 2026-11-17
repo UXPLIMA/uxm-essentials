@@ -13,10 +13,11 @@ import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
 
-import com.uxplima.uxmessentials.economy.application.port.AccountSweep;
 import com.uxplima.uxmessentials.economy.application.port.BaltopRow;
 import com.uxplima.uxmessentials.economy.application.port.EconomyAudit;
 import com.uxplima.uxmessentials.economy.application.port.HistoryRecord;
+import com.uxplima.uxmessentials.economy.application.port.KnownPlayers;
+import com.uxplima.uxmessentials.economy.application.port.ProviderLane;
 import com.uxplima.uxmessentials.economy.application.port.TransactionHistory;
 import com.uxplima.uxmessentials.economy.application.port.WalletRepository;
 import com.uxplima.uxmessentials.economy.domain.Currency;
@@ -24,6 +25,7 @@ import com.uxplima.uxmessentials.economy.domain.CurrencyId;
 import com.uxplima.uxmessentials.economy.domain.EconomyMessageKey;
 import com.uxplima.uxmessentials.economy.domain.EconomyReason;
 import com.uxplima.uxmessentials.economy.domain.Money;
+import com.uxplima.uxmessentials.economy.domain.SweepMode;
 import com.uxplima.uxmessentials.economy.domain.TransferError;
 import com.uxplima.uxmessentials.economy.domain.Wallet;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
@@ -67,7 +69,14 @@ class EcoAdminTest {
             notifier,
             history,
             new SweepRunner(
-                    AccountSweep.unreachable(),
+                    NoSweeps.JOURNAL,
+                    new SweepRunner.Paths(
+                            currency -> SweepMode.LEDGER,
+                            bank,
+                            history,
+                            currency -> ProviderLane.inPlace(),
+                            () -> {},
+                            KnownPlayers.none()),
                     new ManualScheduler(),
                     audit,
                     notifier,

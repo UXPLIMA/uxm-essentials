@@ -13,11 +13,14 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
+import java.util.function.Function;
 
 import com.uxplima.uxmessentials.economy.application.port.AccountSweep;
 import com.uxplima.uxmessentials.economy.application.port.BaltopRow;
 import com.uxplima.uxmessentials.economy.application.port.EconomyAudit;
 import com.uxplima.uxmessentials.economy.application.port.HistoryRecord;
+import com.uxplima.uxmessentials.economy.application.port.KnownPlayers;
+import com.uxplima.uxmessentials.economy.application.port.ProviderLane;
 import com.uxplima.uxmessentials.economy.application.port.TransactionHistory;
 import com.uxplima.uxmessentials.economy.application.port.WalletRepository;
 import com.uxplima.uxmessentials.economy.domain.Currency;
@@ -26,6 +29,7 @@ import com.uxplima.uxmessentials.economy.domain.EconomyMessageKey;
 import com.uxplima.uxmessentials.economy.domain.EconomyReason;
 import com.uxplima.uxmessentials.economy.domain.Money;
 import com.uxplima.uxmessentials.economy.domain.SweepKind;
+import com.uxplima.uxmessentials.economy.domain.SweepMode;
 import com.uxplima.uxmessentials.economy.domain.SweepScope;
 import com.uxplima.uxmessentials.economy.domain.SweepState;
 import com.uxplima.uxmessentials.economy.domain.TransferError;
@@ -68,8 +72,31 @@ class SweepRunnerTest {
                 return key.key();
             },
             (viewer, text) -> {});
-    private final SweepRunner runner = new SweepRunner(journal, scheduler, audit, notifier, events, log, CLOCK);
     private final InMemoryBank bank = new InMemoryBank(COINS);
+    private final Ledger history = new Ledger();
+    private SweepMode mode = SweepMode.LEDGER;
+    private ProviderLane lane = ProviderLane.inPlace();
+    private int handOvers;
+    private final SweepRunner runner = new SweepRunner(
+            journal,
+            new SweepRunner.Paths(
+                    currency -> mode,
+                    bank,
+                    history,
+                    currency -> new ProviderLane() {
+                        @Override
+                        public <T> List<T> each(List<PlayerRef> owners, Function<PlayerRef, T> work, T notRun) {
+                            return lane.each(owners, work, notRun);
+                        }
+                    },
+                    () -> handOvers++,
+                    KnownPlayers.none()),
+            scheduler,
+            audit,
+            notifier,
+            events,
+            log,
+            CLOCK);
     private final EcoAdmin admin = new EcoAdmin(bank, new NoWallets(), audit, notifier, new NoHistory(), runner, CLOCK);
 
     private static Money coins(String amount) {
@@ -124,15 +151,103 @@ class SweepRunnerTest {
     }
 
     @Test
-    void aCurrencyKeptOutsideTheLedgerIsRefusedAndNothingIsOpened() {
-        journal.unreachable();
+    void aGiveAllThroughAnotherPluginPaysEachPlayerOnceThroughIt() {
+        mode = SweepMode.PROVIDER;
+        journal.accounts(12);
+
+        int affected = admin.giveAll(ADMIN, coins("25"), SweepScope.PLAYERS);
+
+        assertThat(affected).isEqualTo(12);
+        assertThat(journal.opened).containsExactly("CREDIT:PLAYERS:25:ADMIN_GIVEALL");
+        for (PlayerRef player : journal.players()) {
+            assertThat(bank.balance(player, COINS)).isEqualTo(coins("25"));
+        }
+        assertThat(history.rows).hasSize(12).allMatch(row -> row.startsWith("CREDIT:25:ADMIN_GIVEALL"));
+        assertThat(audit.lines).containsExactly("bulk:12:ADMIN_GIVEALL");
+        assertThat(lines).containsExactly(EconomyMessageKey.ECO_ADMIN_GIVEALL.key());
+    }
+
+    @Test
+    void aResetAllThroughAnotherPluginMovesEachBalanceToTheStartingFigure() {
+        mode = SweepMode.PROVIDER;
+        journal.accounts(3);
+        List<PlayerRef> players = journal.players();
+        bank.set(players.get(0), coins("30"));
+        bank.set(players.get(2), coins("10"));
+
+        int affected = admin.resetAll(ADMIN, COINS, SweepScope.PLAYERS);
+
+        assertThat(affected).isEqualTo(2);
+        assertThat(players)
+                .allSatisfy(player -> assertThat(bank.balance(player, COINS)).isEqualTo(coins("10")));
+        assertThat(history.rows).containsExactlyInAnyOrder("DEBIT:20:ADMIN_RESETALL", "CREDIT:10:ADMIN_RESETALL");
+    }
+
+    @Test
+    void playersTheOtherPluginWasNotCalledForAreCountedUncertainAndNotPaidAgain() {
+        mode = SweepMode.PROVIDER;
+        journal.accounts(4);
+        // The lane gives up on the last player of the chunk, the way it does when the server stops.
+        lane = new ProviderLane() {
+            @Override
+            public <T> List<T> each(List<PlayerRef> owners, Function<PlayerRef, T> work, T notRun) {
+                List<T> results = new ArrayList<>(
+                        ProviderLane.inPlace().each(owners.subList(0, owners.size() - 1), work, notRun));
+                results.add(notRun);
+                return results;
+            }
+        };
+
+        int affected = admin.giveAll(ADMIN, coins("25"), SweepScope.PLAYERS);
+
+        assertThat(affected).isEqualTo(3);
+        assertThat(bank.balance(journal.players().get(3), COINS)).isEqualTo(Money.zero(COINS));
+        assertThat(lines)
+                .containsExactly(
+                        EconomyMessageKey.ECO_ADMIN_GIVEALL.key(), EconomyMessageKey.ECO_ADMIN_BULK_UNCERTAIN.key());
+        assertThat(placeholders.get(1)).containsEntry("count", "1");
+    }
+
+    @Test
+    void aProviderChunkWhoseSettleFailedIsSettledOnceBeforeTheNextChunk() {
+        mode = SweepMode.PROVIDER;
+        journal.accounts(12);
+        journal.failSettles(1);
+
+        admin.giveAll(ADMIN, coins("25"), SweepScope.PLAYERS);
+        scheduler.runAsync();
+
+        assertThat(journal.players())
+                .allSatisfy(player -> assertThat(bank.balance(player, COINS)).isEqualTo(coins("25")));
+        assertThat(audit.lines).containsExactly("bulk:12:ADMIN_GIVEALL");
+        assertThat(placeholders.getLast()).containsEntry("count", "12");
+    }
+
+    @Test
+    void aChunkAnotherServerIsPayingIsTriedAgainLaterWithoutAWord() {
+        mode = SweepMode.PROVIDER;
+        journal.accounts(4);
+        journal.busyOnce();
 
         int affected = admin.giveAll(ADMIN, coins("25"), SweepScope.PLAYERS);
 
         assertThat(affected).isZero();
-        assertThat(journal.opened).isEmpty();
-        assertThat(lines).containsExactly(EconomyMessageKey.ECO_ADMIN_BULK_UNREACHABLE.key());
-        assertThat(placeholders.getFirst()).containsEntry("currency", "coins");
+        assertThat(lines).isEmpty();
+        scheduler.runAsync();
+        assertThat(lines).containsExactly(EconomyMessageKey.ECO_ADMIN_GIVEALL.key());
+    }
+
+    @Test
+    void aGiveAllOfAnItemCurrencyHandsOverToThePlayersOnlineHereAfterEachChunk() {
+        mode = SweepMode.ITEMS;
+        journal.accounts(12);
+
+        int affected = admin.giveAll(ADMIN, coins("25"), SweepScope.PLAYERS);
+
+        assertThat(affected).isEqualTo(12);
+        assertThat(handOvers).isEqualTo(3);
+        assertThat(lines).containsExactly(EconomyMessageKey.ECO_ADMIN_GIVEALL_ITEMS.key());
+        assertThat(placeholders.getFirst()).containsEntry("count", "12");
     }
 
     @Test
@@ -345,9 +460,10 @@ class SweepRunnerTest {
         private final Map<String, Entry> entries = new LinkedHashMap<>();
         private final Set<Integer> failing = new HashSet<>();
         private final Set<Integer> refusing = new HashSet<>();
+        private int failingSettles;
+        private boolean busy;
         final List<String> opened = new ArrayList<>();
         int advances;
-        private boolean reaches = true;
         private @Nullable SweepOutcome fixedChunk;
         private @Nullable RuntimeException openFailure;
 
@@ -361,10 +477,6 @@ class SweepRunnerTest {
             }
         }
 
-        void unreachable() {
-            reaches = false;
-        }
-
         void chunkResult(SweepOutcome outcome) {
             fixedChunk = outcome;
         }
@@ -375,6 +487,27 @@ class SweepRunnerTest {
 
         void refuseAdvance(int call) {
             refusing.add(call);
+        }
+
+        void failSettles(int count) {
+            failingSettles = count;
+        }
+
+        void busyOnce() {
+            busy = true;
+        }
+
+        /** The accounts as the players they belong to. */
+        List<PlayerRef> players() {
+            List<PlayerRef> players = new ArrayList<>();
+            for (int i = 0; i < owners.size(); i++) {
+                players.add(player(i));
+            }
+            return players;
+        }
+
+        private static PlayerRef player(int index) {
+            return new PlayerRef(new UUID(0L, index + 1L), "P" + index);
         }
 
         void failOpen(RuntimeException failure) {
@@ -395,7 +528,7 @@ class SweepRunnerTest {
 
         /** Opened straight in the journal, the way a sweep another server or an earlier run opened is found. */
         Sweep opened(SweepKind kind, SweepScope scope, Money amount, EconomyReason reason, PlayerRef actor, long at) {
-            return ((Opened) open(kind, scope, amount, reason, actor, at)).sweep();
+            return ((Opened) open(kind, scope, SweepMode.LEDGER, amount, reason, actor, at)).sweep();
         }
 
         /** How many accounts were changed at all. */
@@ -416,13 +549,14 @@ class SweepRunnerTest {
         }
 
         @Override
-        public boolean reaches(Currency currency) {
-            return reaches;
-        }
-
-        @Override
         public Opening open(
-                SweepKind kind, SweepScope scope, Money amount, EconomyReason reason, PlayerRef actor, long at) {
+                SweepKind kind,
+                SweepScope scope,
+                SweepMode mode,
+                Money amount,
+                EconomyReason reason,
+                PlayerRef actor,
+                long at) {
             RuntimeException failure = openFailure;
             if (failure != null) {
                 openFailure = null;
@@ -433,7 +567,7 @@ class SweepRunnerTest {
                     return new Busy(entry.status());
                 }
             }
-            Sweep sweep = new Sweep("sweep-" + entries.size(), kind, scope, amount, reason, actor, at);
+            Sweep sweep = new Sweep("sweep-" + entries.size(), kind, scope, mode, amount, reason, actor, at);
             opened.add(kind + ":" + scope + ":"
                     + amount.amount().stripTrailingZeros().toPlainString() + ":" + reason);
             entries.put(sweep.id(), new Entry(sweep));
@@ -450,24 +584,52 @@ class SweepRunnerTest {
             if (!entry.state.unfinished()) {
                 return new Step(entry.total, List.of(), Progress.ENDED);
             }
+            if (busy) {
+                busy = false;
+                return new Step(entry.total, List.of(), Progress.BUSY);
+            }
             if (refusing.remove(advances)) {
                 entry.state = SweepState.FAILED;
                 entry.error = "numeric value out of range";
-                return new Step(entry.total, List.of(), Progress.FAILED, entry.error);
+                return new Step(entry.total, List.of(), List.of(), Progress.FAILED, entry.error);
             }
             entry.state = SweepState.RUNNING;
             if (entry.cursor >= owners.size()) {
                 entry.state = SweepState.DONE;
                 return new Step(entry.total, List.of(), Progress.FINISHED);
             }
-            List<String> slice = owners.subList(entry.cursor, Math.min(owners.size(), entry.cursor + chunk));
+            int from = entry.cursor;
+            List<String> slice = owners.subList(from, Math.min(owners.size(), from + chunk));
+            if (sweep.mode() == SweepMode.PROVIDER) {
+                // The runner pays these through the other plugin and settles what it did.
+                List<PlayerRef> calls = new ArrayList<>();
+                for (int i = from; i < from + slice.size(); i++) {
+                    calls.add(player(i));
+                }
+                entry.cursor += slice.size();
+                return new Step(entry.total, List.of(), calls, Progress.MORE, null);
+            }
             for (String owner : slice) {
                 credits.merge(owner, 1, Integer::sum);
             }
             SweepOutcome fixed = fixedChunk;
             entry.total = entry.total.plus(fixed != null ? fixed : new SweepOutcome(slice.size(), 0, 0));
             entry.cursor += slice.size();
-            return new Step(entry.total, List.of(), Progress.MORE);
+            List<UUID> changed = new ArrayList<>();
+            for (int i = from; i < from + slice.size(); i++) {
+                changed.add(player(i).uuid());
+            }
+            return new Step(entry.total, changed, Progress.MORE);
+        }
+
+        @Override
+        public void settle(Sweep sweep, SweepOutcome done) {
+            if (failingSettles > 0) {
+                failingSettles--;
+                throw new IllegalStateException("connection lost");
+            }
+            Entry entry = entry(sweep.id());
+            entry.total = entry.total.plus(done);
         }
 
         @Override
@@ -520,6 +682,7 @@ class SweepRunnerTest {
                         sweep.id(),
                         sweep.kind(),
                         sweep.scope(),
+                        sweep.mode(),
                         sweep.amount().currency().id().value(),
                         sweep.amount().amount(),
                         sweep.reason(),
@@ -529,6 +692,22 @@ class SweepRunnerTest {
                         sweep.startedAt(),
                         error);
             }
+        }
+    }
+
+    /** The ledger rows a sweep through another plugin writes, as {@code TYPE:amount:REASON}. */
+    private static final class Ledger extends NoHistory {
+
+        final List<String> rows = new ArrayList<>();
+
+        @Override
+        public void recordCredit(String ownerId, Money amount, EconomyReason reason, long at) {
+            rows.add("CREDIT:" + amount.amount().stripTrailingZeros().toPlainString() + ":" + reason);
+        }
+
+        @Override
+        public void recordDebit(String ownerId, Money amount, EconomyReason reason, long at) {
+            rows.add("DEBIT:" + amount.amount().stripTrailingZeros().toPlainString() + ":" + reason);
         }
     }
 
@@ -607,7 +786,7 @@ class SweepRunnerTest {
         }
     }
 
-    private static final class NoHistory implements TransactionHistory {
+    private static class NoHistory implements TransactionHistory {
 
         @Override
         public List<HistoryRecord> queryTransactions(UUID playerUuid, int limit, int offset) {

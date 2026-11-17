@@ -189,15 +189,43 @@ public final class EconomyWiring {
 
         ResolvedEconomy resolved =
                 resolveProvider(plugin, ctx, kernel, hooks, settings, currencies, decoratedRepository, clock);
-        // giveall and resetall reach every account only while this plugin's ledger holds the money. A foreign economy
-        // that won the provider keeps its own accounts, which this plugin cannot list.
-        AccountSweep sweep = resolved.ledgerInPlay()
-                ? WalletSync.sweep(
-                        WalletRepositories.accountSweep(
-                                persistence, ledger.telemetry(), currencies, clock, kernel.log()),
-                        cached,
-                        bus.publisher())
-                : AccountSweep.unreachable();
+        // giveall and resetall reach every player wherever a currency's money is kept: the ledger's rows, items in
+        // inventories (queued deliveries, handed over when the player is online), or another plugin's accounts (paid
+        // one player at a time through it).
+        AccountSweep journal = WalletSync.sweep(
+                WalletRepositories.accountSweep(persistence, ledger.telemetry(), currencies, clock, kernel.log()),
+                cached,
+                bus.publisher());
+        com.uxplima.uxmessentials.economy.application.DeliverSweptItems sweptItems =
+                new com.uxplima.uxmessentials.economy.application.DeliverSweptItems(
+                        WalletRepositories.itemDeliveries(persistence, clock),
+                        new com.uxplima.uxmessentials.economy.adapter.outbound.BukkitItemPurse(
+                                kernel.scheduler(), calculations, kernel.log()),
+                        currencies,
+                        ledger.telemetry(),
+                        new EconomyNotifier(kernel.messages(), kernel.messageSink(), settings.amountFormat()),
+                        kernel.playerLookup(),
+                        kernel.log(),
+                        clock);
+        Runnable handOver = new com.uxplima.uxmessentials.economy.adapter.outbound.OnlineItemHandover(
+                kernel.scheduler(), sweptItems, kernel.log());
+        // Another server's sweep over an item currency queued deliveries for players who may be online here.
+        bus.registry().register(message -> {
+            if (message instanceof com.uxplima.uxmessentials.shared.network.AllBalancesChanged) {
+                handOver.run();
+            }
+        });
+        SweepParts sweep = new SweepParts(
+                journal,
+                sweepModes(resolved.ledgerInPlay()),
+                sweepLanes(resolved.vaultForeign(), kernel.scheduler()),
+                sweptItems,
+                handOver,
+                new com.uxplima.uxmessentials.economy.adapter.outbound.ServerKnownPlayers(
+                        plugin.getServer(),
+                        kernel.scheduler(),
+                        new com.uxplima.uxmessentials.persistence.lookup.JooqPlayerNameRepository(persistence.dsl()),
+                        kernel.log()));
         return assemble(
                 plugin,
                 ctx,
@@ -253,12 +281,13 @@ public final class EconomyWiring {
             return new ResolvedEconomy(
                     new PublishingEconomyProvider(foreign.get(), kernel.events(), clock, kernel.log()),
                     backends,
-                    false);
+                    false,
+                    foreign.get() instanceof com.uxplima.uxmessentials.economy.adapter.vault.VaultEconomyAdapter);
         }
         logBackendsInUse(currencies, kernel.log());
         if (!settings.registerProvider()) {
             kernel.log().info("native economy provider registration disabled by config; using it locally");
-            return new ResolvedEconomy(nativeProvider, backends, true);
+            return new ResolvedEconomy(nativeProvider, backends, true, false);
         }
         EconomyProviderRegistrar registrar = new EconomyProviderRegistrar(
                 plugin.getServer().getServicesManager(), plugin, kernel.log(), settings.registerPriority());
@@ -270,7 +299,7 @@ public final class EconomyWiring {
             ForeignEconomyProviders.publishNative(
                     plugin, resolved, currencies, settings.registerPriority(), kernel.log());
         }
-        return new ResolvedEconomy(resolved, backends, resolved == nativeProvider);
+        return new ResolvedEconomy(resolved, backends, resolved == nativeProvider, false);
     }
 
     /**
@@ -301,7 +330,58 @@ public final class EconomyWiring {
      * The provider the plugin talks through and the backend set it routes over, resolved together at start, and
      * whether that provider is this plugin's own, so its ledger is where native currencies are kept.
      */
-    private record ResolvedEconomy(EconomyProvider provider, CurrencyBackendRegistry backends, boolean ledgerInPlay) {}
+    private record ResolvedEconomy(
+            EconomyProvider provider, CurrencyBackendRegistry backends, boolean ledgerInPlay, boolean vaultForeign) {}
+
+    /**
+     * What a sweep over every account needs besides its journal.
+     *
+     * @param modes where each currency's money is kept, as a sweep reaches it
+     * @param lanes where the calls to the plugin that keeps a currency run
+     * @param items hands over the item deliveries a sweep queued, on join
+     * @param handOver one pass handing the players online here what was queued for them
+     * @param knownPlayers tops up the list of players a sweep reaches
+     */
+    private record SweepParts(
+            AccountSweep journal,
+            java.util.function.Function<Currency, com.uxplima.uxmessentials.economy.domain.SweepMode> modes,
+            java.util.function.Function<Currency, com.uxplima.uxmessentials.economy.application.port.ProviderLane>
+                    lanes,
+            com.uxplima.uxmessentials.economy.application.DeliverSweptItems items,
+            Runnable handOver,
+            com.uxplima.uxmessentials.economy.application.port.KnownPlayers knownPlayers) {}
+
+    /**
+     * An item currency is reached through deliveries whoever provides the economy; a currency on this plugin's ledger
+     * through its rows while that ledger is the economy in play; anything else through the plugin that keeps it.
+     */
+    private static java.util.function.Function<Currency, com.uxplima.uxmessentials.economy.domain.SweepMode> sweepModes(
+            boolean ledgerInPlay) {
+        return currency -> {
+            if (currency.isPhysical()) {
+                return com.uxplima.uxmessentials.economy.domain.SweepMode.ITEMS;
+            }
+            boolean onLedger = ledgerInPlay && NativeCurrencyBackend.ID.equals(currency.backendId());
+            return onLedger
+                    ? com.uxplima.uxmessentials.economy.domain.SweepMode.LEDGER
+                    : com.uxplima.uxmessentials.economy.domain.SweepMode.PROVIDER;
+        };
+    }
+
+    /**
+     * A Vault economy, whether it won the provider or backs one currency, is called on the server thread a few per
+     * tick. Treasury's calls are asynchronous and the other currency backends move to the thread they need by
+     * themselves, so they are called in place, off the tick.
+     */
+    private static java.util.function.Function<
+                    Currency, com.uxplima.uxmessentials.economy.application.port.ProviderLane>
+            sweepLanes(boolean vaultForeign, com.uxplima.uxmessentials.shared.application.port.Scheduler scheduler) {
+        com.uxplima.uxmessentials.economy.application.port.ProviderLane global =
+                new com.uxplima.uxmessentials.economy.adapter.outbound.GlobalRegionLane(scheduler);
+        com.uxplima.uxmessentials.economy.application.port.ProviderLane inPlace =
+                com.uxplima.uxmessentials.economy.application.port.ProviderLane.inPlace();
+        return currency -> vaultForeign || "vault".equals(currency.backendId()) ? global : inPlace;
+    }
 
     private static Wired assemble(
             Plugin plugin,
@@ -315,7 +395,7 @@ public final class EconomyWiring {
             EconomyProvider resolved,
             CurrencyBackendRegistry backends,
             WalletRepository repository,
-            AccountSweep sweep,
+            SweepParts sweep,
             PendingTransactionRepository pendingRepo,
             com.uxplima.uxmlib.gui.input.@org.jspecify.annotations.Nullable TextInput textInput,
             com.uxplima.uxmessentials.shared.adapter.inbound.gui.@org.jspecify.annotations.Nullable PlayerPickerView
@@ -401,6 +481,7 @@ public final class EconomyWiring {
         listenersList.add(new com.uxplima.uxmessentials.economy.adapter.inbound.listener.PendingTransactionListener(
                 new com.uxplima.uxmessentials.economy.application.DeliverPendingCredits(
                         resolved, pendingRepo, services.notifier(), kernel.playerLookup(), kernel.log()),
+                sweep.items(),
                 kernel.scheduler()));
         // Always on, like the pending credits above: items kept for a seller who left must reach them even after the
         // operator turned selling off.
@@ -569,7 +650,7 @@ public final class EconomyWiring {
             EconomyConfig settings,
             CurrencyRegistry currencies,
             WalletRepository repository,
-            AccountSweep sweep,
+            SweepParts sweep,
             EconomyProvider resolved,
             BaltopSnapshots snapshots,
             com.uxplima.uxmessentials.economy.application.port.TransactionHistory history,
@@ -761,7 +842,21 @@ public final class EconomyWiring {
                         notifier,
                         history,
                         new com.uxplima.uxmessentials.economy.application.SweepRunner(
-                                sweep, kernel.scheduler(), audit, notifier, kernel.events(), kernel.log(), clock),
+                                sweep.journal(),
+                                new com.uxplima.uxmessentials.economy.application.SweepRunner.Paths(
+                                        sweep.modes(),
+                                        new com.uxplima.uxmessentials.economy.application.UncountedEconomyProvider(
+                                                resolved),
+                                        history,
+                                        sweep.lanes(),
+                                        sweep.handOver(),
+                                        sweep.knownPlayers()),
+                                kernel.scheduler(),
+                                audit,
+                                notifier,
+                                kernel.events(),
+                                kernel.log(),
+                                clock),
                         clock),
                 exchangeService,
                 currencies,

@@ -46,6 +46,7 @@ class MariadbItemColumnsTest {
     /** Text columns that hold no item stacks, so a TEXT column is wide enough on every backend. */
     private static final Set<String> PLAIN_TEXT = Set.of(
             "communication_announcement.lines",
+            "economy_sweeps.pending_owners",
             "guard_history.after_data",
             "guard_history.before_data",
             "guard_regions.data",

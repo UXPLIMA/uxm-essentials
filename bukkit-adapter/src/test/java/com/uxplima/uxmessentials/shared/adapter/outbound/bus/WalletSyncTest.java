@@ -19,6 +19,7 @@ import com.uxplima.uxmessentials.economy.domain.CurrencyId;
 import com.uxplima.uxmessentials.economy.domain.EconomyReason;
 import com.uxplima.uxmessentials.economy.domain.Money;
 import com.uxplima.uxmessentials.economy.domain.SweepKind;
+import com.uxplima.uxmessentials.economy.domain.SweepMode;
 import com.uxplima.uxmessentials.economy.domain.SweepScope;
 import com.uxplima.uxmessentials.economy.domain.TransferError;
 import com.uxplima.uxmessentials.economy.domain.Wallet;
@@ -100,6 +101,7 @@ class WalletSyncTest {
         return ((AccountSweep.Opened) sweep.open(
                         SweepKind.CREDIT,
                         SweepScope.PLAYERS,
+                        SweepMode.LEDGER,
                         Money.of(COINS, new BigDecimal("25")),
                         EconomyReason.ADMIN_GIVEALL,
                         ALEX,
@@ -127,15 +129,19 @@ class WalletSyncTest {
         }
 
         @Override
-        public boolean reaches(Currency currency) {
-            return true;
+        public Opening open(
+                SweepKind kind,
+                SweepScope scope,
+                SweepMode mode,
+                Money amount,
+                EconomyReason reason,
+                PlayerRef actor,
+                long at) {
+            return new Opened(new Sweep("sweep-1", kind, scope, mode, amount, reason, actor, at));
         }
 
         @Override
-        public Opening open(
-                SweepKind kind, SweepScope scope, Money amount, EconomyReason reason, PlayerRef actor, long at) {
-            return new Opened(new Sweep("sweep-1", kind, scope, amount, reason, actor, at));
-        }
+        public void settle(Sweep sweep, SweepOutcome done) {}
 
         @Override
         public Step advance(Sweep sweep) {

@@ -1,5 +1,6 @@
 package com.uxplima.uxmessentials.economy.application;
 
+import java.math.BigDecimal;
 import java.time.Clock;
 import java.time.Duration;
 import java.util.List;
@@ -9,6 +10,7 @@ import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.function.Function;
 
 import com.uxplima.uxmessentials.economy.application.port.AccountSweep;
 import com.uxplima.uxmessentials.economy.application.port.AccountSweep.Step;
@@ -16,29 +18,48 @@ import com.uxplima.uxmessentials.economy.application.port.AccountSweep.Sweep;
 import com.uxplima.uxmessentials.economy.application.port.AccountSweep.SweepOutcome;
 import com.uxplima.uxmessentials.economy.application.port.AccountSweep.SweepStatus;
 import com.uxplima.uxmessentials.economy.application.port.EconomyAudit;
+import com.uxplima.uxmessentials.economy.application.port.EconomyProvider;
+import com.uxplima.uxmessentials.economy.application.port.KnownPlayers;
+import com.uxplima.uxmessentials.economy.application.port.ProviderLane;
+import com.uxplima.uxmessentials.economy.application.port.TransactionHistory;
+import com.uxplima.uxmessentials.economy.domain.Currency;
 import com.uxplima.uxmessentials.economy.domain.EconomyMessageKey;
 import com.uxplima.uxmessentials.economy.domain.EconomyReason;
 import com.uxplima.uxmessentials.economy.domain.Money;
 import com.uxplima.uxmessentials.economy.domain.SweepKind;
+import com.uxplima.uxmessentials.economy.domain.SweepMode;
 import com.uxplima.uxmessentials.economy.domain.SweepScope;
+import com.uxplima.uxmessentials.economy.domain.TransferError;
 import com.uxplima.uxmessentials.economy.domain.event.BalancesSwept;
 import com.uxplima.uxmessentials.shared.application.port.DomainEventPublisher;
 import com.uxplima.uxmessentials.shared.application.port.Logger;
 import com.uxplima.uxmessentials.shared.application.port.Scheduler;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
+import com.uxplima.uxmessentials.shared.domain.Result;
+import com.uxplima.uxmessentials.shared.domain.Unit;
 import org.jspecify.annotations.Nullable;
 
 /**
- * Runs sweeps over every account to their end: the work behind {@code /eco giveall} and {@code /eco resetall}.
+ * Runs sweeps over every account to their end: the work behind {@code /eco giveall} and {@code /eco resetall}, for
+ * every currency setup.
  *
- * <p>A sweep is advanced one chunk at a time, each its own short transaction, so the runner holds no lock between
- * chunks. Whoever runs the last chunk announces the result once: one audit line, the count to the actor, and one
- * {@link BalancesSwept} event. A chunk that fails for a reason that passes (a lost connection, a lock cycle) changed
- * nothing; the sweep is journalled as paused, the actor is told how far it got, and the runner tries again after
- * {@link #RETRY_AFTER} until it finishes or an operator cancels it. A chunk the database refuses for good ends the
- * sweep as failed, with one audit line for the accounts already changed. A sweep left running by a stop is picked up
- * by {@link #resumeUnfinished} when the economy starts on any server. None of this can change an account twice: the
- * journal's cursor moves in the same transaction as the balances.
+ * <p>Where the money is kept decides the {@link SweepMode}. On this plugin's ledger each chunk changes the balances
+ * itself. For an item currency each chunk queues one delivery per player, and this runner then hands over the ones
+ * for players online here ({@link Paths#itemsQueued}); the rest are handed over on their next join. When another
+ * plugin keeps the balances (a Vault or Treasury economy, or a currency backend of another plugin), each chunk hands
+ * out a group of players, this runner pays them one by one through that plugin on the lane it expects
+ * ({@link ProviderLane}), and then settles the chunk in the journal.
+ *
+ * <p>Calls to another plugin are not transactional, so a provider sweep is at most once: a player is handed out
+ * before the call, and a runner that stops before settling leaves those players uncertain. They are counted and
+ * logged by name, never paid again: a missed payment can be made up from the log, a doubled one cannot be found.
+ *
+ * <p>A chunk is its own short transaction, so the runner holds no lock between chunks. Whoever runs the last chunk
+ * announces the result once: one audit line, the count to the actor, and one {@link BalancesSwept} event. A chunk
+ * that fails for a reason that passes changed nothing; the sweep is journalled as paused, the actor is told how far
+ * it got, and the runner tries again after {@link #RETRY_AFTER} until it finishes or an operator cancels it. A chunk
+ * the database refuses for good ends the sweep as failed. A sweep left running by a stop is picked up by
+ * {@link #resumeUnfinished} when the economy starts on any server.
  *
  * <p>The journal keeps one unfinished sweep per currency across every server, so a second click on the bulk screen,
  * or the command repeated after a pause, is refused rather than paying everyone twice. Every method runs off the tick
@@ -53,6 +74,7 @@ public final class SweepRunner {
     private static final int SHORT_ID = 8;
 
     private final AccountSweep sweeps;
+    private final Paths paths;
     private final Scheduler scheduler;
     private final EconomyAudit audit;
     private final EconomyNotifier notifier;
@@ -61,9 +83,12 @@ public final class SweepRunner {
     private final Clock clock;
     private final Set<String> running = ConcurrentHashMap.newKeySet();
     private final Set<String> toldPaused = ConcurrentHashMap.newKeySet();
+    /** Provider chunks whose calls were made but whose settle has not been stored yet, by sweep id. */
+    private final Map<String, SweepOutcome> unsettled = new ConcurrentHashMap<>();
 
     public SweepRunner(
             AccountSweep sweeps,
+            Paths paths,
             Scheduler scheduler,
             EconomyAudit audit,
             EconomyNotifier notifier,
@@ -71,6 +96,7 @@ public final class SweepRunner {
             Logger log,
             Clock clock) {
         this.sweeps = Objects.requireNonNull(sweeps, "sweeps");
+        this.paths = Objects.requireNonNull(paths, "paths");
         this.scheduler = Objects.requireNonNull(scheduler, "scheduler");
         this.audit = Objects.requireNonNull(audit, "audit");
         this.notifier = Objects.requireNonNull(notifier, "notifier");
@@ -79,9 +105,32 @@ public final class SweepRunner {
         this.clock = Objects.requireNonNull(clock, "clock");
     }
 
-    /** Whether the currency's balances can be swept at all. */
-    boolean reaches(com.uxplima.uxmessentials.economy.domain.Currency currency) {
-        return sweeps.reaches(currency);
+    /**
+     * How a sweep reaches each kind of currency.
+     *
+     * @param modes where a currency's money is kept, as a sweep reaches it
+     * @param economy the provider in play, for a sweep through another plugin
+     * @param history the ledger a sweep through another plugin writes its rows to
+     * @param lanes where the calls to the plugin that keeps a currency run
+     * @param itemsQueued hands over the item deliveries queued for the players online here
+     * @param knownPlayers tops up the list of players a sweep reaches before it opens
+     */
+    public record Paths(
+            Function<Currency, SweepMode> modes,
+            EconomyProvider economy,
+            TransactionHistory history,
+            Function<Currency, ProviderLane> lanes,
+            Runnable itemsQueued,
+            KnownPlayers knownPlayers) {
+
+        public Paths {
+            Objects.requireNonNull(modes, "modes");
+            Objects.requireNonNull(economy, "economy");
+            Objects.requireNonNull(history, "history");
+            Objects.requireNonNull(lanes, "lanes");
+            Objects.requireNonNull(itemsQueued, "itemsQueued");
+            Objects.requireNonNull(knownPlayers, "knownPlayers");
+        }
     }
 
     /**
@@ -89,9 +138,16 @@ public final class SweepRunner {
      * already has an unfinished sweep (the actor is told which), or when the sweep paused or failed.
      */
     @Nullable SweepOutcome start(SweepKind kind, SweepScope scope, Money amount, EconomyReason reason, PlayerRef actor) {
+        SweepMode mode = paths.modes().apply(amount.currency());
+        try {
+            paths.knownPlayers().recordAll();
+        } catch (RuntimeException failure) {
+            // The players every server recorded at their joins are still reached.
+            log.error("event=economy_known_players_failed", failure);
+        }
         AccountSweep.Opening opening;
         try {
-            opening = sweeps.open(kind, scope, amount, reason, actor, clock.millis());
+            opening = sweeps.open(kind, scope, mode, amount, reason, actor, clock.millis());
         } catch (RuntimeException failure) {
             // Nothing was opened, so nothing changed and nothing will resume.
             notifier.send(actor, EconomyMessageKey.ECO_ADMIN_BULK_FAILED, Map.of());
@@ -120,9 +176,10 @@ public final class SweepRunner {
     public void resumeUnfinished() {
         for (Sweep sweep : sweeps.resumable()) {
             log.info(
-                    "event=economy_sweep_resumed id={} kind={} currency={}",
+                    "event=economy_sweep_resumed id={} kind={} mode={} currency={}",
                     sweep.id(),
                     sweep.kind(),
+                    sweep.mode(),
                     sweep.amount().currency().id().value());
             run(sweep);
         }
@@ -169,6 +226,7 @@ public final class SweepRunner {
             while (true) {
                 Step step;
                 try {
+                    settleLeftOver(sweep);
                     step = sweeps.advance(sweep);
                 } catch (RuntimeException failure) {
                     paused(sweep, sofar, failure);
@@ -177,7 +235,15 @@ public final class SweepRunner {
                 sofar = step.total();
                 switch (step.progress()) {
                     case MORE -> {
-                        // The next chunk opens its own transaction; nothing is held in between.
+                        if (!step.calls().isEmpty()) {
+                            SweepOutcome done = callChunk(sweep, step.calls());
+                            sofar = sofar.plus(done);
+                            unsettled.put(sweep.id(), done);
+                        }
+                        if (sweep.mode() == SweepMode.ITEMS
+                                && !step.changedOwners().isEmpty()) {
+                            handOverItems();
+                        }
                     }
                     case FINISHED -> {
                         finished(sweep, step.total());
@@ -191,11 +257,109 @@ public final class SweepRunner {
                         failed(sweep, step);
                         return null;
                     }
+                    case BUSY -> {
+                        // Another server is paying a chunk of it; try again once that chunk has been settled.
+                        scheduler.asyncAfter(RETRY_AFTER, () -> run(sweep));
+                        return null;
+                    }
                 }
             }
         } finally {
             running.remove(sweep.id());
         }
+    }
+
+    /** Store the outcome of a provider chunk whose settle failed before, so its calls are counted exactly once. */
+    private void settleLeftOver(Sweep sweep) {
+        SweepOutcome left = unsettled.get(sweep.id());
+        if (left != null) {
+            sweeps.settle(sweep, left);
+            unsettled.remove(sweep.id());
+        }
+    }
+
+    private void handOverItems() {
+        try {
+            paths.itemsQueued().run();
+        } catch (RuntimeException failure) {
+            // The deliveries stay queued for each player's next join.
+            log.error("event=swept_items_handover_failed", failure);
+        }
+    }
+
+    /** Pay one handed-out chunk through the plugin that keeps the balances. */
+    private SweepOutcome callChunk(Sweep sweep, List<PlayerRef> owners) {
+        ProviderLane lane = paths.lanes().apply(sweep.amount().currency());
+        List<Call> calls = lane.each(owners, owner -> call(sweep, owner), Call.NOT_RUN);
+        int changed = 0;
+        int skipped = 0;
+        int uncertain = 0;
+        for (int i = 0; i < calls.size(); i++) {
+            Call call = calls.get(i);
+            switch (call) {
+                case CHANGED -> changed++;
+                case SKIPPED -> skipped++;
+                case UNCHANGED -> {
+                    // Already at the figure a reset sets.
+                }
+                case FAILED, NOT_RUN -> {
+                    uncertain++;
+                    log.warn(
+                            "event=economy_sweep_uncertain id={} owner={} name={} reason={}",
+                            sweep.id(),
+                            owners.get(i).uuid(),
+                            owners.get(i).name(),
+                            call == Call.NOT_RUN ? "not_called" : "call_failed");
+                }
+            }
+        }
+        return new SweepOutcome(changed, skipped, 0, uncertain);
+    }
+
+    /** One player's change through the other plugin, on its lane. */
+    private Call call(Sweep sweep, PlayerRef owner) {
+        Money amount = sweep.amount();
+        Currency currency = amount.currency();
+        try {
+            if (sweep.kind() == SweepKind.CREDIT) {
+                return landed(paths.economy().credit(owner, amount), owner, amount, true, sweep.reason());
+            }
+            BigDecimal before = paths.economy().balance(owner, currency).amount();
+            int sign = amount.amount().compareTo(before);
+            if (sign == 0) {
+                return Call.UNCHANGED;
+            }
+            Money delta = Money.of(currency, amount.amount().subtract(before).abs());
+            return sign > 0
+                    ? landed(paths.economy().credit(owner, delta), owner, delta, true, sweep.reason())
+                    : landed(paths.economy().debit(owner, delta), owner, delta, false, sweep.reason());
+        } catch (RuntimeException failure) {
+            log.error("event=economy_sweep_call_failed id=" + sweep.id() + " owner=" + owner.uuid(), failure);
+            return Call.FAILED;
+        }
+    }
+
+    private Call landed(
+            Result<Unit, TransferError> result, PlayerRef owner, Money moved, boolean credit, EconomyReason reason) {
+        if (result.isErr()) {
+            return Call.SKIPPED;
+        }
+        String ownerId = owner.uuid().toString();
+        if (credit) {
+            paths.history().recordCredit(ownerId, moved, reason, clock.millis());
+        } else {
+            paths.history().recordDebit(ownerId, moved, reason, clock.millis());
+        }
+        return Call.CHANGED;
+    }
+
+    /** What one call to the other plugin did. */
+    private enum Call {
+        CHANGED,
+        UNCHANGED,
+        SKIPPED,
+        FAILED,
+        NOT_RUN
     }
 
     private void paused(Sweep sweep, SweepOutcome sofar, RuntimeException failure) {
@@ -243,11 +407,13 @@ public final class SweepRunner {
         PlayerRef actor = sweep.actor();
         Money amount = sweep.amount();
         audit.bulkMutation(actor, amount, total.changed(), sweep.reason());
+        String count = Integer.toString(total.changed());
+        boolean items = sweep.mode() == SweepMode.ITEMS;
         if (sweep.kind() == SweepKind.CREDIT) {
             notifier.send(
                     actor,
-                    EconomyMessageKey.ECO_ADMIN_GIVEALL,
-                    Map.of("count", Integer.toString(total.changed()), "amount", notifier.amount(amount)));
+                    items ? EconomyMessageKey.ECO_ADMIN_GIVEALL_ITEMS : EconomyMessageKey.ECO_ADMIN_GIVEALL,
+                    Map.of("count", count, "amount", notifier.amount(amount)));
             if (total.skipped() > 0) {
                 notifier.send(
                         actor,
@@ -256,11 +422,19 @@ public final class SweepRunner {
             }
         } else {
             notifier.send(
-                    actor, EconomyMessageKey.ECO_ADMIN_RESETALL, Map.of("count", Integer.toString(total.changed())));
+                    actor,
+                    items ? EconomyMessageKey.ECO_ADMIN_RESETALL_ITEMS : EconomyMessageKey.ECO_ADMIN_RESETALL,
+                    Map.of("count", count, "amount", notifier.amount(amount)));
         }
         if (total.gone() > 0) {
             notifier.send(
                     actor, EconomyMessageKey.ECO_ADMIN_BULK_GONE, Map.of("count", Integer.toString(total.gone())));
+        }
+        if (total.uncertain() > 0) {
+            notifier.send(
+                    actor,
+                    EconomyMessageKey.ECO_ADMIN_BULK_UNCERTAIN,
+                    Map.of("count", Integer.toString(total.uncertain())));
         }
         events.publish(new BalancesSwept(
                 sweep.id(),

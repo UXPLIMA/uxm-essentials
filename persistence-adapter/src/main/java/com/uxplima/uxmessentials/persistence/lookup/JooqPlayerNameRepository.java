@@ -29,6 +29,12 @@ import org.jspecify.annotations.NullMarked;
 @NullMarked
 public final class JooqPlayerNameRepository extends JooqRepository implements PlayerNameRepository {
 
+    /** Rows per insert when adding a server's whole list. */
+    private static final int BATCH = 500;
+
+    /** The width of the name columns, the longest name a Java login carries. */
+    private static final int NAME_LENGTH = 16;
+
     public JooqPlayerNameRepository(DSLContext dsl) {
         super(dsl);
     }
@@ -60,6 +66,41 @@ public final class JooqPlayerNameRepository extends JooqRepository implements Pl
                 .set(PLAYER_NAMES.LOWER_NAME, lower)
                 .set(PLAYER_NAMES.LAST_SEEN, record.lastSeen())
                 .execute());
+    }
+
+    /**
+     * Add the accounts the index does not have yet and leave every row it has as it is, so a name a join recorded is
+     * never replaced by an older one from a server's own list. A name longer than the column, which no Java login
+     * carries, is left out. Returns how many were added.
+     */
+    public int addMissing(List<PlayerName> records) {
+        Objects.requireNonNull(records, "records");
+        int added = 0;
+        for (int from = 0; from < records.size(); from += BATCH) {
+            List<PlayerName> batch = records.subList(from, Math.min(records.size(), from + BATCH));
+            added += write(dsl -> {
+                var insert = dsl.insertInto(
+                        PLAYER_NAMES,
+                        PLAYER_NAMES.UUID,
+                        PLAYER_NAMES.NAME,
+                        PLAYER_NAMES.LOWER_NAME,
+                        PLAYER_NAMES.LAST_SEEN);
+                boolean any = false;
+                for (PlayerName record : batch) {
+                    if (record.name().length() > NAME_LENGTH) {
+                        continue;
+                    }
+                    insert = insert.values(
+                            record.uuid().toString(),
+                            record.name(),
+                            record.name().toLowerCase(Locale.ROOT),
+                            record.lastSeen());
+                    any = true;
+                }
+                return any ? insert.onConflictDoNothing().execute() : 0;
+            });
+        }
+        return added;
     }
 
     @Override

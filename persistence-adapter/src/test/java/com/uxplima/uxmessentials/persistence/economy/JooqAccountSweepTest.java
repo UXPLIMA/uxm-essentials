@@ -1,5 +1,6 @@
 package com.uxplima.uxmessentials.persistence.economy;
 
+import static com.uxplima.uxmessentials.persistence.jooq.tables.EconomyItemDeliveries.ECONOMY_ITEM_DELIVERIES;
 import static com.uxplima.uxmessentials.persistence.jooq.tables.EconomyOwners.ECONOMY_OWNERS;
 import static com.uxplima.uxmessentials.persistence.jooq.tables.PlayerNames.PLAYER_NAMES;
 import static com.uxplima.uxmessentials.persistence.jooq.tables.Transactions.TRANSACTIONS;
@@ -35,9 +36,11 @@ import com.uxplima.uxmessentials.economy.application.port.AccountSweep.SweepStat
 import com.uxplima.uxmessentials.economy.domain.Currency;
 import com.uxplima.uxmessentials.economy.domain.CurrencyId;
 import com.uxplima.uxmessentials.economy.domain.CurrencyRegistry;
+import com.uxplima.uxmessentials.economy.domain.Denomination;
 import com.uxplima.uxmessentials.economy.domain.EconomyReason;
 import com.uxplima.uxmessentials.economy.domain.Money;
 import com.uxplima.uxmessentials.economy.domain.SweepKind;
+import com.uxplima.uxmessentials.economy.domain.SweepMode;
 import com.uxplima.uxmessentials.economy.domain.SweepScope;
 import com.uxplima.uxmessentials.economy.domain.SweepState;
 import com.uxplima.uxmessentials.persistence.testing.EveryBackend;
@@ -64,12 +67,21 @@ class JooqAccountSweepTest {
     private static final PlayerRef ALEX = owner(1, "Alex");
     private static final PlayerRef SAM = owner(2, "Sam");
     private static final PlayerRef TOWN = owner(3, "town-Oakvale");
+    /** A Bedrock player through Floodgate: the id is the Xbox user id under a zero high half, the name prefixed. */
+    private static final PlayerRef BEDROCK =
+            new PlayerRef(UUID.fromString("00000000-0000-0000-0009-01f2a3b4c5d6"), ".BedrockGamer123");
+
+    private static final Currency GOLD = Currency.builder(CurrencyId.of("gold"))
+            .physical(true)
+            .denominations(List.of(new Denomination(BigDecimal.ONE, "GOLD_NUGGET", "gold nugget", null)))
+            .starting(new BigDecimal("10"))
+            .build();
     private static final Currency COINS = Currency.builder(CurrencyId.of("coins"))
             .max(new BigDecimal("1000"))
             .starting(new BigDecimal("50"))
             .build();
     private static final Currency GEMS = Currency.builder(CurrencyId.of("gems")).build();
-    private static final CurrencyRegistry CURRENCIES = CurrencyRegistry.of(List.of(COINS, GEMS), COINS.id());
+    private static final CurrencyRegistry CURRENCIES = CurrencyRegistry.of(List.of(COINS, GEMS, GOLD), COINS.id());
     private static final Clock CLOCK = Clock.fixed(Instant.ofEpochMilli(AT), ZoneOffset.UTC);
 
     private DSLContext dsl;
@@ -229,7 +241,14 @@ class JooqAccountSweepTest {
         assertThat(sweeps.unfinished()).isEmpty();
         assertThat(sweeps.advance(sweep).progress()).isEqualTo(Progress.ENDED);
         // A failed sweep no longer holds its currency.
-        assertThat(sweeps.open(SweepKind.CREDIT, SweepScope.ALL, coins("1"), EconomyReason.ADMIN_GIVEALL, ADMIN, AT))
+        assertThat(sweeps.open(
+                        SweepKind.CREDIT,
+                        SweepScope.ALL,
+                        SweepMode.LEDGER,
+                        coins("1"),
+                        EconomyReason.ADMIN_GIVEALL,
+                        ADMIN,
+                        AT))
                 .isInstanceOf(Opened.class);
     }
 
@@ -240,17 +259,36 @@ class JooqAccountSweepTest {
         JooqAccountSweep elsewhere = sweeps(telemetry::reserveIds, telemetry::windIdsForward);
 
         Opening second = elsewhere.open(
-                SweepKind.RESET, SweepScope.PLAYERS, starting(COINS), EconomyReason.ADMIN_RESETALL, ADMIN, AT);
+                SweepKind.RESET,
+                SweepScope.PLAYERS,
+                SweepMode.LEDGER,
+                starting(COINS),
+                EconomyReason.ADMIN_RESETALL,
+                ADMIN,
+                AT);
 
         assertThat(second).isInstanceOfSatisfying(Busy.class, busy -> {
             assertThat(busy.existing().id()).isEqualTo(first.id());
             assertThat(busy.existing().state()).isEqualTo(SweepState.RUNNING);
         });
-        assertThat(elsewhere.open(SweepKind.CREDIT, SweepScope.ALL, gems("1"), EconomyReason.ADMIN_GIVEALL, ADMIN, AT))
+        assertThat(elsewhere.open(
+                        SweepKind.CREDIT,
+                        SweepScope.ALL,
+                        SweepMode.LEDGER,
+                        gems("1"),
+                        EconomyReason.ADMIN_GIVEALL,
+                        ADMIN,
+                        AT))
                 .isInstanceOf(Opened.class);
         runToEnd(first);
         assertThat(elsewhere.open(
-                        SweepKind.RESET, SweepScope.PLAYERS, starting(COINS), EconomyReason.ADMIN_RESETALL, ADMIN, AT))
+                        SweepKind.RESET,
+                        SweepScope.PLAYERS,
+                        SweepMode.LEDGER,
+                        starting(COINS),
+                        EconomyReason.ADMIN_RESETALL,
+                        ADMIN,
+                        AT))
                 .isInstanceOf(Opened.class);
     }
 
@@ -264,7 +302,13 @@ class JooqAccountSweepTest {
                     () -> {
                         await(start);
                         return server.open(
-                                SweepKind.CREDIT, SweepScope.ALL, coins("5"), EconomyReason.ADMIN_GIVEALL, ADMIN, AT);
+                                SweepKind.CREDIT,
+                                SweepScope.ALL,
+                                SweepMode.LEDGER,
+                                coins("5"),
+                                EconomyReason.ADMIN_GIVEALL,
+                                ADMIN,
+                                AT);
                     },
                     servers));
         }
@@ -299,7 +343,14 @@ class JooqAccountSweepTest {
         assertThat(ledger()).hasSize(JooqAccountSweep.CHUNK);
         assertThat(sweeps.unfinished()).isEmpty();
         assertThat(sweeps.cancel(sweep.id(), AT)).isEmpty();
-        assertThat(sweeps.open(SweepKind.CREDIT, SweepScope.ALL, coins("1"), EconomyReason.ADMIN_GIVEALL, ADMIN, AT))
+        assertThat(sweeps.open(
+                        SweepKind.CREDIT,
+                        SweepScope.ALL,
+                        SweepMode.LEDGER,
+                        coins("1"),
+                        EconomyReason.ADMIN_GIVEALL,
+                        ADMIN,
+                        AT))
                 .isInstanceOf(Opened.class);
     }
 
@@ -428,6 +479,143 @@ class JooqAccountSweepTest {
     }
 
     @Test
+    void aSweepOfPlayersReachesABedrockPlayerJoinedThroughFloodgate() {
+        joined(BEDROCK);
+        wallets.credit(BEDROCK, coins("5"));
+        wallets.credit(TOWN, coins("5"));
+
+        SweepOutcome outcome = runToEnd(open(SweepKind.CREDIT, SweepScope.PLAYERS, coins("25")));
+
+        assertThat(outcome).isEqualTo(new SweepOutcome(1, 0, 0));
+        assertThat(balance(BEDROCK, COINS)).isEqualByComparingTo("30");
+        assertThat(balance(TOWN, COINS)).isEqualByComparingTo("5");
+    }
+
+    @Test
+    void aSweepAskedForByABedrockOperatorKeepsTheirWholeName() {
+        PlayerRef operator =
+                new PlayerRef(UUID.fromString("00000000-0000-0000-0009-0000000000aa"), ".AVeryLongGamertag_123");
+
+        sweeps.open(
+                SweepKind.CREDIT,
+                SweepScope.ALL,
+                SweepMode.LEDGER,
+                coins("1"),
+                EconomyReason.ADMIN_GIVEALL,
+                operator,
+                AT);
+
+        assertThat(sweeps.unfinished())
+                .singleElement()
+                .satisfies(status -> assertThat(status.actor()).isEqualTo(operator));
+    }
+
+    @Test
+    void anItemSweepQueuesOneDeliveryPerPlayerWhoJoinedABedrockOneToo() {
+        joined(ALEX);
+        joined(BEDROCK);
+        wallets.credit(TOWN, coins("5"));
+
+        SweepOutcome outcome = runToEnd(open(SweepKind.CREDIT, SweepScope.ALL, SweepMode.ITEMS, gold("5")));
+
+        assertThat(outcome).isEqualTo(new SweepOutcome(2, 0, 0));
+        assertThat(deliveries())
+                .containsExactlyInAnyOrder("GIVE:" + ALEX.uuid() + ":5", "GIVE:" + BEDROCK.uuid() + ":5");
+        assertThat(ledger()).isEmpty();
+    }
+
+    @Test
+    void anItemSweepStoppedPartWayQueuesNobodyTwice() {
+        int players = JooqAccountSweep.CHUNK + 5;
+        for (int i = 0; i < players; i++) {
+            joined(owner(2000 + i, "J" + i));
+        }
+        Sweep sweep = open(SweepKind.CREDIT, SweepScope.PLAYERS, SweepMode.ITEMS, gold("5"));
+        sweeps.advance(sweep);
+
+        SweepOutcome outcome = runToEnd(sweep);
+
+        assertThat(outcome.changed()).isEqualTo(players);
+        assertThat(deliveries()).hasSize(players).doesNotHaveDuplicates();
+    }
+
+    @Test
+    void anItemResetReplacesWhatWasWaitingForThePlayersWithTheReset() {
+        joined(ALEX);
+        joined(SAM);
+        runToEnd(open(SweepKind.CREDIT, SweepScope.PLAYERS, SweepMode.ITEMS, gold("5")));
+        new JooqPendingTransactionRepository(dsl).queueCredit(ALEX, "gold", new BigDecimal("7"));
+        new JooqPendingTransactionRepository(dsl).queueCredit(ALEX, "coins", new BigDecimal("7"));
+
+        SweepOutcome outcome = runToEnd(open(SweepKind.RESET, SweepScope.PLAYERS, SweepMode.ITEMS, starting(GOLD)));
+
+        assertThat(outcome).isEqualTo(new SweepOutcome(2, 0, 0));
+        assertThat(deliveries())
+                .containsExactlyInAnyOrder("RESET:" + ALEX.uuid() + ":10", "RESET:" + SAM.uuid() + ":10");
+        // The queued gold credit is part of what the reset sets; the coins one is another currency's and stays.
+        assertThat(new JooqPendingTransactionRepository(dsl).getAndClearPending(ALEX.uuid()))
+                .singleElement()
+                .satisfies(pending -> assertThat(pending.currencyId()).isEqualTo("coins"));
+    }
+
+    @Test
+    void aProviderSweepHandsThePlayersOutAndCountsWhatItsRunnerSettles() {
+        joined(ALEX);
+        joined(BEDROCK);
+        Sweep sweep = open(SweepKind.CREDIT, SweepScope.PLAYERS, SweepMode.PROVIDER, coins("5"));
+
+        Step handed = sweeps.advance(sweep);
+
+        assertThat(handed.progress()).isEqualTo(Progress.MORE);
+        assertThat(handed.calls()).containsExactlyInAnyOrder(ALEX, BEDROCK);
+        sweeps.settle(sweep, new SweepOutcome(1, 1, 0));
+        Step last = sweeps.advance(sweep);
+        assertThat(last.progress()).isEqualTo(Progress.FINISHED);
+        assertThat(last.total()).isEqualTo(new SweepOutcome(1, 1, 0));
+        assertThat(ledger()).isEmpty();
+    }
+
+    @Test
+    void aChunkAnotherRunnerHasOutMakesTheNextStepWait() {
+        joined(ALEX);
+        Sweep sweep = open(SweepKind.CREDIT, SweepScope.PLAYERS, SweepMode.PROVIDER, coins("5"));
+        sweeps.advance(sweep);
+
+        Step elsewhere = runner("elsewhere", Duration.ofMinutes(10)).advance(sweep);
+
+        assertThat(elsewhere.progress()).isEqualTo(Progress.BUSY);
+        assertThat(elsewhere.calls()).isEmpty();
+    }
+
+    @Test
+    void aChunkHandedOutAndNeverSettledIsCountedUncertainAndNotHandedOutAgain() {
+        joined(ALEX);
+        joined(SAM);
+        Sweep sweep = open(SweepKind.CREDIT, SweepScope.PLAYERS, SweepMode.PROVIDER, coins("5"));
+        sweeps.advance(sweep);
+        RecordingLogger log = new RecordingLogger();
+
+        // The runner that had it stopped; another one finds the chunk stale.
+        Step next = new JooqAccountSweep(
+                        dsl,
+                        telemetry::reserveIds,
+                        telemetry::windIdsForward,
+                        CURRENCIES,
+                        CLOCK,
+                        log,
+                        "elsewhere",
+                        Duration.ZERO)
+                .advance(sweep);
+
+        assertThat(next.progress()).isEqualTo(Progress.FINISHED);
+        assertThat(next.total()).isEqualTo(new SweepOutcome(0, 0, 0, 2));
+        assertThat(log.errors)
+                .singleElement()
+                .asString()
+                .contains("event=economy_sweep_uncertain", ALEX.uuid().toString());
+    }
+
+    @Test
     void theJournalListsTheSweepsStillRunningForAnyServerToCarryOn() {
         wallets.ensureOwner(ALEX);
         Sweep running = open(SweepKind.CREDIT, SweepScope.ALL, coins("5"));
@@ -448,9 +636,37 @@ class JooqAccountSweepTest {
         assertThat(sweeps.advance(done).progress()).isEqualTo(Progress.ENDED);
     }
 
+    private JooqAccountSweep runner(String name, Duration staleAfter) {
+        return new JooqAccountSweep(
+                dsl,
+                telemetry::reserveIds,
+                telemetry::windIdsForward,
+                CURRENCIES,
+                CLOCK,
+                new RecordingLogger(),
+                name,
+                staleAfter);
+    }
+
+    /** Each queued item delivery as {@code KIND:owner:amount}. */
+    private List<String> deliveries() {
+        return dsl.selectFrom(ECONOMY_ITEM_DELIVERIES)
+                .fetch()
+                .map(row -> row.getKind() + ":" + row.getOwner() + ":"
+                        + row.getAmount().stripTrailingZeros().toPlainString());
+    }
+
+    private static Money gold(String amount) {
+        return Money.of(GOLD, new BigDecimal(amount));
+    }
+
     private Sweep open(SweepKind kind, SweepScope scope, Money amount) {
+        return open(kind, scope, SweepMode.LEDGER, amount);
+    }
+
+    private Sweep open(SweepKind kind, SweepScope scope, SweepMode mode, Money amount) {
         EconomyReason reason = kind == SweepKind.CREDIT ? EconomyReason.ADMIN_GIVEALL : EconomyReason.ADMIN_RESETALL;
-        return ((Opened) sweeps.open(kind, scope, amount, reason, ADMIN, AT)).sweep();
+        return ((Opened) sweeps.open(kind, scope, mode, amount, reason, ADMIN, AT)).sweep();
     }
 
     private SweepOutcome runToEnd(Sweep sweep) {

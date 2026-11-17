@@ -36,9 +36,9 @@ import com.uxplima.uxmessentials.shared.domain.Unit;
  * <p>A {@code set}/{@code reset} the store could not apply returns {@link TransferError#PLAYER_OFFLINE}, tells the
  * actor, and records no ledger row or audit entry.
  *
- * <p>{@code giveall} and {@code resetall} reach every account the ledger knows, not the players one server happens to
- * see: the {@link SweepRunner} runs them chunk by chunk, writing each account's ledger row with its balance, so these
- * two verbs never touch {@link TransactionHistory}, and it tells the actor the count once the last chunk committed.
+ * <p>{@code giveall} and {@code resetall} reach every player, not the players one server happens to see, wherever the
+ * currency's money is kept: the {@link SweepRunner} runs them chunk by chunk and tells the actor the count once the
+ * last chunk is stored. {@code giveall --online} is the one bulk verb that reads the roster of this server.
  *
  * <p>An offline target is first materialised via {@link WalletRepository#ensureOwner}, so a give/set to a
  * never-joined player never breaks a foreign key: every ledger row names an owner that exists.
@@ -275,19 +275,9 @@ public final class EcoAdmin {
                 .orElseGet(() -> status.amount().stripTrailingZeros().toPlainString());
     }
 
-    /**
-     * Run one sweep, or tell {@code actor} why none can run: the currency's balances are kept where the ledger cannot
-     * list them. The runner says the rest: the count, a sweep already running, or a pause.
-     */
+    /** Run one sweep; the runner tells the actor the count, a sweep already unfinished, or a pause. */
     private int sweep(PlayerRef actor, SweepKind kind, SweepScope scope, Money amount, EconomyReason reason) {
         Objects.requireNonNull(scope, "scope");
-        if (!sweeps.reaches(amount.currency())) {
-            notifier.send(
-                    actor,
-                    EconomyMessageKey.ECO_ADMIN_BULK_UNREACHABLE,
-                    Map.of("currency", amount.currency().id().value()));
-            return 0;
-        }
         SweepOutcome outcome = sweeps.start(kind, scope, amount, reason, actor);
         return outcome == null ? 0 : outcome.changed();
     }

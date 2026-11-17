@@ -18,18 +18,23 @@ in its own default. See [network.md](network.md).
 
 `/eco giveall` and `/eco resetall` used to change only the players online on the server that ran them. They now
 change every player who has joined a server of the database, offline and on other servers too, and with
-`--all-accounts` also the accounts other plugins opened. The update adds one table, `economy_sweeps`, where the
-progress of each run is kept. See [economy.md](economy.md#changing-every-balance).
+`--all-accounts` also the accounts other plugins opened, for every kind of currency: the ledger, item currencies
+(delivered when each player is next online) and economies another plugin keeps (paid one player at a time through
+it). The update adds two tables, `economy_sweeps`, where the progress of each run is kept, and
+`economy_item_deliveries`, the item deliveries waiting for their players. See
+[economy.md](economy.md#changing-every-balance).
 
 - **Scheduled commands.** A console script or scheduler that runs `eco giveall 100` as a reward for the players
   online would now pay every player who ever joined, each time it runs. Add `--online` to keep the old meaning:
   `eco giveall 100 --online`. `/payall` is no substitute: only a player can run it, and it takes the money from that
   player.
-- **Refusals.** `giveall` and `resetall` without `--online` change nothing and say so for a currency whose `backend`
-  is another plugin, for an item currency, and for every currency while Treasury or another Vault economy provides
-  the server's economy.
+- **Item currencies.** `giveall` no longer drops coins at the feet of a player whose inventory is full: what does
+  not fit waits for their next join. `giveall --online` pays into the inventory as before.
+- **Another plugin's economy.** Payments through a Vault or Treasury economy are made at most once; a player whose
+  payment was under way when the server stopped is named in the console as uncertain rather than paid twice.
 - **Events.** A plugin that listened to `UxmWalletCreditEvent` for each account `giveall` paid now hears one
-  `UxmBalanceSweepEvent` when the run finishes. `giveall --online` still fires the credit event per player.
+  `UxmBalanceSweepEvent` when the run finishes, on the ledger and for item currencies. Through another plugin's
+  economy, and with `giveall --online`, each payment still fires the credit event.
 - **New permission.** `/eco sweeps` and `/eco sweeps cancel <id>` need `uxmessentials.economy.admin.sweeps`.
 
 ## Transaction history ids come from the database

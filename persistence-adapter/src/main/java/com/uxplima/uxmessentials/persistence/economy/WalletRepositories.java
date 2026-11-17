@@ -101,7 +101,7 @@ public final class WalletRepositories {
     }
 
     /**
-     * The journalled sweep over every account of the native ledger, drawing its ledger ids from the allocator
+     * The journalled sweep over every account, for every place a currency's money is kept, drawing its ledger ids from the allocator
      * {@code telemetry} uses, so its rows and the buffered ones never share an id.
      */
     public static AccountSweep accountSweep(
@@ -114,6 +114,13 @@ public final class WalletRepositories {
         Objects.requireNonNull(telemetry, "telemetry");
         return new JooqAccountSweep(
                 persistence.dsl(), telemetry::reserveIds, telemetry::windIdsForward, currencies, clock, log);
+    }
+
+    /** The item deliveries a sweep over an item currency queued, claimed once across every server. */
+    public static com.uxplima.uxmessentials.economy.application.port.ItemDeliveryQueue itemDeliveries(
+            Persistence persistence, Clock clock) {
+        Objects.requireNonNull(persistence, "persistence");
+        return new JooqItemDeliveries(persistence.dsl(), clock);
     }
 
     /** The jOOQ-backed {@code /paytoggle} accept-pay flag over the shared persistence DSL. */
