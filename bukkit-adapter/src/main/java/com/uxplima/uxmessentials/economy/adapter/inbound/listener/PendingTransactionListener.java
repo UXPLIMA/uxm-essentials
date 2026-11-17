@@ -40,9 +40,10 @@ public final class PendingTransactionListener implements Listener {
     public void onPlayerJoin(PlayerJoinEvent event) {
         PlayerRef ref = BukkitRefs.toRef(event.getPlayer());
         scheduler.asyncAfter(SETTLE_DELAY, () -> {
-            credits.deliver(ref);
-            // What a giveall or resetall of an item currency queued for them, on whichever server it ran.
+            // What a giveall or resetall queued for them, on whichever server it ran, goes first: a reset decides the
+            // balance, and the credits queued while they were away came after it, so they land on top of it.
             sweptItems.onJoin(ref);
+            credits.deliver(ref);
         });
     }
 }

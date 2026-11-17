@@ -40,5 +40,6 @@ class JooqPlayerNameRepositoryTest {
         assertThat(names.loadRecent(10))
                 .extracting(PlayerName::name)
                 .containsExactlyInAnyOrder("Alex", ".BedrockGamer123");
+        assertThat(names.knownUuids()).containsExactlyInAnyOrder(ALEX, BEDROCK);
     }
 }

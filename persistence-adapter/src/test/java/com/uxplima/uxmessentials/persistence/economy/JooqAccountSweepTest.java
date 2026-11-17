@@ -516,7 +516,7 @@ class JooqAccountSweepTest {
         joined(BEDROCK);
         wallets.credit(TOWN, coins("5"));
 
-        SweepOutcome outcome = runToEnd(open(SweepKind.CREDIT, SweepScope.ALL, SweepMode.ITEMS, gold("5")));
+        SweepOutcome outcome = runToEnd(open(SweepKind.CREDIT, SweepScope.ALL, SweepMode.DEFERRED, gold("5")));
 
         assertThat(outcome).isEqualTo(new SweepOutcome(2, 0, 0));
         assertThat(deliveries())
@@ -525,12 +525,22 @@ class JooqAccountSweepTest {
     }
 
     @Test
+    void itemSweepsWhileAPlayerIsAwayLeaveOneDeliveryOfTheirSum() {
+        joined(ALEX);
+
+        runToEnd(open(SweepKind.CREDIT, SweepScope.PLAYERS, SweepMode.DEFERRED, gold("5")));
+        runToEnd(open(SweepKind.CREDIT, SweepScope.PLAYERS, SweepMode.DEFERRED, gold("7")));
+
+        assertThat(deliveries()).containsExactly("GIVE:" + ALEX.uuid() + ":12");
+    }
+
+    @Test
     void anItemSweepStoppedPartWayQueuesNobodyTwice() {
         int players = JooqAccountSweep.CHUNK + 5;
         for (int i = 0; i < players; i++) {
             joined(owner(2000 + i, "J" + i));
         }
-        Sweep sweep = open(SweepKind.CREDIT, SweepScope.PLAYERS, SweepMode.ITEMS, gold("5"));
+        Sweep sweep = open(SweepKind.CREDIT, SweepScope.PLAYERS, SweepMode.DEFERRED, gold("5"));
         sweeps.advance(sweep);
 
         SweepOutcome outcome = runToEnd(sweep);
@@ -543,11 +553,11 @@ class JooqAccountSweepTest {
     void anItemResetReplacesWhatWasWaitingForThePlayersWithTheReset() {
         joined(ALEX);
         joined(SAM);
-        runToEnd(open(SweepKind.CREDIT, SweepScope.PLAYERS, SweepMode.ITEMS, gold("5")));
+        runToEnd(open(SweepKind.CREDIT, SweepScope.PLAYERS, SweepMode.DEFERRED, gold("5")));
         new JooqPendingTransactionRepository(dsl).queueCredit(ALEX, "gold", new BigDecimal("7"));
         new JooqPendingTransactionRepository(dsl).queueCredit(ALEX, "coins", new BigDecimal("7"));
 
-        SweepOutcome outcome = runToEnd(open(SweepKind.RESET, SweepScope.PLAYERS, SweepMode.ITEMS, starting(GOLD)));
+        SweepOutcome outcome = runToEnd(open(SweepKind.RESET, SweepScope.PLAYERS, SweepMode.DEFERRED, starting(GOLD)));
 
         assertThat(outcome).isEqualTo(new SweepOutcome(2, 0, 0));
         assertThat(deliveries())

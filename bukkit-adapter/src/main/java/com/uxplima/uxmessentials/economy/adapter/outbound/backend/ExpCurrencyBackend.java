@@ -5,20 +5,20 @@ import java.math.RoundingMode;
 import java.time.Duration;
 import java.util.List;
 import java.util.Objects;
-import java.util.concurrent.CompletableFuture;
+import java.util.Optional;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.Supplier;
 
 import org.bukkit.Server;
 import org.bukkit.entity.Player;
 
+import com.uxplima.uxmessentials.economy.adapter.outbound.EntityHandoff;
 import com.uxplima.uxmessentials.economy.application.port.BaltopRow;
 import com.uxplima.uxmessentials.economy.application.port.CurrencyBackend;
 import com.uxplima.uxmessentials.economy.domain.Currency;
 import com.uxplima.uxmessentials.economy.domain.Money;
 import com.uxplima.uxmessentials.economy.domain.Precision;
 import com.uxplima.uxmessentials.economy.domain.TransferError;
-import com.uxplima.uxmessentials.shared.adapter.outbound.BoundedAwait;
 import com.uxplima.uxmessentials.shared.application.port.Logger;
 import com.uxplima.uxmessentials.shared.application.port.Scheduler;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
@@ -40,8 +40,10 @@ import com.uxplima.uxmessentials.shared.domain.Unit;
  * and a hard violation on Folia. So each operation hops onto the owner's entity thread through the injected
  * {@link Scheduler}, does its read and write there in one hop, a check-and-set is never split across threads, and
  * bridges the result back through a bounded await. A call already on a tick thread runs inline to avoid blocking
- * itself. A player who leaves mid-hop, or a hop that stalls past the bound, degrades to
- * {@link TransferError#PLAYER_OFFLINE} (or a zero balance) rather than wedging the caller.
+ * itself. A player who leaves before the hop runs degrades to {@link TransferError#PLAYER_OFFLINE} (or a zero
+ * balance). A hop that stalls past the bound is abandoned so it never runs late: a write then reports
+ * {@link TransferError#PLAYER_OFFLINE}, which is true since nothing changed, and a balance read throws, since the
+ * balance is unknown and a caller that took it for zero would set it from a wrong figure.
  */
 public final class ExpCurrencyBackend implements CurrencyBackend {
 
@@ -50,13 +52,26 @@ public final class ExpCurrencyBackend implements CurrencyBackend {
 
     private final Server server;
     private final Scheduler scheduler;
-    private final Logger log;
     private final AtomicBoolean warned = new AtomicBoolean();
+    private final EntityHandoff.Outcomes outcomes;
 
     public ExpCurrencyBackend(Server server, Scheduler scheduler, Logger log) {
         this.server = Objects.requireNonNull(server, "server");
         this.scheduler = Objects.requireNonNull(scheduler, "scheduler");
-        this.log = Objects.requireNonNull(log, "log");
+        Objects.requireNonNull(log, "log");
+        this.outcomes = new EntityHandoff.Outcomes() {
+            @Override
+            public void timedOut() {
+                if (warned.compareAndSet(false, true)) {
+                    log.warn("event=currency_backend_failed id=exp reason=hop_timeout");
+                }
+            }
+
+            @Override
+            public void failed(Throwable failure) {
+                log.error("event=currency_backend_failed id=exp", failure);
+            }
+        };
     }
 
     @Override
@@ -88,7 +103,12 @@ public final class ExpCurrencyBackend implements CurrencyBackend {
     public Money balance(PlayerRef owner, Currency currency) {
         Objects.requireNonNull(owner, "owner");
         Objects.requireNonNull(currency, "currency");
-        return onOwnerThread(owner, () -> readBalance(owner, currency), Money.zero(currency));
+        Optional<Money> read = onOwnerThread(
+                owner,
+                () -> Optional.of(readBalance(owner, currency)),
+                Optional.of(Money.zero(currency)),
+                Optional.empty());
+        return read.orElseThrow(() -> new IllegalStateException("exp balance of " + owner.uuid() + " did not answer"));
     }
 
     private Money readBalance(PlayerRef owner, Currency currency) {
@@ -100,7 +120,8 @@ public final class ExpCurrencyBackend implements CurrencyBackend {
     public Result<Unit, TransferError> credit(PlayerRef owner, Money amount) {
         Objects.requireNonNull(owner, "owner");
         Objects.requireNonNull(amount, "amount");
-        return onOwnerThread(owner, () -> applyCredit(owner, amount), Result.err(TransferError.PLAYER_OFFLINE));
+        Result<Unit, TransferError> offline = Result.err(TransferError.PLAYER_OFFLINE);
+        return onOwnerThread(owner, () -> applyCredit(owner, amount), offline, offline);
     }
 
     private Result<Unit, TransferError> applyCredit(PlayerRef owner, Money amount) {
@@ -116,7 +137,8 @@ public final class ExpCurrencyBackend implements CurrencyBackend {
     public Result<Unit, TransferError> debit(PlayerRef owner, Money amount) {
         Objects.requireNonNull(owner, "owner");
         Objects.requireNonNull(amount, "amount");
-        return onOwnerThread(owner, () -> applyDebit(owner, amount), Result.err(TransferError.PLAYER_OFFLINE));
+        Result<Unit, TransferError> offline = Result.err(TransferError.PLAYER_OFFLINE);
+        return onOwnerThread(owner, () -> applyDebit(owner, amount), offline, offline);
     }
 
     private Result<Unit, TransferError> applyDebit(PlayerRef owner, Money amount) {
@@ -141,27 +163,21 @@ public final class ExpCurrencyBackend implements CurrencyBackend {
 
     /**
      * Run {@code work} on the owner's entity thread and return its result. Already on a tick thread the work runs
-     * inline: scheduling then blocking that same thread would deadlock. Otherwise the hop completes a future,
-     * awaited with a hard bound; a retired owner (left mid-hop) or a stall yields {@code offline}, the stall logged
-     * once so a persistently wedged hop cannot spam the log.
+     * inline: scheduling then blocking that same thread would deadlock. Otherwise the wait and the hop race through
+     * {@link EntityHandoff}: a retired owner (left first) yields {@code offline}; a hop that has not started within
+     * the bound is abandoned, never runs, and yields {@code unknown}, the stall logged once so a persistently wedged
+     * hop cannot spam the log; a hop that started is waited for, since its change lands either way.
      */
-    private <T> T onOwnerThread(PlayerRef owner, Supplier<T> work, T offline) {
+    private <T> T onOwnerThread(PlayerRef owner, Supplier<T> work, T offline, T unknown) {
         // Folia splits the tick across region threads, so "am I on a tick thread" is the wrong question, a caller
         // on one region's thread must still hop to reach an entity owned by another. The Scheduler port answers the
         // right one.
         if (scheduler.ownsEntity(owner)) {
             return work.get();
         }
-        CompletableFuture<T> hop = new CompletableFuture<>();
-        scheduler.onEntity(owner, () -> hop.complete(work.get()), () -> hop.complete(offline));
-        try {
-            return BoundedAwait.get(hop, HOP_TIMEOUT, "exp currency hop");
-        } catch (IllegalStateException stalled) {
-            if (warned.compareAndSet(false, true)) {
-                log.warn("event=currency_backend_failed id=exp reason=hop_timeout");
-            }
-            return offline;
-        }
+        EntityHandoff<T> hop = new EntityHandoff<>();
+        scheduler.onEntity(owner, () -> hop.run(work), () -> hop.retire(offline));
+        return hop.await(HOP_TIMEOUT, unknown, outcomes);
     }
 
     private static int whole(Money amount) {

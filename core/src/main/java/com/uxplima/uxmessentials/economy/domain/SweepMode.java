@@ -7,13 +7,14 @@ public enum SweepMode {
     /** The balances are rows of this plugin's ledger: each chunk changes them and writes their ledger rows at once. */
     LEDGER,
     /**
-     * The balances are items in inventories: each chunk queues one delivery per player, handed over in their
-     * inventory when they are online on a server of the database.
+     * The balance can only be changed while its player is online: items in an inventory, or a backend such as
+     * experience that has no offline account. Each chunk queues one delivery per player, handed over when they are
+     * online on a server of the database.
      */
-    ITEMS,
+    DEFERRED,
     /**
-     * Another plugin keeps the balances (a Vault or Treasury economy, or a currency backend of another plugin): each
-     * chunk hands a group of players to the runner, which pays them one by one through that plugin.
+     * Another plugin keeps the balances, offline ones included (a Vault or Treasury economy, or a currency backend of
+     * another plugin): each chunk hands a group of players to the runner, which pays them one by one through it.
      */
     PROVIDER
 }

@@ -432,7 +432,7 @@ public final class JooqAccountSweep implements AccountSweep {
         }
         return switch (sweep.mode()) {
             case LEDGER -> ledgerChunk(tx, sweep, journal, firstId);
-            case ITEMS -> itemsChunk(tx, sweep, journal);
+            case DEFERRED -> itemsChunk(tx, sweep, journal);
             case PROVIDER -> providerChunk(tx, sweep, journal);
         };
     }
@@ -467,9 +467,11 @@ public final class JooqAccountSweep implements AccountSweep {
     }
 
     /**
-     * Queue one item delivery per player of the chunk. A reset first drops the deliveries of the currency still
-     * waiting for those players and the item credits queued for them while they were away, since the reset decides
-     * what they hold; its own delivery then sets the held amount when they are next online.
+     * Queue one delivery per player of the chunk, a give added to one already waiting. A reset first drops the
+     * deliveries of the currency queued for those players and the credits queued for them while they were away, since
+     * the reset decides what they hold; its own delivery then sets the balance when they are next online. A give being
+     * handed over right now is dropped too: it came before the reset, and the reset is applied after it, since a
+     * player's deliveries are handed over one at a time and the reset before any give that came after it.
      */
     private Step itemsChunk(DSLContext tx, Sweep sweep, EconomySweepsRecord journal) {
         SweepOutcome total = totals(journal);
@@ -492,32 +494,17 @@ public final class JooqAccountSweep implements AccountSweep {
                     .and(ECONOMY_PENDING_PHYSICAL_TRANSACTIONS.PLAYER_UUID.in(owners))
                     .execute();
         }
-        String kind = sweep.kind() == SweepKind.CREDIT
-                ? ItemDeliveryQueue.Kind.GIVE.name()
-                : ItemDeliveryQueue.Kind.RESET.name();
-        long now = clock.millis();
-        var insert = tx.insertInto(
-                ECONOMY_ITEM_DELIVERIES,
-                ECONOMY_ITEM_DELIVERIES.ID,
-                ECONOMY_ITEM_DELIVERIES.SWEEP_ID,
-                ECONOMY_ITEM_DELIVERIES.OWNER,
-                ECONOMY_ITEM_DELIVERIES.CURRENCY,
-                ECONOMY_ITEM_DELIVERIES.KIND,
-                ECONOMY_ITEM_DELIVERIES.AMOUNT,
-                ECONOMY_ITEM_DELIVERIES.CREATED_AT,
-                ECONOMY_ITEM_DELIVERIES.HELD_BACK);
-        for (String owner : owners) {
-            insert = insert.values(
-                    UUID.randomUUID().toString(),
-                    sweep.id(),
-                    owner,
-                    currencyId,
-                    kind,
-                    sweep.amount().amount(),
-                    now,
-                    0);
-        }
-        insert.execute();
+        ItemDeliveryQueue.Kind kind =
+                sweep.kind() == SweepKind.CREDIT ? ItemDeliveryQueue.Kind.GIVE : ItemDeliveryQueue.Kind.RESET;
+        JooqItemDeliveries.queue(
+                tx,
+                clock.millis(),
+                sweep.id(),
+                owners,
+                currencyId,
+                kind,
+                sweep.amount().amount(),
+                sweep.reason());
         SweepOutcome done = new SweepOutcome(owners.size(), 0, 0);
         moveCursor(tx, sweep, journal, owners.getLast(), done);
         List<UUID> queued = new ArrayList<>(players.size());

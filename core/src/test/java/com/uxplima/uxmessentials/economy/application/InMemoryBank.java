@@ -26,6 +26,7 @@ final class InMemoryBank implements EconomyProvider {
     private final Map<String, Money> balances = new HashMap<>();
     private final Set<Currency> broken = new HashSet<>();
     private boolean transfersBroken;
+    private boolean balancesUnread;
 
     InMemoryBank(Currency... currencies) {
         this.currencies = Set.of(currencies);
@@ -38,6 +39,11 @@ final class InMemoryBank implements EconomyProvider {
     /** Make every credit in {@code currency} throw, the way a provider whose storage is down does. */
     void breakCredits(Currency currency) {
         broken.add(currency);
+    }
+
+    /** Make every balance read throw, the way a backend whose hop to the player timed out does. */
+    void breakBalanceReads() {
+        balancesUnread = true;
     }
 
     /** Make every transfer throw before it moves anything, the way a ledger that lost its connection does. */
@@ -55,6 +61,9 @@ final class InMemoryBank implements EconomyProvider {
 
     @Override
     public Money balance(PlayerRef owner, Currency currency) {
+        if (balancesUnread) {
+            throw new IllegalStateException("balance did not answer");
+        }
         return balances.getOrDefault(owner.uuid() + currency.id().value(), Money.zero(currency));
     }
 

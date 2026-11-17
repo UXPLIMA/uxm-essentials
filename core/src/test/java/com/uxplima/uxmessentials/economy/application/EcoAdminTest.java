@@ -76,6 +76,7 @@ class EcoAdminTest {
                             history,
                             currency -> ProviderLane.inPlace(),
                             () -> {},
+                            (online, amount, reason) -> 0,
                             KnownPlayers.none()),
                     new ManualScheduler(),
                     audit,

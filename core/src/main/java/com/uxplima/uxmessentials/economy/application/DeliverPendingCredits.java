@@ -6,6 +6,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.function.BiPredicate;
 
 import com.uxplima.uxmessentials.economy.application.port.EconomyProvider;
 import com.uxplima.uxmessentials.economy.application.port.PendingTransactionRepository;
@@ -27,6 +28,9 @@ import org.jspecify.annotations.NullMarked;
  * rejoin, two servers on one database) never pay the same row twice. A credit that does not land is put back for
  * the next join rather than dropped. A player who already left by the time delivery runs is skipped and their rows
  * stay queued, since a physical credit could not reach them and the notice would go nowhere.
+ *
+ * <p>A currency whose reset still waits to be applied to the player keeps its credits queued: they came after the
+ * reset, and paying them first would let the reset take them away again.
  */
 @NullMarked
 public final class DeliverPendingCredits {
@@ -36,6 +40,7 @@ public final class DeliverPendingCredits {
     private final EconomyNotifier notifier;
     private final PlayerLookup players;
     private final Logger log;
+    private final BiPredicate<PlayerRef, String> held;
 
     public DeliverPendingCredits(
             EconomyProvider economy,
@@ -43,6 +48,18 @@ public final class DeliverPendingCredits {
             EconomyNotifier notifier,
             PlayerLookup players,
             Logger log) {
+        this(economy, pending, notifier, players, log, (player, currency) -> false);
+    }
+
+    /** @param held whether a player's credits of a currency must stay queued for now */
+    public DeliverPendingCredits(
+            EconomyProvider economy,
+            PendingTransactionRepository pending,
+            EconomyNotifier notifier,
+            PlayerLookup players,
+            Logger log,
+            BiPredicate<PlayerRef, String> held) {
+        this.held = Objects.requireNonNull(held, "held");
         this.economy = Objects.requireNonNull(economy, "economy");
         this.pending = Objects.requireNonNull(pending, "pending");
         this.notifier = Objects.requireNonNull(notifier, "notifier");
@@ -69,7 +86,13 @@ public final class DeliverPendingCredits {
         for (PendingTransaction row : queued) {
             totals.merge(row.currencyId(), row.amount(), BigDecimal::add);
         }
-        totals.forEach((currencyId, amount) -> apply(player, currencyId, amount));
+        totals.forEach((currencyId, amount) -> {
+            if (held.test(player, currencyId)) {
+                requeue(player, currencyId, amount);
+            } else {
+                apply(player, currencyId, amount);
+            }
+        });
     }
 
     /**

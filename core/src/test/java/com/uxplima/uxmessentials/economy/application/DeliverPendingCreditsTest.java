@@ -45,8 +45,23 @@ class DeliverPendingCreditsTest {
                     },
                     (viewer, text) -> {}),
             new Online(),
-            log);
+            log,
+            (player, currency) -> this.heldCurrencies.contains(currency));
     private final Set<UUID> online = new HashSet<>(Set.of(ALEX.uuid()));
+    private final Set<String> heldCurrencies = new HashSet<>();
+
+    @Test
+    void theCreditsOfACurrencyWhoseResetStillWaitsStayQueued() {
+        heldCurrencies.add("coins");
+        queue.queueCredit(ALEX, "coins", new BigDecimal("10"));
+        queue.queueCredit(ALEX, "gems", new BigDecimal("2"));
+
+        credits.deliver(ALEX);
+
+        assertThat(bank.balance(ALEX, COINS).amount()).isEqualByComparingTo("0");
+        assertThat(bank.balance(ALEX, GEMS).amount()).isEqualByComparingTo("2");
+        assertThat(queue.rows).containsExactly("coins=10");
+    }
 
     @Test
     void queuedCreditsArePaidOncePerCurrencyAndLeaveTheQueue() {

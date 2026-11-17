@@ -26,13 +26,15 @@ import com.uxplima.uxmessentials.economy.domain.Money;
 import com.uxplima.uxmessentials.shared.application.port.PlayerLookup;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmessentials.shared.domain.message.MessageKey;
+import com.uxplima.uxmessentials.testing.QueuedScheduler;
 import com.uxplima.uxmessentials.testing.QuietLog;
 import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.Test;
 
 /**
- * The items a sweep queued reach a player's inventory once, what does not fit waits for their next join instead of
- * falling on the ground, and a reset brings the held amount to the starting figure.
+ * The deliveries a sweep queued reach a player once, what does not fit waits for their next join instead of falling on
+ * the ground, a reset brings the balance to the starting figure before any give that came after it, and a hand-over
+ * whose finish could not be stored is never handed over again.
  */
 class DeliverSweptItemsTest {
 
@@ -48,9 +50,11 @@ class DeliverSweptItemsTest {
     private final List<String> ledger = new ArrayList<>();
     private final List<String> lines = new ArrayList<>();
     private final Map<UUID, Boolean> online = new HashMap<>(Map.of(ALEX.uuid(), true));
+    private final QueuedScheduler timers = new QueuedScheduler();
+    private boolean deferred = true;
     private final DeliverSweptItems deliver = new DeliverSweptItems(
             queue,
-            purse,
+            currency -> deferred ? Optional.<ItemPurse>of(purse) : Optional.empty(),
             CurrencyRegistry.of(List.of(GOLD), GOLD.id()),
             new Ledger(ledger),
             new EconomyNotifier(
@@ -60,6 +64,7 @@ class DeliverSweptItemsTest {
                     },
                     (viewer, text) -> {}),
             new Online(online),
+            timers,
             new QuietLog(),
             CLOCK);
 
@@ -101,7 +106,7 @@ class DeliverSweptItemsTest {
     }
 
     @Test
-    void aResetThatNeedsMoreThanFitsKeepsTheShortfallForLater() {
+    void aResetThatNeedsMoreThanFitsKeepsTheShortfallUnderItsOwnReason() {
         purse.room = new BigDecimal("4");
         queue.add("d1", ItemDeliveryQueue.Kind.RESET, "10");
 
@@ -111,8 +116,90 @@ class DeliverSweptItemsTest {
         assertThat(queue.rows.values()).singleElement().satisfies(row -> {
             assertThat(row.delivery.kind()).isEqualTo(ItemDeliveryQueue.Kind.GIVE);
             assertThat(row.delivery.amount()).isEqualByComparingTo("6");
+            assertThat(row.delivery.reason()).isEqualTo(EconomyReason.ADMIN_RESETALL);
             assertThat(row.heldBack).isTrue();
         });
+    }
+
+    @Test
+    void aResetIsAppliedBeforeTheGivesBesideItWhateverOrderTheyWereRead() {
+        purse.held = new BigDecimal("40");
+        queue.add("give", ItemDeliveryQueue.Kind.GIVE, "5");
+        queue.add("reset", ItemDeliveryQueue.Kind.RESET, "10");
+
+        deliver.onJoin(ALEX);
+
+        assertThat(purse.held).isEqualByComparingTo("15");
+        assertThat(ledger).containsExactly("DEBIT:30:ADMIN_RESETALL", "CREDIT:5:ADMIN_GIVEALL");
+    }
+
+    @Test
+    void theGivesAndCreditsOfACurrencyWaitWhileItsResetCannotBeApplied() {
+        purse.held = new BigDecimal("40");
+        purse.resetAnswers = false;
+        queue.add("reset", ItemDeliveryQueue.Kind.RESET, "10");
+        queue.add("give", ItemDeliveryQueue.Kind.GIVE, "5");
+
+        deliver.onJoin(ALEX);
+
+        assertThat(purse.held).isEqualByComparingTo("40");
+        assertThat(ledger).isEmpty();
+        assertThat(queue.rows.values())
+                .allSatisfy(row -> assertThat(row.claimant).isNull());
+        assertThat(deliver.holdsCredits(ALEX, "gold")).isTrue();
+
+        purse.resetAnswers = true;
+        deliver.onJoin(ALEX);
+
+        assertThat(purse.held).isEqualByComparingTo("15");
+        assertThat(deliver.holdsCredits(ALEX, "gold")).isFalse();
+    }
+
+    @Test
+    void aHandOverWhoseFinishFailedIsStoredLaterAndNeverHandedOverAgain() {
+        queue.add("d1", ItemDeliveryQueue.Kind.GIVE, "25");
+        queue.finishFailures = 2;
+        // The claim reads as stale to the queue, the way it would once the stale window passed without a refresh.
+        queue.claimsLookStale = true;
+
+        deliver.onJoin(ALEX);
+        deliver.onJoin(ALEX);
+
+        assertThat(purse.held).isEqualByComparingTo("25");
+        assertThat(queue.rows).containsKey("d1");
+
+        timers.runAll();
+
+        assertThat(queue.rows).isEmpty();
+        assertThat(queue.touched).isPositive();
+        deliver.onJoin(ALEX);
+        assertThat(purse.held).isEqualByComparingTo("25");
+        assertThat(ledger).containsExactly("CREDIT:25:ADMIN_GIVEALL");
+    }
+
+    @Test
+    void aGiveToThePlayersOnlineKeepsWhatDoesNotFitForTheNextJoin() {
+        purse.room = new BigDecimal("15");
+
+        int queued = deliver.giveNow(List.of(ALEX), Money.of(GOLD, new BigDecimal("25")), EconomyReason.ADMIN_GIVEALL);
+
+        assertThat(queued).isEqualTo(1);
+        assertThat(purse.held).isEqualByComparingTo("15");
+        assertThat(queue.rows.values()).singleElement().satisfies(row -> {
+            assertThat(row.delivery.amount()).isEqualByComparingTo("10");
+            assertThat(row.heldBack).isTrue();
+        });
+    }
+
+    @Test
+    void aCurrencyNoLongerDeliveredThisWayKeepsItsDeliveriesWaiting() {
+        deferred = false;
+        queue.add("d1", ItemDeliveryQueue.Kind.GIVE, "25");
+
+        deliver.onJoin(ALEX);
+
+        assertThat(purse.held).isEqualByComparingTo("0");
+        assertThat(queue.rows).containsKey("d1");
     }
 
     @Test
@@ -144,15 +231,19 @@ class DeliverSweptItemsTest {
 
         final Map<String, Row> rows = new LinkedHashMap<>();
         final List<String> claimedElsewhere = new ArrayList<>();
+        int finishFailures;
+        boolean claimsLookStale;
+        int touched;
 
         void add(String id, Kind kind, String amount) {
-            rows.put(id, new Row(new ItemDelivery(id, ALEX.uuid(), "gold", kind, new BigDecimal(amount))));
+            EconomyReason reason = kind == Kind.RESET ? EconomyReason.ADMIN_RESETALL : EconomyReason.ADMIN_GIVEALL;
+            rows.put(id, new Row(new ItemDelivery(id, ALEX.uuid(), "gold", kind, new BigDecimal(amount), reason)));
         }
 
         @Override
         public List<ItemDelivery> claimable(UUID owner, boolean withHeldBack) {
             return rows.values().stream()
-                    .filter(row -> row.claimant == null && (withHeldBack || !row.heldBack))
+                    .filter(row -> open(row) && (withHeldBack || !row.heldBack))
                     .map(row -> row.delivery)
                     .toList();
         }
@@ -167,17 +258,48 @@ class DeliverSweptItemsTest {
         }
 
         @Override
-        public boolean claim(String id, String claimant) {
+        public boolean resetWaiting(UUID owner, String currency) {
+            return rows.values().stream()
+                    .anyMatch(row -> row.delivery.kind() == Kind.RESET
+                            && row.delivery.owner().equals(owner)
+                            && row.delivery.currency().equals(currency));
+        }
+
+        @Override
+        public void queueGive(
+                String sweepId, List<UUID> owners, String currency, BigDecimal amount, EconomyReason reason) {
+            for (UUID owner : owners) {
+                String id = sweepId + ":" + owner;
+                rows.put(id, new Row(new ItemDelivery(id, owner, currency, Kind.GIVE, amount, reason)));
+            }
+        }
+
+        @Override
+        public Optional<ItemDelivery> claim(String id, String claimant) {
             Row row = rows.get(id);
-            if (row == null || row.claimant != null || claimedElsewhere.contains(id)) {
-                return false;
+            if (row == null || !open(row) || claimedElsewhere.contains(id)) {
+                return Optional.empty();
             }
             row.claimant = claimant;
+            return Optional.of(row.delivery);
+        }
+
+        @Override
+        public boolean touch(String id, String claimant) {
+            Row row = rows.get(id);
+            if (row == null || !claimant.equals(row.claimant)) {
+                return false;
+            }
+            touched++;
             return true;
         }
 
         @Override
         public boolean finish(String id, String claimant, BigDecimal rest) {
+            if (finishFailures > 0) {
+                finishFailures--;
+                throw new IllegalStateException("database unreachable");
+            }
             Row row = rows.get(id);
             if (row == null || !claimant.equals(row.claimant)) {
                 return false;
@@ -186,7 +308,8 @@ class DeliverSweptItemsTest {
                 rows.remove(id);
                 return true;
             }
-            Row kept = new Row(new ItemDelivery(id, row.delivery.owner(), row.delivery.currency(), Kind.GIVE, rest));
+            ItemDelivery was = row.delivery;
+            Row kept = new Row(new ItemDelivery(id, was.owner(), was.currency(), Kind.GIVE, rest, was.reason()));
             kept.heldBack = true;
             rows.put(id, kept);
             return true;
@@ -198,6 +321,10 @@ class DeliverSweptItemsTest {
             if (row != null && claimant.equals(row.claimant)) {
                 row.claimant = null;
             }
+        }
+
+        private boolean open(Row row) {
+            return row.claimant == null || claimsLookStale;
         }
 
         static final class Row {
@@ -219,6 +346,7 @@ class DeliverSweptItemsTest {
         BigDecimal held = BigDecimal.ZERO;
         BigDecimal room = new BigDecimal("1000");
         boolean reachable = true;
+        boolean resetAnswers = true;
 
         @Override
         public Optional<BigDecimal> give(PlayerRef owner, Money amount) {
@@ -233,7 +361,7 @@ class DeliverSweptItemsTest {
 
         @Override
         public Optional<Change> setTo(PlayerRef owner, Money target) {
-            if (!reachable) {
+            if (!reachable || !resetAnswers) {
                 return Optional.empty();
             }
             BigDecimal before = held;

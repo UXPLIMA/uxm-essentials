@@ -94,24 +94,29 @@ reaches players only.
 
 `/eco giveall <amount> [currency] --online` gives the amount only to the players online on the server that runs it,
 one by one, the way a scheduled reward for being online wants, whatever kind of currency it is. It replies with the
-number of players and fires the usual credit event for each of them.
+number of players and fires the usual credit event for each of them. For an item currency, or experience, it is a
+delivery per player handed over at once, so what does not fit an inventory waits for the next join, as below.
 
 How the change reaches the players depends on where the currency's money is kept:
 
 - **This plugin's ledger** (the usual case): a few hundred accounts at a time, each step one short transaction that
   changes the balances and writes their history lines together.
-- **An item currency**: each step queues one delivery per player. A player online on any server gets it at once,
-  the others when they next join any server; each delivery is handed over once, however many servers try. What does
-  not fit in the inventory is not dropped: it waits for the next join. A `resetall` sets the coins a player carries
-  in their inventory (the balance an item currency counts) to the starting figure when they are next online, and
-  drops the gives and the offline credits of that currency still waiting for them. Coins in chests and ender chests
-  are not part of the balance and are left alone.
+- **A balance that changes only while its player is online**: an item currency, or a backend such as `exp` that
+  cannot reach an offline player. Each step queues one delivery per player. A player online on any server gets it at
+  once, the others when they next join any server; each delivery is handed over once, however many servers try. What
+  does not fit in the inventory is not dropped: it waits for the next join. Gives queued while a player is away add
+  up in one delivery, so the waiting list stays one line per player and currency however many runs there are.
+  A `resetall` sets the balance (for an item currency, the coins a player carries in their inventory) to the
+  starting figure when they are next online, and drops the gives and the offline credits of that currency still
+  waiting for them. It is applied before anything given after it, and while it waits, credits of that currency
+  wait with it. Coins in chests and ender chests are not part of the balance and are left alone.
 - **Another plugin keeps the money** (a Vault or Treasury economy provides the server's economy, or the currency's
   `backend` is another plugin): each step hands up to fifty players to that plugin, one call per player. A Vault
   economy is called on the server thread, ten players a tick; Treasury and the other backends off it. `resetall`
   takes or adds the difference to the starting figure. These calls cannot be undone together, so they are made at
   most once: a player whose call was under way when the server stopped, or whose call failed, is counted as
-  uncertain, named in the console (`event=economy_sweep_uncertain`) and not paid again. `--all-accounts` adds
+  uncertain, named in the console (`event=economy_sweep_uncertain`) and not paid again; check those players by
+  hand. A balance the plugin did not return is left as it was and counted as left out. `--all-accounts` adds
   nothing here, since the other plugin's accounts cannot be listed.
 
 - The change runs in the background and the reply comes once it is done, with the number of accounts changed.

@@ -2,9 +2,11 @@ package com.uxplima.uxmessentials.persistence.lookup;
 
 import static com.uxplima.uxmessentials.persistence.jooq.tables.PlayerNames.PLAYER_NAMES;
 
+import java.util.HashSet;
 import java.util.List;
 import java.util.Locale;
 import java.util.Objects;
+import java.util.Set;
 import java.util.UUID;
 
 import com.uxplima.uxmessentials.persistence.runtime.JooqRepository;
@@ -101,6 +103,21 @@ public final class JooqPlayerNameRepository extends JooqRepository implements Pl
             });
         }
         return added;
+    }
+
+    /** Every player the list already holds, so a caller reads names only for the ones it lacks. */
+    public Set<UUID> knownUuids() {
+        return read(dsl -> {
+            Set<UUID> known = new HashSet<>();
+            for (String id : dsl.select(PLAYER_NAMES.UUID).from(PLAYER_NAMES).fetch(PLAYER_NAMES.UUID)) {
+                try {
+                    known.add(UUID.fromString(id));
+                } catch (IllegalArgumentException malformed) {
+                    // Not a player id; nothing to skip on its account.
+                }
+            }
+            return known;
+        });
     }
 
     @Override

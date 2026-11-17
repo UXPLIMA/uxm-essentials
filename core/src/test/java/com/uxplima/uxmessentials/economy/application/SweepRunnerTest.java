@@ -77,6 +77,7 @@ class SweepRunnerTest {
     private SweepMode mode = SweepMode.LEDGER;
     private ProviderLane lane = ProviderLane.inPlace();
     private int handOvers;
+    private final List<String> givenNow = new ArrayList<>();
     private final SweepRunner runner = new SweepRunner(
             journal,
             new SweepRunner.Paths(
@@ -90,6 +91,13 @@ class SweepRunnerTest {
                         }
                     },
                     () -> handOvers++,
+                    (online, amount, reason) -> {
+                        for (PlayerRef player : online) {
+                            givenNow.add(player.name() + ":"
+                                    + amount.amount().stripTrailingZeros().toPlainString() + ":" + reason);
+                        }
+                        return online.size();
+                    },
                     KnownPlayers.none()),
             scheduler,
             audit,
@@ -239,7 +247,7 @@ class SweepRunnerTest {
 
     @Test
     void aGiveAllOfAnItemCurrencyHandsOverToThePlayersOnlineHereAfterEachChunk() {
-        mode = SweepMode.ITEMS;
+        mode = SweepMode.DEFERRED;
         journal.accounts(12);
 
         int affected = admin.giveAll(ADMIN, coins("25"), SweepScope.PLAYERS);
@@ -364,6 +372,37 @@ class SweepRunnerTest {
         admin.listSweeps(ADMIN);
 
         assertThat(lines).containsExactly(EconomyMessageKey.ECO_ADMIN_SWEEPS_NONE.key());
+    }
+
+    @Test
+    void aResetAllThroughAnotherPluginLeavesAPlayerWhoseBalanceDidNotAnswerAsTheyAre() {
+        mode = SweepMode.PROVIDER;
+        journal.accounts(2);
+        List<PlayerRef> players = journal.players();
+        bank.set(players.get(0), coins("30"));
+        bank.breakBalanceReads();
+
+        int affected = admin.resetAll(ADMIN, COINS, SweepScope.PLAYERS);
+
+        assertThat(affected).isZero();
+        assertThat(history.rows).isEmpty();
+        assertThat(lines).doesNotContain(EconomyMessageKey.ECO_ADMIN_BULK_UNCERTAIN.key());
+    }
+
+    @Test
+    void aGiveAllToThePlayersOnlineOfADeferredCurrencyIsQueuedForEachOfThemNotCredited() {
+        mode = SweepMode.DEFERRED;
+        PlayerRef alex = new PlayerRef(UUID.fromString("00000000-0000-0000-0000-000000000001"), "Alex");
+        PlayerRef sam = new PlayerRef(UUID.fromString("00000000-0000-0000-0000-000000000002"), "Sam");
+
+        int affected = admin.giveOnline(ADMIN, List.of(alex, sam), coins("25"));
+
+        assertThat(affected).isEqualTo(2);
+        assertThat(givenNow).containsExactly("Alex:25:ADMIN_GIVEALL", "Sam:25:ADMIN_GIVEALL");
+        assertThat(bank.balance(alex, COINS)).isEqualTo(coins("0"));
+        assertThat(history.rows).isEmpty();
+        assertThat(audit.lines).containsExactly("bulk:2:ADMIN_GIVEALL");
+        assertThat(lines).containsExactly(EconomyMessageKey.ECO_ADMIN_GIVEALL_ONLINE.key());
     }
 
     @Test

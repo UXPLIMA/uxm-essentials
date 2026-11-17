@@ -122,9 +122,23 @@ public final class EcoAdmin {
     /**
      * {@code /eco giveall <amount> [currency] --online}: credit each of {@code online}, the players online on the
      * issuing server, one by one, the way a scheduled reward for being online expects. Returns how many were credited.
+     * A currency whose balance changes only while its player is online (items, experience) is queued per player and
+     * handed over at once, so what does not fit an inventory waits for the next join instead of being dropped.
      */
     public int giveOnline(PlayerRef actor, List<PlayerRef> online, Money amount) {
         validateBulk(actor, amount);
+        int affected = sweeps.deferred(amount.currency())
+                ? sweeps.giveOnline(List.copyOf(online), amount, EconomyReason.ADMIN_GIVEALL)
+                : creditEach(online, amount);
+        audit.bulkMutation(actor, amount, affected, EconomyReason.ADMIN_GIVEALL);
+        notifier.send(
+                actor,
+                EconomyMessageKey.ECO_ADMIN_GIVEALL_ONLINE,
+                Map.of("count", Integer.toString(affected), "amount", notifier.amount(amount)));
+        return affected;
+    }
+
+    private int creditEach(List<PlayerRef> online, Money amount) {
         int affected = 0;
         for (PlayerRef target : List.copyOf(online)) {
             repository.ensureOwner(target);
@@ -133,11 +147,6 @@ public final class EcoAdmin {
                 affected++;
             }
         }
-        audit.bulkMutation(actor, amount, affected, EconomyReason.ADMIN_GIVEALL);
-        notifier.send(
-                actor,
-                EconomyMessageKey.ECO_ADMIN_GIVEALL_ONLINE,
-                Map.of("count", Integer.toString(affected), "amount", notifier.amount(amount)));
         return affected;
     }
 

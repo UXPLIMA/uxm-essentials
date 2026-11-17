@@ -29,12 +29,13 @@ public final class BukkitItemPurse implements ItemPurse {
 
     private final Scheduler scheduler;
     private final BukkitInventoryCalculations calculations;
+    private final Logger log;
     private final EntityHandoff.Outcomes outcomes;
 
     public BukkitItemPurse(Scheduler scheduler, BukkitInventoryCalculations calculations, Logger log) {
         this.scheduler = Objects.requireNonNull(scheduler, "scheduler");
         this.calculations = Objects.requireNonNull(calculations, "calculations");
-        Objects.requireNonNull(log, "log");
+        this.log = Objects.requireNonNull(log, "log");
         this.outcomes = new EntityHandoff.Outcomes() {
             @Override
             public void timedOut() {
@@ -56,20 +57,30 @@ public final class BukkitItemPurse implements ItemPurse {
     @Override
     public Optional<Change> setTo(PlayerRef owner, Money target) {
         return onPlayer(owner, player -> {
-            BigDecimal before = calculations.getBalance(player, target.currency());
-            BigDecimal diff = target.amount().subtract(before);
-            if (diff.signum() > 0) {
-                BigDecimal fit = calculations.creditFitting(player, Money.of(target.currency(), diff));
-                return new Change(before, before.add(fit));
-            }
-            if (diff.signum() < 0) {
-                boolean taken = calculations
-                        .debit(player, Money.of(target.currency(), diff.negate()))
-                        .isOk();
-                return new Change(before, taken ? target.amount() : before);
-            }
-            return new Change(before, before);
-        });
+                    BigDecimal before = calculations.getBalance(player, target.currency());
+                    BigDecimal diff = target.amount().subtract(before);
+                    if (diff.signum() > 0) {
+                        BigDecimal fit = calculations.creditFitting(player, Money.of(target.currency(), diff));
+                        return Optional.of(new Change(before, before.add(fit)));
+                    }
+                    if (diff.signum() < 0) {
+                        boolean taken = calculations
+                                .debit(player, Money.of(target.currency(), diff.negate()))
+                                .isOk();
+                        if (!taken) {
+                            // The items moved between the count and the take. Reporting the reset as done would
+                            // leave the player above the figure for good; not done keeps it for the next pass.
+                            log.warn(
+                                    "event=swept_items_reset_take_failed player={} wanted={}",
+                                    owner.uuid(),
+                                    diff.negate());
+                            return Optional.<Change>empty();
+                        }
+                        return Optional.of(new Change(before, target.amount()));
+                    }
+                    return Optional.of(new Change(before, before));
+                })
+                .flatMap(change -> change);
     }
 
     /** Run {@code work} on the player's thread; empty when they are not online here or the thread did not take it. */

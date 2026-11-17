@@ -6,8 +6,9 @@
 -- connection carries on from `after_owner` and never changes an account twice. A runner locks the row before each
 -- chunk, so two servers resuming the same sweep take turns rather than repeat a chunk.
 --
--- `mode` says where the currency's money is kept. LEDGER: the chunk changes the wallet rows. ITEMS: the chunk queues
--- one row per player in `economy_item_deliveries`. PROVIDER: another plugin keeps the balances; the chunk hands its
+-- `mode` says where the currency's money is kept. LEDGER: the chunk changes the wallet rows. DEFERRED: the balance
+-- changes only while its player is online (items, experience), so the chunk queues a delivery per player in
+-- `economy_item_deliveries`. PROVIDER: another plugin keeps the balances; the chunk hands its
 -- players out in `pending_owners` (comma separated owner ids) with `pending_by` (the runner's token) and `pending_at`,
 -- the runner pays them through that plugin and then adds what it did and clears the three. Such calls are not
 -- transactional, so a chunk still handed out when its runner is gone (`pending_at` older than the stale window) is
@@ -58,16 +59,21 @@ CREATE TABLE ${prefix}economy_sweeps (
 -- Serves the start-up read of the sweeps still running or paused.
 CREATE INDEX ${prefix}idx_economy_sweeps_state ON ${prefix}economy_sweeps (state);
 
--- The item deliveries a sweep over an item currency queued: one row per player and sweep (the unique key keeps a
--- chunk that runs again from queueing twice), handed over in the player's inventory when they are online on any
--- server of the database. `kind` is GIVE (add `amount`) or RESET (set the held amount to `amount`).
+-- The deliveries queued for balances that change only while their player is online (items, experience), handed over
+-- when the player is online on any server of the database. A DEFERRED sweep queues one per player and chunk, and
+-- /eco giveall --online queues one per player under an id of its own. `kind` is GIVE (add `amount`) or RESET (set
+-- the balance to `amount`); `reason` is what the ledger row of the hand-over says.
 --
--- A delivery claims a row before it hands the items over and changes or deletes it only after: `claimed_by` is the
+-- A delivery claims a row before it changes the balance and changes or deletes it only after: `claimed_by` is the
 -- claiming delivery's token and `claimed_at` when it claimed, both NULL while the row waits. A claim older than the
 -- stale window can be taken again, so a server that stopped between the claim and the hand-over does not strand the
--- row. What did not fit stays as a GIVE of the rest with `held_back` 1, handed over on the player's next join rather
--- than on every pass over the players online. No foreign key to economy_owners: a player who never held a ledger
--- balance has no row there.
+-- row; a claimant still waiting to record a hand-over refreshes `claimed_at`. What did not fit stays as a GIVE of the
+-- rest with `held_back` 1, handed over on the player's next join rather than on every pass over the players online.
+--
+-- The table stays small without a retention job: a GIVE is added to the player's unclaimed GIVE of the same currency
+-- and reason when there is one, a held-back rest too, and a RESET first deletes every row of its currency for the
+-- player. So a player away for many sweeps has at most one waiting row per currency and reason. No foreign key to
+-- economy_owners: a player who never held a ledger balance has no row there.
 CREATE TABLE ${prefix}economy_item_deliveries (
     id          VARCHAR(36)    NOT NULL,
     sweep_id    VARCHAR(36)    NOT NULL,
@@ -75,6 +81,7 @@ CREATE TABLE ${prefix}economy_item_deliveries (
     currency    VARCHAR(32)    NOT NULL,
     kind        VARCHAR(16)    NOT NULL,
     amount      DECIMAL(20, 4) NOT NULL,
+    reason      VARCHAR(32)    NOT NULL,
     created_at  BIGINT         NOT NULL,
     held_back   INT            NOT NULL,
     claimed_by  VARCHAR(36),

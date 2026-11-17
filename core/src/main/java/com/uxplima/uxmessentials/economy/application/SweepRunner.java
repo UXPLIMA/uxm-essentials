@@ -112,7 +112,9 @@ public final class SweepRunner {
      * @param economy the provider in play, for a sweep through another plugin
      * @param history the ledger a sweep through another plugin writes its rows to
      * @param lanes where the calls to the plugin that keeps a currency run
-     * @param itemsQueued hands over the item deliveries queued for the players online here
+     * @param itemsQueued hands over the deliveries queued for the players online here
+     * @param giveNow queues a give for each player online here and hands it over at once, for a currency whose
+     *     balance changes only while its player is online
      * @param knownPlayers tops up the list of players a sweep reaches before it opens
      */
     public record Paths(
@@ -121,9 +123,11 @@ public final class SweepRunner {
             TransactionHistory history,
             Function<Currency, ProviderLane> lanes,
             Runnable itemsQueued,
+            DeferredGive giveNow,
             KnownPlayers knownPlayers) {
 
         public Paths {
+            Objects.requireNonNull(giveNow, "giveNow");
             Objects.requireNonNull(modes, "modes");
             Objects.requireNonNull(economy, "economy");
             Objects.requireNonNull(history, "history");
@@ -131,6 +135,24 @@ public final class SweepRunner {
             Objects.requireNonNull(itemsQueued, "itemsQueued");
             Objects.requireNonNull(knownPlayers, "knownPlayers");
         }
+    }
+
+    /** Queue a give for each of a list of players and hand it over at once, keeping what does not fit. */
+    @FunctionalInterface
+    public interface DeferredGive {
+
+        /** Returns how many players a give was queued for. */
+        int giveNow(List<PlayerRef> online, Money amount, EconomyReason reason);
+    }
+
+    /** Whether {@code currency}'s balances change only while their player is online, so a give is queued first. */
+    boolean deferred(Currency currency) {
+        return paths.modes().apply(currency) == SweepMode.DEFERRED;
+    }
+
+    /** {@code /eco giveall --online} for a deferred currency; returns how many players a give was queued for. */
+    int giveOnline(List<PlayerRef> online, Money amount, EconomyReason reason) {
+        return paths.giveNow().giveNow(online, amount, reason);
     }
 
     /**
@@ -240,7 +262,7 @@ public final class SweepRunner {
                             sofar = sofar.plus(done);
                             unsettled.put(sweep.id(), done);
                         }
-                        if (sweep.mode() == SweepMode.ITEMS
+                        if (sweep.mode() == SweepMode.DEFERRED
                                 && !step.changedOwners().isEmpty()) {
                             handOverItems();
                         }
@@ -324,7 +346,19 @@ public final class SweepRunner {
             if (sweep.kind() == SweepKind.CREDIT) {
                 return landed(paths.economy().credit(owner, amount), owner, amount, true, sweep.reason());
             }
-            BigDecimal before = paths.economy().balance(owner, currency).amount();
+            BigDecimal before;
+            try {
+                before = paths.economy().balance(owner, currency).amount();
+            } catch (RuntimeException unknown) {
+                // A balance that did not answer is unknown, not zero: setting from a guess would pay or take the
+                // wrong amount. Nothing was changed, so the player is counted as skipped.
+                log.warn(
+                        "event=economy_sweep_balance_unknown id={} owner={} reason={}",
+                        sweep.id(),
+                        owner.uuid(),
+                        unknown.toString());
+                return Call.SKIPPED;
+            }
             int sign = amount.amount().compareTo(before);
             if (sign == 0) {
                 return Call.UNCHANGED;
@@ -408,7 +442,7 @@ public final class SweepRunner {
         Money amount = sweep.amount();
         audit.bulkMutation(actor, amount, total.changed(), sweep.reason());
         String count = Integer.toString(total.changed());
-        boolean items = sweep.mode() == SweepMode.ITEMS;
+        boolean items = sweep.mode() == SweepMode.DEFERRED;
         if (sweep.kind() == SweepKind.CREDIT) {
             notifier.send(
                     actor,

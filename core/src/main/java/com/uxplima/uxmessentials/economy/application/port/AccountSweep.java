@@ -26,7 +26,7 @@ import org.jspecify.annotations.Nullable;
  * <ul>
  *   <li>{@link SweepMode#LEDGER}: changes the chunk's balances and writes one ledger row per changed account in the
  *       same transaction, so a sweep cut short carries on from its cursor without changing any account twice.
- *   <li>{@link SweepMode#ITEMS}: queues one item delivery per player in the same transaction, handed over when the
+ *   <li>{@link SweepMode#DEFERRED}: queues one item delivery per player in the same transaction, handed over when the
  *       player is online; queued once, each delivery is claimed and handed over once.
  *   <li>{@link SweepMode#PROVIDER}: records the chunk's players as handed out and returns them in {@link Step#calls}
  *       for the runner to pay through the other plugin, then {@link #settle} records what those calls did. Calls to

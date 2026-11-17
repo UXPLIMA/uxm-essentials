@@ -196,15 +196,20 @@ public final class EconomyWiring {
                 WalletRepositories.accountSweep(persistence, ledger.telemetry(), currencies, clock, kernel.log()),
                 cached,
                 bus.publisher());
+        java.util.function.Function<Currency, Optional<com.uxplima.uxmessentials.economy.application.port.ItemPurse>>
+                purses = deferredPurses(
+                        resolved,
+                        new com.uxplima.uxmessentials.economy.adapter.outbound.BukkitItemPurse(
+                                kernel.scheduler(), calculations, kernel.log()));
         com.uxplima.uxmessentials.economy.application.DeliverSweptItems sweptItems =
                 new com.uxplima.uxmessentials.economy.application.DeliverSweptItems(
                         WalletRepositories.itemDeliveries(persistence, clock),
-                        new com.uxplima.uxmessentials.economy.adapter.outbound.BukkitItemPurse(
-                                kernel.scheduler(), calculations, kernel.log()),
+                        purses,
                         currencies,
                         ledger.telemetry(),
                         new EconomyNotifier(kernel.messages(), kernel.messageSink(), settings.amountFormat()),
                         kernel.playerLookup(),
+                        kernel.scheduler(),
                         kernel.log(),
                         clock);
         Runnable handOver = new com.uxplima.uxmessentials.economy.adapter.outbound.OnlineItemHandover(
@@ -217,7 +222,7 @@ public final class EconomyWiring {
         });
         SweepParts sweep = new SweepParts(
                 journal,
-                sweepModes(resolved.ledgerInPlay()),
+                sweepModes(resolved.ledgerInPlay(), purses),
                 sweepLanes(resolved.vaultForeign(), kernel.scheduler()),
                 sweptItems,
                 handOver,
@@ -352,14 +357,41 @@ public final class EconomyWiring {
             com.uxplima.uxmessentials.economy.application.port.KnownPlayers knownPlayers) {}
 
     /**
-     * An item currency is reached through deliveries whoever provides the economy; a currency on this plugin's ledger
-     * through its rows while that ledger is the economy in play; anything else through the plugin that keeps it.
+     * The balance a deferred currency's deliveries change: items in the inventory for an item currency, whoever
+     * provides the economy; the backend itself for a backend of this plugin's that cannot change an offline player's
+     * balance (experience), while this plugin's economy is the one in play. Empty for every other currency.
      */
-    private static java.util.function.Function<Currency, com.uxplima.uxmessentials.economy.domain.SweepMode> sweepModes(
-            boolean ledgerInPlay) {
+    private static java.util.function.Function<
+                    Currency, Optional<com.uxplima.uxmessentials.economy.application.port.ItemPurse>>
+            deferredPurses(
+                    ResolvedEconomy resolved, com.uxplima.uxmessentials.economy.application.port.ItemPurse items) {
         return currency -> {
             if (currency.isPhysical()) {
-                return com.uxplima.uxmessentials.economy.domain.SweepMode.ITEMS;
+                return Optional.of(items);
+            }
+            if (!resolved.ledgerInPlay()) {
+                return Optional.empty();
+            }
+            return resolved.backends()
+                    .find(currency.backendId())
+                    .filter(backend -> !backend.worksOffline())
+                    .map(com.uxplima.uxmessentials.economy.application.BackendPurse::new);
+        };
+    }
+
+    /**
+     * A currency whose balance changes only while its player is online is reached through deliveries; a currency on
+     * this plugin's ledger through its rows while that ledger is the economy in play; anything else through the plugin
+     * that keeps it.
+     */
+    private static java.util.function.Function<Currency, com.uxplima.uxmessentials.economy.domain.SweepMode> sweepModes(
+            boolean ledgerInPlay,
+            java.util.function.Function<
+                            Currency, Optional<com.uxplima.uxmessentials.economy.application.port.ItemPurse>>
+                    purses) {
+        return currency -> {
+            if (purses.apply(currency).isPresent()) {
+                return com.uxplima.uxmessentials.economy.domain.SweepMode.DEFERRED;
             }
             boolean onLedger = ledgerInPlay && NativeCurrencyBackend.ID.equals(currency.backendId());
             return onLedger
@@ -480,7 +512,12 @@ public final class EconomyWiring {
         java.util.List<org.bukkit.event.Listener> listenersList = new java.util.ArrayList<>();
         listenersList.add(new com.uxplima.uxmessentials.economy.adapter.inbound.listener.PendingTransactionListener(
                 new com.uxplima.uxmessentials.economy.application.DeliverPendingCredits(
-                        resolved, pendingRepo, services.notifier(), kernel.playerLookup(), kernel.log()),
+                        resolved,
+                        pendingRepo,
+                        services.notifier(),
+                        kernel.playerLookup(),
+                        kernel.log(),
+                        sweep.items()::holdsCredits),
                 sweep.items(),
                 kernel.scheduler()));
         // Always on, like the pending credits above: items kept for a seller who left must reach them even after the
@@ -850,6 +887,7 @@ public final class EconomyWiring {
                                         history,
                                         sweep.lanes(),
                                         sweep.handOver(),
+                                        sweep.items()::giveNow,
                                         sweep.knownPlayers()),
                                 kernel.scheduler(),
                                 audit,
