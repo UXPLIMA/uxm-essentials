@@ -103,6 +103,15 @@ shared database; nothing needs editing. A same-server trade that cannot hand a p
 mid-trade, or because the server stopped with the trade open, now keeps them there and gives them back on that
 player's next join, where it used to lose them. See [trade.md](trade.md#items-kept-for-the-next-join).
 
+## Rank actions wait for a player who is not here
+
+The update adds one table, `rank_pending_actions`. The first server to start on the new release creates it in the
+shared database; nothing needs editing. A rankup or prestige whose player left before its actions ran, or moved to
+another server, now keeps the actions and runs them on that player's next join on any server, where it used to drop
+them. Rank actions also take `{uuid}`, the player's account id. A line that hands the player to a permission plugin,
+such as `console lp user {player} parent set citizen`, should use `{uuid}` instead: a Bedrock name with a prefix, or a
+name longer than an account name, makes every line with `{player}` skip, and LuckPerms refuses a name with a prefix.
+
 ## Velocity bus frames need a shared secret
 
 A network on `network.transport = "velocity"` or `"both"` now signs every frame it sends through the proxy, so a

@@ -62,6 +62,7 @@ class MariadbItemColumnsTest {
             "npc.skin_texture",
             "player_skins.texture_sign",
             "player_skins.texture_value",
+            "rank_pending_actions.action_line",
             "staff_loadout.potion_effects",
             "trade_escrow.money");
 

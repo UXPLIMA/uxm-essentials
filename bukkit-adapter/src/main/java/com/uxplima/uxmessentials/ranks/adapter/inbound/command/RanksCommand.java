@@ -26,6 +26,7 @@ import com.uxplima.uxmessentials.shared.adapter.outbound.BukkitRefs;
 import com.uxplima.uxmessentials.shared.application.permission.EconomyPermissions;
 import com.uxplima.uxmessentials.shared.application.port.Logger;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
+import com.uxplima.uxmessentials.shared.application.port.PlayerLookup;
 import com.uxplima.uxmessentials.shared.application.port.Scheduler;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmessentials.shared.domain.message.SharedMessageKey;
@@ -73,12 +74,14 @@ public final class RanksCommand implements CommandRegistration {
             RankLadder ladder,
             Optional<RanksPanelMenu> panel,
             CurrentRank currentRank,
+            PlayerLookup players,
             Scheduler scheduler,
             Logger log,
             Messages messages) {
         this.setRank = new SetRankExecutor(
                 Objects.requireNonNull(setRank, "setRank"),
                 Objects.requireNonNull(ladder, "ladder"),
+                Objects.requireNonNull(players, "players"),
                 Objects.requireNonNull(scheduler, "scheduler"),
                 Objects.requireNonNull(log, "log"),
                 messages);
