@@ -15,6 +15,8 @@ import org.bukkit.plugin.messaging.PluginMessageListener;
 
 import com.uxplima.uxmessentials.shared.application.port.Logger;
 import com.uxplima.uxmessentials.shared.application.port.Scheduler;
+import com.uxplima.uxmessentials.shared.network.BedrockFormAnswerFrame;
+import com.uxplima.uxmessentials.shared.network.BedrockPresenceFrame;
 import com.uxplima.uxmessentials.shared.network.BusChannel;
 import com.uxplima.uxmessentials.shared.network.BusSecret;
 import com.uxplima.uxmessentials.shared.network.BusTransport;
@@ -229,24 +231,37 @@ public final class PluginMessagingTransport implements PluginMessageListener, Bu
     }
 
     /**
-     * Note, here on the carrier's own thread and before the frame is checked, whose connection carried a proxy
-     * connection frame about that same player, and when: the listener that acts on it learns from the receipt whether
+     * Note, here on the carrier's own thread and before the frame is checked, whose connection carried a frame the
+     * proxy plugin sends about that same player, and when: the listener that acts on it learns from the receipt whether
      * it came over that player's connection and during which of their visits. Frames of other kinds, about another
      * player, or that do not decode are not noted; a receipt nobody takes is dropped by newer ones.
      */
     void noteCarrier(UUID carrier, byte[] sealed) {
-        if (sealed.length <= FrameSeal.TRAILER_BYTES
-                || !NetworkMessageCodec.isType(sealed, NetworkMessage.MessageType.PROXY_CONNECTION)) {
+        if (sealed.length <= FrameSeal.TRAILER_BYTES || !fromProxyPlugin(sealed)) {
             return;
         }
         try {
-            if (NetworkMessageCodec.decode(FrameSeal.frame(sealed)) instanceof ProxyConnectionFrame proxyFrame
-                    && proxyFrame.player().equals(carrier)) {
-                receipts.received(proxyFrame.frameId(), carrier);
+            switch (NetworkMessageCodec.decode(FrameSeal.frame(sealed))) {
+                case ProxyConnectionFrame frame
+                when frame.player().equals(carrier) -> receipts.received(frame.frameId(), carrier);
+                case BedrockPresenceFrame frame
+                when frame.player().equals(carrier) -> receipts.received(frame.frameId(), carrier);
+                case BedrockFormAnswerFrame frame
+                when frame.player().equals(carrier) -> receipts.received(frame.frameId(), carrier);
+                default -> {
+                    // About another player: not noted.
+                }
             }
         } catch (RuntimeException unreadable) {
             // Not a frame this build reads; the signature check refuses and counts it.
         }
+    }
+
+    /** Whether {@code frame} is of a kind only the proxy plugin sends, over the connection of the player it names. */
+    static boolean fromProxyPlugin(byte[] frame) {
+        return NetworkMessageCodec.isType(frame, NetworkMessage.MessageType.PROXY_CONNECTION)
+                || NetworkMessageCodec.isType(frame, NetworkMessage.MessageType.BEDROCK_PRESENCE)
+                || NetworkMessageCodec.isType(frame, NetworkMessage.MessageType.BEDROCK_FORM_ANSWER);
     }
 
     /**

@@ -6,10 +6,19 @@ plugins {
 // The optional proxy-side cross-server bus broker. It shares the pure NetworkMessage hierarchy and codec with
 // the bukkit-side bus client through :core, compiles against velocity-api only, and ships as its own jar.
 
+repositories {
+    maven("https://repo.opencollab.dev/main/") // Geyser's base API and Cumulus
+}
+
 dependencies {
     implementation(project(":core"))
     api(project(":api"))
+    // The form model, its codec and the Cumulus mapping a backend's forms are shown with. It names no server type.
+    implementation(uxm.uxmlib.bedrock)
     compileOnly(libs.velocity.api)
+    // Geyser on the proxy supplies its base API and Cumulus at runtime; both are reached only once it is loaded.
+    compileOnly(libs.geyser.base.api) { isTransitive = false }
+    compileOnly(libs.cumulus) { isTransitive = false }
     // The proxy provides Configurate, Adventure and LuckPerms at runtime.
     compileOnly(uxm.configurate.hocon)
     compileOnly(libs.bundles.adventure)
@@ -20,6 +29,7 @@ dependencies {
     testImplementation(libs.bundles.adventure)
     // The broker test builds the proxy's plugin message event and fakes the server types it touches.
     testImplementation(libs.velocity.api)
+    testImplementation(libs.cumulus) { isTransitive = false }
 }
 
 // The velocity-api annotation processor generates its own velocity-plugin.json from the @Plugin annotation. The

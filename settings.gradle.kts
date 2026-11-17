@@ -19,7 +19,7 @@ dependencyResolutionManagement {
         maven("https://repo.uxplima.com/repository/maven-public/")
     }
     versionCatalogs {
-        create("uxm") { from("com.uxplima.gradle:uxm-catalog:0.8.0") }
+        create("uxm") { from("com.uxplima.gradle:uxm-catalog:0.9.0") }
     }
 }
 

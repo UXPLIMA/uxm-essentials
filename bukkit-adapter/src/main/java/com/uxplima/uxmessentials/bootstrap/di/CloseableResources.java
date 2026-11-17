@@ -19,6 +19,7 @@ import com.uxplima.uxmessentials.shared.adapter.inbound.command.LocaleBinding;
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.UsageBinding;
 import com.uxplima.uxmessentials.shared.adapter.inbound.window.FormReportingScreen;
 import com.uxplima.uxmessentials.shared.adapter.outbound.action.ServerConnector;
+import com.uxplima.uxmessentials.shared.adapter.outbound.bedrock.ProxyBedrock;
 import com.uxplima.uxmessentials.shared.adapter.outbound.currency.Currencies;
 import com.uxplima.uxmessentials.shared.adapter.outbound.style.EngineTheme;
 import com.uxplima.uxmessentials.shared.application.port.PlayerDataStore;
@@ -70,6 +71,7 @@ public final class CloseableResources implements AutoCloseable {
     private @Nullable ServerConnector serverConnector;
     private @Nullable BedrockDetector bedrock;
     private @Nullable BedrockScreen bedrockScreen;
+    private @Nullable ProxyBedrock proxyBedrock;
     private @Nullable FormReportingScreen menuForms;
 
     /** The theme the menu engine draws in; set once during wiring and re-read on a theme reload. */
@@ -288,6 +290,16 @@ public final class CloseableResources implements AutoCloseable {
     /** The resolved Bedrock screen, or null before wiring has constructed it. */
     public @Nullable BedrockScreen bedrockScreen() {
         return bedrockScreen;
+    }
+
+    /** Captures the relay that answers for Bedrock players through Geyser on the proxy, when the bus can hear it. */
+    public void proxyBedrock(ProxyBedrock relay) {
+        this.proxyBedrock = Objects.requireNonNull(relay, "relay");
+    }
+
+    /** The proxy Bedrock relay, or null when this backend cannot hear the proxy plugin. */
+    public @Nullable ProxyBedrock proxyBedrock() {
+        return proxyBedrock;
     }
 
     /** Captures the menu engine's Bedrock screen, which reports each menu form it sends. */

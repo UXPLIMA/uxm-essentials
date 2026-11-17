@@ -5,6 +5,7 @@ import java.time.Clock;
 import java.util.List;
 import java.util.Objects;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.function.Consumer;
 
 import org.bukkit.Server;
 import org.bukkit.event.Listener;
@@ -19,6 +20,7 @@ import com.uxplima.uxmessentials.shared.adapter.outbound.skin.HttpClientFetcher;
 import com.uxplima.uxmessentials.shared.adapter.outbound.skin.MineSkinService;
 import com.uxplima.uxmessentials.shared.application.module.KernelPorts;
 import com.uxplima.uxmessentials.shared.application.module.ModuleContext;
+import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmessentials.skin.adapter.inbound.command.SkinCommand;
 import com.uxplima.uxmessentials.skin.adapter.inbound.listener.SkinLoginListener;
 import com.uxplima.uxmessentials.skin.adapter.outbound.FloodgateLinks;
@@ -28,6 +30,7 @@ import com.uxplima.uxmessentials.skin.adapter.outbound.PaperSkinView;
 import com.uxplima.uxmessentials.skin.adapter.outbound.SkinFolderNames;
 import com.uxplima.uxmessentials.skin.application.ClearSkin;
 import com.uxplima.uxmessentials.skin.application.DescribeSkin;
+import com.uxplima.uxmessentials.skin.application.DressBedrockArrival;
 import com.uxplima.uxmessentials.skin.application.DressLogin;
 import com.uxplima.uxmessentials.skin.application.DropSkin;
 import com.uxplima.uxmessentials.skin.application.NamedSkins;
@@ -134,7 +137,15 @@ public final class SkinWiring {
                         cache, dressLogin, view, kernel.playerLookup(), kernel.scheduler(), dressing::get));
         bus.registry().registerPlayerCacheDrop(cache::invalidateAll);
 
-        return new Wired(List.of(command), List.of(login), repository, () -> dressing.set(false));
+        // A Bedrock player the proxy names only once they are in is dressed then, off the tick.
+        DressBedrockArrival bedrockArrival = new DressBedrockArrival(repository, dressLogin, view, config);
+        Consumer<PlayerRef> bedrockArrived = player -> kernel.scheduler().async(() -> {
+            if (dressing.get()) {
+                bedrockArrival.arrived(player);
+            }
+        });
+
+        return new Wired(List.of(command), List.of(login), repository, bedrockArrived, () -> dressing.set(false));
     }
 
     /**
@@ -146,11 +157,16 @@ public final class SkinWiring {
      * @param stop the teardown run on module stop, after which no login is dressed
      */
     public record Wired(
-            List<CommandRegistration> commands, List<Listener> listeners, SkinRepository repository, Runnable stop) {
+            List<CommandRegistration> commands,
+            List<Listener> listeners,
+            SkinRepository repository,
+            Consumer<PlayerRef> bedrockArrived,
+            Runnable stop) {
         public Wired {
             commands = List.copyOf(commands);
             listeners = List.copyOf(listeners);
             Objects.requireNonNull(repository, "repository");
+            Objects.requireNonNull(bedrockArrived, "bedrockArrived");
             Objects.requireNonNull(stop, "stop");
         }
     }

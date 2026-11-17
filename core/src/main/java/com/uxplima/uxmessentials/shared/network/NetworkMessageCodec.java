@@ -367,6 +367,29 @@ public final class NetworkMessageCodec {
                 }
             }
             case PlayerNoticesKept kept -> writeUuid(out, kept.recipient());
+            case BedrockPresenceFrame bedrock -> {
+                writeUuid(out, bedrock.frameId());
+                writeUuid(out, bedrock.player());
+                writeText(out, bedrock.server());
+                writeText(out, bedrock.xuid());
+                writeText(out, bedrock.platform());
+                writeText(out, bedrock.inputMode());
+                writeText(out, bedrock.uiProfile());
+                writeText(out, bedrock.version());
+                writeText(out, bedrock.language());
+            }
+            case BedrockFormRequestFrame request -> {
+                writeUuid(out, request.player());
+                out.writeLong(request.requestId());
+                writeText(out, request.form());
+            }
+            case BedrockFormAnswerFrame answer -> {
+                writeUuid(out, answer.frameId());
+                writeText(out, answer.toServer());
+                writeUuid(out, answer.player());
+                out.writeLong(answer.requestId());
+                writeText(out, answer.answer());
+            }
         }
     }
 
@@ -485,6 +508,22 @@ public final class NetworkMessageCodec {
             case VOTE_REWARDS_QUEUED -> readQueuedVote(in, origin);
             case STAFF_ACTION -> readStaffAction(in, origin);
             case PLAYER_NOTICES_KEPT -> new PlayerNoticesKept(origin, readUuid(in));
+            case BEDROCK_PRESENCE ->
+                new BedrockPresenceFrame(
+                        origin,
+                        readUuid(in),
+                        readUuid(in),
+                        in.readUTF(),
+                        in.readUTF(),
+                        in.readUTF(),
+                        in.readUTF(),
+                        in.readUTF(),
+                        in.readUTF(),
+                        in.readUTF());
+            case BEDROCK_FORM_REQUEST -> new BedrockFormRequestFrame(origin, readUuid(in), in.readLong(), in.readUTF());
+            case BEDROCK_FORM_ANSWER ->
+                new BedrockFormAnswerFrame(
+                        origin, readUuid(in), in.readUTF(), readUuid(in), in.readLong(), in.readUTF());
         };
     }
 

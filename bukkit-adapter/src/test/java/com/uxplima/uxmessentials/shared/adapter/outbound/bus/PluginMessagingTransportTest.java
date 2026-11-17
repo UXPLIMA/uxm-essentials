@@ -19,6 +19,8 @@ import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmessentials.shared.domain.Position;
 import com.uxplima.uxmessentials.shared.network.BalanceChanged;
 import com.uxplima.uxmessentials.shared.network.BanChanged;
+import com.uxplima.uxmessentials.shared.network.BedrockFormAnswerFrame;
+import com.uxplima.uxmessentials.shared.network.BedrockPresenceFrame;
 import com.uxplima.uxmessentials.shared.network.BusChannel;
 import com.uxplima.uxmessentials.shared.network.BusSecret;
 import com.uxplima.uxmessentials.shared.network.FrameSeal;
@@ -127,6 +129,37 @@ class PluginMessagingTransportTest {
         assertThat(receipts.take(aboutAdaAgain.frameId()))
                 .as("carried by another player")
                 .isEmpty();
+    }
+
+    @Test
+    void theProxysBedrockWordIsReceiptedOnlyWhenTheBedrockPlayerCarriedIt() {
+        UUID mira = new UUID(0L, 9L);
+        UUID bob = new UUID(0L, 8L);
+        BedrockPresenceFrame presence = new BedrockPresenceFrame(
+                ProxyConnectionFrame.PROXY,
+                new UUID(3L, 1L),
+                mira,
+                "s",
+                "2535",
+                "GOOGLE",
+                "TOUCH",
+                "POCKET",
+                "1",
+                "en");
+        BedrockFormAnswerFrame answer =
+                new BedrockFormAnswerFrame(ProxyConnectionFrame.PROXY, new UUID(3L, 2L), "s", mira, 1L, "AQM=");
+        BedrockFormAnswerFrame carriedByBob =
+                new BedrockFormAnswerFrame(ProxyConnectionFrame.PROXY, new UUID(3L, 3L), "s", mira, 2L, "AQM=");
+        FrameSeal seal = new FrameSeal(BusSecret.of(SECRET), () -> now);
+        transport.start(delivered::add);
+
+        transport.noteCarrier(mira, seal.seal(NetworkMessageCodec.encode(presence)));
+        transport.noteCarrier(mira, seal.seal(NetworkMessageCodec.encode(answer)));
+        transport.noteCarrier(bob, seal.seal(NetworkMessageCodec.encode(carriedByBob)));
+
+        assertThat(receipts.take(presence.frameId())).contains(new CarrierReceipts.Receipt(mira, START));
+        assertThat(receipts.take(answer.frameId())).contains(new CarrierReceipts.Receipt(mira, START));
+        assertThat(receipts.take(carriedByBob.frameId())).isEmpty();
     }
 
     @Test

@@ -5,7 +5,8 @@
   "description": "Cross-server bus broker and proxy command-control for uxmEssentials.",
   "authors": ["UXPLIMA"],
   "dependencies": [
-    { "id": "luckperms", "optional": true }
+    { "id": "luckperms", "optional": true },
+    { "id": "geyser", "optional": true }
   ],
   "main": "com.uxplima.uxmessentials.velocity.UxmEssentialsVelocity"
 }

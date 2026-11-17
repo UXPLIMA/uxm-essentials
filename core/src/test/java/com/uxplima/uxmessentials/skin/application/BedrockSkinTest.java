@@ -122,6 +122,36 @@ class BedrockSkinTest {
         assertThat(mojang.asked).isEmpty();
     }
 
+    @Test
+    void aBedrockPlayerNamedOnlyOnceTheyAreInIsDressedInTheirBedrockSkinThen() {
+        geyser.skin = Optional.of(BEDROCK);
+
+        new DressBedrockArrival(rows, dressLogin(SkinConfig.defaults()), view, SkinConfig.defaults()).arrived(STEVE);
+
+        assertThat(view.dressed).containsExactly("BE_Steve:bedrock");
+        assertThat(rows.find(STEVE.uuid())).map(PlayerSkin::texture).contains(BEDROCK);
+        assertThat(mojang.asked).isEmpty();
+    }
+
+    @Test
+    void aBedrockPlayerWhoChoseTheirOwnSkinKeepsItWhenTheyAreNamedLate() {
+        geyser.skin = Optional.of(BEDROCK);
+        rows.save(new PlayerSkin(STEVE, new SkinSource.ByName("Ada"), JAVA_ADA, SkinModel.CLASSIC, Instant.EPOCH));
+
+        new DressBedrockArrival(rows, dressLogin(SkinConfig.defaults()), view, SkinConfig.defaults()).arrived(STEVE);
+
+        assertThat(view.dressed).isEmpty();
+    }
+
+    @Test
+    void aLateBedrockPlayerWhoseSkinCannotBeReadKeepsWhatTheyJoinedIn() {
+        SkinConfig config = SkinConfig.defaults().withDefaultPool(List.of("Alex"));
+
+        new DressBedrockArrival(rows, dressLogin(config), view, config).arrived(STEVE);
+
+        assertThat(view.dressed).isEmpty();
+    }
+
     private DressLogin dressLogin(SkinConfig config) {
         return new DressLogin(rows, mojang, geyser, config, new QuietLog());
     }

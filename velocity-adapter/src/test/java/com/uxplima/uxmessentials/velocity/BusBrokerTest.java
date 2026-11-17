@@ -11,6 +11,9 @@ import java.util.Optional;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 
+import com.uxplima.uxmessentials.shared.network.BedrockFormAnswerFrame;
+import com.uxplima.uxmessentials.shared.network.BedrockFormRequestFrame;
+import com.uxplima.uxmessentials.shared.network.BedrockPresenceFrame;
 import com.uxplima.uxmessentials.shared.network.BusChannel;
 import com.uxplima.uxmessentials.shared.network.BusSecret;
 import com.uxplima.uxmessentials.shared.network.FrameSeal;
@@ -19,6 +22,7 @@ import com.uxplima.uxmessentials.shared.network.FreezeReset;
 import com.uxplima.uxmessentials.shared.network.HomeChanged;
 import com.uxplima.uxmessentials.shared.network.NetworkMessage;
 import com.uxplima.uxmessentials.shared.network.NetworkMessageCodec;
+import com.uxplima.uxmessentials.shared.network.ProxyConnectionFrame;
 import com.uxplima.uxmessentials.shared.network.ServerPing;
 import com.velocitypowered.api.event.connection.PluginMessageEvent;
 import com.velocitypowered.api.proxy.Player;
@@ -192,6 +196,33 @@ class BusBrokerTest {
 
         assertThat(freezes.frozenOn(steve)).isEmpty();
         assertThat(survival.received).isEmpty();
+    }
+
+    @Test
+    void aBedrockFormAnswerOrRequestOrPresenceFromABackendIsNeverRelayed() {
+        UUID mira = new UUID(0L, 9L);
+        byte[] answer = sealed(new BedrockFormAnswerFrame(
+                ProxyConnectionFrame.PROXY, new UUID(3L, 1L), "survival-1", mira, 1L, "AQIAAQADcGlu"));
+        byte[] request = sealed(new BedrockFormRequestFrame("lobby-1", mira, 1L, "AQIABFNob3A="));
+        byte[] presence = sealed(new BedrockPresenceFrame(
+                ProxyConnectionFrame.PROXY,
+                new UUID(3L, 2L),
+                mira,
+                "survival-1",
+                "1",
+                "GOOGLE",
+                "TOUCH",
+                "POCKET",
+                "1",
+                "en"));
+
+        broker.relay(fromLobby(answer));
+        broker.relay(fromLobby(request));
+        broker.relay(fromLobby(presence));
+
+        assertThat(survival.received).isEmpty();
+        assertThat(creative.received).isEmpty();
+        assertThat(lobby.received).isEmpty();
     }
 
     /** A backend that records what the proxy sends it; with nobody on it, nothing can be sent, as on Velocity. */
