@@ -161,6 +161,9 @@ public interface UxmEssentialsApi {
      * <p>Always there, unlike the module queries below: it reads the server's own record of who has played. Ask it
      * rather than Mojang, which knows neither an offline-mode account nor a Bedrock one.
      *
+     * <p>A default method, so a class that implements this interface itself, such as a test double, still compiles.
+     * The plugin overrides it; the default has no record of names to read, so it says so rather than answer nobody.
+     *
      * <pre>{@code
      * api.players().byName("Steve").thenAccept(match -> {
      *     switch (match) {
@@ -170,8 +173,12 @@ public interface UxmEssentialsApi {
      *     }
      * });
      * }</pre>
+     *
+     * @throws UnsupportedOperationException from an implementation that does not override this method
      */
-    UxmPlayersQuery players();
+    default UxmPlayersQuery players() {
+        throw new UnsupportedOperationException("this implementation of the API cannot look players up by name");
+    }
 
     /**
      * Reading a player's homes, or empty when the homes module is switched off.
