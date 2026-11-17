@@ -8,6 +8,8 @@ import com.google.inject.Inject;
 import com.uxplima.uxmessentials.shared.network.BusChannel;
 import com.uxplima.uxmessentials.shared.network.BusSecret;
 import com.uxplima.uxmessentials.shared.network.FrameSeal;
+import com.uxplima.uxmessentials.shared.network.NetworkMessage;
+import com.uxplima.uxmessentials.shared.network.NetworkMessageCodec;
 import com.uxplima.uxmessentials.velocity.commandcontrol.CommandControlConfigLoader;
 import com.uxplima.uxmessentials.velocity.commandcontrol.ProxyCatalog;
 import com.uxplima.uxmessentials.velocity.commandcontrol.ProxyCommandControl;
@@ -18,8 +20,10 @@ import com.velocitypowered.api.plugin.Dependency;
 import com.velocitypowered.api.plugin.Plugin;
 import com.velocitypowered.api.plugin.annotation.DataDirectory;
 import com.velocitypowered.api.proxy.ProxyServer;
+import com.velocitypowered.api.proxy.ServerConnection;
 import com.velocitypowered.api.proxy.messages.MinecraftChannelIdentifier;
 import org.jspecify.annotations.NullMarked;
+import org.jspecify.annotations.Nullable;
 import org.slf4j.Logger;
 import org.spongepowered.configurate.ConfigurateException;
 
@@ -41,7 +45,7 @@ import org.spongepowered.configurate.ConfigurateException;
         version = BuildConstants.VERSION,
         description = "Cross-server bus broker and proxy command-control for uxmEssentials.",
         authors = {"UXPLIMA"},
-        dependencies = {@Dependency(id = "luckperms", optional = true)})
+        dependencies = {@Dependency(id = "luckperms", optional = true), @Dependency(id = "geyser", optional = true)})
 @NullMarked
 public final class UxmEssentialsVelocity {
 
@@ -51,6 +55,7 @@ public final class UxmEssentialsVelocity {
     private final ProxyFreezes freezes = new ProxyFreezes(System::currentTimeMillis);
     private final BusBroker broker;
     private final MinecraftChannelIdentifier channel;
+    private volatile @Nullable ProxyBedrockForms bedrockForms;
 
     @Inject
     public UxmEssentialsVelocity(ProxyServer proxy, Logger logger, @DataDirectory Path dataDirectory) {
@@ -96,17 +101,40 @@ public final class UxmEssentialsVelocity {
                     + " switches and a switch asks for the second factor again");
             return;
         }
-        proxy.getEventManager()
-                .register(
-                        this,
-                        new ProxyConnections(
-                                new FrameSeal(secret, System::currentTimeMillis), channel, UUID::randomUUID));
+        FrameSeal seal = new FrameSeal(secret, System::currentTimeMillis);
+        proxy.getEventManager().register(this, new ProxyConnections(seal, channel, UUID::randomUUID));
+        speakForGeyser(seal);
+    }
+
+    /**
+     * With Geyser on this proxy, tell backends which players are Bedrock players and show those players the forms a
+     * backend asks for: the backends with neither Floodgate nor Geyser of their own learn it only this way.
+     */
+    private void speakForGeyser(FrameSeal seal) {
+        if (!proxy.getPluginManager().isLoaded("geyser")) {
+            return;
+        }
+        ProxyBedrockForms forms = new ProxyBedrockForms(
+                seal, new GeyserOnProxy(), ProxyBedrockListener.connections(proxy, channel), UUID::randomUUID, logger);
+        proxy.getEventManager().register(this, new ProxyBedrockListener(forms));
+        bedrockForms = forms;
+        logger.info("Geyser found: backends without Floodgate or Geyser get Bedrock forms through this proxy");
     }
 
     /** Relay an incoming bus frame from its origin backend to every other backend. */
     @Subscribe
     public void onPluginMessage(PluginMessageEvent event) {
         if (!channel.getId().equals(event.getIdentifier().getId())) {
+            return;
+        }
+        ProxyBedrockForms forms = bedrockForms;
+        if (forms != null
+                && NetworkMessageCodec.isType(event.getData(), NetworkMessage.MessageType.BEDROCK_FORM_REQUEST)
+                && event.getSource() instanceof ServerConnection backend) {
+            // For this proxy alone: the broker never relays it, and Velocity does not forward it either.
+            event.setResult(PluginMessageEvent.ForwardResult.handled());
+            forms.request(
+                    backend.getPlayer().getUniqueId(), backend.getServerInfo().getName(), event.getData());
             return;
         }
         broker.relay(event);

@@ -5,6 +5,7 @@ import java.util.Objects;
 import java.util.function.Supplier;
 
 import com.uxplima.uxmessentials.shared.network.BusChannel;
+import com.uxplima.uxmessentials.shared.network.NetworkMessage;
 import com.uxplima.uxmessentials.shared.network.NetworkMessageCodec;
 import com.velocitypowered.api.event.connection.PluginMessageEvent;
 import com.velocitypowered.api.proxy.ServerConnection;
@@ -75,6 +76,11 @@ final class BusBroker {
         if (origin == null) {
             return;
         }
+        if (proxyOnly(event.getData())) {
+            // Bedrock presence, form requests and answers pass between one backend and this proxy alone. A form
+            // answer can hold a secret, so no other backend ever gets one, whoever sent it.
+            return;
+        }
         String sourceServer = sourceConnection.getServerInfo().getName();
         fanOut(event.getData(), origin, sourceServer);
         freezes.observe(event.getData(), sourceServer);
@@ -85,6 +91,13 @@ final class BusBroker {
             // and the server picks whoever is still on it, or sends nothing.
             sourceConnection.getServer().sendPluginMessage(channel, event.getData());
         }
+    }
+
+    /** Whether {@code frame} is of a kind that passes between the proxy plugin and one backend only. */
+    static boolean proxyOnly(byte[] frame) {
+        return NetworkMessageCodec.isType(frame, NetworkMessage.MessageType.BEDROCK_PRESENCE)
+                || NetworkMessageCodec.isType(frame, NetworkMessage.MessageType.BEDROCK_FORM_REQUEST)
+                || NetworkMessageCodec.isType(frame, NetworkMessage.MessageType.BEDROCK_FORM_ANSWER);
     }
 
     private void fanOut(byte[] frame, String origin, String sourceServerName) {

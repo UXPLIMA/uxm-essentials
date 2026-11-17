@@ -62,7 +62,10 @@ public sealed interface NetworkMessage
                 BroadcastFrame,
                 VoteRewardsQueued,
                 StaffActionFrame,
-                PlayerNoticesKept {
+                PlayerNoticesKept,
+                BedrockPresenceFrame,
+                BedrockFormRequestFrame,
+                BedrockFormAnswerFrame {
 
     /** The {@code server-id} of the backend that produced this frame; the loop sentinel keys on it. */
     String originServer();
@@ -116,10 +119,13 @@ public sealed interface NetworkMessage
         MAIL_ARRIVED(38),
         RANK_ACTIONS_KEPT(39),
         INVENTORY_RESTORE_KEPT(40),
+        BEDROCK_PRESENCE(41),
+        BEDROCK_FORM_REQUEST(42),
         BROADCAST(43),
         VOTE_REWARDS_QUEUED(44),
         STAFF_ACTION(45),
-        PLAYER_NOTICES_KEPT(46);
+        PLAYER_NOTICES_KEPT(46),
+        BEDROCK_FORM_ANSWER(47);
 
         private final byte wireTag;
 

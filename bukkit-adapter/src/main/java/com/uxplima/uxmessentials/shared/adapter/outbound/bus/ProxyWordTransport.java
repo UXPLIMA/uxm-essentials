@@ -4,14 +4,13 @@ import java.util.Objects;
 import java.util.function.Consumer;
 
 import com.uxplima.uxmessentials.shared.network.BusTransport;
-import com.uxplima.uxmessentials.shared.network.NetworkMessage;
-import com.uxplima.uxmessentials.shared.network.NetworkMessageCodec;
 import org.jspecify.annotations.NullMarked;
 
 /**
  * The proxy plugin's word on a backend whose bus runs over Redis alone. The proxy plugin tells a backend how a player
- * reached it over that player's own connection, on the plugin-messaging channel, whatever carries the bus between
- * backends. This listens on that channel for those frames only: they are checked against the network secret and
+ * reached it, whether they are a Bedrock player, and their answer to a form, over that player's own connection, on the
+ * plugin-messaging channel, whatever carries the bus between backends. This listens on that channel for those frames
+ * only: they are checked against the network secret and
  * receipted with their carrier exactly as on the Velocity carrier, and nothing is ever sent on it.
  */
 @NullMarked
@@ -27,7 +26,7 @@ final class ProxyWordTransport implements BusTransport {
     public void start(Consumer<byte[]> onFrame) {
         Objects.requireNonNull(onFrame, "onFrame");
         channel.start(frame -> {
-            if (NetworkMessageCodec.isType(frame, NetworkMessage.MessageType.PROXY_CONNECTION)) {
+            if (PluginMessagingTransport.fromProxyPlugin(frame)) {
                 onFrame.accept(frame);
             }
         });

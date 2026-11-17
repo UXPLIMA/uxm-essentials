@@ -161,17 +161,17 @@ the party is not paid on that backend. Use `both` only while moving from one car
 `uxmEssentials-velocity` relays bus frames, and, with `command-control.enabled = true` in its `config.conf`, hides and
 gates the proxy's own commands (`/server`, `/glist`, `/send` and proxy plugins' commands) by LuckPerms group. With
 `bus.secret` in its `config.conf` set to the backends' `network.bus.secret`, it also tells each backend a player reaches
-whether they switched servers or logged in (see [second factor](#second-factor)). It stores no data: each backend
-announces its own players. Backend commands are gated by the `commandcontrol` module on each backend.
+whether they switched servers or logged in (see [second factor](#second-factor)), and, with Geyser on the proxy, whether
+they are a Bedrock player. A backend with neither Floodgate nor Geyser then shows them forms through the proxy and
+gives them their Bedrock skin; a form's answer goes to the backend that asked and nowhere else. It stores no data:
+each backend announces its own players. Backend commands are gated by the `commandcontrol` module on each backend.
 
 ## Checking a network
 
 `/uxmess doctor` on a backend shows:
 
 - the bus line: disabled, or one verdict per carrier. Velocity reads `proxy OFF` without a usable
-  `network.bus.secret`, and connected only while signed frames come back through the proxy plugin, at least once in
-  three heartbeats. Frames ride a player's connection, so with nobody online on
-  the backend it reads `idle` and says so. Otherwise it reads `NOT ANSWERING`: install `uxmEssentials-velocity`, or
+  `network.bus.secret`, and connected only while signed frames come back through the proxy plugin, at least once in three heartbeats. Frames ride a player's connection, so with nobody online on the backend it reads `idle` and says so. Otherwise it reads `NOT ANSWERING`: install `uxmEssentials-velocity`, or
   update it to the same release, since an older proxy jar does not answer. Redis reads connected while its
   connection is up, `DISCONNECTED` otherwise. Frames refused for a wrong secret or clock in the same three heartbeats
   add `REFUSED` and the count. A carrier not working, or refusing frames, is a warning, since the backends reached only

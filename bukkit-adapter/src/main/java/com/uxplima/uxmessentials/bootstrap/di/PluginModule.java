@@ -231,6 +231,8 @@ import com.uxplima.uxmessentials.shared.adapter.outbound.api.EventBridgeRegistry
 import com.uxplima.uxmessentials.shared.adapter.outbound.api.EventBridges;
 import com.uxplima.uxmessentials.shared.adapter.outbound.api.PlayerQueries;
 import com.uxplima.uxmessentials.shared.adapter.outbound.api.QueryContexts;
+import com.uxplima.uxmessentials.shared.adapter.outbound.bedrock.ProxyBedrock;
+import com.uxplima.uxmessentials.shared.adapter.outbound.bedrock.ProxyBedrockWiring;
 import com.uxplima.uxmessentials.shared.adapter.outbound.bus.Bus;
 import com.uxplima.uxmessentials.shared.adapter.outbound.bus.BusWiring;
 import com.uxplima.uxmessentials.shared.adapter.outbound.bus.NetworkConfig;
@@ -702,9 +704,21 @@ public final class PluginModule {
         // This plugin enables at STARTUP, before Floodgate whatever load order it declares, so a choice made here
         // was NONE for the life of the server. The resolving pair asks again on each use until a backend answers,
         // and the line operators read is written once the server has finished loading.
-        BedrockDetector bedrock = BedrockDetector.resolving(plugin.getServer());
+        // With neither Floodgate nor Geyser here, Geyser on the proxy still knows the Bedrock players: the proxy
+        // plugin names them over the bus and shows them forms, so that relay answers where no local plugin does.
+        Optional<ProxyBedrockWiring.Wired> proxyBedrock = ProxyBedrockWiring.wire(
+                plugin, NetworkConfig.from(config), bus.bus(), kernel.scheduler(), kernel.log());
+        proxyBedrock.ifPresent(relay -> {
+            resources.addListener(relay.presence());
+            resources.proxyBedrock(relay.relay());
+        });
+        BedrockDetector bedrock = BedrockDetector.resolving(
+                plugin.getServer(),
+                proxyBedrock.map(relay -> relay.relay().detector()).orElse(BedrockDetector.NONE));
         resources.bedrock(bedrock);
-        BedrockScreen bedrockScreen = BedrockScreen.resolving(plugin.getServer());
+        BedrockScreen bedrockScreen = BedrockScreen.resolving(
+                plugin.getServer(),
+                proxyBedrock.map(relay -> relay.relay().screen()).orElse(BedrockScreen.NONE));
         resources.bedrockScreen(bedrockScreen);
         // The engine's menu forms are reported, so /menu open can tell its sender a Bedrock target was shown the menu.
         FormReportingScreen menuForms = new FormReportingScreen(bedrockScreen);
@@ -1859,6 +1873,10 @@ public final class PluginModule {
         wired.commands().forEach(resources::addCommand);
         wired.listeners().forEach(resources::addListener);
         resources.onClose(wired.stop());
+        ProxyBedrock proxyBedrock = resources.proxyBedrock();
+        if (proxyBedrock != null) {
+            proxyBedrock.onArrival(wired.bedrockArrived());
+        }
         // The published read is the player's own choice rather than the texture they wear: the blob means nothing
         // outside a client, while the source is what a consumer can act on. Same cached store /skin info reads.
         links.queries.register(
