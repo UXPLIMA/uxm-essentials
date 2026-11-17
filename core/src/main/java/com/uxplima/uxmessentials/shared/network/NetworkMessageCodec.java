@@ -14,6 +14,8 @@ import java.util.Objects;
 import java.util.Set;
 import java.util.UUID;
 
+import com.uxplima.uxmessentials.shared.domain.PresenceTraits;
+
 /**
  * The pure-Java binary codec for every {@link NetworkMessage}. Encodes a frame to a {@code byte[]} and
  * decodes one back, with no dependency on Bukkit, Velocity, or any serialization framework, just
@@ -32,6 +34,9 @@ public final class NetworkMessageCodec {
 
     /** The protocol version written as the first wire byte; bump only on an incompatible format change. */
     public static final byte VERSION = 1;
+
+    /** What a player's presence traits take on the wire: their hidden level and the staff flag. */
+    static final int TRAITS_BYTES = Integer.BYTES + 1;
 
     /**
      * The most players one presence snapshot part may name. Far above what fits in a part, it only stops a corrupt
@@ -198,6 +203,7 @@ public final class NetworkMessageCodec {
                 writeUuid(out, presence.player());
                 out.writeUTF(presence.playerName());
                 out.writeBoolean(presence.online());
+                writeTraits(out, presence.traits());
             }
             case PresenceSnapshot snapshot -> {
                 out.writeLong(snapshot.session());
@@ -209,6 +215,9 @@ public final class NetworkMessageCodec {
                 for (PresenceSnapshot.Member member : snapshot.players()) {
                     writeUuid(out, member.player());
                     out.writeUTF(member.name());
+                }
+                for (PresenceSnapshot.Member member : snapshot.players()) {
+                    writeTraits(out, member.traits());
                 }
             }
             case PrivateMessageFrame privateMessage -> {
@@ -323,6 +332,10 @@ public final class NetworkMessageCodec {
             case PlayerSkinChanged skin -> writeUuid(out, skin.player());
             case RankActionsKept kept -> writeUuid(out, kept.player());
             case InventoryRestoreKept kept -> writeUuid(out, kept.player());
+            case BroadcastFrame broadcast -> {
+                writeUuid(out, broadcast.broadcastId());
+                out.writeUTF(broadcast.body());
+            }
         }
     }
 
@@ -360,7 +373,14 @@ public final class NetworkMessageCodec {
             case IP_BAN_CHANGED -> new IpBanChanged(origin, in.readUTF());
             case RANK_CHANGED -> new RankChanged(origin, readUuid(in));
             case PRESENCE_CHANGED ->
-                new PresenceChanged(origin, in.readLong(), in.readLong(), readUuid(in), in.readUTF(), in.readBoolean());
+                new PresenceChanged(
+                        origin,
+                        in.readLong(),
+                        in.readLong(),
+                        readUuid(in),
+                        in.readUTF(),
+                        in.readBoolean(),
+                        in.available() >= TRAITS_BYTES ? readTraits(in) : PresenceTraits.UNKNOWN);
             case PRESENCE_SNAPSHOT -> readSnapshot(in, origin);
             case PRIVATE_MESSAGE ->
                 new PrivateMessageFrame(
@@ -431,6 +451,7 @@ public final class NetworkMessageCodec {
             case PLAYER_SKIN_CHANGED -> new PlayerSkinChanged(origin, readUuid(in));
             case RANK_ACTIONS_KEPT -> new RankActionsKept(origin, readUuid(in));
             case INVENTORY_RESTORE_KEPT -> new InventoryRestoreKept(origin, readUuid(in));
+            case BROADCAST -> new BroadcastFrame(origin, readUuid(in), in.readUTF());
         };
     }
 
@@ -513,11 +534,29 @@ public final class NetworkMessageCodec {
         if (count < 0 || count > MAX_SNAPSHOT_PLAYERS) {
             throw new IllegalArgumentException("presence snapshot names an impossible player count: " + count);
         }
+        List<UUID> ids = new ArrayList<>(count);
+        List<String> names = new ArrayList<>(count);
+        for (int i = 0; i < count; i++) {
+            ids.add(readUuid(in));
+            names.add(in.readUTF());
+        }
+        // A roster from a peer on an older release ends after the names.
+        boolean traited = in.available() >= (long) TRAITS_BYTES * count;
         List<PresenceSnapshot.Member> players = new ArrayList<>(count);
         for (int i = 0; i < count; i++) {
-            players.add(new PresenceSnapshot.Member(readUuid(in), in.readUTF()));
+            PresenceTraits traits = traited ? readTraits(in) : PresenceTraits.UNKNOWN;
+            players.add(new PresenceSnapshot.Member(ids.get(i), names.get(i), traits));
         }
         return new PresenceSnapshot(origin, session, sequence, replyRequested, part, parts, players);
+    }
+
+    private static void writeTraits(DataOutputStream out, PresenceTraits traits) throws IOException {
+        out.writeInt(traits.hiddenLevel());
+        out.writeBoolean(traits.staff());
+    }
+
+    private static PresenceTraits readTraits(DataInputStream in) throws IOException {
+        return new PresenceTraits(in.readInt(), in.readBoolean());
     }
 
     private static void writeUuid(DataOutputStream out, UUID uuid) throws IOException {

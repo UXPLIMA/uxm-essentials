@@ -102,11 +102,16 @@ public final class StaffPlayerMenu {
      */
     private void teleportTo(MenuActionContext ctx) {
         PlayerRef looker = BukkitRefs.toRef(ctx.viewer());
-        UUID targetId = ctx.entry(PlayerRef.class).uuid();
+        PlayerRef clicked = ctx.entry(PlayerRef.class);
+        UUID targetId = clicked.uuid();
         ctx.player().closeInventory();
         Player target = server.getPlayer(targetId);
         if (target == null) {
-            deliver(looker, StaffMessageKey.STAFF_TELEPORT_FAILED, Map.of());
+            // Not on this backend: a staff member listed from another one, reached by the cross-server teleport,
+            // which answers the looker itself.
+            if (!teleport.teleportElsewhere(looker, clicked.name())) {
+                deliver(looker, StaffMessageKey.STAFF_TELEPORT_FAILED, Map.of());
+            }
             return;
         }
         String name = target.getName();

@@ -2,6 +2,8 @@ package com.uxplima.uxmessentials.presence.adapter.inbound.command;
 
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
+import java.util.Optional;
 
 import org.bukkit.Bukkit;
 import org.bukkit.command.CommandSender;
@@ -20,9 +22,11 @@ import com.uxplima.uxmessentials.presence.adapter.PresenceServices;
 import com.uxplima.uxmessentials.presence.domain.PresenceMessageKey;
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandRegistration;
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandSuggestions;
+import com.uxplima.uxmessentials.shared.adapter.outbound.lookup.VisibleNetwork;
 import com.uxplima.uxmessentials.shared.application.permission.SocialPermissions;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
 import com.uxplima.uxmessentials.shared.application.port.Scheduler;
+import com.uxplima.uxmessentials.shared.domain.OnlinePlayer;
 import com.uxplima.uxmlib.command.Gate;
 import com.uxplima.uxmlib.command.Sender;
 import org.jspecify.annotations.NullMarked;
@@ -43,8 +47,11 @@ public final class RealnameCommand extends PresenceCommandSupport implements Com
     private static final String PERMISSION = SocialPermissions.REALNAME_USE;
     private static final PlainTextComponentSerializer PLAIN = PlainTextComponentSerializer.plainText();
 
-    public RealnameCommand(PresenceServices services, Messages messages, Scheduler scheduler) {
+    private final VisibleNetwork network;
+
+    public RealnameCommand(PresenceServices services, Messages messages, Scheduler scheduler, VisibleNetwork network) {
         super(services, messages, scheduler);
+        this.network = Objects.requireNonNull(network, "network");
     }
 
     @Override
@@ -73,9 +80,21 @@ public final class RealnameCommand extends PresenceCommandSupport implements Com
         scheduler.onGlobal(() -> {
             Player match = findVisibleMatch(sender, query);
             if (match == null) {
+                // A player on another backend is found by their account name; their display name stays there.
+                Optional<OnlinePlayer> elsewhere = network.findElsewhere(query, sender);
                 replyOnSenderThread(
                         sender,
-                        () -> feedback.send(sender, PresenceMessageKey.REALNAME_NOT_FOUND, Map.of("query", query)));
+                        () -> elsewhere.ifPresentOrElse(
+                                found -> feedback.send(
+                                        sender,
+                                        PresenceMessageKey.REALNAME_RESULT,
+                                        Map.of(
+                                                "display",
+                                                found.player().name(),
+                                                "name",
+                                                found.player().name())),
+                                () -> feedback.send(
+                                        sender, PresenceMessageKey.REALNAME_NOT_FOUND, Map.of("query", query))));
                 return;
             }
             String display = PLAIN.serialize(match.displayName());

@@ -28,4 +28,13 @@ public interface StaffTeleport {
      * teleport module is off or either player is no longer reachable.
      */
     CompletionStage<Boolean> teleportTo(PlayerRef staff, PlayerRef target);
+
+    /**
+     * Sends {@code staff} to the player named {@code target} on another backend of the network, through the teleport
+     * module's cross-server staff teleport, which tells the staff member how it went. {@code false} when that cannot
+     * be started: the teleport module is off, or its cross-server teleports are.
+     */
+    default boolean teleportElsewhere(PlayerRef staff, String target) {
+        return false;
+    }
 }

@@ -34,6 +34,7 @@ import com.uxplima.uxmessentials.shared.application.port.PlayerLookup;
 import com.uxplima.uxmessentials.shared.application.port.PlayerNameIndex;
 import com.uxplima.uxmessentials.shared.domain.NameCase;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
+import com.uxplima.uxmessentials.shared.domain.PresenceTraits;
 import com.uxplima.uxmessentials.shared.domain.message.MessageKey;
 import com.uxplima.uxmessentials.testing.FakePermissions;
 import com.uxplima.uxmessentials.testing.RecordingNotifier;
@@ -88,7 +89,7 @@ class LiveTargetsTest {
 
     LiveTargetsTest() {
         TrackNetworkPresence track = new TrackNetworkPresence(presence, NetworkPresenceBroadcast.NONE, NO_NAMES, CLOCK);
-        track.remoteJoined("lobby-1", new RosterStamp(1L, 1L), REMOTE);
+        track.remoteJoined("lobby-1", new RosterStamp(1L, 1L), REMOTE, PresenceTraits.PLAIN);
         track.joined(LOCAL);
     }
 
