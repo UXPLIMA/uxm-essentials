@@ -2,6 +2,8 @@ package com.uxplima.uxmessentials.security.adapter;
 
 import java.util.Map;
 import java.util.Objects;
+import java.util.UUID;
+import java.util.function.Consumer;
 
 import org.bukkit.entity.Player;
 
@@ -53,7 +55,12 @@ public final class PinEnrolmentController implements KeypadActions {
     private final Scheduler scheduler;
     private final Messages messages;
     private final MessageSink sink;
+    private final Consumer<PlayerRef> verifyInstead;
 
+    /**
+     * @param verifyInstead puts a player who turns out to hold a PIN already through ordinary verification, so the
+     *     factor they have is the one they prove
+     */
     public PinEnrolmentController(
             SetPin setPin,
             PinPolicy pinPolicy,
@@ -64,7 +71,8 @@ public final class PinEnrolmentController implements KeypadActions {
             FreezeGameMode gameMode,
             Scheduler scheduler,
             Messages messages,
-            MessageSink sink) {
+            MessageSink sink,
+            Consumer<PlayerRef> verifyInstead) {
         this.setPin = Objects.requireNonNull(setPin, "setPin");
         this.pinPolicy = Objects.requireNonNull(pinPolicy, "pinPolicy");
         this.sessions = Objects.requireNonNull(sessions, "sessions");
@@ -75,6 +83,12 @@ public final class PinEnrolmentController implements KeypadActions {
         this.scheduler = Objects.requireNonNull(scheduler, "scheduler");
         this.messages = Objects.requireNonNull(messages, "messages");
         this.sink = Objects.requireNonNull(sink, "sink");
+        this.verifyInstead = Objects.requireNonNull(verifyInstead, "verifyInstead");
+    }
+
+    /** Take {@code playerId} off the create pad, dropping whatever they had entered; their freeze is not touched. */
+    public void abandon(UUID playerId) {
+        sessions.clear(Objects.requireNonNull(playerId, "playerId"));
     }
 
     /** Put {@code viewer} at the create pad and ask them for their first entry. */
@@ -139,7 +153,15 @@ public final class PinEnrolmentController implements KeypadActions {
     }
 
     private void applyResult(Player player, PlayerRef viewer, PinSetResult result) {
-        if (result != PinSetResult.SET && result != PinSetResult.ALREADY_SET) {
+        if (result == PinSetResult.ALREADY_SET) {
+            // A PIN exists that these entries did not create (set on another server, or by an earlier session that
+            // left before hearing back). Two matching entries prove nothing about it, so the freeze stays and the
+            // player is asked for the PIN they have, under the same attempt limit as anyone else.
+            sessions.clear(viewer.uuid());
+            verifyInstead.accept(viewer);
+            return;
+        }
+        if (result != PinSetResult.SET) {
             notifyRefusal(viewer, refusalKey(result));
             restart(player, viewer);
             return;

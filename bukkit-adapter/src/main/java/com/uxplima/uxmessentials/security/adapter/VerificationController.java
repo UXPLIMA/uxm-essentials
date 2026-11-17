@@ -193,6 +193,9 @@ public final class VerificationController implements KeypadActions {
     public void onQuit(PlayerRef viewer) {
         Objects.requireNonNull(viewer, "viewer");
         sessions.clear(viewer.uuid());
+        // A half-made PIN must not outlive the session it was being made in: kept, it would take the next join's
+        // entries as a new PIN rather than as proof of the one that exists by then.
+        enrolment.abandon(viewer.uuid());
         Player live = Bukkit.getPlayer(viewer.uuid());
         if (live != null) {
             gameMode.restore(live);
@@ -266,7 +269,7 @@ public final class VerificationController implements KeypadActions {
             // from: this is the path an operator's `/security reset` takes, and it is exactly when they should be
             // made to set a new one rather than quietly left with no factor at all.
             if (permissions.has(ref, PIN_REQUIRED_PERMISSION)) {
-                scheduler.onEntity(ref, () -> beginEnrolment(ref));
+                scheduler.onEntity(ref, () -> beginEnrolment(ref, token));
                 return;
             }
             sessions.clear(ref.uuid());
@@ -310,7 +313,7 @@ public final class VerificationController implements KeypadActions {
             // held instead and made to set one now, because "you must have a factor" means nothing if not having one
             // is the way past it.
             if (permissions.has(ref, PIN_REQUIRED_PERMISSION)) {
-                scheduler.onEntity(ref, () -> beginEnrolment(ref));
+                scheduler.onEntity(ref, () -> beginEnrolment(ref, token));
                 return;
             }
             sessions.clear(ref.uuid());
@@ -324,14 +327,18 @@ public final class VerificationController implements KeypadActions {
         scheduler.onEntity(ref, () -> beginFreeze(ref, totpEnabled, token));
     }
 
-    /** Hold {@code ref} at the create-a-PIN pad; the freeze stays on until they have one. */
-    private void beginEnrolment(PlayerRef ref) {
+    /**
+     * Hold {@code ref} at the create-a-PIN pad; the freeze stays on until they have one, or until the entry timeout
+     * runs out, exactly as it would at the verify pad.
+     */
+    private void beginEnrolment(PlayerRef ref, long token) {
         Player live = Bukkit.getPlayer(ref.uuid());
         if (live == null || !live.isOnline()) {
             sessions.clear(ref.uuid());
             return;
         }
         enrolment.begin(live, ref);
+        startEntryTimeout(ref, token);
     }
 
     private void beginFreeze(PlayerRef ref, boolean totpEnabled, long token) {
@@ -340,6 +347,9 @@ public final class VerificationController implements KeypadActions {
             sessions.clear(ref.uuid());
             return;
         }
+        // They hold a factor now, so this freeze is answered by proving it; a create-a-PIN session left from before
+        // must not be the one that takes their entries.
+        enrolment.abandon(ref.uuid());
         // A spectator cannot click any window the server opens, so move them somewhere they can before the keypad
         // goes up; the mode they had is put back the moment they verify or leave.
         gameMode.apply(live);
@@ -487,6 +497,7 @@ public final class VerificationController implements KeypadActions {
     }
 
     private void kick(PlayerRef viewer, SecurityMessageKey key) {
+        enrolment.abandon(viewer.uuid());
         Player live = Bukkit.getPlayer(viewer.uuid());
         if (live != null && live.isOnline()) {
             keypad.closeFor(viewer);

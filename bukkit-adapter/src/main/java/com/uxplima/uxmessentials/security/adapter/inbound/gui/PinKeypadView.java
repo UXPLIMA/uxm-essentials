@@ -11,12 +11,12 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.function.Predicate;
-import java.util.regex.Pattern;
 
 import org.bukkit.Bukkit;
 import org.bukkit.entity.Player;
 
 import com.uxplima.uxmessentials.security.adapter.PinEntryPrompt;
+import com.uxplima.uxmessentials.security.adapter.SecureEntryInput;
 import com.uxplima.uxmessentials.security.adapter.VerificationFeedback;
 import com.uxplima.uxmessentials.security.domain.SecurityMessageKey;
 import com.uxplima.uxmessentials.shared.adapter.outbound.BukkitRefs;
@@ -81,8 +81,6 @@ public final class PinKeypadView {
 
     /** The most digits the pad accepts, comfortably above an 8-digit PIN and a 6-digit code. */
     private static final int MAX_ENTRY = 12;
-
-    private static final Pattern WHITESPACE = Pattern.compile("\\s+");
 
     /** A typed prompt gone sooner than this was most likely never on the player's screen at all. */
     private static final Duration QUICK_CLOSE = Duration.ofSeconds(1);
@@ -273,6 +271,14 @@ public final class PinKeypadView {
         scheduler.onEntity(viewer, () -> closeLive(id));
     }
 
+    /**
+     * Whether {@code viewer} is being asked for a PIN or code right now: a keypad window or a typed prompt is up, or
+     * one is about to be asked again after a refused or dismissed entry.
+     */
+    public boolean isEntering(UUID viewer) {
+        return open.containsKey(Objects.requireNonNull(viewer, "viewer"));
+    }
+
     /** Close every open keypad and drop all tracking, so a module disable leaves no locked window. */
     public void closeAll() {
         for (Tracked tracked : List.copyOf(open.values())) {
@@ -376,19 +382,23 @@ public final class PinKeypadView {
      */
     private void askTyped(Player player, Tracked tracked) {
         UUID id = tracked.viewer().uuid();
-        open.put(id, tracked);
-        long token = promptTokens.incrementAndGet();
-        if (typing.putIfAbsent(id, token) != null) {
-            return;
+        Tracked previous = open.put(id, tracked);
+        Long showing = typing.get(id);
+        if (showing != null) {
+            if (previous != null && stepOf(previous) == stepOf(tracked)) {
+                return;
+            }
+            // The prompt on screen asks the wrong question (a verify prompt still up when a reset sends the player to
+            // create a PIN). Dropping its token makes its answer count for nothing, and the new prompt replaces it.
+            typing.remove(id, showing);
         }
+        long token = promptTokens.incrementAndGet();
+        typing.put(id, token);
         askedAt.put(id, System.nanoTime());
-        PinEntryPrompt.Step step = !tracked.creating()
-                ? PinEntryPrompt.Step.VERIFY
-                : tracked.confirming() ? PinEntryPrompt.Step.CONFIRM : PinEntryPrompt.Step.CREATE;
         typed.prompt(
                 player,
                 tracked.viewer(),
-                step,
+                stepOf(tracked),
                 entered -> typedSubmitted(player, tracked.viewer(), token, entered),
                 () -> typedClosed(id, token));
     }
@@ -400,9 +410,16 @@ public final class PinKeypadView {
         }
         askedAt.remove(viewer.uuid());
         quickCloses.remove(viewer.uuid());
-        // An authenticator app shows its code in two groups and a phone keyboard may add a space; neither a PIN nor a
-        // code has whitespace in it, and the keypad could never have entered any.
-        target.submit(player, viewer, WHITESPACE.matcher(entered).replaceAll(""));
+        // Only what the keypad could have entered counts as the keypad's digits: fullwidth digits become ASCII and
+        // spaces go, and anything else reaches the policy or the verify as typed and is refused there.
+        target.submit(player, viewer, SecureEntryInput.normalise(entered));
+    }
+
+    private static PinEntryPrompt.Step stepOf(Tracked tracked) {
+        if (!tracked.creating()) {
+            return PinEntryPrompt.Step.VERIFY;
+        }
+        return tracked.confirming() ? PinEntryPrompt.Step.CONFIRM : PinEntryPrompt.Step.CREATE;
     }
 
     /**

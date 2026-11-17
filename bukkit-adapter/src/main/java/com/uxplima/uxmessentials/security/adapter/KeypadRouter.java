@@ -16,7 +16,9 @@ import org.jspecify.annotations.NullMarked;
  *
  * <p>The order matters and reflects which state can coexist. Creating a PIN is checked first because a player at the
  * create pad is also join-frozen (the freeze is what holds them there), so testing the freeze first would send their
- * new PIN to be verified against the factor they do not have yet. The join freeze comes before a re-auth because the
+ * new PIN to be verified against the factor they do not have yet. It only counts while the freeze that holds them
+ * there is on: a create-a-PIN session outliving its freeze would otherwise take a later verification's entries as a
+ * new PIN. The join freeze comes before a re-auth because the
  * two can overlap: an operator can force a player back into verification while a re-auth prompt is still open, and the
  * entry then answers the freeze. Sent to the re-auth instead, it would run the command and leave the player frozen
  * with nothing asking them for anything.
@@ -57,7 +59,7 @@ public final class KeypadRouter implements KeypadActions {
     }
 
     private KeypadActions actionsFor(PlayerRef viewer) {
-        if (enrolmentSessions.isPending(viewer.uuid())) {
+        if (enrolmentSessions.isPending(viewer.uuid()) && freezes.isPending(viewer.uuid())) {
             return enrolmentActions;
         }
         if (freezes.isPending(viewer.uuid())) {

@@ -4,6 +4,7 @@ import java.nio.file.Path;
 import java.time.Clock;
 import java.util.List;
 import java.util.Objects;
+import java.util.concurrent.atomic.AtomicReference;
 
 import org.bukkit.event.Listener;
 import org.bukkit.plugin.Plugin;
@@ -18,6 +19,7 @@ import com.uxplima.uxmessentials.security.adapter.inbound.command.SecurityComman
 import com.uxplima.uxmessentials.security.adapter.inbound.command.TwoFactorCommand;
 import com.uxplima.uxmessentials.security.adapter.inbound.gui.PinKeypadView;
 import com.uxplima.uxmessentials.security.adapter.inbound.gui.PinKeypadWindowListener;
+import com.uxplima.uxmessentials.security.adapter.inbound.listener.PinEntryChatGuard;
 import com.uxplima.uxmessentials.security.adapter.inbound.listener.ReauthCommandListener;
 import com.uxplima.uxmessentials.security.adapter.inbound.listener.SecurityGuardListener;
 import com.uxplima.uxmessentials.security.adapter.inbound.listener.SecurityJoinListener;
@@ -46,8 +48,6 @@ import com.uxplima.uxmessentials.shared.application.module.KernelPorts;
 import com.uxplima.uxmessentials.shared.application.module.ModuleContext;
 import com.uxplima.uxmessentials.shared.application.port.IpHistoryStore;
 import com.uxplima.uxmessentials.shared.application.port.IpTokens;
-import com.uxplima.uxmlib.bedrock.BedrockDetector;
-import com.uxplima.uxmlib.gui.input.TextInput;
 import com.uxplima.uxmlib.menu.Menus;
 import com.uxplima.uxmlib.menu.binding.MenuBindings;
 import org.jspecify.annotations.NullMarked;
@@ -70,8 +70,7 @@ public final class SecurityWiring {
             Plugin plugin,
             ModuleContext ctx,
             Persistence persistence,
-            TextInput textInput,
-            BedrockDetector bedrock,
+            SecureEntryInput entryInput,
             Menus menus,
             MenuBindings menuBindings,
             LockoutBan lockoutBan,
@@ -82,8 +81,7 @@ public final class SecurityWiring {
         Objects.requireNonNull(plugin, "plugin");
         Objects.requireNonNull(ctx, "ctx");
         Objects.requireNonNull(persistence, "persistence");
-        Objects.requireNonNull(textInput, "textInput");
-        Objects.requireNonNull(bedrock, "bedrock");
+        Objects.requireNonNull(entryInput, "entryInput");
         Objects.requireNonNull(menus, "menus");
         Objects.requireNonNull(menuBindings, "menuBindings");
         Objects.requireNonNull(lockoutBan, "lockoutBan");
@@ -149,7 +147,7 @@ public final class SecurityWiring {
         // type the whole entry into one text prompt instead; a Java player keeps the pad.
         PinKeypadView keypad = new PinKeypadView(
                 menus,
-                new TextInputPinPrompt(textInput, bedrock),
+                new TextInputPinPrompt(entryInput),
                 sessions::isPending,
                 kernel.messages(),
                 feedback,
@@ -169,10 +167,12 @@ public final class SecurityWiring {
                 ownTeleports,
                 kernel.log());
         VerifyTwoFactor verify = new VerifyTwoFactor(repository, twoFactor.codeWindow());
-        TextInputTotpPrompt totpPrompt = new TextInputTotpPrompt(textInput);
+        TextInputTotpPrompt totpPrompt = new TextInputTotpPrompt(entryInput);
         // The create-a-PIN pad: shown to a player holding uxmessentials.security.pin.required who has no factor, so
         // "you must have a PIN" is enforceable rather than advisory. It writes through the same SetPin the /pin
         // command uses, so a PIN made here obeys the same length and blocked-list rules.
+        // Built after the enrolment controller it hands players back to, so the enrolment reaches it through this.
+        AtomicReference<VerificationController> verification = new AtomicReference<>();
         PinEnrolmentController enrolment = new PinEnrolmentController(
                 setPin,
                 twoFactor.pinPolicy(),
@@ -183,7 +183,13 @@ public final class SecurityWiring {
                 freezeGameMode,
                 kernel.scheduler(),
                 kernel.messages(),
-                kernel.messageSink());
+                kernel.messageSink(),
+                ref -> {
+                    VerificationController built = verification.get();
+                    if (built != null) {
+                        built.forceReverify(ref);
+                    }
+                });
         VerificationController controller = new VerificationController(
                 repository,
                 verify,
@@ -208,6 +214,7 @@ public final class SecurityWiring {
                 kernel.messageSink(),
                 kernel.log(),
                 clock);
+        verification.set(controller);
         // The two /security operator verbs. Force revokes the target's device trust (the durable forced state, so
         // their next join re-verifies even from a trusted device), paired with the immediate online freeze driven
         // through the controller above. Reset is the recovery door: the one path that clears a factor without proving
@@ -294,6 +301,8 @@ public final class SecurityWiring {
                         kernel.messages(),
                         kernel.messageSink()),
                 new PinKeypadWindowListener(menus, keypad),
+                new PinEntryChatGuard(
+                        id -> sessions.isPending(id) || keypad.isEntering(id), kernel.messages(), kernel.messageSink()),
                 new ReauthCommandListener(
                         opProtection.enabled(), opProtection.policy(), reauthState, reauthController, clock),
                 new SecurityGuardListener(clientGuard, brands));
