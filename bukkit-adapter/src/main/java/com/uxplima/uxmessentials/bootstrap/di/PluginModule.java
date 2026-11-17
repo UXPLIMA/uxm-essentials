@@ -3361,6 +3361,11 @@ public final class PluginModule {
                     wired.levels()));
         }
         links.vanishNetwork = wired.network();
+        // A typed player name never tells a sender which server a player they may not see is on.
+        PlayerArgument.bindVisibility(new com.uxplima.uxmessentials.vanish.adapter.outbound.VanishArgumentVisibility(
+                wired.levels(),
+                wired.network(),
+                wired.network() != com.uxplima.uxmessentials.vanish.application.port.NetworkVanishStore.empty()));
         links.queries.register(
                 UxmVanishQuery.class,
                 new VanishQueries(

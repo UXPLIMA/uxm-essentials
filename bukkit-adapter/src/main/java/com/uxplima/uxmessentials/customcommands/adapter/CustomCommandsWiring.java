@@ -112,7 +112,8 @@ public final class CustomCommandsWiring {
                     () -> Objects.requireNonNull(state.get(), "state")
                             .catalog()
                             .byId(id)
-                            .orElse(command)));
+                            .orElse(command),
+                    new CommandFeedback(ctx.kernel().messages())));
         }
         CreateWizard wizard = new CreateWizard(
                 prompt,

@@ -53,15 +53,37 @@ import org.jspecify.annotations.Nullable;
 public final class PlayerArgument
         implements CustomArgumentType<PlayerSelectorArgumentResolver, PlayerSelectorArgumentResolver> {
 
-    private static final PlayerArgument SINGLE = new PlayerArgument(true);
-    private static final PlayerArgument MANY = new PlayerArgument(false);
+    private static final PlayerArgument SINGLE = new PlayerArgument(true, null);
+    private static final PlayerArgument MANY = new PlayerArgument(false, null);
 
     private static volatile @Nullable Bound bound;
+    private static volatile Visibility visibility = Visibility.EVERYONE;
 
     private final boolean single;
+    private final @Nullable ArgumentType<PlayerSelectorArgumentResolver> selectors;
 
-    private PlayerArgument(boolean single) {
+    private PlayerArgument(boolean single, @Nullable ArgumentType<PlayerSelectorArgumentResolver> selectors) {
         this.single = single;
+        this.selectors = selectors;
+    }
+
+    /**
+     * Whether the sender of a command may be told where a player is. A vanished player must not be found on another
+     * server by someone who may not see them, so the vanish module binds its rule here.
+     */
+    @FunctionalInterface
+    public interface Visibility {
+
+        /** Nobody is hidden: what a server without the vanish module means. */
+        Visibility EVERYONE = (source, target) -> true;
+
+        /** Whether the sender of {@code source} may learn that {@code target} is online, and where. Memory only. */
+        boolean mayLocate(CommandSourceStack source, PlayerRef target);
+    }
+
+    /** A single-player argument that parses selectors with {@code selectors}, for a test of the selector path. */
+    static PlayerArgument withSelectors(ArgumentType<PlayerSelectorArgumentResolver> selectors) {
+        return new PlayerArgument(true, Objects.requireNonNull(selectors, "selectors"));
     }
 
     /** One player: a selector that may match several is refused at parse time, as the vanilla argument does. */
@@ -84,9 +106,18 @@ public final class PlayerArgument
         bound = new Bound(Objects.requireNonNull(lookup, "lookup"), Objects.requireNonNull(presence, "presence"));
     }
 
-    /** Forget what {@link #bind} bound, when the plugin that bound it stops: names then match this server's list. */
+    /** Bind the rule for who may be told where a player is. Called when the vanish module has wired. */
+    public static void bindVisibility(Visibility rule) {
+        visibility = Objects.requireNonNull(rule, "rule");
+    }
+
+    /**
+     * Forget what {@link #bind} and {@link #bindVisibility} bound, when the plugin that bound them stops: names then
+     * match this server's list.
+     */
     public static void unbind() {
         bound = null;
+        visibility = Visibility.EVERYONE;
     }
 
     @Override
@@ -108,13 +139,17 @@ public final class PlayerArgument
 
     @Override
     public ArgumentType<PlayerSelectorArgumentResolver> getNativeType() {
+        if (selectors != null) {
+            return selectors;
+        }
         return single ? ArgumentTypes.player() : ArgumentTypes.players();
     }
 
     /**
      * The line telling the sender why {@code argument} named nobody on this server: the server a player of that name
-     * is on, the spellings to choose from when it names several accounts only in case, or {@code unknown} with the
-     * typed text as {@code {player}}.
+     * is on, the spellings to choose from when it names several accounts here only in case, or {@code unknown} with
+     * the typed text as {@code {player}}. A player the sender may not see (vanished, by the bound {@link Visibility})
+     * is answered as unknown, so the line never tells where they are.
      */
     public static MessageLine miss(CommandContext<CommandSourceStack> ctx, String argument, MessageKey unknown) {
         Objects.requireNonNull(unknown, "unknown");
@@ -132,7 +167,7 @@ public final class PlayerArgument
         if (current == null) {
             return new MessageLine(unknown, args);
         }
-        Optional<OnlinePlayer> elsewhere = elsewhere(current, name.get());
+        Optional<OnlinePlayer> elsewhere = elsewhere(current, ctx.getSource(), name.get());
         if (elsewhere.isPresent()) {
             return new MessageLine(
                     SharedMessageKey.COMMAND_TARGET_ELSEWHERE,
@@ -140,18 +175,17 @@ public final class PlayerArgument
                             "player", elsewhere.get().player().name(),
                             "server", elsewhere.get().server()));
         }
-        NameMatch network = current.presence().matchByName(name.get());
-        return network instanceof NameMatch.Ambiguous ? network.miss(unknown, args) : new MessageLine(unknown, args);
+        return new MessageLine(unknown, args);
     }
 
     /**
      * The player online on another server that the name typed for {@code argument} means, with that server; empty for
-     * a selector, a name nobody holds elsewhere, or before the network roster is bound.
+     * a selector, a name nobody the sender may see holds elsewhere, or before the network roster is bound.
      */
     public static Optional<OnlinePlayer> elsewhere(CommandContext<CommandSourceStack> ctx, String argument) {
         Bound current = bound;
         Optional<String> name = name(ctx, argument);
-        return current == null || name.isEmpty() ? Optional.empty() : elsewhere(current, name.get());
+        return current == null || name.isEmpty() ? Optional.empty() : elsewhere(current, ctx.getSource(), name.get());
     }
 
     /**
@@ -211,8 +245,8 @@ public final class PlayerArgument
                 : NameMatch.found(new PlayerRef(exact.getUniqueId(), exact.getName()));
     }
 
-    /** The backend other than this one where a player of {@code name} is online, if one is. */
-    private static Optional<OnlinePlayer> elsewhere(Bound current, String name) {
+    /** The backend other than this one where a player of {@code name} the sender may see is online, if one is. */
+    private static Optional<OnlinePlayer> elsewhere(Bound current, CommandSourceStack source, String name) {
         Optional<UUID> id = uuid(name);
         Optional<OnlinePlayer> online = id.isPresent()
                 ? current.presence().find(id.get())
@@ -220,7 +254,9 @@ public final class PlayerArgument
                         .matchByName(name)
                         .player()
                         .flatMap(ref -> current.presence().find(ref.uuid()));
-        return online.filter(found -> !found.server().equals(current.presence().localServer()));
+        Visibility rule = visibility;
+        return online.filter(found -> !found.server().equals(current.presence().localServer()))
+                .filter(found -> rule.mayLocate(source, found.player()));
     }
 
     private static Optional<UUID> uuid(String text) {

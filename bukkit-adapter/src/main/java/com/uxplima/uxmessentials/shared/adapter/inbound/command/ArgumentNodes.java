@@ -76,18 +76,52 @@ public final class ArgumentNodes {
     }
 
     /**
-     * Read every declared argument off {@code ctx}, keyed by name in declared order, as its rendered text. An
-     * optional argument the sender left out reads as the empty string rather than throwing.
+     * The arguments read off a command: every value, or the online-player argument that named nobody on this server,
+     * in which case the command must not run.
      */
-    public static Map<String, String> read(CommandContext<CommandSourceStack> ctx, List<ArgumentSpec> args)
+    public sealed interface Reading {
+
+        /** Every declared argument, keyed by name in declared order, as its rendered text. */
+        record Values(Map<String, String> values) implements Reading {
+            public Values {
+                values = java.util.Collections.unmodifiableMap(new LinkedHashMap<>(values));
+            }
+        }
+
+        /**
+         * An online-player argument matched nobody here: a name nobody connected holds, one of a player on another
+         * server, or a selector that matched no one. {@link PlayerArgument#miss} says which.
+         */
+        record Unmatched(String argument) implements Reading {}
+    }
+
+    /**
+     * Read every declared argument off {@code ctx}, keyed by name in declared order, as its rendered text. An
+     * optional argument the sender left out reads as the empty string rather than throwing. An online-player argument
+     * that resolves to nobody here stops the read: actions written for a player must never run with no one in their
+     * placeholder, nor here for a player on another server.
+     */
+    public static Reading read(CommandContext<CommandSourceStack> ctx, List<ArgumentSpec> args)
             throws CommandSyntaxException {
         Objects.requireNonNull(ctx, "ctx");
         Objects.requireNonNull(args, "args");
         Map<String, String> values = new LinkedHashMap<>();
         for (ArgumentSpec arg : args) {
-            values.put(arg.name(), present(ctx, arg.name()) ? stringify(ctx, arg) : "");
+            if (!present(ctx, arg.name())) {
+                values.put(arg.name(), "");
+                continue;
+            }
+            if (arg.type() == ArgType.ONLINE_PLAYER) {
+                Optional<String> player = resolvePlayerName(ctx, arg.name());
+                if (player.isEmpty()) {
+                    return new Reading.Unmatched(arg.name());
+                }
+                values.put(arg.name(), player.get());
+                continue;
+            }
+            values.put(arg.name(), stringify(ctx, arg));
         }
-        return values;
+        return new Reading.Values(values);
     }
 
     /** Whether Brigadier actually parsed a value under {@code name} on the path that reached this executor. */
@@ -186,24 +220,20 @@ public final class ArgumentNodes {
             case INT -> Integer.toString(IntegerArgumentType.getInteger(ctx, name));
             case DOUBLE -> Double.toString(DoubleArgumentType.getDouble(ctx, name));
             case BOOL -> Boolean.toString(BoolArgumentType.getBool(ctx, name));
-            case ONLINE_PLAYER -> resolvePlayerName(ctx, name);
-            case STRING, PLAYER, MATERIAL, WORLD -> StringArgumentType.getString(ctx, name);
+            case STRING, PLAYER, MATERIAL, WORLD, ONLINE_PLAYER -> StringArgumentType.getString(ctx, name);
         };
     }
 
-    /**
-     * Resolve an online-player argument to the target's name: the player here it names, else the typed name of a
-     * player online on another server, else empty.
-     */
-    private static String resolvePlayerName(CommandContext<CommandSourceStack> ctx, String name)
-            throws CommandSyntaxException {
-        PlayerSelectorArgumentResolver resolver = ctx.getArgument(name, PlayerSelectorArgumentResolver.class);
-        List<Player> resolved = resolver.resolve(ctx.getSource());
-        if (!resolved.isEmpty()) {
-            return resolved.get(0).getName();
+    /** The name of the player here an online-player argument names, or empty when it matched nobody here. */
+    private static Optional<String> resolvePlayerName(CommandContext<CommandSourceStack> ctx, String name) {
+        try {
+            PlayerSelectorArgumentResolver resolver = ctx.getArgument(name, PlayerSelectorArgumentResolver.class);
+            List<Player> resolved = resolver.resolve(ctx.getSource());
+            return resolved.isEmpty()
+                    ? Optional.empty()
+                    : Optional.of(resolved.get(0).getName());
+        } catch (CommandSyntaxException unmatched) {
+            return Optional.empty();
         }
-        return PlayerArgument.elsewhere(ctx, name)
-                .map(found -> found.player().name())
-                .orElse("");
     }
 }

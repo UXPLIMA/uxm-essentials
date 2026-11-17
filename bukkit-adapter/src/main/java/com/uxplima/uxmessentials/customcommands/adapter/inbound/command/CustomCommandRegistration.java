@@ -24,6 +24,8 @@ import com.uxplima.uxmessentials.shared.adapter.inbound.command.ArgumentNodes;
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.ArgumentSpec;
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandFeedback;
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandRegistration;
+import com.uxplima.uxmessentials.shared.adapter.inbound.command.PlayerArgument;
+import com.uxplima.uxmessentials.shared.domain.message.SharedMessageKey;
 import com.uxplima.uxmlib.command.Gate;
 import com.uxplima.uxmlib.command.Sender;
 
@@ -56,21 +58,25 @@ public final class CustomCommandRegistration implements CommandRegistration {
     private final List<ArgumentSpec> arguments;
     private final RunCustomCommand runner;
     private final Supplier<CustomCommand> live;
+    private final CommandFeedback feedback;
 
     public CustomCommandRegistration(
             CustomCommand command,
             List<ArgumentSpec> arguments,
             RunCustomCommand runner,
-            Supplier<CustomCommand> live) {
+            Supplier<CustomCommand> live,
+            CommandFeedback feedback) {
         this.command = Objects.requireNonNull(command, "command");
         this.arguments = List.copyOf(Objects.requireNonNull(arguments, "arguments"));
         this.runner = Objects.requireNonNull(runner, "runner");
         this.live = Objects.requireNonNull(live, "live");
+        this.feedback = Objects.requireNonNull(feedback, "feedback");
     }
 
     /** A registration pinned to one definition, for a caller with no reloadable catalog behind it. */
-    public CustomCommandRegistration(CustomCommand command, List<ArgumentSpec> arguments, RunCustomCommand runner) {
-        this(command, arguments, runner, () -> command);
+    public CustomCommandRegistration(
+            CustomCommand command, List<ArgumentSpec> arguments, RunCustomCommand runner, CommandFeedback feedback) {
+        this(command, arguments, runner, () -> command, feedback);
     }
 
     @Override
@@ -129,7 +135,14 @@ public final class CustomCommandRegistration implements CommandRegistration {
 
     private int run(CommandContext<CommandSourceStack> ctx) throws CommandSyntaxException {
         CommandSender sender = Sender.audience(ctx.getSource());
-        Map<String, String> values = new LinkedHashMap<>(ArgumentNodes.read(ctx, arguments));
+        ArgumentNodes.Reading reading = ArgumentNodes.read(ctx, arguments);
+        if (reading instanceof ArgumentNodes.Reading.Unmatched unmatched) {
+            // Nothing runs, so no cooldown, price or first action is spent on a player who is not here.
+            feedback.send(
+                    sender, PlayerArgument.miss(ctx, unmatched.argument(), SharedMessageKey.COMMAND_UNKNOWN_PLAYER));
+            return 0;
+        }
+        Map<String, String> values = new LinkedHashMap<>(((ArgumentNodes.Reading.Values) reading).values());
         values.put(RAW_ARGUMENTS, remainder(ctx.getInput()));
         RunOutcome outcome = runner.run(live.get(), CommandFeedback.refOf(sender), !(sender instanceof Player), values);
         return switch (outcome) {

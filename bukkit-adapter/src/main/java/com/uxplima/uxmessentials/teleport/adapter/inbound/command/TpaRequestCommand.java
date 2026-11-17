@@ -75,17 +75,15 @@ public final class TpaRequestCommand extends TeleportCommandSupport implements C
         if (sender == null) {
             return 0;
         }
-        Optional<Player> resolved;
-        if (services.crossServerRequests().enabled()) {
-            resolved = resolveHere(ctx, "player");
-            Optional<String> elsewhere = resolved.isEmpty() ? typedName(ctx, "player") : Optional.empty();
+        Optional<Player> resolved = resolveHere(ctx, "player");
+        if (resolved.isEmpty() && services.crossServerRequests().enabled()) {
+            Optional<String> elsewhere = typedName(ctx, "player");
             if (elsewhere.isPresent()) {
                 // Nobody here by that name: the request goes to the backend the player is on, if any.
                 services.crossServerRequests().request(ref(sender), elsewhere.get(), direction);
                 return Command.SINGLE_SUCCESS;
             }
         }
-        resolved = resolveHere(ctx, "player");
         if (resolved.isEmpty()) {
             services.notifier()
                     .send(ref(sender), PlayerArgument.miss(ctx, "player", SharedMessageKey.COMMAND_UNKNOWN_PLAYER));

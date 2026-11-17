@@ -1,7 +1,6 @@
 package com.uxplima.uxmessentials.custommenus.adapter.inbound.command;
 
 import java.util.List;
-import java.util.Map;
 import java.util.Objects;
 
 import org.bukkit.command.CommandSender;
@@ -20,6 +19,7 @@ import com.uxplima.uxmessentials.shared.adapter.inbound.command.ArgumentNodes;
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.CatalogGate;
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandFeedback;
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandRegistration;
+import com.uxplima.uxmessentials.shared.adapter.inbound.command.PlayerArgument;
 import com.uxplima.uxmessentials.shared.adapter.outbound.permission.CatalogPermissionCheck;
 import com.uxplima.uxmessentials.shared.adapter.outbound.style.StyledText;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
@@ -111,8 +111,13 @@ public final class MenuOpenCommand implements CommandRegistration {
         }
         // Pre-open actions ride the engine's open-actions seam: opening the menu below runs its open-actions on open,
         // so a menu whose command opens it fires that menu's open-actions: no separate pre-open hook needed here.
-        Map<String, String> arguments = ArgumentNodes.read(ctx, spec.arguments());
-        menus.open(player, menuId, null, 0, arguments);
+        ArgumentNodes.Reading reading = ArgumentNodes.read(ctx, spec.arguments());
+        if (reading instanceof ArgumentNodes.Reading.Unmatched unmatched) {
+            feedback.send(
+                    sender, PlayerArgument.miss(ctx, unmatched.argument(), SharedMessageKey.COMMAND_UNKNOWN_PLAYER));
+            return 0;
+        }
+        menus.open(player, menuId, null, 0, ((ArgumentNodes.Reading.Values) reading).values());
         return Command.SINGLE_SUCCESS;
     }
 
