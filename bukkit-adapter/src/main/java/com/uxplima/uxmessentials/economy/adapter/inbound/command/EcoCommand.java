@@ -303,11 +303,20 @@ public final class EcoCommand extends EconomyCommandSupport implements CommandRe
     }
 
     private int runTarget(CommandContext<CommandSourceStack> ctx, String verb) {
-        Resolved resolved = resolveTargeted(ctx);
-        if (resolved == null) {
+        Request request = request(ctx);
+        if (request == null) {
             return Command.SINGLE_SUCCESS;
         }
-        offTick(() -> dispatchTarget(verb, resolved.actor, resolved.target, resolved.amount));
+        // Off the tick, where the lookup may read the database for a name memory does not hold.
+        offTick(() -> {
+            NameMatch match = resolveAnyTarget(request.targetName());
+            Optional<PlayerRef> target = match.player();
+            if (target.isEmpty()) {
+                rejectUnknownTarget(request.actor(), request.targetName(), match);
+                return;
+            }
+            dispatchTarget(verb, request.actor(), target.get(), request.amount());
+        });
         return Command.SINGLE_SUCCESS;
     }
 
@@ -323,8 +332,9 @@ public final class EcoCommand extends EconomyCommandSupport implements CommandRe
     /**
      * Resolve an admin command's named target, online first and then every account the server has seen, so
      * {@code /eco give|take|set|reset} can act on a player who is not currently online (the use cases materialise
-     * the offline row with {@code ensureOwner}). The lookup is non-blocking; an unknown name, or one several case
-     * variants share, leaves no player and the caller reports why.
+     * the offline row with {@code ensureOwner}). Called off the tick, so a name memory does not hold is read from the
+     * database; an unknown name, or one several case variants share, leaves no player and the caller reports why, so
+     * no account is made up for a name.
      */
     private NameMatch resolveAnyTarget(String name) {
         return services.players().matchByName(name);
@@ -463,13 +473,23 @@ public final class EcoCommand extends EconomyCommandSupport implements CommandRe
             return 0;
         }
         String targetName = ctx.getArgument("player", String.class);
-        NameMatch match = resolveAnyTarget(targetName);
-        Optional<PlayerRef> target = match.player();
-        if (target.isEmpty()) {
-            rejectUnknownTarget(ref(sender), targetName, match);
-            return Command.SINGLE_SUCCESS;
-        }
-        services.historyView().open(sender, target.get().uuid(), target.get().name());
+        PlayerRef viewer = ref(sender);
+        offTick(() -> {
+            NameMatch match = resolveAnyTarget(targetName);
+            Optional<PlayerRef> target = match.player();
+            if (target.isEmpty()) {
+                rejectUnknownTarget(viewer, targetName, match);
+                return;
+            }
+            services.scheduler()
+                    .onEntity(
+                            viewer,
+                            () -> services.historyView()
+                                    .open(
+                                            sender,
+                                            target.get().uuid(),
+                                            target.get().name()));
+        });
         return Command.SINGLE_SUCCESS;
     }
 
@@ -540,7 +560,8 @@ public final class EcoCommand extends EconomyCommandSupport implements CommandRe
                                 services.notifier().amount(amount)));
     }
 
-    private @org.jspecify.annotations.Nullable Resolved resolveTargeted(CommandContext<CommandSourceStack> ctx) {
+    /** The actor, the typed target name and the amount of a give, take or set; null after telling the actor why not. */
+    private @org.jspecify.annotations.Nullable Request request(CommandContext<CommandSourceStack> ctx) {
         PlayerRef actor = actor(ctx);
         Optional<Currency> currency = currency(ctx);
         if (currency.isEmpty()) {
@@ -551,14 +572,7 @@ public final class EcoCommand extends EconomyCommandSupport implements CommandRe
         if (amount.isEmpty()) {
             return null;
         }
-        String targetName = ctx.getArgument("player", String.class);
-        NameMatch match = resolveAnyTarget(targetName);
-        Optional<PlayerRef> target = match.player();
-        if (target.isEmpty()) {
-            rejectUnknownTarget(actor, targetName, match);
-            return null;
-        }
-        return new Resolved(actor, target.get(), amount.get());
+        return new Request(actor, ctx.getArgument("player", String.class), amount.get());
     }
 
     private int runBackup(CommandContext<CommandSourceStack> ctx) {
@@ -620,5 +634,5 @@ public final class EcoCommand extends EconomyCommandSupport implements CommandRe
         return Command.SINGLE_SUCCESS;
     }
 
-    private record Resolved(PlayerRef actor, PlayerRef target, Money amount) {}
+    private record Request(PlayerRef actor, String targetName, Money amount) {}
 }

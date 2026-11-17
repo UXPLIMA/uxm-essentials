@@ -138,6 +138,33 @@ class NativeVaultEconomyTest {
     }
 
     @Test
+    void anAmbiguousNameIsRefusedWithAReasonThatSaysSo() {
+        PlayerRef steve = new PlayerRef(UUID.randomUUID(), "Steve");
+        PlayerRef lowerSteve = new PlayerRef(UUID.randomUUID(), "steve");
+        names.matches.put("STEVE", NameMatch.ambiguous("STEVE", List.of(steve, lowerSteve)));
+
+        EconomyResponse ambiguous = vault().depositPlayer("STEVE", 5);
+        EconomyResponse unknown = vault().depositPlayer("Nobody", 5);
+
+        assertThat(ambiguous.errorMessage).contains("several accounts");
+        assertThat(unknown.errorMessage).isEqualTo("unknown player");
+    }
+
+    @Test
+    void aNameOnlyTheDatabaseKnowsIsPaidWhenTheLookupSettlesIt() {
+        PlayerRef steve = new PlayerRef(UUID.randomUUID(), "Steve");
+        // Memory has forgotten Steve; the lookup's full answer, read from the database off the tick, knows him.
+        names.matches.put("Steve", NameMatch.found(steve));
+        names.forgotten.add("Steve");
+        unreachable.writable = true;
+
+        EconomyResponse response = vault().depositPlayer("Steve", 5);
+
+        assertThat(response.type).isEqualTo(ResponseType.SUCCESS);
+        assertThat(unreachable.credited).extracting(PlayerRef::uuid).containsExactly(steve.uuid());
+    }
+
+    @Test
     void aFailedWriteDoesNotClaimNothingMoved() {
         EconomyResponse response = vault().depositPlayer(alex, 25);
 
@@ -166,10 +193,14 @@ class NativeVaultEconomyTest {
         public void debug(String message, Object... args) {}
     }
 
-    /** The plugin's lookup, answering the names a test sets and nobody else. */
+    /**
+     * The plugin's lookup, answering the names a test sets and nobody else; a forgotten name is known only to the
+     * database, which a lookup reads off the tick.
+     */
     private static final class Names implements PlayerLookup {
 
         final Map<String, NameMatch> matches = new java.util.HashMap<>();
+        final java.util.Set<String> forgotten = new java.util.HashSet<>();
 
         @Override
         public Optional<PlayerRef> findOnlineByName(String name) {
@@ -179,6 +210,11 @@ class NativeVaultEconomyTest {
         @Override
         public NameMatch matchByName(String name) {
             return matches.getOrDefault(name, NameMatch.unknown());
+        }
+
+        @Override
+        public NameMatch matchByNameFromMemory(String name) {
+            return forgotten.contains(name) ? NameMatch.unknown() : matchByName(name);
         }
 
         @Override
