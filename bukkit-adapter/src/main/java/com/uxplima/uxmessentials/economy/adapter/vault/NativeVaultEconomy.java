@@ -18,6 +18,7 @@ import com.uxplima.uxmessentials.economy.domain.Currency;
 import com.uxplima.uxmessentials.economy.domain.Money;
 import com.uxplima.uxmessentials.shared.application.port.Logger;
 import com.uxplima.uxmessentials.shared.application.port.PlayerLookup;
+import com.uxplima.uxmessentials.shared.domain.NameMatch;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import net.milkbowl.vault.economy.Economy;
 import net.milkbowl.vault.economy.EconomyResponse;
@@ -39,12 +40,14 @@ import org.jspecify.annotations.Nullable;
  * method answers {@link ResponseType#NOT_IMPLEMENTED} rather than mapping a personal account onto a shape
  * that does not fit it.
  *
- * <p>The name-keyed methods are Vault's deprecated half. They resolve a name through the plugin's lookup from memory
- * only, and refuse otherwise, because the alternative is a blocking lookup on whichever thread the caller happens to
- * hold. The server's own name cache is not asked first: it matches any case and keeps one profile per lower-cased
- * name, so on an offline-mode server, where {@code Steve} and {@code steve} are two accounts, money would move to
- * whichever joined last. A name that could mean several accounts is refused too. A UUID-keyed caller is never
- * refused.
+ * <p>The name-keyed methods are Vault's deprecated half. They resolve a name through the plugin's lookup, which on a
+ * tick thread answers from memory only, so a caller there never waits on storage; a caller on its own thread may wait
+ * on a database read, or on the server's player-data files, for a name memory does not hold, as it may already for the
+ * wallet. A lookup that fails is a failed response like a failed wallet read, never an exception. A name the lookup
+ * cannot settle is refused, never paid to an account made up for it. The server's own name cache is not asked first:
+ * it matches any case and keeps one profile per lower-cased name, so on an offline-mode server, where {@code Steve} and {@code steve} are two accounts, money would move to
+ * whichever joined last. A name that could mean several accounts is refused too, with a reason that says so. A
+ * UUID-keyed caller is never refused.
  *
  * <p>Every method is synchronous, because Vault's contract is: a caller wants a number back, so there is no
  * seam to hand the work to the scheduler through. The rule that every provider call runs off the tick thread
@@ -62,7 +65,10 @@ public final class NativeVaultEconomy implements Economy {
 
     private static final String NOT_A_BANK = "uxmEssentials has no named bank accounts";
     private static final String UNKNOWN_PLAYER = "unknown player";
+    private static final String AMBIGUOUS_PLAYER =
+            "several accounts have this name in different case; call the UUID method for the one meant";
     private static final String NEGATIVE_AMOUNT = "amount must not be negative";
+    private static final String LOOKUP_FAILED = "the player lookup failed, so nothing moved; try again";
     private static final String UNREACHABLE =
             "the ledger failed during the change and cannot say whether it was stored; check the balance";
 
@@ -146,7 +152,7 @@ public final class NativeVaultEconomy implements Economy {
 
     @Override
     public boolean hasAccount(String name) {
-        OfflinePlayer player = cached(name);
+        OfflinePlayer player = cached("hasAccount", name);
         return player != null && hasAccount(player);
     }
 
@@ -175,7 +181,7 @@ public final class NativeVaultEconomy implements Economy {
 
     @Override
     public double getBalance(String name) {
-        OfflinePlayer player = cached(name);
+        OfflinePlayer player = cached("getBalance", name);
         return player == null ? 0d : getBalance(player);
     }
 
@@ -196,7 +202,7 @@ public final class NativeVaultEconomy implements Economy {
 
     @Override
     public boolean has(String name, double amount) {
-        OfflinePlayer player = cached(name);
+        OfflinePlayer player = cached("has", name);
         return player != null && has(player, amount);
     }
 
@@ -241,8 +247,12 @@ public final class NativeVaultEconomy implements Economy {
 
     @Override
     public EconomyResponse withdrawPlayer(String name, double amount) {
-        OfflinePlayer player = cached(name);
-        return player == null ? failure(amount, 0d, UNKNOWN_PLAYER) : withdrawPlayer(player, amount);
+        NameMatch match = match("withdraw", name);
+        if (match == null) {
+            return failure(amount, 0d, LOOKUP_FAILED);
+        }
+        OfflinePlayer player = account(match);
+        return player == null ? failure(amount, 0d, refusal(match)) : withdrawPlayer(player, amount);
     }
 
     @Override
@@ -284,15 +294,8 @@ public final class NativeVaultEconomy implements Economy {
      * line.
      */
     private void logFailure(String op, PlayerRef owner, Money moved, RuntimeException failure) {
-        long now = nanos.getAsLong();
-        if (loggedOnce.compareAndSet(false, true)) {
-            nextLogAt.set(now + LOG_EVERY.toNanos());
-        } else {
-            long due = nextLogAt.get();
-            if (now - due < 0 || !nextLogAt.compareAndSet(due, now + LOG_EVERY.toNanos())) {
-                suppressed.incrementAndGet();
-                return;
-            }
+        if (!logDue()) {
+            return;
         }
         log.error(
                 "event=vault_write_failed op=" + op + " owner=" + owner.uuid() + " amount="
@@ -302,6 +305,32 @@ public final class NativeVaultEconomy implements Economy {
                 failure);
     }
 
+    /** Tell the console a name lookup failed, under the same once-a-minute limit as a failed write. */
+    private void logLookupFailure(String op, String name, RuntimeException failure) {
+        if (!logDue()) {
+            return;
+        }
+        log.error(
+                "event=vault_lookup_failed op=" + op + " name=" + name + " suppressed=" + suppressed.getAndSet(0)
+                        + " (nothing moved)",
+                failure);
+    }
+
+    /** Whether a failure may be logged now; one that may not is counted into the next line that is. */
+    private boolean logDue() {
+        long now = nanos.getAsLong();
+        if (loggedOnce.compareAndSet(false, true)) {
+            nextLogAt.set(now + LOG_EVERY.toNanos());
+            return true;
+        }
+        long due = nextLogAt.get();
+        if (now - due < 0 || !nextLogAt.compareAndSet(due, now + LOG_EVERY.toNanos())) {
+            suppressed.incrementAndGet();
+            return false;
+        }
+        return true;
+    }
+
     @Override
     public EconomyResponse depositPlayer(OfflinePlayer player, String world, double amount) {
         return depositPlayer(player, amount);
@@ -309,8 +338,12 @@ public final class NativeVaultEconomy implements Economy {
 
     @Override
     public EconomyResponse depositPlayer(String name, double amount) {
-        OfflinePlayer player = cached(name);
-        return player == null ? failure(amount, 0d, UNKNOWN_PLAYER) : depositPlayer(player, amount);
+        NameMatch match = match("deposit", name);
+        if (match == null) {
+            return failure(amount, 0d, LOOKUP_FAILED);
+        }
+        OfflinePlayer player = account(match);
+        return player == null ? failure(amount, 0d, refusal(match)) : depositPlayer(player, amount);
     }
 
     @Override
@@ -331,7 +364,7 @@ public final class NativeVaultEconomy implements Economy {
 
     @Override
     public boolean createPlayerAccount(String name) {
-        OfflinePlayer player = cached(name);
+        OfflinePlayer player = cached("createPlayerAccount", name);
         return player != null && createPlayerAccount(player);
     }
 
@@ -407,12 +440,39 @@ public final class NativeVaultEconomy implements Economy {
                 player.getUniqueId(), name == null ? player.getUniqueId().toString() : name);
     }
 
-    /** The account {@code name} names, from memory; null for a name nobody here used or several accounts share. */
-    private @Nullable OfflinePlayer cached(String name) {
-        return players.matchByNameFromMemory(Objects.requireNonNull(name, "name"))
-                .player()
+    /**
+     * The account {@code name} names; null for a name nobody used, several accounts share, or the lookup could not
+     * read.
+     */
+    private @Nullable OfflinePlayer cached(String op, String name) {
+        NameMatch match = match(op, name);
+        return match == null ? null : account(match);
+    }
+
+    /**
+     * Who {@code name} means, or null when the lookup failed. On a tick thread the lookup answers from memory; a
+     * caller on its own thread may wait on the database, or on the server's player-data files, for a name memory does
+     * not hold, as it may already wait on the wallet read that follows. Vault's contract has no exception in it, so a
+     * failed read is logged and answered like any other refusal.
+     */
+    private @Nullable NameMatch match(String op, String name) {
+        Objects.requireNonNull(name, "name");
+        try {
+            return players.matchByName(name);
+        } catch (RuntimeException unreadable) {
+            logLookupFailure(op, name, unreadable);
+            return null;
+        }
+    }
+
+    private @Nullable OfflinePlayer account(NameMatch match) {
+        return match.player()
                 .map(found -> server.getOfflinePlayer(found.uuid()))
                 .orElse(null);
+    }
+
+    private static String refusal(NameMatch match) {
+        return match instanceof NameMatch.Ambiguous ? AMBIGUOUS_PLAYER : UNKNOWN_PLAYER;
     }
 
     private static EconomyResponse success(double amount, double balance) {

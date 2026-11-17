@@ -27,6 +27,7 @@ import org.jspecify.annotations.Nullable;
 import org.mockbukkit.mockbukkit.ServerMock;
 import org.mockbukkit.mockbukkit.inventory.InventoryMock;
 import org.mockbukkit.mockbukkit.scheduler.BukkitSchedulerMock;
+import org.mockbukkit.mockbukkit.scheduler.RepeatingTask;
 
 /**
  * MockBukkit's server with a global and an async scheduler a scenario can drive to a quiet point.
@@ -111,10 +112,13 @@ final class ScenarioServer extends ServerMock {
     }
 
     /**
-     * Runs at least one game second of ticks and keeps ticking until the async lane has been quiet for two ticks, the
-     * way a server keeps ticking while its async lane works: async work often waits for a hop onto a player's thread,
-     * and what it hands back to the tick runs on a later tick, so a scenario must not stop the moment the lane goes
-     * idle. Between ticks it waits for the async lane, briefly, so work that does not wait on a tick is not raced.
+     * Runs at least one game second of ticks and keeps ticking until the plugin has been quiet for two ticks, the way a
+     * server keeps ticking while its work is in flight. Quiet means the async lane is idle and started nothing new, and
+     * no one-off task is due on the next tick. The second half matters because async work hands its answer back by a
+     * hop onto a player's thread, and that hop often hops again (a message goes out through the sink on the tick
+     * after): stopping once the lane is idle would cut such a chain short whenever the async work happened to finish
+     * late in the second. Between ticks it waits for the async lane, briefly, so work that does not wait on a tick is
+     * not raced.
      */
     void settle() {
         long deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(10);
@@ -126,12 +130,29 @@ final class ScenarioServer extends ServerMock {
             ticks++;
             awaitAsyncIdle(TimeUnit.MILLISECONDS.toNanos(5));
             long started = asyncStarted();
-            quietTicks = started == seen && !asyncBusy() ? quietTicks + 1 : 0;
+            quietTicks = started == seen && !asyncBusy() && !handOffDue() ? quietTicks + 1 : 0;
             seen = started;
             if (System.nanoTime() > deadline) {
-                throw new IllegalStateException("async work still running after 10 seconds:" + asyncStacks());
+                throw new IllegalStateException("the plugin was still busy after 10 seconds:" + asyncStacks());
             }
         }
+    }
+
+    /**
+     * Whether a one-off task is due on the next tick: work handed on to a thread rather than finished. A repeating task
+     * is the plugin's own timer, always due again, so it never counts; a delayed one-off due later is a wait the
+     * scenario asks for itself, and does not count either.
+     */
+    private boolean handOffDue() {
+        long next = getScheduler().getCurrentTick() + 1;
+        for (BukkitTask pending : getScheduler().getPendingTasks()) {
+            if (pending instanceof org.mockbukkit.mockbukkit.scheduler.ScheduledTask task
+                    && !(task instanceof RepeatingTask)
+                    && task.getScheduledTick() == next) {
+                return true;
+            }
+        }
+        return false;
     }
 
     private boolean asyncBusy() {
