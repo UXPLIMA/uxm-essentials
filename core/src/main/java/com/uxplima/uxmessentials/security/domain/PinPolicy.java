@@ -60,12 +60,18 @@ public record PinPolicy(int minLength, int maxLength, Set<String> blocked) {
         return PinValidation.OK;
     }
 
+    /**
+     * Whether every character is one of the ten ASCII digits. Only those, because the keypad has only those: a digit
+     * from another script (fullwidth, Arabic-Indic) would make a PIN nobody at the keypad can type, and would slip past
+     * a blocked entry written in ASCII.
+     */
     private static boolean isAllDigits(String candidate) {
         if (candidate.isEmpty()) {
             return false;
         }
         for (int i = 0; i < candidate.length(); i++) {
-            if (!Character.isDigit(candidate.charAt(i))) {
+            char c = candidate.charAt(i);
+            if (c < '0' || c > '9') {
                 return false;
             }
         }

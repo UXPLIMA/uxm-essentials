@@ -1344,6 +1344,17 @@ public final class PluginModule {
         // here, on enable, before any menu can be clicked. The listener was constructed earlier (it installs before
         // the modules wire), so this late-init is what closes the ordering gap between the two.
         menuTextInputRef.set(textInput);
+        // The security prompts carry a PIN or a code, so they get their own door onto the same seam: one that refuses
+        // the chat mode, because a chat line can reach chat loggers before any capture sees it.
+        links.securityEntryInput = new com.uxplima.uxmessentials.security.adapter.SecureEntryInput(
+                textInput,
+                input.settings(),
+                anvil,
+                new GuiText(kernel.messages()),
+                resolvedBedrock == null ? BedrockDetector.NONE : resolvedBedrock,
+                resolvedScreen == null ? BedrockScreen.NONE : resolvedScreen,
+                kernel.scheduler(),
+                kernel.log());
         // The one shared target picker. It is infrastructure rather than a module's own screen (moderation's
         // sanction flows and the /eco admin GUI both open it), so it is built and registered with the engine here,
         // once, and handed to those modules through the links bag. Two instances would each try to claim the same
@@ -1734,7 +1745,6 @@ public final class PluginModule {
                     persistence,
                     resources,
                     links,
-                    textInput,
                     menus,
                     menuBindings,
                     Objects.requireNonNull(ipCapture, "ipCapture"));
@@ -1963,7 +1973,6 @@ public final class PluginModule {
             Persistence persistence,
             CloseableResources resources,
             ContextLinks links,
-            TextInput textInput,
             Menus menus,
             MenuBindings menuBindings,
             IpCapture ipCapture) {
@@ -1994,7 +2003,7 @@ public final class PluginModule {
                 plugin,
                 ctx,
                 persistence,
-                textInput,
+                Objects.requireNonNull(links.securityEntryInput, "securityEntryInput"),
                 menus,
                 menuBindings,
                 lockoutBan,
@@ -4041,6 +4050,8 @@ public final class PluginModule {
                 staffTeleport;
         private com.uxplima.uxmessentials.moderation.application.@org.jspecify.annotations.Nullable TempBan
                 securityLockoutBan;
+        private com.uxplima.uxmessentials.security.adapter.@org.jspecify.annotations.Nullable SecureEntryInput
+                securityEntryInput;
         // The PlaceholderAPI read seams, filled by each enabled context that contributes placeholders.
         private final PlaceholderContexts.Builder placeholders = PlaceholderContexts.builder();
         // The leaderboards every module that ranks something defines as it wires, built once they all have.
