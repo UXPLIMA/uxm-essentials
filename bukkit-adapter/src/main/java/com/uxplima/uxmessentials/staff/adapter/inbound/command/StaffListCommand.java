@@ -1,5 +1,6 @@
 package com.uxplima.uxmessentials.staff.adapter.inbound.command;
 
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -16,11 +17,13 @@ import com.mojang.brigadier.context.CommandContext;
 import com.mojang.brigadier.tree.LiteralCommandNode;
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandRegistration;
 import com.uxplima.uxmessentials.shared.adapter.outbound.BukkitRefs;
+import com.uxplima.uxmessentials.shared.adapter.outbound.lookup.VisibleNetwork;
 import com.uxplima.uxmessentials.shared.application.permission.EnforcementPermissions;
 import com.uxplima.uxmessentials.shared.application.permission.SocialPermissions;
 import com.uxplima.uxmessentials.shared.application.port.MessageSink;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
 import com.uxplima.uxmessentials.shared.application.port.Scheduler;
+import com.uxplima.uxmessentials.shared.domain.OnlinePlayer;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmessentials.staff.adapter.StaffServices;
 import com.uxplima.uxmessentials.staff.adapter.inbound.gui.StaffPlayerMenu;
@@ -35,7 +38,8 @@ import org.jspecify.annotations.NullMarked;
  * the global region thread (iterating the online list off it is illegal on Folia) and hands it to the menu, or
  * sends {@link StaffMessageKey#STAFF_LIST_EMPTY} when no staff are online rather than opening an empty window. This
  * is the GUI counterpart to the presence context's text {@code /staff} roster. It agrees on who is staff via the
- * same {@code uxmessentials.staff.member} marker.
+ * same {@code uxmessentials.staff.member} marker. On a network the staff on the other backends the sender may see are
+ * listed too, and a click on one of them sends the sender there through the cross-server staff teleport.
  */
 @NullMarked
 public final class StaffListCommand extends StaffCommandSupport implements CommandRegistration {
@@ -48,6 +52,7 @@ public final class StaffListCommand extends StaffCommandSupport implements Comma
     private final Messages messages;
     private final MessageSink sink;
     private final StaffPlayerMenu playerMenu;
+    private final VisibleNetwork network;
 
     public StaffListCommand(
             StaffServices services,
@@ -55,13 +60,15 @@ public final class StaffListCommand extends StaffCommandSupport implements Comma
             Scheduler scheduler,
             Server server,
             MessageSink sink,
-            StaffPlayerMenu playerMenu) {
+            StaffPlayerMenu playerMenu,
+            VisibleNetwork network) {
         super(services, messages);
         this.scheduler = Objects.requireNonNull(scheduler, "scheduler");
         this.server = Objects.requireNonNull(server, "server");
         this.messages = Objects.requireNonNull(messages, "messages");
         this.sink = Objects.requireNonNull(sink, "sink");
         this.playerMenu = Objects.requireNonNull(playerMenu, "playerMenu");
+        this.network = Objects.requireNonNull(network, "network");
     }
 
     @Override
@@ -107,7 +114,10 @@ public final class StaffListCommand extends StaffCommandSupport implements Comma
                 .filter(sender::canSee)
                 .filter(online -> online.hasPermission(STAFF_MEMBER_NODE))
                 .map(BukkitRefs::toRef)
-                .collect(Collectors.toList());
+                .collect(Collectors.toCollection(ArrayList::new));
+        for (OnlinePlayer elsewhere : network.staffElsewhere(sender)) {
+            roster.add(elsewhere.player());
+        }
         if (roster.isEmpty()) {
             sink.deliver(lookerRef, messages.resolve(lookerRef, StaffMessageKey.STAFF_LIST_EMPTY, Map.of()));
             return;

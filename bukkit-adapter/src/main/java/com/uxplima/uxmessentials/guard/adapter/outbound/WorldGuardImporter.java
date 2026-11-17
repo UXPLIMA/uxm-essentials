@@ -333,8 +333,8 @@ public final class WorldGuardImporter {
     }
 
     /**
-     * The UUID of every player the regions store by name, as far as the server's player cache knows them. Asked on
-     * the global thread, then the import carries on off the tick.
+     * The UUID of every player the regions store by name, as far as any server of the network or this server's player
+     * data knows them. Asked off the tick, so a name only the shared database holds is found.
      */
     private CompletableFuture<Map<String, UUID>> resolveNames(List<WgRegion> read) {
         Set<String> wanted = new HashSet<>();

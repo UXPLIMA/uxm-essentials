@@ -2,6 +2,8 @@ package com.uxplima.uxmessentials.presence.adapter.inbound.command;
 
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
+import java.util.Optional;
 
 import org.bukkit.Bukkit;
 import org.bukkit.command.CommandSender;
@@ -21,9 +23,11 @@ import com.uxplima.uxmessentials.presence.domain.PresenceMessageKey;
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandRegistration;
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandSuggestions;
 import com.uxplima.uxmessentials.shared.adapter.outbound.BukkitRefs;
+import com.uxplima.uxmessentials.shared.adapter.outbound.lookup.VisibleNetwork;
 import com.uxplima.uxmessentials.shared.application.permission.SocialPermissions;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
 import com.uxplima.uxmessentials.shared.application.port.Scheduler;
+import com.uxplima.uxmessentials.shared.domain.OnlinePlayer;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmlib.command.Gate;
 import com.uxplima.uxmlib.command.Sender;
@@ -37,6 +41,9 @@ import org.jspecify.annotations.NullMarked;
  * so a vanished player the sender may not see is unresolvable, never leaking details they could not otherwise
  * learn. The console has no {@code canSee} graph and may resolve anyone. A pure read: no use case, no state
  * mutation, just a scan of the visible online set and one resolved reply.
+ *
+ * <p>A player the sender may see on another backend of the network, found by account name, is answered with what this
+ * backend knows of them: their name, uuid and the server they are on.
  */
 @NullMarked
 public final class WhoisCommand extends PresenceCommandSupport implements CommandRegistration {
@@ -44,8 +51,11 @@ public final class WhoisCommand extends PresenceCommandSupport implements Comman
     private static final String PERMISSION = SocialPermissions.WHOIS_USE;
     private static final PlainTextComponentSerializer PLAIN = PlainTextComponentSerializer.plainText();
 
-    public WhoisCommand(PresenceServices services, Messages messages, Scheduler scheduler) {
+    private final VisibleNetwork network;
+
+    public WhoisCommand(PresenceServices services, Messages messages, Scheduler scheduler, VisibleNetwork network) {
         super(services, messages, scheduler);
+        this.network = Objects.requireNonNull(network, "network");
     }
 
     @Override
@@ -75,9 +85,19 @@ public final class WhoisCommand extends PresenceCommandSupport implements Comman
         scheduler.onGlobal(() -> {
             Player match = VisibleNameMatch.find(sender, query);
             if (match == null) {
+                Optional<OnlinePlayer> elsewhere = network.findElsewhere(query, sender);
                 replyOnSenderThread(
                         sender,
-                        () -> feedback.send(sender, PresenceMessageKey.WHOIS_NOT_FOUND, Map.of("query", query)));
+                        () -> elsewhere.ifPresentOrElse(
+                                found -> feedback.send(
+                                        sender,
+                                        PresenceMessageKey.WHOIS_RESULT_ELSEWHERE,
+                                        Map.of(
+                                                "name", found.player().name(),
+                                                "uuid", found.player().uuid().toString(),
+                                                "server", found.server())),
+                                () -> feedback.send(
+                                        sender, PresenceMessageKey.WHOIS_NOT_FOUND, Map.of("query", query))));
                 return;
             }
             PlayerRef matchRef = BukkitRefs.toRef(match);

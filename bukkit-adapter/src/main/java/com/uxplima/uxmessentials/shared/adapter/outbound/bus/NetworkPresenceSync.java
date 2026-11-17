@@ -4,10 +4,12 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
 
+import com.uxplima.uxmessentials.shared.application.networkpresence.RosterMember;
 import com.uxplima.uxmessentials.shared.application.networkpresence.RosterStamp;
 import com.uxplima.uxmessentials.shared.application.networkpresence.TrackNetworkPresence;
 import com.uxplima.uxmessentials.shared.application.port.NetworkPresenceBroadcast;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
+import com.uxplima.uxmessentials.shared.domain.PresenceTraits;
 import com.uxplima.uxmessentials.shared.network.PresenceChanged;
 import com.uxplima.uxmessentials.shared.network.PresenceSnapshot;
 import com.uxplima.uxmessentials.shared.network.ServerPing;
@@ -47,16 +49,20 @@ public final class NetworkPresenceSync {
                     RosterStamp stamp = new RosterStamp(changed.session(), changed.sequence());
                     if (changed.online()) {
                         track.remoteJoined(
-                                changed.originServer(), stamp, new PlayerRef(changed.player(), changed.playerName()));
+                                changed.originServer(),
+                                stamp,
+                                new PlayerRef(changed.player(), changed.playerName()),
+                                changed.traits());
                     } else {
                         track.remoteLeft(
                                 changed.originServer(), stamp, new PlayerRef(changed.player(), changed.playerName()));
                     }
                 }
                 case PresenceSnapshot snapshot -> {
-                    List<PlayerRef> players = new ArrayList<>(snapshot.players().size());
+                    List<RosterMember> players =
+                            new ArrayList<>(snapshot.players().size());
                     for (PresenceSnapshot.Member member : snapshot.players()) {
-                        players.add(new PlayerRef(member.player(), member.name()));
+                        players.add(new RosterMember(new PlayerRef(member.player(), member.name()), member.traits()));
                     }
                     track.remoteRoster(
                             snapshot.originServer(),
@@ -78,22 +84,29 @@ public final class NetworkPresenceSync {
     private record Publishing(BusPublisher bus) implements NetworkPresenceBroadcast {
 
         @Override
-        public void joined(RosterStamp stamp, PlayerRef player) {
+        public void joined(RosterStamp stamp, PlayerRef player, PresenceTraits traits) {
             bus.publish(new PresenceChanged(
-                    bus.serverId(), stamp.session(), stamp.sequence(), player.uuid(), player.name(), true));
+                    bus.serverId(), stamp.session(), stamp.sequence(), player.uuid(), player.name(), true, traits));
         }
 
         @Override
         public void left(RosterStamp stamp, PlayerRef player) {
             bus.publish(new PresenceChanged(
-                    bus.serverId(), stamp.session(), stamp.sequence(), player.uuid(), player.name(), false));
+                    bus.serverId(),
+                    stamp.session(),
+                    stamp.sequence(),
+                    player.uuid(),
+                    player.name(),
+                    false,
+                    PresenceTraits.PLAIN));
         }
 
         @Override
-        public void roster(RosterStamp stamp, boolean replyRequested, List<PlayerRef> players) {
+        public void roster(RosterStamp stamp, boolean replyRequested, List<RosterMember> players) {
             List<PresenceSnapshot.Member> members = new ArrayList<>(players.size());
-            for (PlayerRef player : players) {
-                members.add(new PresenceSnapshot.Member(player.uuid(), player.name()));
+            for (RosterMember member : players) {
+                members.add(new PresenceSnapshot.Member(
+                        member.player().uuid(), member.player().name(), member.traits()));
             }
             // Cut into parts so no relayed frame reaches the size at which a backend disconnects its carrier.
             for (PresenceSnapshot part : PresenceSnapshot.split(

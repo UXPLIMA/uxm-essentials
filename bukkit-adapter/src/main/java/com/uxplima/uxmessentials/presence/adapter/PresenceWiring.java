@@ -45,6 +45,7 @@ import com.uxplima.uxmessentials.shared.adapter.inbound.gui.ManagementGuiRegistr
 import com.uxplima.uxmessentials.shared.adapter.inbound.settings.HeldSettingsListener;
 import com.uxplima.uxmessentials.shared.adapter.outbound.bus.Bus;
 import com.uxplima.uxmessentials.shared.adapter.outbound.bus.PlayerSettingsSync;
+import com.uxplima.uxmessentials.shared.adapter.outbound.lookup.VisibleNetwork;
 import com.uxplima.uxmessentials.shared.application.message.Notifier;
 import com.uxplima.uxmessentials.shared.application.module.KernelPorts;
 import com.uxplima.uxmessentials.shared.application.module.ModuleContext;
@@ -88,7 +89,8 @@ public final class PresenceWiring {
             ManagementGuiRegistry guiRegistry,
             Menus menus,
             Persistence persistence,
-            Bus bus) {
+            Bus bus,
+            VisibleNetwork network) {
         Objects.requireNonNull(plugin, "plugin");
         Objects.requireNonNull(persistence, "persistence");
         Objects.requireNonNull(bus, "bus");
@@ -98,6 +100,7 @@ public final class PresenceWiring {
         Objects.requireNonNull(guiLayouts, "guiLayouts");
         Objects.requireNonNull(guiRegistry, "guiRegistry");
         Objects.requireNonNull(menus, "menus");
+        Objects.requireNonNull(network, "network");
         KernelPorts kernel = ctx.kernel();
         PresenceSettings settings = new PresenceSettings(ctx.config());
         Clock clock = Clock.systemUTC();
@@ -160,8 +163,8 @@ public final class PresenceWiring {
                 com.uxplima.uxmessentials.shared.adapter.inbound.gui.EntityListLayout.paginatedDefault(
                         org.bukkit.Material.PLAYER_HEAD));
         OnlinePlayerListView listView = new OnlinePlayerListView(menus, guiText, kernel.scheduler(), listLayout);
-        List<CommandRegistration> commands = new ArrayList<>(
-                PresenceCommands.all(services, kernel.messages(), kernel.scheduler(), listView, kernel.playerLookup()));
+        List<CommandRegistration> commands = new ArrayList<>(PresenceCommands.all(
+                services, kernel.messages(), kernel.scheduler(), listView, kernel.playerLookup(), network));
         commands.add(new PresenceSettingsCommand(services, kernel.messages(), kernel.scheduler(), settingsView));
         List<Listener> listeners = new ArrayList<>(listeners(kernel, settings, services, store, notifier));
         listeners.add(heldNicks);

@@ -249,6 +249,10 @@ public enum ItemworldMessageKey implements MessageKey {
     COPYINV_DONE("itemworld.copyinv.done"),
     // /endercopy
     ENDERCOPY_DONE("itemworld.endercopy.done"),
+    // /enderclear, /endercopy and /copyinv of a player who is offline
+    OFFLINE_NOT_UNDERSTOOD("itemworld.offline.not-understood"),
+    OFFLINE_CHANGED("itemworld.offline.changed"),
+    OFFLINE_SAVE_FAILED("itemworld.offline.save-failed"),
     // /break
     BREAK_DONE("itemworld.break.done"),
     BREAK_NO_TARGET("itemworld.break.no-target"),

@@ -18,6 +18,7 @@ import com.uxplima.uxmessentials.shared.domain.NameCase;
 import com.uxplima.uxmessentials.shared.domain.NameMatch;
 import com.uxplima.uxmessentials.shared.domain.OnlinePlayer;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
+import com.uxplima.uxmessentials.shared.domain.PresenceTraits;
 import com.uxplima.uxmessentials.testing.MutableClock;
 import org.junit.jupiter.api.Test;
 
@@ -236,9 +237,9 @@ class NetworkPresenceTest {
     void aRosterCutIntoPartsAppliesOnlyOnceEveryPartArrived() {
         RosterStamp stamp = new RosterStamp(1L, 1L);
 
-        survival.track.remoteRoster("lobby-1", stamp, false, 1, 2, List.of(ALEX));
+        survival.track.remoteRoster("lobby-1", stamp, false, 1, 2, List.of(plain(ALEX)));
         assertThat(survival.roster.online()).isEmpty();
-        survival.track.remoteRoster("lobby-1", stamp, false, 0, 2, List.of(STEVE));
+        survival.track.remoteRoster("lobby-1", stamp, false, 0, 2, List.of(plain(STEVE)));
 
         assertThat(survival.roster.onServer("lobby-1"))
                 .containsExactly(new OnlinePlayer(ALEX, "lobby-1"), new OnlinePlayer(STEVE, "lobby-1"));
@@ -248,8 +249,8 @@ class NetworkPresenceTest {
     void aStartingBackendsRosterInPartsAppliesAndIsAnsweredOnce() {
         RosterStamp stamp = new RosterStamp(1L, 1L);
 
-        survival.track.remoteRoster("lobby-1", stamp, true, 1, 2, List.of(ALEX));
-        survival.track.remoteRoster("lobby-1", stamp, true, 0, 2, List.of(STEVE));
+        survival.track.remoteRoster("lobby-1", stamp, true, 1, 2, List.of(plain(ALEX)));
+        survival.track.remoteRoster("lobby-1", stamp, true, 0, 2, List.of(plain(STEVE)));
 
         assertThat(survival.roster.onServer("lobby-1"))
                 .containsExactly(new OnlinePlayer(ALEX, "lobby-1"), new OnlinePlayer(STEVE, "lobby-1"));
@@ -351,13 +352,14 @@ class NetworkPresenceTest {
 
     @Test
     void heartbeatsAloneDoNotKeepARosterFromAnEarlierRunAlive() {
-        survival.track.remoteJoined("lobby-1", new RosterStamp(2_000L, 1L), STEVE);
+        survival.track.remoteJoined("lobby-1", new RosterStamp(2_000L, 1L), STEVE, PresenceTraits.PLAIN);
 
         // Restarted with its clock set back: every roster of the new run reads as older than the run it replaces.
         for (int beat = 0; beat < 10; beat++) {
             clock.advance(HEARTBEAT);
             survival.track.remoteAlive("lobby-1");
-            survival.track.remoteRoster("lobby-1", new RosterStamp(1_000L, beat + 1L), false, 0, 1, List.of(ALEX));
+            survival.track.remoteRoster(
+                    "lobby-1", new RosterStamp(1_000L, beat + 1L), false, 0, 1, List.of(plain(ALEX)));
         }
 
         assertThat(survival.roster.onServer("lobby-1")).containsExactly(new OnlinePlayer(ALEX, "lobby-1"));
@@ -417,6 +419,10 @@ class NetworkPresenceTest {
         }
     }
 
+    private static RosterMember plain(PlayerRef player) {
+        return new RosterMember(player, PresenceTraits.PLAIN);
+    }
+
     /** Holds what a backend announced until the test delivers, reorders or loses it. */
     private static final class Outbox implements NetworkPresenceBroadcast {
 
@@ -428,8 +434,8 @@ class NetworkPresenceTest {
         }
 
         @Override
-        public void joined(RosterStamp stamp, PlayerRef player) {
-            sent.add(peer -> peer.remoteJoined(origin, stamp, player));
+        public void joined(RosterStamp stamp, PlayerRef player, PresenceTraits traits) {
+            sent.add(peer -> peer.remoteJoined(origin, stamp, player, traits));
         }
 
         @Override
@@ -438,8 +444,8 @@ class NetworkPresenceTest {
         }
 
         @Override
-        public void roster(RosterStamp stamp, boolean replyRequested, List<PlayerRef> players) {
-            List<PlayerRef> copy = List.copyOf(players);
+        public void roster(RosterStamp stamp, boolean replyRequested, List<RosterMember> players) {
+            List<RosterMember> copy = List.copyOf(players);
             sent.add(peer -> peer.remoteRoster(origin, stamp, replyRequested, 0, 1, copy));
         }
 

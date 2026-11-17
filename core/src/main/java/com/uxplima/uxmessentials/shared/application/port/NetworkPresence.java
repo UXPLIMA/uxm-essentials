@@ -7,6 +7,7 @@ import java.util.UUID;
 
 import com.uxplima.uxmessentials.shared.domain.NameMatch;
 import com.uxplima.uxmessentials.shared.domain.OnlinePlayer;
+import com.uxplima.uxmessentials.shared.domain.PresenceTraits;
 
 /**
  * Which backend each online player is on, across the whole network. A context that names a player (a sanction, a
@@ -59,6 +60,14 @@ public interface NetworkPresence {
 
     /** Every player online on any backend this server knows, ordered by server and then by name. */
     List<OnlinePlayer> online();
+
+    /**
+     * The traits announced for {@code player} on the backend {@link #find} places them on: whether they are hidden
+     * and whether they are staff. Empty for a player online nowhere this server knows; the default knows no traits.
+     */
+    default Optional<PresenceTraits> traits(UUID player) {
+        return Optional.empty();
+    }
 
     /**
      * The other backend {@code player} is online on, or left within {@code within}, as far as this server heard: the

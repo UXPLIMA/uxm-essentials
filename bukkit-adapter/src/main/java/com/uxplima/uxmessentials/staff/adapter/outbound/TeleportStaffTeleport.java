@@ -10,6 +10,7 @@ import org.bukkit.entity.Player;
 import com.uxplima.uxmessentials.shared.adapter.outbound.BukkitRefs;
 import com.uxplima.uxmessentials.shared.application.port.Scheduler;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
+import com.uxplima.uxmessentials.teleport.application.CrossServerStaffTeleport;
 import com.uxplima.uxmessentials.teleport.application.TeleportEngine;
 import com.uxplima.uxmessentials.teleport.domain.Destination;
 import com.uxplima.uxmessentials.teleport.domain.TeleportKind;
@@ -33,13 +34,27 @@ import org.jspecify.annotations.NullMarked;
 public final class TeleportStaffTeleport implements com.uxplima.uxmessentials.staff.application.port.StaffTeleport {
 
     private final TeleportEngine engine;
+    private final CrossServerStaffTeleport crossServer;
     private final Server server;
     private final Scheduler scheduler;
 
-    public TeleportStaffTeleport(TeleportEngine engine, Server server, Scheduler scheduler) {
+    public TeleportStaffTeleport(
+            TeleportEngine engine, CrossServerStaffTeleport crossServer, Server server, Scheduler scheduler) {
         this.engine = Objects.requireNonNull(engine, "engine");
+        this.crossServer = Objects.requireNonNull(crossServer, "crossServer");
         this.server = Objects.requireNonNull(server, "server");
         this.scheduler = Objects.requireNonNull(scheduler, "scheduler");
+    }
+
+    @Override
+    public boolean teleportElsewhere(PlayerRef staff, String target) {
+        Objects.requireNonNull(staff, "staff");
+        Objects.requireNonNull(target, "target");
+        if (!crossServer.enabled()) {
+            return false;
+        }
+        crossServer.goTo(staff, target);
+        return true;
     }
 
     @Override

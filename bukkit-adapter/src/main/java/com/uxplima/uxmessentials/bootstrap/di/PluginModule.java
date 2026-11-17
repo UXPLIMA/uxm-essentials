@@ -22,6 +22,7 @@ import java.util.logging.Logger;
 import java.util.stream.Collectors;
 
 import org.bukkit.Material;
+import org.bukkit.Server;
 import org.bukkit.entity.Player;
 import org.bukkit.plugin.ServicePriority;
 import org.bukkit.plugin.java.JavaPlugin;
@@ -931,6 +932,7 @@ public final class PluginModule {
                 menuTextInputRef,
                 wiredKernel.resolver()::resolve,
                 networkPresence.presence(),
+                networkPresence.track(),
                 wiredKernel.networkClaims());
         bus.start();
         networkPresence.start();
@@ -1287,6 +1289,7 @@ public final class PluginModule {
             AtomicReference<TextInput> menuTextInputRef,
             Function<com.uxplima.uxmessentials.shared.domain.PlayerRef, Locale> languages,
             NetworkPresence presence,
+            com.uxplima.uxmessentials.shared.application.networkpresence.TrackNetworkPresence presenceTrack,
             Optional<com.uxplima.uxmessentials.shared.application.ledger.NetworkClaims> networkClaims) {
         // teleport is wired before homes/warps (registry order is dependency-first), so its engine is
         // captured and handed to the contexts that delegate teleport execution to it.
@@ -1309,6 +1312,23 @@ public final class PluginModule {
                 .map(link -> link.answeredWithin(System.currentTimeMillis(), busHealth.answerWindow()))
                 .orElse(false);
         links.networked = NetworkConfig.from(config).enabled();
+        // Who is online on the other backends, as far as a viewer may see them, for every list, picker and suggestion
+        // that names the players online. The see level is a permission read, the same with the vanish module off.
+        links.visibleNetwork = com.uxplima.uxmessentials.shared.adapter.outbound.lookup.VisibleNetwork.of(
+                new com.uxplima.uxmessentials.shared.application.networkpresence.NetworkPlayers(presence),
+                new com.uxplima.uxmessentials.vanish.adapter.outbound.BukkitVanishLevelResolver()::seeLevel);
+        com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandSuggestions.network(links.visibleNetwork);
+        resources.onClose(() -> com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandSuggestions.network(
+                com.uxplima.uxmessentials.shared.adapter.outbound.lookup.VisibleNetwork.NONE));
+        // What the other backends need to list this backend's players: how deep each is vanished and whether they are
+        // staff. Read as each player joins, when vanish or LuckPerms says it changed, and with every heartbeat.
+        Server server = plugin.getServer();
+        presenceTrack.readTraitsWith(player -> presenceTraits(server, links, player));
+        if (com.uxplima.uxmessentials.shared.adapter.outbound.permission.LuckPermsAccess.isPresent(server)) {
+            com.uxplima.uxmessentials.shared.adapter.inbound.networkpresence.LuckPermsPresenceTraits.watch(
+                    plugin, kernel.scheduler(), presenceTrack);
+        }
+        links.presenceTrack = presenceTrack;
         // Whether a joining player is new to the whole network, read during the login from the shared name index.
         links.firstJoins = new com.uxplima.uxmessentials.shared.application.FirstJoins(
                 PlayerNameRepositories.known(persistence), kernel.log());
@@ -1366,7 +1386,13 @@ public final class PluginModule {
         // once, and handed to those modules through the links bag. Two instances would each try to claim the same
         // spec and binding ids.
         links.playerPicker = new com.uxplima.uxmessentials.shared.adapter.inbound.gui.PlayerPickerView(
-                menus, kernel.scheduler(), textInput, plugin.getServer(), kernel.messages(), kernel.messageSink());
+                menus,
+                kernel.scheduler(),
+                textInput,
+                plugin.getServer(),
+                kernel.messages(),
+                kernel.messageSink(),
+                links.visibleNetwork);
         links.playerPicker.register(menuBindings, plugin.getDataFolder().toPath(), kernel.log());
         // The browse-menu layout loader resolves modules/<m>/gui/<name>.conf disk-first then bundled; built once
         // here with the data folder so every GUI-using context loads its layout the same way.
@@ -1885,7 +1911,8 @@ public final class PluginModule {
         GuardQueries queries = new GuardQueries(wired.service());
         links.queries.register(UxmRegionsQuery.class, queries);
         links.queries.register(com.uxplima.uxmessentials.api.query.UxmGuardQuery.class, queries);
-        links.placeholders.regions(new GuardRegionsPlaceholders(plugin.getServer(), wired.service()));
+        links.placeholders.regions(new GuardRegionsPlaceholders(
+                plugin.getServer(), wired.service(), ctx.kernel().playerLookup()));
     }
 
     private static void wireInvrollback(
@@ -2443,7 +2470,7 @@ public final class PluginModule {
                         ctx.kernel().scheduler()));
         // Captured for staff (wired last), which binds its COMPASS gadget and /stafflist to this admin engine.
         links.staffTeleport = new com.uxplima.uxmessentials.staff.adapter.StaffWiring.TeleportSeam(
-                wired.services().engine());
+                wired.services().engine(), wired.services().crossServerStaff());
         // Captured for moderation, which lands later and rebinds this jail gate to the real jail policy.
         links.jailGate = wired.jailGate();
         // Captured for vanish, which lands later and rebinds this seam so a cross-server request to a vanished
@@ -2886,7 +2913,9 @@ public final class PluginModule {
                         .find(com.uxplima.uxmessentials.api.query.UxmGuardQuery.class)
                         .flatMap(guard -> guard.behaviour(player.getUniqueId(), behaviour))
                         .filter("deny"::equals)
-                        .isPresent());
+                        .isPresent(),
+                links.presence,
+                PlayerArgument::mayLocate);
         wired.commands().forEach(resources::addCommand);
         wired.listeners().forEach(resources::addListener);
         wired.startBackgroundWork();
@@ -2909,6 +2938,11 @@ public final class PluginModule {
                         source));
         // Captured for staff (wired last), which binds its EXAMINE gadget to this /invsee open use case.
         links.staffOpenContainer = wired.services().openContainer();
+        // The item commands that copy or clear a container reach offline players through the same storage, which
+        // counts only while this module tracks who is joining.
+        links.offlineStorage = wired.offlineStorage();
+        resources.onClose(() -> links.offlineStorage =
+                com.uxplima.uxmessentials.playerstate.adapter.outbound.OfflinePlayerStorage.unavailable());
         // Captured so presence (wired later) rebinds the playtime sampler's AFK seam to its live store, so the
         // sampler splits active vs AFK seconds. Until then, or when presence is disabled, it counts all active.
         links.playtimeAfkStatus = wired.afkStatus();
@@ -3232,7 +3266,10 @@ public final class PluginModule {
                 textInput,
                 menus,
                 menuBindings,
-                account -> links.storedSkins.of(account));
+                account -> links.storedSkins.of(account),
+                links.presence,
+                PlayerArgument::mayLocate,
+                () -> links.offlineStorage);
         wired.commands().forEach(resources::addCommand);
         wired.listeners().forEach(resources::addListener);
         // Write back any still-open in-inventory shulker view before the module stops, so no edit is lost on disable.
@@ -3365,7 +3402,10 @@ public final class PluginModule {
         // nametags, staff), so its store and toggle are captured here and threaded into their
         // vanish gates during their own wiring; a disabled vanish module leaves those handles null and each consumer
         // degrades to "no one is hidden". On stop the store is cleared so a disable/reload leaves no residual state.
-        VanishWiring.Wired wired = VanishWiring.wire(plugin, ctx, persistence, bus, links.presence);
+        com.uxplima.uxmessentials.shared.application.networkpresence.TrackNetworkPresence presenceTrack =
+                Objects.requireNonNull(links.presenceTrack, "presenceTrack");
+        VanishWiring.Wired wired =
+                VanishWiring.wire(plugin, ctx, persistence, bus, links.presence, presenceTrack::retrait);
         wired.commands().forEach(resources::addCommand);
         wired.listeners().forEach(resources::addListener);
         resources.onClose(wired::stop);
@@ -3423,7 +3463,16 @@ public final class PluginModule {
         java.util.function.Consumer<com.uxplima.uxmessentials.shared.domain.PlayerRef> vanishToggleHandle =
                 vanishToggle == null ? who -> {} : vanishToggle::toggle;
         PresenceWiring.Wired wired = PresenceWiring.wire(
-                plugin, ctx, vanishLookup, vanishToggleHandle, guiLayouts, guiRegistry, menus, persistence, bus);
+                plugin,
+                ctx,
+                vanishLookup,
+                vanishToggleHandle,
+                guiLayouts,
+                guiRegistry,
+                menus,
+                persistence,
+                bus,
+                links.visibleNetwork);
         wired.commands().forEach(resources::addCommand);
         wired.listeners().forEach(resources::addListener);
         wired.startBackgroundWork();
@@ -3911,13 +3960,14 @@ public final class PluginModule {
         // and unsubscribed on stop (the kernel port exposes only publish). With messaging off no alert is wired.
         InProcessDomainEventPublisher events =
                 (InProcessDomainEventPublisher) ctx.kernel().events();
-        StaffWiring.Wired wired =
-                StaffWiring.wire(plugin, ctx, persistence, bus, seams, events, guiRegistry, menus, menuBindings);
+        StaffWiring.Wired wired = StaffWiring.wire(
+                plugin, ctx, persistence, bus, seams, events, guiRegistry, menus, menuBindings, links.visibleNetwork);
         wired.commands().forEach(resources::addCommand);
         wired.listeners().forEach(resources::addListener);
         // The staff PAPI seam reads the same staff-mode marker the /staffmode use cases hold and counts the online
         // staff-member holders the /stafflist roster shows, so a placeholder matches what the player sees in game.
-        links.placeholders.staff(new StaffStaffPlaceholders(wired.services().store(), plugin.getServer()));
+        links.placeholders.staff(
+                new StaffStaffPlaceholders(wired.services().store(), plugin.getServer(), links.visibleNetwork));
         // Read-only: entering staff mode swaps a real inventory for a loadout, which only the module can undo,
         // so who is on duty is published and turning it on is not.
         links.queries.register(
@@ -4013,8 +4063,30 @@ public final class PluginModule {
                         wired.apiWrites(), lookup, ctx.kernel().scheduler(), source));
     }
 
+    /**
+     * The traits this backend announces for {@code player}: the level they are vanished at, when the vanish module
+     * runs, and whether they hold the staff marker node.
+     */
+    private static com.uxplima.uxmessentials.shared.domain.PresenceTraits presenceTraits(
+            Server server, ContextLinks links, com.uxplima.uxmessentials.shared.domain.PlayerRef player) {
+        com.uxplima.uxmessentials.vanish.application.port.VanishStore vanish = links.vanishStore;
+        int hidden = vanish == null
+                ? com.uxplima.uxmessentials.shared.domain.PresenceTraits.VISIBLE
+                : vanish.levelOf(player.uuid())
+                        .map(com.uxplima.uxmessentials.vanish.domain.VanishLevel::level)
+                        .orElse(com.uxplima.uxmessentials.shared.domain.PresenceTraits.VISIBLE);
+        Player online = server.getPlayer(player.uuid());
+        boolean staff = online != null
+                && online.hasPermission(
+                        com.uxplima.uxmessentials.shared.application.permission.SocialPermissions.STAFF_MEMBER);
+        return new com.uxplima.uxmessentials.shared.domain.PresenceTraits(hidden, staff);
+    }
+
     /** Cross-context handles captured during wiring so a dependent context reaches its prerequisite. */
     private static final class ContextLinks {
+        // The stored containers of players not on this server, while the playerstate module tracks their logins.
+        private volatile com.uxplima.uxmessentials.playerstate.adapter.outbound.OfflinePlayerStorage offlineStorage =
+                com.uxplima.uxmessentials.playerstate.adapter.outbound.OfflinePlayerStorage.unavailable();
         // The stored skins of the skin module, for a head drawn from a texture; none while that module is off.
         private volatile HeadTextures.StoredSkins storedSkins = HeadTextures.StoredSkins.none();
         // The peer backends live by their heartbeats; a cross-server trade invite waits for each to answer.
@@ -4023,6 +4095,12 @@ public final class PluginModule {
         private java.util.function.BooleanSupplier proxyAnswering = () -> false;
         // Whether this backend is part of a network (network.enabled), which is when a jail can be on another one.
         private boolean networked;
+        // The players of the other backends a viewer may see; none until the network view is built at wiring start.
+        private com.uxplima.uxmessentials.shared.adapter.outbound.lookup.VisibleNetwork visibleNetwork =
+                com.uxplima.uxmessentials.shared.adapter.outbound.lookup.VisibleNetwork.NONE;
+        // What this backend announces of its players; vanish tells it when someone vanishes or reappears.
+        private com.uxplima.uxmessentials.shared.application.networkpresence.@org.jspecify.annotations.Nullable TrackNetworkPresence
+                presenceTrack;
         // Whether a joining player is new to the network, for the first-join lines and kits; set before any module.
         private com.uxplima.uxmessentials.shared.application.@org.jspecify.annotations.Nullable FirstJoins firstJoins;
         // The shared target picker, built and registered at enable before any module wires; moderation and the

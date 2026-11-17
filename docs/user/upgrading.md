@@ -11,6 +11,14 @@ to that server, when the database holds none. A nick that is another account's n
 nick, is refused; a player may wear their own name, a Bedrock player's dotted one too. A server still on an older
 release does not show the shared nick, so upgrade every server of the network in the same window.
 
+## Lists name the players of every server
+
+On a network, tab completion, `/list`, `/staff`, `/stafflist`, `staff_online`, the player pickers, `/realname`,
+`/whois` and `/mail sendall` now take in the players of every server, and `/broadcast` reaches every server. Each server
+announces how deep its players are vanished and whether they are staff. A server still on an older release announces
+neither, so until it is upgraded its players are listed only to viewers who see every vanish level, and none of them
+counts as staff; upgrade every server of the network in the same window.
+
 ## Messaging switches follow the player
 
 `/msgtoggle`, `/rtoggle`, `/broadcasttoggle`, `/socialspy` and the `/reply` partner are kept in three new tables

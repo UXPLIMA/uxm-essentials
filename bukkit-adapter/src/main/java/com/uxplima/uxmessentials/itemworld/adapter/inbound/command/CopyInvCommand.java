@@ -1,10 +1,6 @@
 package com.uxplima.uxmessentials.itemworld.adapter.inbound.command;
 
-import java.util.Arrays;
-import java.util.Map;
-
 import org.bukkit.entity.Player;
-import org.bukkit.inventory.ItemStack;
 
 import io.papermc.paper.command.brigadier.CommandSourceStack;
 import io.papermc.paper.command.brigadier.Commands;
@@ -16,23 +12,22 @@ import com.mojang.brigadier.tree.LiteralCommandNode;
 import com.uxplima.uxmessentials.itemworld.adapter.ItemworldServices;
 import com.uxplima.uxmessentials.itemworld.domain.ItemworldMessageKey;
 import com.uxplima.uxmessentials.itemworld.domain.SubFeatureGroup;
+import com.uxplima.uxmessentials.playerstate.adapter.outbound.playerdata.ContainerLayout;
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandRegistration;
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandSuggestions;
-import com.uxplima.uxmessentials.shared.adapter.outbound.lookup.OnlineByName;
 import com.uxplima.uxmessentials.shared.application.permission.ItemworldPermissions;
-import com.uxplima.uxmessentials.shared.domain.NameMatch;
-import com.uxplima.uxmessentials.shared.domain.message.MessageLine;
 import com.uxplima.uxmlib.command.Gate;
 import org.jspecify.annotations.NullMarked;
 
 /**
- * {@code /copyinv <player>}: copy an online target's inventory contents into your own, a staff tool for
- * cloning a loadout. The named target must resolve online (else {@link ItemworldMessageKey#UNKNOWN_TARGET}).
+ * {@code /copyinv <player>}: copy a target's inventory contents into your own, a staff tool for
+ * cloning a loadout. The target may be online here, offline, or on another server, which the command names
+ * (else {@link ItemworldMessageKey#UNKNOWN_TARGET}).
  *
- * <p>The target's inventory is snapshotted on the <em>target's</em> own region thread, then the cloned
- * contents are written to the actor's inventory on the <em>actor's</em> region thread through the kernel
- * {@code Scheduler}, so neither player's entity state is touched off its owning region thread (Folia). The
- * result is reported through {@link ItemworldMessageKey#COPYINV_DONE}.
+ * <p>An online target's inventory is snapshotted on the <em>target's</em> own region thread, an offline one's is read
+ * from the data this server stored for them off the tick, and the copy is written to the actor's inventory on the
+ * <em>actor's</em> region thread through the kernel {@code Scheduler}, so neither player's entity state is touched off
+ * its owning region thread (Folia). The result is reported through {@link ItemworldMessageKey#COPYINV_DONE}.
  */
 @NullMarked
 public final class CopyInvCommand extends ItemworldCommandSupport implements CommandRegistration {
@@ -64,25 +59,13 @@ public final class CopyInvCommand extends ItemworldCommandSupport implements Com
         if (self == null) {
             return Command.SINGLE_SUCCESS;
         }
-        String name = StringArgumentType.getString(ctx, "player");
-        NameMatch match = services.kernel().playerLookup().matchOnlineByName(name);
-        Player target = OnlineByName.player(match);
-        if (target == null) {
-            MessageLine miss = match.miss(ItemworldMessageKey.UNKNOWN_TARGET, Map.of("player", name));
-            reply(ctx, miss.key(), miss.args());
-            return Command.SINGLE_SUCCESS;
-        }
-        services.kernel().scheduler().onEntity(ref(target), () -> {
-            // Read the target's inventory only on the target's own region thread; clone so the array that
-            // crosses to the actor's thread shares no mutable ItemStack with the target's live inventory.
-            ItemStack[] contents = Arrays.stream(target.getInventory().getContents())
-                    .map(stack -> stack == null ? null : stack.clone())
-                    .toArray(ItemStack[]::new);
-            services.kernel().scheduler().onEntity(ref(self), () -> {
-                self.getInventory().setContents(contents);
-                reply(ctx, ItemworldMessageKey.COPYINV_DONE, Map.of("player", target.getName()));
-            });
-        });
+        copyContainer(
+                ctx,
+                self,
+                StringArgumentType.getString(ctx, "player"),
+                ContainerLayout.INVENTORY,
+                Player::getInventory,
+                ItemworldMessageKey.COPYINV_DONE);
         return Command.SINGLE_SUCCESS;
     }
 }

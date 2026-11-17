@@ -175,7 +175,7 @@ Registered when PlaceholderAPI is installed, as `%uxm_essentials_<key>%`. A `pla
 | `skin_value` | skin | What that source names: the account, the link, the file or the Bedrock id. | `"Notch"` | player |
 | `staff_count` | staff | The same connected-staff count, under the spelling a config may prefer. | `"3"` | global |
 | `staff_mode` | staff | Whether the player is in staff mode (yes/no). | `"no"` | session |
-| `staff_online` | staff | How many staff members are connected. | `"3"` | global |
+| `staff_online` | staff | How many staff members are connected, on every server of the network. | `"3"` | global |
 | `survival_autopickup` | survival | Whether the player has auto-pickup switched on (yes/no), the mechanic that sends drops straight to the inventory. | `"yes"` | player |
 | `survival_autopickup_enabled` | survival | Whether this server runs auto-pickup at all (yes/no), the mechanic that sends drops straight to the inventory. | `"yes"` | global |
 | `survival_autosell` | survival | Whether the player has auto-sell switched on (yes/no), the mechanic that sells what is mined. | `"yes"` | player |

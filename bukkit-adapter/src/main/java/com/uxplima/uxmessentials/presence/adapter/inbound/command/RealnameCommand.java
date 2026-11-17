@@ -1,8 +1,14 @@
 package com.uxplima.uxmessentials.presence.adapter.inbound.command;
 
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
+import java.util.Optional;
+import java.util.Set;
+import java.util.UUID;
 
+import org.bukkit.Bukkit;
 import org.bukkit.command.CommandSender;
 import org.bukkit.entity.Player;
 
@@ -19,9 +25,11 @@ import com.uxplima.uxmessentials.presence.adapter.PresenceServices;
 import com.uxplima.uxmessentials.presence.domain.PresenceMessageKey;
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandRegistration;
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandSuggestions;
+import com.uxplima.uxmessentials.shared.adapter.outbound.lookup.VisibleNetwork;
 import com.uxplima.uxmessentials.shared.application.permission.SocialPermissions;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
 import com.uxplima.uxmessentials.shared.application.port.Scheduler;
+import com.uxplima.uxmessentials.shared.domain.OnlinePlayer;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmlib.command.Gate;
 import com.uxplima.uxmlib.command.Sender;
@@ -42,8 +50,11 @@ public final class RealnameCommand extends PresenceCommandSupport implements Com
     private static final String PERMISSION = SocialPermissions.REALNAME_USE;
     private static final PlainTextComponentSerializer PLAIN = PlainTextComponentSerializer.plainText();
 
-    public RealnameCommand(PresenceServices services, Messages messages, Scheduler scheduler) {
+    private final VisibleNetwork network;
+
+    public RealnameCommand(PresenceServices services, Messages messages, Scheduler scheduler, VisibleNetwork network) {
         super(services, messages, scheduler);
+        this.network = Objects.requireNonNull(network, "network");
     }
 
     @Override
@@ -72,8 +83,19 @@ public final class RealnameCommand extends PresenceCommandSupport implements Com
         scheduler.onGlobal(() -> {
             Player match = VisibleNameMatch.find(sender, query);
             if (match == null) {
-                // Nobody here carries it: the nick may be a player's who is offline or on another server.
-                scheduler.async(() -> findStored(sender, query));
+                // A player on another backend is found by their account name; their display name stays there.
+                Optional<OnlinePlayer> elsewhere = network.findElsewhere(query, sender);
+                if (elsewhere.isPresent()) {
+                    String name = elsewhere.get().player().name();
+                    replyOnSenderThread(
+                            sender,
+                            () -> feedback.send(
+                                    sender, PresenceMessageKey.REALNAME_RESULT, Map.of("display", name, "name", name)));
+                    return;
+                }
+                // The nick may be a player's who is offline or on another server: the database knows who carries it.
+                Set<UUID> hidden = hiddenFrom(sender);
+                scheduler.async(() -> findStored(sender, query, hidden));
                 return;
             }
             String display = PLAIN.serialize(match.displayName());
@@ -86,11 +108,39 @@ public final class RealnameCommand extends PresenceCommandSupport implements Com
         return Command.SINGLE_SUCCESS;
     }
 
-    /** Answer from the nicks the database holds, off the tick: the account that carries {@code query}, if any. */
-    private void findStored(CommandSender sender, String query) {
+    /**
+     * The players online anywhere that {@code sender} may not see, read on the global thread. A nick the database names
+     * is answered only for a player outside this set, so the stored nicks never reveal a vanished player.
+     */
+    private Set<UUID> hiddenFrom(CommandSender sender) {
+        Set<UUID> hidden = new HashSet<>();
+        Player viewer = sender instanceof Player player ? player : null;
+        if (viewer != null) {
+            for (Player online : Bukkit.getOnlinePlayers()) {
+                if (!viewer.canSee(online)) {
+                    hidden.add(online.getUniqueId());
+                }
+            }
+        }
+        for (PlayerRef remote : network.everyoneElsewhere()) {
+            hidden.add(remote.uuid());
+        }
+        for (OnlinePlayer visible : network.elsewhere(sender)) {
+            hidden.remove(visible.player().uuid());
+        }
+        return hidden;
+    }
+
+    /**
+     * Answer from the nicks the database holds, off the tick: the account that carries {@code query}, if any, and if
+     * the sender may know of them.
+     */
+    private void findStored(CommandSender sender, String query, Set<UUID> hidden) {
         List<PlayerRef> owners;
         try {
-            owners = services.nickOwners().of(query);
+            owners = services.nickOwners().of(query).stream()
+                    .filter(owner -> !hidden.contains(owner.uuid()))
+                    .toList();
         } catch (RuntimeException unreachable) {
             owners = List.of();
         }

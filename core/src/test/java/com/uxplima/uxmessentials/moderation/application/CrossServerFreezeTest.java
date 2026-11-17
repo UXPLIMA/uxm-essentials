@@ -22,6 +22,7 @@ import com.uxplima.uxmessentials.shared.application.port.NetworkPresenceBroadcas
 import com.uxplima.uxmessentials.shared.application.port.PlayerNameIndex;
 import com.uxplima.uxmessentials.shared.domain.NameCase;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
+import com.uxplima.uxmessentials.shared.domain.PresenceTraits;
 import com.uxplima.uxmessentials.shared.domain.message.MessageKey;
 import com.uxplima.uxmessentials.shared.network.FreezeChanged;
 import com.uxplima.uxmessentials.shared.network.NetworkMessage;
@@ -65,7 +66,7 @@ class CrossServerFreezeTest {
             if (backend == server) {
                 backend.track.joined(STEVE);
             } else {
-                backend.track.remoteJoined(server.name, new RosterStamp(1L, sequence), STEVE);
+                backend.track.remoteJoined(server.name, new RosterStamp(1L, sequence), STEVE, PresenceTraits.PLAIN);
             }
         }
     }
