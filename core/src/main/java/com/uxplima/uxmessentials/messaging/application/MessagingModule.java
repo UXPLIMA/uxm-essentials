@@ -49,8 +49,8 @@ public final class MessagingModule implements FeatureModule {
 
     @Override
     public List<ListenerFactory> listeners() {
-        // The new-mail join notify and the reply-target capture/forget listeners are Bukkit-facing and come
-        // from the inbound adapter; a disabled module registers none here.
+        // The unread-mail join notice is Bukkit-facing and comes from the inbound adapter; a disabled module
+        // registers none here.
         return List.of();
     }
 

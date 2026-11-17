@@ -196,7 +196,7 @@ shared: each backend reads its own `config.conf` and module files, so keep them 
 | Worlds | Managed worlds and settings, per server | `/worlds tp` and `/worlds spawn` to another server | `worlds` `cross-server.enabled` |
 | Teleport | Pending moves | `/tpa`, `/tpahere`, staff `/tp` and `/tphere` | `teleport` `cross-server.enabled` |
 | Moderation | Bans, mutes, warnings, IP bans, jails, history | A ban or IP ban kicks everywhere; a jail sends the player to the jail's server; a freeze holds everywhere | none |
-| Messaging | Mail, ignore lists | `/msg`, `/reply`, `/helpop`; staff chat in the staff module | none |
+| Messaging | Mail, ignore lists | `/msg`, `/reply`, `/helpop`, new-mail notices; staff chat in the staff module | none |
 | Vanish | Vanish state | Hidden on every server | `vanish` `cross-server` |
 | Kits | One-time claims and cooldowns | none | none |
 | Ranks | Each player's rank and prestige | none | none |

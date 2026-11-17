@@ -3005,6 +3005,7 @@ public final class PluginModule {
                 menus,
                 menuBindings);
         wired.commands().forEach(resources::addCommand);
+        wired.listeners().forEach(resources::addListener);
         wired.startBackgroundWork();
         resources.onClose(wired::stop);
         links.mutePolicy = wired.mutePolicy();

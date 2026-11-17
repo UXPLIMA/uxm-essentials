@@ -152,6 +152,69 @@ class CrossServerMessagingTest {
     }
 
     @Test
+    void mailForAPlayerOnAnotherBackendIsAnnouncedThereOnceEvenWhenTheBusDeliversTwice() {
+        network.deliverTwice = true;
+
+        survival.sendMail.send(ALEX, BOB, body("see you"));
+
+        assertThat(survival.lines()).containsExactly("Alex: mail.sent{player=Bob}");
+        assertThat(lobby.lines()).containsExactly("Bob: new mail from Alex");
+        assertThat(creative.lines()).isEmpty();
+    }
+
+    @Test
+    void aReplyToAPartnerOfflineEverywhereBecomesMailWhenOfflineToMailIsOn() {
+        Network mailing = new Network(true);
+        Backend from = mailing.backend("survival");
+        Backend to = mailing.backend("lobby");
+        from.join(ALEX);
+        to.join(BOB);
+        from.msg(ALEX, "Bob", "hi");
+        to.leave(BOB);
+
+        from.reply.reply(ALEX, body("still there?"));
+
+        assertThat(from.lines()).containsExactly("Alex: sent to Bob: hi", "Alex: msg.sent-to-mail{player=Bob}");
+        assertThat(mailing.mail).extracting(item -> item.body().value()).containsExactly("still there?");
+    }
+
+    @Test
+    void aReplyToAPartnerWhoHidOrTurnedRepliesOffReadsAsOfflineAndBecomesMail() {
+        Network mailing = new Network(true);
+        Backend from = mailing.backend("survival");
+        Backend to = mailing.backend("lobby");
+        from.join(ALEX);
+        to.join(BOB);
+        from.msg(ALEX, "Bob", "hi");
+        to.repliesOff.add(BOB.uuid());
+
+        from.reply.reply(ALEX, body("one"));
+        to.repliesOff.clear();
+        to.vanishedHere.add(BOB.uuid());
+        from.reply.reply(ALEX, body("two"));
+
+        assertThat(from.lines())
+                .containsExactly(
+                        "Alex: sent to Bob: hi",
+                        "Alex: msg.sent-to-mail{player=Bob}",
+                        "Alex: msg.sent-to-mail{player=Bob}");
+        assertThat(to.lines())
+                .containsExactly("Bob: received from Alex: hi", "Bob: new mail from Alex", "Bob: new mail from Alex");
+        assertThat(mailing.mail).extracting(item -> item.body().value()).containsExactly("one", "two");
+    }
+
+    @Test
+    void aReplyToAPartnerOfflineEverywhereFindsNoOneWhenOfflineToMailIsOff() {
+        survival.msg(ALEX, "Bob", "hi");
+        lobby.leave(BOB);
+
+        survival.reply.reply(ALEX, body("still there?"));
+
+        assertThat(survival.lines()).containsExactly("Alex: sent to Bob: hi", "Alex: msg.no-reply-target");
+        assertThat(network.mail).isEmpty();
+    }
+
+    @Test
     void aBackendWhereAnotherPluginRunsPrivateMessagesAnswersOffline() {
         lobby.steppedBack = true;
 
@@ -518,6 +581,7 @@ class CrossServerMessagingTest {
         final List<String> lines = new ArrayList<>();
         final RecordingEvents events = new RecordingEvents();
         final SendMessage sendMessage;
+        final SendMail sendMail;
         final RelayPrivateMessage relay;
         final Reply reply;
         final HelpOp helpOp;
@@ -536,7 +600,8 @@ class CrossServerMessagingTest {
             VanishVisibility vanish = new Vanish();
             ReplyRoutingStore replyRouting = new Switch(repliesOff);
             IgnoreStore ignores = new SharedIgnores();
-            SendMail sendMail = new SendMail(new Mail(), ignores, delivery, network::mute, notifier, events, CLOCK);
+            Bus bus = new Bus();
+            this.sendMail = new SendMail(new Mail(), ignores, delivery, bus, network::mute, notifier, events, CLOCK);
             this.sendMessage = new SendMessage(
                     delivery,
                     ignores,
@@ -550,7 +615,6 @@ class CrossServerMessagingTest {
                     notifier,
                     events,
                     CLOCK);
-            Bus bus = new Bus();
             this.relay = new RelayPrivateMessage(
                     sendMessage, replyRouting, vanish, presence, bus, notifier, scheduler, () -> steppedBack);
             this.reply = new Reply(
@@ -562,7 +626,8 @@ class CrossServerMessagingTest {
                     notifier,
                     Duration.ofMinutes(5),
                     CLOCK,
-                    relay);
+                    relay,
+                    scheduler);
             StaffAudience audience = node -> List.copyOf(staff);
             this.helpOp =
                     new HelpOp(audience, delivery, network::mute, notifier, events, CLOCK, bus, presence, scheduler);
@@ -729,6 +794,11 @@ class CrossServerMessagingTest {
             }
 
             @Override
+            public void announce(RemoteMail mail) {
+                network.peersOf(name).forEach(peer -> peer.sendMail.receive(mail));
+            }
+
+            @Override
             public void publish(RemoteStaffChat chat) {
                 network.peersOf(name).forEach(peer -> peer.staffChat.receive(chat, name));
             }
@@ -807,10 +877,15 @@ class CrossServerMessagingTest {
             }
 
             @Override
-            public void notifyNewMail(PlayerRef recipient, MailItem item) {
+            public void notifyNewMail(PlayerRef recipient, String senderName) {
                 if (connected.contains(recipient.uuid())) {
-                    lines.add(recipient.name() + ": new mail");
+                    lines.add(recipient.name() + ": new mail from " + senderName);
                 }
+            }
+
+            @Override
+            public void notifyUnreadMail(PlayerRef recipient, long unread) {
+                lines.add(recipient.name() + ": unread mail " + unread);
             }
 
             @Override

@@ -6,10 +6,12 @@ import java.util.Objects;
 import java.util.Optional;
 import java.util.concurrent.atomic.AtomicBoolean;
 
+import org.bukkit.event.Listener;
 import org.bukkit.plugin.Plugin;
 
 import com.uxplima.uxmessentials.messaging.adapter.inbound.command.MessagingCommands;
 import com.uxplima.uxmessentials.messaging.adapter.inbound.gui.MessagingGuiViews;
+import com.uxplima.uxmessentials.messaging.adapter.inbound.listener.UnreadMailListener;
 import com.uxplima.uxmessentials.messaging.adapter.outbound.BukkitMessageDelivery;
 import com.uxplima.uxmessentials.messaging.adapter.outbound.BukkitStaffAudience;
 import com.uxplima.uxmessentials.messaging.adapter.outbound.BusMessagingNetwork;
@@ -33,6 +35,7 @@ import com.uxplima.uxmessentials.messaging.application.SendMailToAll;
 import com.uxplima.uxmessentials.messaging.application.SendMessage;
 import com.uxplima.uxmessentials.messaging.application.SocialSpy;
 import com.uxplima.uxmessentials.messaging.application.Unignore;
+import com.uxplima.uxmessentials.messaging.application.UnreadMailNotice;
 import com.uxplima.uxmessentials.messaging.application.port.AfkStatus;
 import com.uxplima.uxmessentials.messaging.application.port.IgnoreStore;
 import com.uxplima.uxmessentials.messaging.application.port.MailRepository;
@@ -124,7 +127,14 @@ public final class MessagingWiring {
         UxmChatStepBack chat = new UxmChatStepBack(plugin.getServer());
         MessagingServices services = assemble(
                 kernel, settings, stores, mutePolicy, afkStatus, vanish, network, presence, chat, Clock.systemUTC());
-        network.bind(services.relay(), services.helpOp());
+        network.bind(services.relay(), services.helpOp(), services.sendMail());
+        // Mail left while a player was away, on any backend, is announced as they join; the count is read off the tick.
+        List<Listener> listeners = List.of(new UnreadMailListener(
+                new UnreadMailNotice(
+                        stores.mail(),
+                        new BukkitMessageDelivery(kernel.messages(), kernel.messageSink()),
+                        kernel.log()),
+                kernel.scheduler()));
         bus.registry().register(network::onFrame);
         MailExpirySweep sweep = new MailExpirySweep(
                 kernel.scheduler(),
@@ -157,7 +167,15 @@ public final class MessagingWiring {
         List<CommandRegistration> commands =
                 MessagingCommands.all(services, kernel.messages(), kernel.messageSink(), views);
         return new Wired(
-                commands, sweep, stores, mutePolicy, afkStatus, running, views, MessagingApiWrites.of(services));
+                commands,
+                listeners,
+                sweep,
+                stores,
+                mutePolicy,
+                afkStatus,
+                running,
+                views,
+                MessagingApiWrites.of(services));
     }
 
     private static MessagingServices assemble(
@@ -173,8 +191,8 @@ public final class MessagingWiring {
             Clock clock) {
         Notifier notifier = new Notifier(kernel.messages(), kernel.messageSink());
         MessageDelivery delivery = new BukkitMessageDelivery(kernel.messages(), kernel.messageSink());
-        SendMail sendMail =
-                new SendMail(stores.mail(), stores.ignores(), delivery, mute, notifier, kernel.events(), clock);
+        SendMail sendMail = new SendMail(
+                stores.mail(), stores.ignores(), delivery, network, mute, notifier, kernel.events(), clock);
         SendMessage sendMessage = new SendMessage(
                 delivery,
                 stores.ignores(),
@@ -209,7 +227,8 @@ public final class MessagingWiring {
                         notifier,
                         settings.replyTtl(),
                         clock,
-                        relay),
+                        relay,
+                        kernel.scheduler()),
                 sendMail,
                 new SendMailToAll(stores.mail(), clock),
                 new ReadMail(stores.mail(), delivery, notifier),
@@ -270,6 +289,7 @@ public final class MessagingWiring {
      * observes.
      *
      * @param commands the Brigadier command registrations to publish
+     * @param listeners the join listener that tells a player about mail they have not read
      * @param expirySweep the self-rescheduling mail-expiry sweep, armed by the caller
      * @param stores the constructed stores, for the stop-time drain of the transient ones
      * @param mutePolicy the rebindable mute gate the moderation context fills in when it wires
@@ -279,6 +299,7 @@ public final class MessagingWiring {
      */
     public record Wired(
             List<CommandRegistration> commands,
+            List<Listener> listeners,
             MailExpirySweep expirySweep,
             Stores stores,
             MutableMutePolicy mutePolicy,
@@ -289,6 +310,7 @@ public final class MessagingWiring {
 
         public Wired {
             commands = List.copyOf(commands);
+            listeners = List.copyOf(listeners);
             Objects.requireNonNull(expirySweep, "expirySweep");
             Objects.requireNonNull(stores, "stores");
             Objects.requireNonNull(mutePolicy, "mutePolicy");
