@@ -99,17 +99,23 @@ public final class JooqTwoFactorRepository extends JooqRepository implements Two
     }
 
     @Override
-    public boolean verifyPin(UUID playerId, String candidate) {
+    public PinCheck pinCheck(UUID playerId) {
         Objects.requireNonNull(playerId, "playerId");
-        Objects.requireNonNull(candidate, "candidate");
         // Read the serialised digest under the pooled connection, then verify off it: a constant-time PBKDF2 compare
-        // should not hold the connection open. No row or no PIN yields no digest and thus no match.
+        // should not hold the connection open. No row or no PIN yields no digest and thus no match. The digest is
+        // parsed and decoded here, so a damaged one fails before any candidate is compared.
         Optional<String> stored = read(dsl -> Optional.ofNullable(dsl.select(SECURITY_2FA.PIN_HASH)
                 .from(SECURITY_2FA)
                 .where(SECURITY_2FA.UUID.eq(playerId.toString()))
                 .fetchOne(SECURITY_2FA.PIN_HASH)));
-        return stored.map(serialized -> hasher.verify(candidate, deserialize(serialized)))
-                .orElse(false);
+        if (stored.isEmpty()) {
+            return PinCheck.NONE;
+        }
+        PasswordHash hash = deserialize(stored.get());
+        java.util.Base64.Decoder decoder = java.util.Base64.getDecoder();
+        var unusedSalt = decoder.decode(hash.salt());
+        var unusedHash = decoder.decode(hash.hash());
+        return candidate -> hasher.verify(Objects.requireNonNull(candidate, "candidate"), hash);
     }
 
     @Override

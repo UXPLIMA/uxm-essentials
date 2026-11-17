@@ -6,6 +6,7 @@ import java.util.concurrent.atomic.AtomicLong;
 import java.util.function.LongSupplier;
 
 import com.uxplima.uxmessentials.shared.application.port.Logger;
+import com.uxplima.uxmessentials.shared.network.FrameSeal;
 import org.jspecify.annotations.NullMarked;
 
 /**

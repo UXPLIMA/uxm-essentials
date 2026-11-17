@@ -1,4 +1,4 @@
-package com.uxplima.uxmessentials.shared.adapter.outbound.bus;
+package com.uxplima.uxmessentials.shared.network;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
