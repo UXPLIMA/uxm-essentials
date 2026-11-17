@@ -25,4 +25,14 @@ public interface Messages {
      * unmatched {@code {name}} is left intact as a dev aid.
      */
     String resolve(PlayerRef viewer, MessageKey key, Map<String, String> placeholders);
+
+    /**
+     * {@link #resolve} for arguments the operator wrote next to the key, as in an {@code @key name=value} line on a
+     * hologram or in a menu. The adapter keeps the placeholders in a value a player may have typed from being filled
+     * for the reader; an operator's own arguments are the operator's words, so theirs are filled like the rest of the
+     * line. Never pass a value a player could have typed.
+     */
+    default String resolveAsWritten(PlayerRef viewer, MessageKey key, Map<String, String> arguments) {
+        return resolve(viewer, key, arguments);
+    }
 }
