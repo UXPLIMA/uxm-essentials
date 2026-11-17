@@ -9,6 +9,8 @@ import java.util.UUID;
 import com.uxplima.uxmessentials.moderation.application.port.ExemptionSightings;
 import com.uxplima.uxmessentials.persistence.runtime.JooqRepository;
 import org.jooq.DSLContext;
+import org.jooq.Record1;
+import org.jooq.impl.DSL;
 import org.jspecify.annotations.NullMarked;
 
 /**
@@ -55,10 +57,15 @@ final class JooqExemptionSightings extends JooqRepository implements ExemptionSi
     }
 
     @Override
-    public boolean heldAnywhere(UUID player) {
+    public Sighting sighting(UUID player) {
         String id = Objects.requireNonNull(player, "player").toString();
-        return read(dsl -> dsl.fetchExists(
-                MODERATION_EXEMPT_SEEN,
-                MODERATION_EXEMPT_SEEN.PLAYER_UUID.eq(id).and(MODERATION_EXEMPT_SEEN.HELD.eq(HELD))));
+        Short most = read(dsl -> dsl.select(DSL.max(MODERATION_EXEMPT_SEEN.HELD))
+                .from(MODERATION_EXEMPT_SEEN)
+                .where(MODERATION_EXEMPT_SEEN.PLAYER_UUID.eq(id))
+                .fetchOne(Record1::value1));
+        if (most == null) {
+            return Sighting.NEVER_SEEN;
+        }
+        return most == HELD ? Sighting.HELD : Sighting.NOT_HELD;
     }
 }

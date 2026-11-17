@@ -51,7 +51,7 @@ class ExemptionWatchTest {
             }
 
             @Override
-            public boolean heldAnywhere(UUID player) {
+            public Sighting sighting(UUID player) {
                 throw new AssertionError("nothing is read here");
             }
         };

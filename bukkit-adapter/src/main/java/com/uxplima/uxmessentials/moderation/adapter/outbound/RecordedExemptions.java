@@ -13,8 +13,9 @@ import org.jspecify.annotations.NullMarked;
 
 /**
  * The punishment exemption as the backends recorded it: {@link Answer#HELD} when any backend last saw the player hold
- * it, otherwise {@link Answer#NOT_HELD}, which only means no backend saw a grant. Any other node is not recorded and
- * grants nothing here. A read that fails is {@link Answer#NO_ANSWER}.
+ * it, {@link Answer#NOT_HELD} when backends recorded the player and none saw a grant, {@link Answer#NO_SOURCE} when
+ * no backend recorded them. Any other node is not recorded and grants nothing here. A read that fails is
+ * {@link Answer#NO_ANSWER}.
  */
 @NullMarked
 public final class RecordedExemptions implements StoredPermissions {
@@ -39,7 +40,12 @@ public final class RecordedExemptions implements StoredPermissions {
         try {
             scheduler.async(() -> {
                 try {
-                    answer.complete(sightings.heldAnywhere(who.uuid()) ? Answer.HELD : Answer.NOT_HELD);
+                    answer.complete(
+                            switch (sightings.sighting(who.uuid())) {
+                                case HELD -> Answer.HELD;
+                                case NOT_HELD -> Answer.NOT_HELD;
+                                case NEVER_SEEN -> Answer.NO_SOURCE;
+                            });
                 } catch (RuntimeException failure) {
                     log.error("event=moderation_exemption_record_unread player=" + who.name(), failure);
                     answer.complete(Answer.NO_ANSWER);

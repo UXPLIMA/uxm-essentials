@@ -114,7 +114,7 @@ public final class ServerStoredPermissions implements StoredPermissions {
         // may read the server (an offline player's name), and the bus answers on another thread.
         List<NodeStore> sources = storedSources();
         List<Pending> stored = prepared(sources, who, node);
-        recorded.ifPresent(seen -> stored.add(new Pending(() -> seen.read(who, node), who, node)));
+        Optional<Pending> seen = recorded.map(record -> new Pending(() -> record.read(who, node), who, node));
         Optional<String> elsewhere = anotherBackend(who.uuid());
         if (elsewhere.isPresent()) {
             CompletableFuture<Answer> live = bus.map(reads -> reads.ask(who, node, elsewhere.get()))
@@ -126,9 +126,9 @@ public final class ServerStoredPermissions implements StoredPermissions {
             }
             return live.thenCompose(answer -> answer == Answer.HELD || answer == Answer.NOT_HELD
                     ? CompletableFuture.completedFuture(answer)
-                    : combined(stored, byDefault).thenApply(read -> onlyAGrant(read, answer)));
+                    : combined(stored, seen, byDefault).thenApply(read -> onlyAGrant(read, answer)));
         }
-        return combined(stored, byDefault);
+        return combined(stored, seen, byDefault);
     }
 
     /**
@@ -166,38 +166,56 @@ public final class ServerStoredPermissions implements StoredPermissions {
         return loads;
     }
 
-    /** The answer of every load and the default together: any grant is held, any miss keeps it from not held. */
-    private CompletableFuture<Answer> combined(List<Pending> loads, boolean byDefault) {
+    /**
+     * The answer of every store, the record and the default together: any grant is held, any miss keeps it from not
+     * held. A store that never saw the player is settled by the record only: when the backends recorded them, and none
+     * saw a grant, they are not held.
+     */
+    private CompletableFuture<Answer> combined(List<Pending> loads, Optional<Pending> seen, boolean byDefault) {
         if (byDefault) {
             return CompletableFuture.completedFuture(Answer.HELD);
         }
-        if (loads.isEmpty()) {
-            return CompletableFuture.completedFuture(Answer.NOT_HELD);
-        }
         List<CompletableFuture<Answer>> answers = new ArrayList<>(loads.size());
         for (Pending load : loads) {
-            CompletableFuture<Answer> answer = new CompletableFuture<>();
-            answers.add(answer);
-            try {
-                scheduler.async(() -> load.run(answer));
-            } catch (RuntimeException refused) {
-                // The scheduler refuses work while the plugin stops.
-                answer.complete(Answer.NO_ANSWER);
-            }
+            answers.add(started(load));
         }
-        return CompletableFuture.allOf(answers.toArray(CompletableFuture[]::new))
+        CompletableFuture<Answer> recordedAnswer =
+                seen.map(this::started).orElseGet(() -> CompletableFuture.completedFuture(Answer.NO_SOURCE));
+        List<CompletableFuture<Answer>> all = new ArrayList<>(answers);
+        all.add(recordedAnswer);
+        return CompletableFuture.allOf(all.toArray(CompletableFuture[]::new))
                 .thenApply(done ->
-                        combine(answers.stream().map(CompletableFuture::join).toList()));
+                        combine(answers.stream().map(CompletableFuture::join).toList(), recordedAnswer.join()));
     }
 
-    private static Answer combine(List<Answer> answers) {
-        if (answers.contains(Answer.HELD)) {
+    /** Run {@code load} on the async lane; one the scheduler refuses while the plugin stops is no answer. */
+    private CompletableFuture<Answer> started(Pending load) {
+        CompletableFuture<Answer> answer = new CompletableFuture<>();
+        try {
+            scheduler.async(() -> load.run(answer));
+        } catch (RuntimeException refused) {
+            answer.complete(Answer.NO_ANSWER);
+        }
+        return answer;
+    }
+
+    /**
+     * {@code stores} answered by the permission stores, {@code record} by what the backends recorded: {@link
+     * Answer#NOT_HELD} there means the player was recorded and no backend saw a grant, {@link Answer#NO_SOURCE} that
+     * no backend recorded them.
+     */
+    private static Answer combine(List<Answer> stores, Answer record) {
+        if (stores.contains(Answer.HELD) || record == Answer.HELD) {
             return Answer.HELD;
         }
-        if (answers.contains(Answer.NO_ANSWER)) {
+        if (stores.contains(Answer.NO_ANSWER) || record == Answer.NO_ANSWER) {
             return Answer.NO_ANSWER;
         }
-        return answers.contains(Answer.NO_SOURCE) ? Answer.NO_SOURCE : Answer.NOT_HELD;
+        if (stores.contains(Answer.NO_SOURCE)) {
+            // A store that never saw the player is settled by what the backends they played on recorded.
+            return record == Answer.NOT_HELD ? Answer.NOT_HELD : Answer.NO_SOURCE;
+        }
+        return Answer.NOT_HELD;
     }
 
     /** One store's read, started on the server thread and run on the async lane. */

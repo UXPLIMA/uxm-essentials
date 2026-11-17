@@ -5,6 +5,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import java.time.Instant;
 import java.util.UUID;
 
+import com.uxplima.uxmessentials.moderation.application.port.ExemptionSightings.Sighting;
 import com.uxplima.uxmessentials.persistence.testing.EveryBackend;
 import com.uxplima.uxmessentials.persistence.testing.TestDatabase;
 import org.junit.jupiter.api.BeforeEach;
@@ -36,8 +37,8 @@ class JooqExemptionSightingsTest {
         lobby.record(ADA, "lobby", false, NOW);
         survival.record(ADA, "survival", true, NOW);
 
-        assertThat(lobby.heldAnywhere(ADA)).isTrue();
-        assertThat(lobby.heldAnywhere(BOB)).as("never seen").isFalse();
+        assertThat(lobby.sighting(ADA)).isEqualTo(Sighting.HELD);
+        assertThat(lobby.sighting(BOB)).isEqualTo(Sighting.NEVER_SEEN);
     }
 
     @Test
@@ -46,7 +47,15 @@ class JooqExemptionSightingsTest {
 
         survival.record(ADA, "survival", false, NOW.plusSeconds(5));
 
-        assertThat(lobby.heldAnywhere(ADA)).isFalse();
+        assertThat(lobby.sighting(ADA)).isEqualTo(Sighting.NOT_HELD);
+    }
+
+    @Test
+    void sightingsWithNoGrantSayNotHeld() {
+        lobby.record(ADA, "lobby", false, NOW);
+        survival.record(ADA, "survival", false, NOW.plusSeconds(5));
+
+        assertThat(lobby.sighting(ADA)).isEqualTo(Sighting.NOT_HELD);
     }
 
     @Test
@@ -55,6 +64,6 @@ class JooqExemptionSightingsTest {
 
         survival.record(ADA, "survival", false, NOW);
 
-        assertThat(lobby.heldAnywhere(ADA)).isTrue();
+        assertThat(lobby.sighting(ADA)).isEqualTo(Sighting.HELD);
     }
 }

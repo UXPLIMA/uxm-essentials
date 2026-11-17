@@ -304,13 +304,15 @@ Whether a target holds `uxmessentials.bypass.punishment` is read where the answe
   joins, leaves, and, with LuckPerms, whenever their permissions change, in `moderation_exempt_seen`.
 - For a player whose server did not answer, only a grant counts: anything else refuses the sanction, since that
   server's own operator list and permission plugin are not read here.
-- A source that cannot tell refuses too. LuckPerms cannot tell for a player its storage never saw (storage not
-  shared with the server they played on), and Vault for a player who never joined this server, since Vault asks by
-  name: on a network with Vault and no LuckPerms, sanction such a player from a server they played on.
+- LuckPerms cannot tell for a player its storage never saw (storage not shared with the server they played on), nor
+  Vault for a player who never joined this server, since Vault asks by name. Then the record decides: a player some
+  server recorded, with no recorded grant, is not exempt. One no server recorded cannot be sanctioned from here; do it
+  from a server they played on.
 
-A grant that was removed while the player was away still counts on the server that recorded it until they join it
-again. When that server is gone for good, delete its rows: `DELETE FROM moderation_exempt_seen WHERE server = 'name'`
-(with your table prefix).
+The record is only as fresh as the player's last visit. An exemption granted while they are offline, in a permission
+store this server does not share, is not seen here until they join the server that has it; a grant removed while they
+are away still counts until then. When a server is gone for good, delete its rows:
+`DELETE FROM moderation_exempt_seen WHERE server = 'name'` (with your table prefix).
 
 ### Kits, ranks and vaults
 

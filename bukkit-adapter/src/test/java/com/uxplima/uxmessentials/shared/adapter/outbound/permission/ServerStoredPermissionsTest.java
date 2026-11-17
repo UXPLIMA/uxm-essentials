@@ -307,6 +307,52 @@ class ServerStoredPermissionsTest {
     }
 
     @Test
+    void aStoreThatNeverSawThePlayerIsSettledByWhatTheBackendsRecorded() {
+        StoredPermissions seenWithoutAGrant = (who, node) -> CompletableFuture.completedFuture(Answer.NOT_HELD);
+        StoredPermissions neverRecorded = (who, node) -> CompletableFuture.completedFuture(Answer.NO_SOURCE);
+
+        CompletableFuture<Answer> recorded = reader(
+                        store(Answer.NO_SOURCE), null, Optional.empty(), Optional.of(seenWithoutAGrant))
+                .read(bert, NODE);
+        CompletableFuture<Answer> unrecorded = reader(
+                        store(Answer.NO_SOURCE), null, Optional.empty(), Optional.of(neverRecorded))
+                .read(bert, NODE);
+        lane.runAll();
+
+        assertThat(recorded).isCompletedWithValue(Answer.NOT_HELD);
+        assertThat(unrecorded).as("nobody can tell: refused as before").isCompletedWithValue(Answer.NO_SOURCE);
+    }
+
+    @Test
+    void aPlayerWhoNeverJoinedHereButWasRecordedElsewhereIsReadFromThatRecord() {
+        register(new FakeProvider("PermissionsEx"));
+        StoredPermissions seenWithoutAGrant = (who, node) -> CompletableFuture.completedFuture(Answer.NOT_HELD);
+
+        CompletableFuture<Answer> answer = ServerStoredPermissions.of(
+                        server,
+                        lane,
+                        presence,
+                        new Warnings(warnings),
+                        Optional.empty(),
+                        Optional.of(seenWithoutAGrant))
+                .read(STRANGER, NODE);
+        lane.runAll();
+
+        assertThat(answer).isCompletedWithValue(Answer.NOT_HELD);
+    }
+
+    @Test
+    void aRecordThatCannotBeReadLeavesNoAnswer() {
+        StoredPermissions failing = (who, node) -> CompletableFuture.completedFuture(Answer.NO_ANSWER);
+
+        CompletableFuture<Answer> answer = reader(store(Answer.NOT_HELD), null, Optional.empty(), Optional.of(failing))
+                .read(bert, NODE);
+        lane.runAll();
+
+        assertThat(answer).isCompletedWithValue(Answer.NO_ANSWER);
+    }
+
+    @Test
     void anOfflinePlayerNoBackendRecordedAsExemptIsReadFromTheOtherSources() {
         StoredPermissions recorded = (who, node) -> CompletableFuture.completedFuture(Answer.NOT_HELD);
 

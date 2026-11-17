@@ -18,6 +18,20 @@ public interface ExemptionSightings {
      */
     void record(UUID player, String server, boolean held, Instant at);
 
-    /** Whether any backend's latest sighting of {@code player} holds the exemption. */
-    boolean heldAnywhere(UUID player);
+    /**
+     * What the backends' latest sightings of {@code player} say together: {@link Sighting#HELD} when any holds the
+     * exemption, {@link Sighting#NOT_HELD} when there are sightings and none does, {@link Sighting#NEVER_SEEN} when no
+     * backend recorded them.
+     */
+    Sighting sighting(UUID player);
+
+    /** What the recorded sightings of one player say. */
+    enum Sighting {
+        /** A backend last saw them holding the exemption. */
+        HELD,
+        /** Backends saw them, and none last saw the exemption held. */
+        NOT_HELD,
+        /** No backend recorded them. */
+        NEVER_SEEN
+    }
 }
