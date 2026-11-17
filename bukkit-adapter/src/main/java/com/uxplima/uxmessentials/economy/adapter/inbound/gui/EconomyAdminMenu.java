@@ -2,7 +2,6 @@ package com.uxplima.uxmessentials.economy.adapter.inbound.gui;
 
 import java.nio.file.Path;
 import java.util.Objects;
-import java.util.Optional;
 
 import org.bukkit.entity.Player;
 
@@ -13,6 +12,7 @@ import com.uxplima.uxmessentials.shared.adapter.outbound.EngineLog;
 import com.uxplima.uxmessentials.shared.application.port.Logger;
 import com.uxplima.uxmessentials.shared.application.port.PlayerLookup;
 import com.uxplima.uxmessentials.shared.application.port.Scheduler;
+import com.uxplima.uxmessentials.shared.domain.NameMatch;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmlib.menu.Menus;
 import com.uxplima.uxmlib.menu.binding.MenuBindings;
@@ -97,8 +97,8 @@ public final class EconomyAdminMenu {
         picker.open(viewer, viewerRef, request);
     }
 
-    private Optional<PlayerRef> resolveOffline(String name) {
-        return players.findByName(name);
+    private NameMatch resolveOffline(String name) {
+        return players.matchByName(name);
     }
 
     /** Open the server-wide bulk screen through the engine. */

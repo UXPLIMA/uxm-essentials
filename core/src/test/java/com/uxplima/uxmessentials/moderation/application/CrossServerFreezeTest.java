@@ -8,7 +8,6 @@ import java.util.ArrayList;
 import java.util.Collection;
 import java.util.HashSet;
 import java.util.List;
-import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
 import java.util.function.Function;
@@ -42,8 +41,8 @@ class CrossServerFreezeTest {
 
     private static final PlayerNameIndex NO_NAMES = new PlayerNameIndex() {
         @Override
-        public Optional<PlayerRef> byName(String name) {
-            return Optional.empty();
+        public List<PlayerRef> byName(String name) {
+            return List.of();
         }
 
         @Override

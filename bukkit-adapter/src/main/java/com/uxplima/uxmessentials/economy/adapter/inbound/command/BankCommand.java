@@ -24,9 +24,11 @@ import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandSuggestio
 import com.uxplima.uxmessentials.shared.adapter.outbound.style.StyledText;
 import com.uxplima.uxmessentials.shared.application.permission.EconomyPermissions;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
+import com.uxplima.uxmessentials.shared.domain.NameMatch;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmessentials.shared.domain.Result;
 import com.uxplima.uxmessentials.shared.domain.Unit;
+import com.uxplima.uxmessentials.shared.domain.message.MessageLine;
 import com.uxplima.uxmlib.command.Args;
 import com.uxplima.uxmlib.command.Gate;
 import org.jspecify.annotations.NullMarked;
@@ -227,12 +229,13 @@ public final class BankCommand extends EconomyCommandSupport implements CommandR
 
         PlayerRef senderRef = ref(sender);
         offTick(() -> {
-            Optional<PlayerRef> target = services.players().findByName(targetName);
+            NameMatch match = services.players().matchByName(targetName);
+            Optional<PlayerRef> target = match.player();
             if (target.isEmpty()) {
+                MessageLine miss =
+                        match.miss(EconomyMessageKey.ECO_ADMIN_TARGET_UNKNOWN, java.util.Map.of("player", targetName));
                 services.scheduler()
-                        .onEntity(
-                                senderRef,
-                                () -> services.notifier().send(senderRef, EconomyMessageKey.ECO_ADMIN_TARGET_UNKNOWN));
+                        .onEntity(senderRef, () -> services.notifier().send(senderRef, miss));
                 return;
             }
 
@@ -262,12 +265,13 @@ public final class BankCommand extends EconomyCommandSupport implements CommandR
 
         PlayerRef senderRef = ref(sender);
         offTick(() -> {
-            Optional<PlayerRef> target = services.players().findByName(targetName);
+            NameMatch match = services.players().matchByName(targetName);
+            Optional<PlayerRef> target = match.player();
             if (target.isEmpty()) {
+                MessageLine miss =
+                        match.miss(EconomyMessageKey.ECO_ADMIN_TARGET_UNKNOWN, java.util.Map.of("player", targetName));
                 services.scheduler()
-                        .onEntity(
-                                senderRef,
-                                () -> services.notifier().send(senderRef, EconomyMessageKey.ECO_ADMIN_TARGET_UNKNOWN));
+                        .onEntity(senderRef, () -> services.notifier().send(senderRef, miss));
                 return;
             }
 

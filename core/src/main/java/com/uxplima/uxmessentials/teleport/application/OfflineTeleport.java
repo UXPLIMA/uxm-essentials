@@ -13,6 +13,7 @@ import com.uxplima.uxmessentials.shared.application.port.Logger;
 import com.uxplima.uxmessentials.shared.application.port.PlayerLookup;
 import com.uxplima.uxmessentials.shared.application.port.Scheduler;
 import com.uxplima.uxmessentials.shared.application.port.WorldLookup;
+import com.uxplima.uxmessentials.shared.domain.NameMatch;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmessentials.shared.domain.Position;
 import com.uxplima.uxmessentials.shared.domain.WorldRef;
@@ -286,9 +287,10 @@ public final class OfflineTeleport {
      */
     private Optional<PlayerRef> offline(PlayerRef actor, String name) {
         Objects.requireNonNull(name, "name");
-        Optional<PlayerRef> target = players.findByName(name);
+        NameMatch match = players.matchByName(name);
+        Optional<PlayerRef> target = match.player();
         if (target.isEmpty()) {
-            tell(actor, TeleportMessageKey.TPOFFLINE_UNKNOWN, name);
+            notifier.send(actor, match.miss(TeleportMessageKey.TPOFFLINE_UNKNOWN, Map.of("player", name)));
             return Optional.empty();
         }
         PlayerRef found = target.get();

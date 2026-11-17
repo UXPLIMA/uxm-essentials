@@ -300,6 +300,7 @@ public final class GuardWiring {
                 },
                 onPlayer,
                 kernel.scheduler(),
+                kernel.playerLookup(),
                 config.rgAlias());
         GuardMenus guardMenus = new GuardMenus(
                 menus, service, command, new CommandFeedback(kernel.messages()), kernel.messages(), onPlayer);

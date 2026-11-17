@@ -23,6 +23,7 @@ import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandFeedback;
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandSuggestions;
 import com.uxplima.uxmessentials.shared.adapter.outbound.BukkitRefs;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
+import com.uxplima.uxmessentials.shared.domain.NameMatch;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmessentials.shared.domain.Position;
 import com.uxplima.uxmessentials.shared.domain.message.MessageKey;
@@ -79,8 +80,8 @@ abstract class PlayerWarpCommandSupport {
     }
 
     /** Tell {@code sender} the named target was not found, in their locale. */
-    final void unknownPlayer(CommandSender sender, String name) {
-        feedback.send(sender, UNKNOWN_PLAYER, Map.of("player", name));
+    final void unknownPlayer(CommandSender sender, String name, NameMatch match) {
+        feedback.send(sender, match.miss(UNKNOWN_PLAYER, Map.of("player", name)));
     }
 
     /**
@@ -176,9 +177,10 @@ abstract class PlayerWarpCommandSupport {
      * rather than acting on nobody, so the caller need not repeat the lookup-or-reject dance.
      */
     final void withPlayer(Target target, String playerName, Consumer<PlayerRef> action) {
-        Optional<PlayerRef> resolved = services.players().findByName(playerName);
+        NameMatch match = services.players().matchByName(playerName);
+        Optional<PlayerRef> resolved = match.player();
         if (resolved.isEmpty()) {
-            onPlayer(target.who(), () -> unknownPlayer(target.sender(), playerName));
+            onPlayer(target.who(), () -> unknownPlayer(target.sender(), playerName, match));
             return;
         }
         action.accept(resolved.get());

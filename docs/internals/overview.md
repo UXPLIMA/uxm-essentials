@@ -52,6 +52,18 @@ uxmEssentials is split into the modules `api`, `bukkit-api`, `core`, `persistenc
 Configuration is read into immutable snapshots and swapped whole on reload. Work that touches files or a
 database runs on the uxmLib `Scheduler` async lane; work on a player or a block runs on its region thread.
 
+## Player names
+
+A name a sender types is resolved through the kernel `PlayerLookup`: the players connected here, then the plugin's
+own name index (every account seen on any server of the database), then the server's user cache. On an offline-mode
+server, one with no authenticating proxy in front, `Steve` and `steve` are two accounts with two uuids and Paper lets
+both play at once, so the indexes keep every account under a lower-cased name. A spelling that matches one account
+exactly is that account; a name only one account holds in any case is that account; a name several accounts hold only
+in other cases is answered with `command.ambiguous-player`, which lists the spellings, and never with one of them.
+Online mode keeps one owner per name, the one seen last. `ServerNameCase` reads which mode applies. The server's own
+by-name methods (`getPlayerExact`, `getOfflinePlayerIfCached`) match in any case and keep one entry per lower-cased
+name, so they cannot tell case variants apart; the lookup can.
+
 ## Migrations
 
 The Flyway scripts under `persistence-adapter/src/main/resources/db/migration` run on every backend and are written

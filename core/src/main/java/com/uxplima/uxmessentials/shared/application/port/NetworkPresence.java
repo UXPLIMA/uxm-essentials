@@ -32,7 +32,8 @@ public interface NetworkPresence {
 
     /**
      * Where the online player with this exact name is, ignoring case. A player on this backend wins over one with
-     * the same name elsewhere, and an exact-case match wins over a match that differs in case.
+     * the same name elsewhere, and an exact-case match wins over a match that differs in case. When only case
+     * variants are online and they are several accounts (offline mode), none is a match.
      */
     Optional<OnlinePlayer> findByName(String name);
 

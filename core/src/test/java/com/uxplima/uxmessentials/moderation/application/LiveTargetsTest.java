@@ -52,8 +52,8 @@ class LiveTargetsTest {
 
     private static final PlayerNameIndex NO_NAMES = new PlayerNameIndex() {
         @Override
-        public Optional<PlayerRef> byName(String name) {
-            return Optional.empty();
+        public List<PlayerRef> byName(String name) {
+            return List.of();
         }
 
         @Override

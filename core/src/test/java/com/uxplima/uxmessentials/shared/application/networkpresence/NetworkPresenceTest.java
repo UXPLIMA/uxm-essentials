@@ -9,7 +9,6 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
-import java.util.Optional;
 import java.util.UUID;
 import java.util.function.Consumer;
 
@@ -41,6 +40,28 @@ class NetworkPresenceTest {
         assertThat(lobby.roster.findByName("sTeVe")).contains(new OnlinePlayer(STEVE, "lobby-1"));
         assertThat(lobby.roster.findByName("Alex")).isEmpty();
         assertThat(lobby.roster.onServer("lobby-1")).containsExactly(new OnlinePlayer(STEVE, "lobby-1"));
+    }
+
+    @Test
+    void offlineModeCaseVariantsOnlineTogetherAreFoundOnlyByTheirOwnSpelling() {
+        PlayerRef lowerSteve = new PlayerRef(UUID.randomUUID(), "steve");
+        lobby.track.joined(STEVE);
+        lobby.track.joined(lowerSteve);
+
+        assertThat(lobby.roster.findByName("Steve")).contains(new OnlinePlayer(STEVE, "lobby-1"));
+        assertThat(lobby.roster.findByName("steve")).contains(new OnlinePlayer(lowerSteve, "lobby-1"));
+        assertThat(lobby.roster.findByName("STEVE")).isEmpty();
+    }
+
+    @Test
+    void caseVariantsHereAreNotSettledByAPlayerOnAnotherBackend() {
+        PlayerRef lowerSteve = new PlayerRef(UUID.randomUUID(), "steve");
+        lobby.track.joined(new PlayerRef(UUID.randomUUID(), "STEVE"));
+        lobby.out.deliverAll(survival.track);
+        survival.track.joined(STEVE);
+        survival.track.joined(lowerSteve);
+
+        assertThat(survival.roster.findByName("sTeVe")).isEmpty();
     }
 
     @Test
@@ -363,8 +384,9 @@ class NetworkPresenceTest {
         private final Map<String, PlayerRef> byLowerName = new HashMap<>();
 
         @Override
-        public Optional<PlayerRef> byName(String name) {
-            return Optional.ofNullable(byLowerName.get(name.toLowerCase(Locale.ROOT)));
+        public List<PlayerRef> byName(String name) {
+            PlayerRef found = byLowerName.get(name.toLowerCase(Locale.ROOT));
+            return found == null ? List.of() : List.of(found);
         }
 
         @Override

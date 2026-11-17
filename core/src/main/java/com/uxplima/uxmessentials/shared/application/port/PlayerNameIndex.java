@@ -1,6 +1,6 @@
 package com.uxplima.uxmessentials.shared.application.port;
 
-import java.util.Optional;
+import java.util.List;
 import java.util.UUID;
 
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
@@ -17,8 +17,12 @@ import com.uxplima.uxmessentials.shared.domain.PlayerRef;
  */
 public interface PlayerNameIndex {
 
-    /** The account that last joined under this name, ignoring case, or empty when the index has never seen it. */
-    Optional<PlayerRef> byName(String name);
+    /**
+     * Every account known under this name in any case, most recently seen first, each under the name it was last
+     * seen with; empty when the index has never seen it. Two accounts share a name in different cases on an
+     * offline-mode server, and an online-mode account can still hold a name another account took since.
+     */
+    List<PlayerRef> byName(String name);
 
     /** Note that {@code uuid} is joining under {@code name}. */
     void record(UUID uuid, String name);

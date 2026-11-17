@@ -127,12 +127,14 @@ public final class NetworkRoster implements NetworkPresence {
         if (wanted.isEmpty()) {
             return Optional.empty();
         }
-        Optional<OnlinePlayer> here = pickByName(
-                local.values().stream()
-                        .map(player -> new OnlinePlayer(player, localServer))
-                        .toList(),
-                wanted);
-        return here.isPresent() ? here : pickByName(remoteWinners(), wanted);
+        List<OnlinePlayer> locals = local.values().stream()
+                .map(player -> new OnlinePlayer(player, localServer))
+                .toList();
+        Optional<OnlinePlayer> here = pickByName(locals, wanted);
+        boolean heldHere =
+                locals.stream().anyMatch(presence -> presence.player().name().equalsIgnoreCase(wanted));
+        // Case variants here that name no single account are not settled by a player elsewhere either.
+        return here.isPresent() || heldHere ? here : pickByName(remoteWinners(), wanted);
     }
 
     @Override
@@ -336,16 +338,19 @@ public final class NetworkRoster implements NetworkPresence {
 
     private static Optional<OnlinePlayer> pickByName(List<OnlinePlayer> candidates, String wanted) {
         OnlinePlayer caseless = null;
+        boolean several = false;
         for (OnlinePlayer presence : candidates) {
             String name = presence.player().name();
             if (name.equals(wanted)) {
                 return Optional.of(presence);
             }
-            if (caseless == null && name.equalsIgnoreCase(wanted)) {
+            if (name.equalsIgnoreCase(wanted)) {
+                several |= caseless != null && !caseless.player().equals(presence.player());
                 caseless = presence;
             }
         }
-        return Optional.ofNullable(caseless);
+        // Two offline-mode accounts online under case variants of the name: neither is the one typed, so no guess.
+        return several ? Optional.empty() : Optional.ofNullable(caseless);
     }
 
     /** Builds the next roster of one backend from its current one. */

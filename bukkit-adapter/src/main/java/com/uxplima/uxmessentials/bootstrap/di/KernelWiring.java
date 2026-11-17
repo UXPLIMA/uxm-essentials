@@ -27,6 +27,7 @@ import com.uxplima.uxmessentials.shared.adapter.outbound.lookup.BukkitWorldLooku
 import com.uxplima.uxmessentials.shared.adapter.outbound.lookup.CachingPlayerNameIndex;
 import com.uxplima.uxmessentials.shared.adapter.outbound.lookup.IndexedPlayerLookup;
 import com.uxplima.uxmessentials.shared.adapter.outbound.lookup.OnlinePlayerIndex;
+import com.uxplima.uxmessentials.shared.adapter.outbound.lookup.ServerNameCase;
 import com.uxplima.uxmessentials.shared.adapter.outbound.message.AdventureTranslations;
 import com.uxplima.uxmessentials.shared.adapter.outbound.message.CatalogMessages;
 import com.uxplima.uxmessentials.shared.adapter.outbound.message.HoconLocaleCatalog;
@@ -256,7 +257,8 @@ final class KernelWiring {
                 new SchedulerWarmups(scheduler, permissions),
                 messages,
                 new BukkitMessageSink(scheduler, prefix, messageBridgeFactory()),
-                new IndexedPlayerLookup(new BukkitOfflineProfiles(), nameIndex, online),
+                new IndexedPlayerLookup(
+                        new BukkitOfflineProfiles(), nameIndex, online, ServerNameCase.of(plugin.getServer())),
                 new BukkitWorldLookup(),
                 new BukkitPlayerLocator(),
                 new InProcessDomainEventPublisher(log),

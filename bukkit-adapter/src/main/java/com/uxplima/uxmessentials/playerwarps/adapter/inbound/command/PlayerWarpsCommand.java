@@ -15,6 +15,7 @@ import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandRegistrat
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandSuggestions;
 import com.uxplima.uxmessentials.shared.application.permission.DestinationPermissions;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
+import com.uxplima.uxmessentials.shared.domain.NameMatch;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmlib.command.Gate;
 import com.uxplima.uxmlib.command.Sender;
@@ -68,9 +69,10 @@ public final class PlayerWarpsCommand extends PlayerWarpCommandSupport implement
             return 0;
         }
         String ownerName = ctx.getArgument("player", String.class);
-        Optional<PlayerRef> owner = services.players().findByName(ownerName);
+        NameMatch match = services.players().matchByName(ownerName);
+        Optional<PlayerRef> owner = match.player();
         if (owner.isEmpty()) {
-            unknownPlayer(Sender.audience(ctx.getSource()), ownerName);
+            unknownPlayer(Sender.audience(ctx.getSource()), ownerName, match);
             return 0;
         }
         PlayerRef viewer = ref(sender);

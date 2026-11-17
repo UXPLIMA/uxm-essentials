@@ -9,7 +9,6 @@ import java.time.ZoneOffset;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
-import java.util.Optional;
 import java.util.UUID;
 
 import com.uxplima.uxmessentials.shared.application.networkpresence.NetworkRoster;
@@ -31,8 +30,8 @@ class NetworkPresenceSyncTest {
 
     private static final PlayerNameIndex NO_NAMES = new PlayerNameIndex() {
         @Override
-        public Optional<PlayerRef> byName(String name) {
-            return Optional.empty();
+        public List<PlayerRef> byName(String name) {
+            return List.of();
         }
 
         @Override

@@ -22,6 +22,7 @@ import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandFeedback;
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandSuggestions;
 import com.uxplima.uxmessentials.shared.adapter.outbound.BukkitRefs;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
+import com.uxplima.uxmessentials.shared.domain.NameMatch;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmessentials.shared.domain.Position;
 import com.uxplima.uxmessentials.shared.domain.message.SharedMessageKey;
@@ -144,10 +145,13 @@ abstract class TeleportCommandSupport {
 
     /** Resolve a named, currently-online player to a {@link PlayerRef} and notify the actor on failure. */
     final Optional<PlayerRef> onlineTarget(PlayerRef actor, String name) {
-        Optional<PlayerRef> target = services.players().findOnlineByName(name);
+        NameMatch match = services.players().matchOnlineByName(name);
+        Optional<PlayerRef> target = match.player();
         if (target.isEmpty()) {
             services.notifier()
-                    .send(actor, TeleportError.TARGET_OFFLINE.messageKey(), java.util.Map.of("player", name));
+                    .send(
+                            actor,
+                            match.miss(TeleportError.TARGET_OFFLINE.messageKey(), java.util.Map.of("player", name)));
         }
         return target;
     }

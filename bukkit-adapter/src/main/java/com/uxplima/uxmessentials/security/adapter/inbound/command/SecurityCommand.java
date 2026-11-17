@@ -32,8 +32,10 @@ import com.uxplima.uxmessentials.shared.application.port.MessageSink;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
 import com.uxplima.uxmessentials.shared.application.port.PlayerLookup;
 import com.uxplima.uxmessentials.shared.application.port.Scheduler;
+import com.uxplima.uxmessentials.shared.domain.NameMatch;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmessentials.shared.domain.message.MessageKey;
+import com.uxplima.uxmessentials.shared.domain.message.MessageLine;
 import com.uxplima.uxmessentials.shared.domain.message.SharedMessageKey;
 import com.uxplima.uxmlib.command.Args;
 import com.uxplima.uxmlib.command.Gate;
@@ -205,9 +207,11 @@ public final class SecurityCommand extends SecurityCommandSupport implements Com
 
     /** Resolve {@code name} off-thread and run {@code action} on the match, or tell the caller there is none. */
     private void onTarget(CommandSender sender, String name, Consumer<PlayerRef> action) {
-        Optional<PlayerRef> target = lookup.findByName(name);
+        NameMatch match = lookup.matchByName(name);
+        Optional<PlayerRef> target = match.player();
         if (target.isEmpty()) {
-            notifySender(sender, SharedMessageKey.COMMAND_UNKNOWN_PLAYER, Map.of("player", name));
+            MessageLine miss = match.miss(SharedMessageKey.COMMAND_UNKNOWN_PLAYER, Map.of("player", name));
+            notifySender(sender, miss.key(), miss.args());
             return;
         }
         action.accept(target.get());

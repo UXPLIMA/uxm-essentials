@@ -26,6 +26,7 @@ import com.uxplima.uxmessentials.shared.adapter.outbound.BukkitRefs;
 import com.uxplima.uxmessentials.shared.application.permission.DestinationPermissions;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
 import com.uxplima.uxmessentials.shared.application.port.Scheduler;
+import com.uxplima.uxmessentials.shared.domain.NameMatch;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmessentials.shared.domain.Position;
 import com.uxplima.uxmlib.command.Args;
@@ -156,9 +157,10 @@ public final class HomeCommand extends HomeCommandSupport implements CommandRegi
         }
         PlayerRef actor = ref(sender);
         String name = ctx.getArgument("player", String.class);
-        Optional<PlayerRef> owner = services.players().findByName(name);
+        NameMatch ownerMatch = services.players().matchByName(name);
+        Optional<PlayerRef> owner = ownerMatch.player();
         if (owner.isEmpty()) {
-            feedback.send(sender, HomesMessageKey.HOME_ADMIN_TARGET_UNKNOWN, Map.of("player", name));
+            feedback.send(sender, ownerMatch.miss(HomesMessageKey.HOME_ADMIN_TARGET_UNKNOWN, Map.of("player", name)));
             return Command.SINGLE_SUCCESS;
         }
         PlayerRef resolved = owner.get();
@@ -182,9 +184,10 @@ public final class HomeCommand extends HomeCommandSupport implements CommandRegi
         }
         PlayerRef owner = ref(sender);
         String name = ctx.getArgument("player", String.class);
-        Optional<PlayerRef> invited = services.players().findByName(name);
+        NameMatch invitedMatch = services.players().matchByName(name);
+        Optional<PlayerRef> invited = invitedMatch.player();
         if (invited.isEmpty()) {
-            feedback.send(sender, HomesMessageKey.HOME_ADMIN_TARGET_UNKNOWN, Map.of("player", name));
+            feedback.send(sender, invitedMatch.miss(HomesMessageKey.HOME_ADMIN_TARGET_UNKNOWN, Map.of("player", name)));
             return Command.SINGLE_SUCCESS;
         }
         PlayerRef resolved = invited.get();
@@ -199,9 +202,10 @@ public final class HomeCommand extends HomeCommandSupport implements CommandRegi
         }
         PlayerRef owner = ref(sender);
         String name = ctx.getArgument("player", String.class);
-        Optional<PlayerRef> invited = services.players().findByName(name);
+        NameMatch invitedMatch = services.players().matchByName(name);
+        Optional<PlayerRef> invited = invitedMatch.player();
         if (invited.isEmpty()) {
-            feedback.send(sender, HomesMessageKey.HOME_ADMIN_TARGET_UNKNOWN, Map.of("player", name));
+            feedback.send(sender, invitedMatch.miss(HomesMessageKey.HOME_ADMIN_TARGET_UNKNOWN, Map.of("player", name)));
             return Command.SINGLE_SUCCESS;
         }
         PlayerRef resolved = invited.get();
@@ -240,9 +244,11 @@ public final class HomeCommand extends HomeCommandSupport implements CommandRegi
         Position at = BukkitRefs.toPosition(Objects.requireNonNull(sender.getLocation(), "location"));
         PlayerRef actor = ref(sender);
         String name = ctx.getArgument("player", String.class);
-        Optional<PlayerRef> resolved = services.players().findByName(name);
+        NameMatch resolvedMatch = services.players().matchByName(name);
+        Optional<PlayerRef> resolved = resolvedMatch.player();
         if (resolved.isEmpty()) {
-            feedback.send(sender, HomesMessageKey.HOME_ADMIN_TARGET_UNKNOWN, Map.of("player", name));
+            feedback.send(
+                    sender, resolvedMatch.miss(HomesMessageKey.HOME_ADMIN_TARGET_UNKNOWN, Map.of("player", name)));
             return Command.SINGLE_SUCCESS;
         }
         PlayerRef target = resolved.get();
@@ -267,9 +273,11 @@ public final class HomeCommand extends HomeCommandSupport implements CommandRegi
         Position at = BukkitRefs.toPosition(Objects.requireNonNull(sender.getLocation(), "location"));
         PlayerRef actor = ref(sender);
         String name = ctx.getArgument("player", String.class);
-        Optional<PlayerRef> resolved = services.players().findByName(name);
+        NameMatch resolvedMatch = services.players().matchByName(name);
+        Optional<PlayerRef> resolved = resolvedMatch.player();
         if (resolved.isEmpty()) {
-            feedback.send(sender, HomesMessageKey.HOME_ADMIN_TARGET_UNKNOWN, Map.of("player", name));
+            feedback.send(
+                    sender, resolvedMatch.miss(HomesMessageKey.HOME_ADMIN_TARGET_UNKNOWN, Map.of("player", name)));
             return Command.SINGLE_SUCCESS;
         }
         PlayerRef target = resolved.get();
@@ -284,9 +292,11 @@ public final class HomeCommand extends HomeCommandSupport implements CommandRegi
         }
         PlayerRef actor = ref(sender);
         String name = ctx.getArgument("player", String.class);
-        Optional<PlayerRef> resolved = services.players().findByName(name);
+        NameMatch resolvedMatch = services.players().matchByName(name);
+        Optional<PlayerRef> resolved = resolvedMatch.player();
         if (resolved.isEmpty()) {
-            feedback.send(sender, HomesMessageKey.HOME_ADMIN_TARGET_UNKNOWN, Map.of("player", name));
+            feedback.send(
+                    sender, resolvedMatch.miss(HomesMessageKey.HOME_ADMIN_TARGET_UNKNOWN, Map.of("player", name)));
             return Command.SINGLE_SUCCESS;
         }
         PlayerRef target = resolved.get();
@@ -302,9 +312,11 @@ public final class HomeCommand extends HomeCommandSupport implements CommandRegi
         PlayerRef actor = ref(sender);
         HomeSlot slot = slotArg(ctx);
         String name = ctx.getArgument("player", String.class);
-        Optional<PlayerRef> resolved = services.players().findByName(name);
+        NameMatch resolvedMatch = services.players().matchByName(name);
+        Optional<PlayerRef> resolved = resolvedMatch.player();
         if (resolved.isEmpty()) {
-            feedback.send(sender, HomesMessageKey.HOME_ADMIN_TARGET_UNKNOWN, Map.of("player", name));
+            feedback.send(
+                    sender, resolvedMatch.miss(HomesMessageKey.HOME_ADMIN_TARGET_UNKNOWN, Map.of("player", name)));
             return Command.SINGLE_SUCCESS;
         }
         PlayerRef target = resolved.get();
@@ -324,9 +336,11 @@ public final class HomeCommand extends HomeCommandSupport implements CommandRegi
             return 0;
         }
         String name = ctx.getArgument("player", String.class);
-        Optional<PlayerRef> resolved = services.players().findByName(name);
+        NameMatch resolvedMatch = services.players().matchByName(name);
+        Optional<PlayerRef> resolved = resolvedMatch.player();
         if (resolved.isEmpty()) {
-            feedback.send(sender, HomesMessageKey.HOME_ADMIN_TARGET_UNKNOWN, Map.of("player", name));
+            feedback.send(
+                    sender, resolvedMatch.miss(HomesMessageKey.HOME_ADMIN_TARGET_UNKNOWN, Map.of("player", name)));
             return Command.SINGLE_SUCCESS;
         }
         PlayerRef target = resolved.get();
@@ -344,9 +358,10 @@ public final class HomeCommand extends HomeCommandSupport implements CommandRegi
             return 0;
         }
         String name = ctx.getArgument("player", String.class);
-        Optional<PlayerRef> target = services.players().findOnlineByName(name);
+        NameMatch targetMatch = services.players().matchOnlineByName(name);
+        Optional<PlayerRef> target = targetMatch.player();
         if (target.isEmpty()) {
-            feedback.send(sender, HomesMessageKey.HOME_ADMIN_TARGET_UNKNOWN, Map.of("player", name));
+            feedback.send(sender, targetMatch.miss(HomesMessageKey.HOME_ADMIN_TARGET_UNKNOWN, Map.of("player", name)));
             return Command.SINGLE_SUCCESS;
         }
         scheduler.async(() -> verb.accept(target.get()));

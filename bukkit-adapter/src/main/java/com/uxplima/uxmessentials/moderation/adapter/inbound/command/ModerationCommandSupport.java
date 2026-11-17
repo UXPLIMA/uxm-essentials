@@ -15,9 +15,11 @@ import com.uxplima.uxmessentials.moderation.domain.ModerationMessageKey;
 import com.uxplima.uxmessentials.shared.adapter.outbound.BukkitRefs;
 import com.uxplima.uxmessentials.shared.application.port.MessageSink;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
+import com.uxplima.uxmessentials.shared.domain.NameMatch;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmessentials.shared.domain.Position;
 import com.uxplima.uxmessentials.shared.domain.message.MessageKey;
+import com.uxplima.uxmessentials.shared.domain.message.MessageLine;
 import com.uxplima.uxmessentials.shared.domain.message.SharedMessageKey;
 import com.uxplima.uxmlib.command.Sender;
 import org.jspecify.annotations.NullMarked;
@@ -57,11 +59,16 @@ abstract class ModerationCommandSupport {
                 : PlayerRef.system(sender.getName());
     }
 
-    /** The target by name, online or known offline, or empty (after a feedback line) when never seen. */
+    /**
+     * The target by name, online or known offline, or empty after a feedback line: the name was never seen, or it
+     * could mean several case variants and none is spelled as typed.
+     */
     final Optional<PlayerRef> targetByName(CommandContext<CommandSourceStack> ctx, String name) {
-        Optional<PlayerRef> target = services.targets().resolve(name);
+        NameMatch match = services.targets().resolve(name);
+        Optional<PlayerRef> target = match.player();
         if (target.isEmpty()) {
-            notify(ctx, UNKNOWN_PLAYER, Map.of("player", name));
+            MessageLine miss = match.miss(UNKNOWN_PLAYER, Map.of("player", name));
+            notify(ctx, miss.key(), miss.args());
         }
         return target;
     }

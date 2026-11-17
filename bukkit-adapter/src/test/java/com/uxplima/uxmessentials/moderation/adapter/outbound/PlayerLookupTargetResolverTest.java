@@ -8,6 +8,7 @@ import java.util.UUID;
 
 import com.uxplima.uxmessentials.shared.application.port.NetworkPresence;
 import com.uxplima.uxmessentials.shared.application.port.PlayerLookup;
+import com.uxplima.uxmessentials.shared.domain.NameCase;
 import com.uxplima.uxmessentials.shared.domain.OnlinePlayer;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import org.junit.jupiter.api.Test;
@@ -43,16 +44,27 @@ class PlayerLookupTargetResolverTest {
     @Test
     void aPlayerOnAnotherBackendIsResolvedAheadOfTheOfflineCache() {
         PlayerLookupTargetResolver resolver = new PlayerLookupTargetResolver(
-                presence(List.of(new OnlinePlayer(ONLINE_ELSEWHERE, "lobby-1"))), offlineCache);
+                presence(List.of(new OnlinePlayer(ONLINE_ELSEWHERE, "lobby-1"))), offlineCache, NameCase.INSENSITIVE);
 
-        assertThat(resolver.resolve("STEVE").map(PlayerRef::uuid)).contains(ONLINE_ELSEWHERE.uuid());
+        assertThat(resolver.resolve("STEVE").player().map(PlayerRef::uuid)).contains(ONLINE_ELSEWHERE.uuid());
     }
 
     @Test
     void aPlayerOnlineNowhereFallsBackToTheOfflineCache() {
-        PlayerLookupTargetResolver resolver = new PlayerLookupTargetResolver(presence(List.of()), offlineCache);
+        PlayerLookupTargetResolver resolver =
+                new PlayerLookupTargetResolver(presence(List.of()), offlineCache, NameCase.INSENSITIVE);
 
-        assertThat(resolver.resolve("steve").map(PlayerRef::uuid)).contains(CACHED_OWNER.uuid());
+        assertThat(resolver.resolve("steve").player().map(PlayerRef::uuid)).contains(CACHED_OWNER.uuid());
+    }
+
+    @Test
+    void offlineModePresenceSettlesOnlyTheSpellingThatWasTyped() {
+        PlayerLookupTargetResolver resolver = new PlayerLookupTargetResolver(
+                presence(List.of(new OnlinePlayer(ONLINE_ELSEWHERE, "lobby-1"))), offlineCache, NameCase.SENSITIVE);
+
+        assertThat(resolver.resolve("Steve").player().map(PlayerRef::uuid)).contains(ONLINE_ELSEWHERE.uuid());
+        // "steve" is another offline-mode account than the "Steve" online elsewhere.
+        assertThat(resolver.resolve("steve").player().map(PlayerRef::uuid)).contains(CACHED_OWNER.uuid());
     }
 
     private static NetworkPresence presence(List<OnlinePlayer> online) {
