@@ -1,6 +1,7 @@
 package com.uxplima.uxmessentials.persistence.messaging;
 
 import static com.uxplima.uxmessentials.persistence.jooq.tables.Ignores.IGNORES;
+import static com.uxplima.uxmessentials.persistence.jooq.tables.PlayerNames.PLAYER_NAMES;
 
 import java.util.List;
 import java.util.Objects;
@@ -13,6 +14,7 @@ import com.uxplima.uxmessentials.messaging.domain.IgnoreScope;
 import com.uxplima.uxmessentials.persistence.runtime.JooqRepository;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import org.jooq.DSLContext;
+import org.jspecify.annotations.Nullable;
 
 /**
  * The jOOQ-backed {@link IgnoreStore} over the generated {@code IGNORES} table. The ignore list is
@@ -22,9 +24,9 @@ import org.jooq.DSLContext;
  * treated as {@link IgnoreScope#ALL} so an ignore is never silently dropped. Every statement is typed jOOQ
  * DSL; no SQL is ever string-concatenated.
  *
- * <p>The ignored player's name is not persisted (only the uuid is). The column shape stays identical on
- * every backend, so an {@link IgnoreEntry} rebuilt from a row carries the ignored uuid with the uuid text
- * as a placeholder name; the command adapter resolves the live name for display.
+ * <p>The ignored player's name is not persisted with the ignore (only the uuid is); it is read from the name
+ * list every backend writes at each join, so the list shows the name the player last joined under. An account
+ * that list has never seen keeps the uuid text as its name.
  */
 public final class JooqIgnoreStore extends JooqRepository implements IgnoreStore {
 
@@ -35,10 +37,12 @@ public final class JooqIgnoreStore extends JooqRepository implements IgnoreStore
     @Override
     public IgnoreList load(PlayerRef owner) {
         Objects.requireNonNull(owner, "owner");
-        List<IgnoreEntry> entries = read(dsl -> dsl.selectFrom(IGNORES)
+        List<IgnoreEntry> entries = read(dsl -> dsl.select(IGNORES.IGNORED, IGNORES.SCOPE, PLAYER_NAMES.NAME)
+                .from(IGNORES)
+                .leftJoin(PLAYER_NAMES)
+                .on(PLAYER_NAMES.UUID.eq(IGNORES.IGNORED))
                 .where(IGNORES.OWNER.eq(owner.uuid().toString()))
-                .fetch()
-                .map(row -> toEntry(row.getIgnored(), row.getScope())));
+                .fetch(row -> toEntry(row.value1(), row.value2(), row.value3())));
         return IgnoreList.of(owner, entries);
     }
 
@@ -71,8 +75,9 @@ public final class JooqIgnoreStore extends JooqRepository implements IgnoreStore
                 .execute();
     }
 
-    private static IgnoreEntry toEntry(String ignoredUuid, String scope) {
+    private static IgnoreEntry toEntry(String ignoredUuid, String scope, @Nullable String name) {
         UUID uuid = UUID.fromString(ignoredUuid);
-        return new IgnoreEntry(new PlayerRef(uuid, ignoredUuid), IgnoreScope.fromStored(scope));
+        String shown = name == null || name.isBlank() ? ignoredUuid : name;
+        return new IgnoreEntry(new PlayerRef(uuid, shown), IgnoreScope.fromStored(scope));
     }
 }
