@@ -97,9 +97,7 @@ public final class RanksCommand implements CommandRegistration {
     public LiteralCommandNode<CommandSourceStack> build() {
         LiteralArgumentBuilder<CommandSourceStack> root = Commands.literal("ranks")
                 .requires(Gate.permission(PERMISSION).or(Gate.permission(GUI_PERMISSION)))
-                .then(Commands.literal("setrank")
-                        .requires(Gate.permission(PERMISSION))
-                        .then(setRank.arguments()));
+                .then(setRank.under(Commands.literal("setrank").requires(Gate.permission(PERMISSION))));
         // The no-argument branch is always wired. Which answer it gives is the GUI switch: the panel when it
         // is on, the line when it is off. The self-service node gates both, because both are the same
         // question asked two ways.

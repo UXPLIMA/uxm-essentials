@@ -115,11 +115,15 @@ public final class RanksWiring {
         PlayerRankRepository repository = RankSync.repository(cache, bus.publisher(), kernel.log());
         CurrentRank currentRank = new CurrentRank(cache, ladder);
         RankRequirementEvaluator requirements = requirementEvaluator(plugin, kernel, persistence, currentRank, economy);
+        // Kept actions are announced on the bus, so the backend the player is on runs them now; the take deletes each
+        // row first, so that backend and a later join can never both run one line.
         RankActions actions = new RankActions(
                 actionRunner(plugin, kernel),
-                PlayerRankRepositories.pendingActions(persistence),
+                RankSync.pendingActions(
+                        PlayerRankRepositories.pendingActions(persistence), bus.publisher(), kernel.log()),
                 kernel.scheduler(),
                 kernel.log());
+        bus.registry().register(RankSync.actionsListener(actions, kernel.playerLookup()));
         Rankup rankup = new Rankup(
                 currentRank,
                 repository,

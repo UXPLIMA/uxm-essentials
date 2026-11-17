@@ -54,7 +54,8 @@ public sealed interface NetworkMessage
                 AllBalancesChanged,
                 PermissionQueryFrame,
                 ProxyConnectionFrame,
-                PlayerSkinChanged {
+                PlayerSkinChanged,
+                RankActionsKept {
 
     /** The {@code server-id} of the backend that produced this frame; the loop sentinel keys on it. */
     String originServer();
@@ -103,7 +104,8 @@ public sealed interface NetworkMessage
         ALL_BALANCES_CHANGED(33),
         PERMISSION_QUERY(34),
         PROXY_CONNECTION(35),
-        PLAYER_SKIN_CHANGED(36);
+        PLAYER_SKIN_CHANGED(36),
+        RANK_ACTIONS_KEPT(39);
 
         private final byte wireTag;
 

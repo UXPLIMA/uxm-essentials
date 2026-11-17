@@ -42,9 +42,7 @@ public final class SetRankCommand implements CommandRegistration {
 
     @Override
     public LiteralCommandNode<CommandSourceStack> build() {
-        return Commands.literal("setrank")
-                .requires(Gate.permission(PERMISSION))
-                .then(setRank.arguments())
+        return setRank.under(Commands.literal("setrank").requires(Gate.permission(PERMISSION)))
                 .build();
     }
 

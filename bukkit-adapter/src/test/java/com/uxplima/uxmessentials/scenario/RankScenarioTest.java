@@ -65,15 +65,26 @@ class RankScenarioTest {
     }
 
     @Test
-    void aBedrockPlayerWithAPrefixTheNameCheckDoesNotKnowGetsTheLinesThatNameTheirAccount() {
+    void aSelectorStillPicksThePlayerOnlineHere() {
+        ScenarioPlayer player = running.join("Selma");
+        player.setOp(true);
+
+        running.run(player, "setrank @s second");
+
+        Optional<UxmRankStanding> standing = running.await(ranks().standingOf(player.getUniqueId()));
+        assertThat(standing).map(found -> found.rank().id()).contains("second");
+        assertThat(running.problems()).isEmpty();
+    }
+
+    @Test
+    void aBedrockPlayerWithAPrefixTheAccountNameCheckDoesNotKnowGetsEveryLine() {
         ScenarioPlayer player = running.join("#Bea");
         RunningPlugin.said(player);
 
         running.run(player, "rankup");
 
-        assertThat(RunningPlugin.said(player))
-                .contains("account " + player.getUniqueId())
-                .noneMatch(line -> line.startsWith("name "));
+        assertThat(RunningPlugin.said(player)).contains("account " + player.getUniqueId(), "name #Bea");
+        assertThat(running.problems()).isEmpty();
     }
 
     private UxmRanksQuery ranks() {

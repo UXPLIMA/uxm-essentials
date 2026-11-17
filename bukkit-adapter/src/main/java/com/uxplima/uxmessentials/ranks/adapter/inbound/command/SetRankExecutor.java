@@ -10,10 +10,15 @@ import org.bukkit.entity.Player;
 
 import io.papermc.paper.command.brigadier.CommandSourceStack;
 import io.papermc.paper.command.brigadier.Commands;
+import io.papermc.paper.command.brigadier.argument.ArgumentTypes;
+import io.papermc.paper.command.brigadier.argument.resolvers.selector.PlayerSelectorArgumentResolver;
 
 import com.mojang.brigadier.Command;
 import com.mojang.brigadier.builder.ArgumentBuilder;
+import com.mojang.brigadier.builder.LiteralArgumentBuilder;
 import com.mojang.brigadier.context.CommandContext;
+import com.mojang.brigadier.context.ParsedCommandNode;
+import com.mojang.brigadier.exceptions.CommandSyntaxException;
 import com.uxplima.uxmessentials.ranks.application.SetRank;
 import com.uxplima.uxmessentials.ranks.domain.Rank;
 import com.uxplima.uxmessentials.ranks.domain.RankId;
@@ -53,6 +58,10 @@ import org.jspecify.annotations.NullMarked;
 @NullMarked
 final class SetRankExecutor {
 
+    private static final String TARGETS = "targets";
+    private static final String PLAYER = "player";
+    private static final String RANK = "rank";
+
     private final SetRank setRank;
     private final RankLadder ladder;
     private final PlayerLookup players;
@@ -75,50 +84,120 @@ final class SetRankExecutor {
         this.feedback = new CommandFeedback(Objects.requireNonNull(messages, "messages"));
     }
 
-    /** A fresh {@code <player> <rank>} argument subtree, wired with target/rank suggestions and the set executor. */
-    ArgumentBuilder<CommandSourceStack, ?> arguments() {
-        return CommandSuggestions.playerArgument("player")
-                .then(Commands.argument("rank", Args.token())
-                        .suggests(CommandSuggestions.fromStrings(this::rankIds))
-                        .executes(this::run));
+    /**
+     * The {@code <player> <rank>} argument subtrees. A selector ({@code @p}, {@code @a[tag=vip]}) is read by the
+     * vanilla parser and resolved the usual way, so a command block keeps working; it names the players online here.
+     * A name goes to {@link PlayerLookup} instead, whichever branch read it: the vanilla parser also reads a plain
+     * name, but answers only for a player online here and settles case on its own. A name the vanilla parser
+     * refuses, such as a Bedrock name with a {@code #} prefix, is read by the second branch.
+     */
+    LiteralArgumentBuilder<CommandSourceStack> under(LiteralArgumentBuilder<CommandSourceStack> literal) {
+        return literal.then(Commands.argument(TARGETS, ArgumentTypes.players())
+                        .suggests(CommandSuggestions.onlinePlayers())
+                        .then(rankArgument(this::runSelected)))
+                .then(CommandSuggestions.playerArgument(PLAYER).then(rankArgument(this::runNamed)));
+    }
+
+    private ArgumentBuilder<CommandSourceStack, ?> rankArgument(Command<CommandSourceStack> run) {
+        return Commands.argument(RANK, Args.token())
+                .suggests(CommandSuggestions.fromStrings(this::rankIds))
+                .executes(run);
     }
 
     private List<String> rankIds() {
         return ladder.ranks().stream().map(rank -> rank.id().value()).toList();
     }
 
-    private int run(CommandContext<CommandSourceStack> ctx) {
+    /** The selector branch: a selector resolves to the players online here, a plain name goes to the lookup. */
+    private int runSelected(CommandContext<CommandSourceStack> ctx) throws CommandSyntaxException {
+        String typed = raw(ctx, TARGETS);
+        if (!typed.startsWith("@")) {
+            return runByName(ctx, typed);
+        }
         CommandSender sender = Sender.audience(ctx.getSource());
-        String name = ctx.getArgument("player", String.class);
-        RankId rankId = RankId.of(ctx.getArgument("rank", String.class));
-        if (!ladder.contains(rankId)) {
-            feedback.send(sender, RanksMessageKey.RANKS_SETRANK_UNKNOWN_RANK, Map.of("rank", rankId.value()));
+        Optional<RankId> rankId = rankOf(ctx, sender);
+        if (rankId.isEmpty()) {
+            return 0;
+        }
+        List<Player> selected =
+                ctx.getArgument(TARGETS, PlayerSelectorArgumentResolver.class).resolve(ctx.getSource());
+        if (selected.isEmpty()) {
+            feedback.send(sender, SharedMessageKey.COMMAND_UNKNOWN_PLAYER, Map.of("player", typed));
+            return 0;
+        }
+        for (Player player : selected) {
+            PlayerRef who = BukkitRefs.toRef(player);
+            scheduler.async(() -> set(sender, who, rankId.get()));
+        }
+        return Command.SINGLE_SUCCESS;
+    }
+
+    /** The name branch, for a name the vanilla parser refuses. */
+    private int runNamed(CommandContext<CommandSourceStack> ctx) {
+        return runByName(ctx, ctx.getArgument(PLAYER, String.class));
+    }
+
+    private int runByName(CommandContext<CommandSourceStack> ctx, String name) {
+        CommandSender sender = Sender.audience(ctx.getSource());
+        Optional<RankId> rankId = rankOf(ctx, sender);
+        if (rankId.isEmpty()) {
             return 0;
         }
         scheduler.async(() -> {
+            NameMatch match;
             try {
-                NameMatch match = players.matchByName(name);
-                Optional<PlayerRef> target = match.player();
-                if (target.isEmpty()) {
-                    reply(sender, match.miss(SharedMessageKey.COMMAND_UNKNOWN_PLAYER, Map.of("player", name)));
-                    return;
-                }
-                PlayerRef who = target.get();
-                Optional<Rank> set = setRank.setRank(who.uuid(), rankId);
-                if (set.isEmpty()) {
-                    reply(sender, RanksMessageKey.RANKS_SETRANK_UNKNOWN_RANK, Map.of("rank", rankId.value()));
-                    return;
-                }
-                reply(
-                        sender,
-                        RanksMessageKey.RANKS_SETRANK_SUCCESS,
-                        Map.of("player", who.name(), "rank", set.get().displayName()));
+                match = players.matchByName(name);
             } catch (RuntimeException failure) {
-                log.error("failed to set the rank of player " + name, failure);
+                log.error("failed to look up player " + name + " to set their rank", failure);
                 reply(sender, SharedMessageKey.COMMAND_ERROR, Map.of());
+                return;
             }
+            Optional<PlayerRef> target = match.player();
+            if (target.isEmpty()) {
+                reply(sender, match.miss(SharedMessageKey.COMMAND_UNKNOWN_PLAYER, Map.of("player", name)));
+                return;
+            }
+            set(sender, target.get(), rankId.get());
         });
         return Command.SINGLE_SUCCESS;
+    }
+
+    /** The rank argument, or empty after telling the sender when it names no rung. */
+    private Optional<RankId> rankOf(CommandContext<CommandSourceStack> ctx, CommandSender sender) {
+        RankId rankId = RankId.of(ctx.getArgument(RANK, String.class));
+        if (!ladder.contains(rankId)) {
+            feedback.send(sender, RanksMessageKey.RANKS_SETRANK_UNKNOWN_RANK, Map.of("rank", rankId.value()));
+            return Optional.empty();
+        }
+        return Optional.of(rankId);
+    }
+
+    /** On the async lane: write the rank and tell the sender. */
+    private void set(CommandSender sender, PlayerRef who, RankId rankId) {
+        try {
+            Optional<Rank> set = setRank.setRank(who.uuid(), rankId);
+            if (set.isEmpty()) {
+                reply(sender, RanksMessageKey.RANKS_SETRANK_UNKNOWN_RANK, Map.of("rank", rankId.value()));
+                return;
+            }
+            reply(
+                    sender,
+                    RanksMessageKey.RANKS_SETRANK_SUCCESS,
+                    Map.of("player", who.name(), "rank", set.get().displayName()));
+        } catch (RuntimeException failure) {
+            log.error("failed to set the rank of player " + who.uuid(), failure);
+            reply(sender, SharedMessageKey.COMMAND_ERROR, Map.of());
+        }
+    }
+
+    /** The text the sender typed for argument {@code name}. */
+    private static String raw(CommandContext<CommandSourceStack> ctx, String name) {
+        for (ParsedCommandNode<CommandSourceStack> node : ctx.getNodes()) {
+            if (node.getNode().getName().equals(name)) {
+                return node.getRange().get(ctx.getInput());
+            }
+        }
+        throw new IllegalStateException("no argument " + name + " in " + ctx.getInput());
     }
 
     private void reply(CommandSender sender, MessageKey key, Map<String, String> placeholders) {
