@@ -125,8 +125,11 @@ public final class CachingPlayerNameIndex implements PlayerNameIndex {
         this.clock = Objects.requireNonNull(clock, "clock");
     }
 
-    /** The holders the store confirmed under one name, at {@code at} on the index's clock. */
-    private record Confirmed(List<PlayerRef> holders, long at) {}
+    /**
+     * The holders the store confirmed under one name, at {@code at} on the index's clock, read while {@code heard}
+     * names had been recorded or learned: good only while no other name has been since.
+     */
+    private record Confirmed(List<PlayerRef> holders, long at, long heard) {}
 
     /**
      * Attach the durable store and warm the map with its {@code warmLimit} most recently seen rows. Reads the
@@ -212,11 +215,11 @@ public final class CachingPlayerNameIndex implements PlayerNameIndex {
             return byName(name);
         }
         long now = clock.getAsLong();
+        long heardBefore = heard.get();
         Confirmed known = confirmed.get(key);
-        if (known != null && now - known.at() < CONFIRMED_FOR_MILLIS) {
+        if (known != null && known.heard() == heardBefore && now - known.at() < CONFIRMED_FOR_MILLIS) {
             return known.holders();
         }
-        long heardBefore = heard.get();
         List<PlayerName> found;
         try {
             found = confirm(store, name, now);
@@ -225,12 +228,11 @@ public final class CachingPlayerNameIndex implements PlayerNameIndex {
             return byName(name);
         }
         List<PlayerRef> holders = found.stream().map(PlayerName::ref).toList();
-        if (heard.get() == heardBefore) {
-            if (confirmed.size() >= CONFIRMED_NAMES) {
-                confirmed.clear();
-            }
-            confirmed.put(key, new Confirmed(holders, now));
+        if (confirmed.size() >= CONFIRMED_NAMES) {
+            confirmed.clear();
         }
+        // Kept with the count it was read at, so a name heard while the store was read leaves it unused.
+        confirmed.put(key, new Confirmed(holders, now, heardBefore));
         return holders;
     }
 
@@ -378,14 +380,17 @@ public final class CachingPlayerNameIndex implements PlayerNameIndex {
             return;
         }
         PlayerName row = new PlayerName(uuid, trimmed, System.currentTimeMillis());
+        PlayerNameRepository store = repository.get();
+        // Until the row is written, this join stands against whatever the store still says of the account. Marked
+        // before it is remembered, so a read of the store already under way cannot put the old name back meanwhile.
+        if (store != null) {
+            unwritten.merge(uuid, 1, Integer::sum);
+        }
         remember(row);
         nameHeard();
-        PlayerNameRepository store = repository.get();
         if (store == null) {
             return;
         }
-        // Until the row is written, this join stands against whatever the store still says of the account.
-        unwritten.merge(uuid, 1, Integer::sum);
         scheduler.async(() -> {
             try {
                 store.upsert(row);
@@ -417,12 +422,13 @@ public final class CachingPlayerNameIndex implements PlayerNameIndex {
         if (trimmed.isEmpty()) {
             return;
         }
-        remember(new PlayerName(uuid, trimmed, System.currentTimeMillis()));
         long now = clock.getAsLong();
         if (learnedAt.size() > CONFIRMED_NAMES) {
             learnedAt.values().removeIf(at -> now - at >= LEARNED_STANDS_MILLIS);
         }
+        // Marked before it is remembered, as a join is.
         learnedAt.put(uuid, now);
+        remember(new PlayerName(uuid, trimmed, System.currentTimeMillis()));
         nameHeard();
         PlayerNameRepository store = repository.get();
         if (store != null) {

@@ -475,6 +475,39 @@ class IndexedPlayerLookupTest {
     }
 
     @Test
+    void aConfirmationReadWhileANameWasHeardIsNotServedAfterwards() {
+        PlayerRef bob = new PlayerRef(UUID.randomUUID(), "Bob");
+        StoredNames store = new StoredNames();
+        store.upsert(new PlayerName(ALEX.uuid(), ALEX.name(), 100L));
+        names.backWith(store, 10);
+        // While the store is read for "alex", another backend announces Bob: the answer read may be out of date.
+        store.duringNextRead = () -> names.learn(bob.uuid(), bob.name());
+        onlineMode.matchByName("alex");
+        int reads = store.reads;
+
+        onlineMode.matchByName("alex");
+
+        assertThat(store.reads).isGreaterThan(reads);
+    }
+
+    @Test
+    void aJoinHereWhileTheStoreIsReadIsNotUndoneByWhatTheReadFound() {
+        PlayerRef first = new PlayerRef(UUID.randomUUID(), "Bob");
+        PlayerRef renamed = new PlayerRef(UUID.randomUUID(), "Rob");
+        StoredNames store = new StoredNames();
+        store.upsert(new PlayerName(first.uuid(), first.name(), 100L));
+        // What the store still says of the second account, which is about to join here under a new name.
+        store.upsert(new PlayerName(renamed.uuid(), "bob", 200L));
+        names.backWith(store, 10);
+        store.duringNextRead = () -> names.record(renamed.uuid(), renamed.name());
+
+        onlineMode.matchByName("Bob");
+
+        assertThat(names.byUuid(renamed.uuid())).contains(renamed);
+        assertThat(names.byName("bob")).doesNotContain(new PlayerRef(renamed.uuid(), "bob"));
+    }
+
+    @Test
     void offlineModeTheServerCacheAnswersOnlyForTheSpellingTyped() {
         server.profiles.put(STEVE.uuid(), STEVE);
 
@@ -556,6 +589,8 @@ class IndexedPlayerLookupTest {
         int reads;
         /** Whether the database is down, so every read fails. */
         boolean unreachable;
+        /** Run once in the middle of the next read of a name, as another thread would act while it waits on the store. */
+        @org.jspecify.annotations.Nullable Runnable duringNextRead;
 
         private void read() {
             if (unreachable) {
@@ -572,10 +607,16 @@ class IndexedPlayerLookupTest {
         @Override
         public List<PlayerName> underName(String name, int limit) {
             read();
-            return newestFirst()
+            List<PlayerName> found = newestFirst()
                     .filter(row -> row.name().equalsIgnoreCase(name.strip()))
                     .limit(limit)
                     .toList();
+            Runnable meanwhile = duringNextRead;
+            duringNextRead = null;
+            if (meanwhile != null) {
+                meanwhile.run();
+            }
+            return found;
         }
 
         @Override
