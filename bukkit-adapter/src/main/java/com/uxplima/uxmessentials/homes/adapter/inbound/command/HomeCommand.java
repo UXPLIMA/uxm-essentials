@@ -1,8 +1,6 @@
 package com.uxplima.uxmessentials.homes.adapter.inbound.command;
 
-import java.util.Map;
 import java.util.Objects;
-import java.util.Optional;
 
 import org.bukkit.entity.Player;
 
@@ -27,7 +25,6 @@ import com.uxplima.uxmessentials.shared.adapter.outbound.BukkitRefs;
 import com.uxplima.uxmessentials.shared.application.permission.DestinationPermissions;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
 import com.uxplima.uxmessentials.shared.application.port.Scheduler;
-import com.uxplima.uxmessentials.shared.domain.NameMatch;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmessentials.shared.domain.Position;
 import com.uxplima.uxmlib.command.Args;
@@ -55,8 +52,8 @@ import org.jspecify.annotations.NullMarked;
  * <p>Per-subcommand permissions are enforced by a {@code Gate} on each node, so only
  * {@code home} is a command-catalog id; the subcommands are literals inside the tree. Each subcommand keeps
  * its prior behaviour: targets resolve via the offline-capable
- * {@link com.uxplima.uxmessentials.shared.application.port.PlayerLookup#matchByName} on the async lane (only
- * {@code admin tp} needs the target online), and repository I/O runs off the tick thread via the injected
+ * {@link com.uxplima.uxmessentials.shared.application.port.PlayerLookup#matchByName} on the async lane, so the
+ * owner of the homes may be offline or on another server, and repository I/O runs off the tick thread via the injected
  * {@link Scheduler}.
  */
 @NullMarked
@@ -205,8 +202,8 @@ public final class HomeCommand extends HomeCommandSupport implements CommandRegi
     }
 
     private int runAdminTeleport(CommandContext<CommandSourceStack> ctx) {
-        // tp requires the actor to be online: the actor teleports.
-        return dispatchOnlineTarget(ctx, target -> services.homeAdmin().teleport(refOf(ctx), target, slotArg(ctx)));
+        // The actor travels, so only the actor must be here; the home's owner may be offline or on another server.
+        return dispatchOfflineTarget(ctx, target -> services.homeAdmin().teleport(refOf(ctx), target, slotArg(ctx)));
     }
 
     private int runAdminSetWithSlot(CommandContext<CommandSourceStack> ctx) {
@@ -288,26 +285,6 @@ public final class HomeCommand extends HomeCommandSupport implements CommandRegi
         }
         String name = ctx.getArgument("player", String.class);
         resolveOffTick(sender, name, verb);
-        return Command.SINGLE_SUCCESS;
-    }
-
-    /**
-     * Resolve target online-only (for verbs like {@code tp} where the actor is the one moving).
-     */
-    private int dispatchOnlineTarget(
-            CommandContext<CommandSourceStack> ctx, java.util.function.Consumer<PlayerRef> verb) {
-        Player sender = player(ctx);
-        if (sender == null) {
-            return 0;
-        }
-        String name = ctx.getArgument("player", String.class);
-        NameMatch targetMatch = services.players().matchOnlineByName(name);
-        Optional<PlayerRef> target = targetMatch.player();
-        if (target.isEmpty()) {
-            feedback.send(sender, targetMatch.miss(HomesMessageKey.HOME_ADMIN_TARGET_UNKNOWN, Map.of("player", name)));
-            return Command.SINGLE_SUCCESS;
-        }
-        scheduler.async(() -> verb.accept(target.get()));
         return Command.SINGLE_SUCCESS;
     }
 

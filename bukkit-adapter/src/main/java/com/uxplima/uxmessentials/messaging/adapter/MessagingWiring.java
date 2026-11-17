@@ -158,7 +158,8 @@ public final class MessagingWiring {
                         new UnreadMailNotice(
                                 stores.mail(),
                                 new BukkitMessageDelivery(kernel.messages(), kernel.messageSink()),
-                                kernel.log()),
+                                kernel.log(),
+                                presence),
                         kernel.scheduler()));
         network.bind(services.relay(), services.helpOp(), services.sendMail());
         bus.registry().register(network::onFrame);

@@ -20,6 +20,7 @@ import com.mojang.brigadier.suggestion.SuggestionProvider;
 import com.uxplima.uxmessentials.playerstate.adapter.PlayerStateServices;
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandFeedback;
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandSuggestions;
+import com.uxplima.uxmessentials.shared.adapter.inbound.command.PlayerArgument;
 import com.uxplima.uxmessentials.shared.adapter.outbound.BukkitRefs;
 import com.uxplima.uxmessentials.shared.application.permission.PlayerstatePermissions;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
@@ -81,8 +82,8 @@ abstract class PlayerstateCommandSupport {
      * otherwise the no-permission rejection is sent and the list is empty. A selector that matches no online
      * player yields the unknown-player rejection and an empty list.
      *
-     * <p>The argument is a {@link io.papermc.paper.command.brigadier.argument.ArgumentTypes#players()} selector,
-     * so {@code @a} parses and resolves to every online player. The caller applies its per-player effect once
+     * <p>The argument is a {@link PlayerArgument#players()}, so {@code @a} parses and resolves to every online
+     * player, and a name resolves through the plugin's lookup. The caller applies its per-player effect once
      * per returned target; each target carries its own uuid, so the effect adapter hops to the correct region
      * thread for each. A single name still resolves to a one-element list, leaving the single-target path
      * unchanged.
@@ -123,8 +124,8 @@ abstract class PlayerstateCommandSupport {
     }
 
     /**
-     * Resolve the optional {@code player} selector argument to a single target, taking the first match of an
-     * {@link io.papermc.paper.command.brigadier.argument.ArgumentTypes#player()} argument. Used by the
+     * Resolve the optional {@code player} selector argument to a single target, taking the first match of a
+     * {@link PlayerArgument#player()} argument. Used by the
      * single-target write verbs that keep a selector by design ({@code /clearinventory}, {@code /exp}), where
      * naming one player via a selector is reasonable. The single-target <em>read</em> verbs ({@code /playtime},
      * {@code /getpos}, {@code /ping}) deliberately do <em>not</em> use this. They take a plain name through
@@ -228,25 +229,16 @@ abstract class PlayerstateCommandSupport {
         try {
             List<Player> resolved = resolver.resolve(ctx.getSource());
             if (resolved.isEmpty()) {
-                reply(sender, UNKNOWN_PLAYER, Map.of("player", typedTarget(ctx)));
+                feedback.send(sender, PlayerArgument.miss(ctx, "player", UNKNOWN_PLAYER));
                 return List.of();
             }
             return resolved.stream().map(BukkitRefs::toRef).toList();
         } catch (CommandSyntaxException unmatched) {
             // A name with no online player, or a selector that matched nothing, surfaced to the sender as the
             // same unknown-player rejection the name path used, never as a raw Brigadier parse error.
-            reply(sender, UNKNOWN_PLAYER, Map.of("player", typedTarget(ctx)));
+            feedback.send(sender, PlayerArgument.miss(ctx, "player", UNKNOWN_PLAYER));
             return List.of();
         }
-    }
-
-    /** The raw text the sender typed for the {@code player} argument, for the unknown-player rejection. */
-    private static String typedTarget(CommandContext<CommandSourceStack> ctx) {
-        return ctx.getNodes().stream()
-                .filter(node -> "player".equals(node.getNode().getName()))
-                .findFirst()
-                .map(node -> node.getRange().get(ctx.getInput()))
-                .orElse("");
     }
 
     private Optional<PlayerSelectorArgumentResolver> selector(CommandContext<CommandSourceStack> ctx) {

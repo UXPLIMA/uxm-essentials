@@ -128,7 +128,7 @@ way.
 | `/home admin <player> info <slot>` | `uxmessentials.home.admin` | Shows the details of one home. |
 | `/home setserver <from> <to>` | `uxmessentials.home.setserver` | Moves every home recorded on one server to another, without moving any home. |
 
-Slots in commands count from 1, as in the grid. Other nodes: `uxmessentials.home.icon` (pick an icon, everyone),
+Slots in commands count from 1, as in the grid. The `<player>` of the admin commands, of `visit` and of the invites may be offline or on another server. Other nodes: `uxmessentials.home.icon` (pick an icon, everyone),
 `uxmessentials.bypass.safety.home` (no warning before an unsafe teleport, and landing at an unsafe home on another
 server, operators).
 

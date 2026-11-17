@@ -7,7 +7,6 @@ import org.bukkit.entity.Player;
 
 import io.papermc.paper.command.brigadier.CommandSourceStack;
 import io.papermc.paper.command.brigadier.Commands;
-import io.papermc.paper.command.brigadier.argument.ArgumentTypes;
 import io.papermc.paper.command.brigadier.argument.resolvers.selector.PlayerSelectorArgumentResolver;
 
 import com.mojang.brigadier.builder.RequiredArgumentBuilder;
@@ -26,10 +25,11 @@ import org.jspecify.annotations.NullMarked;
  * entity selector. An entity selector such as {@code @e} is still rejected at parse time if typed by hand: it
  * is simply no longer offered, so the completion list no longer advertises a token the command cannot use.
  *
- * <p>This deliberately wraps {@link ArgumentTypes#players()} rather than {@link ArgumentTypes#player()}: the
+ * <p>This deliberately wraps {@link PlayerArgument#players()} rather than {@link PlayerArgument#player()}: the
  * single-target form rejects a selector that matches more than one entity at parse time, which is exactly the
  * behaviour we are fixing. The plural form parses {@code @a} and hands back the whole list, and a single name
- * still resolves to a one-element list, so the single-name path is unchanged. The resolver runs synchronously
+ * resolves through the plugin's lookup to a one-element list, or to none with {@link PlayerArgument#miss} saying
+ * why. The resolver runs synchronously
  * on the command (tick) thread; callers iterate the returned list and schedule each player's effect onto that
  * player's own region/entity thread.
  */
@@ -45,7 +45,7 @@ public final class PlayerTargets {
      */
     public static RequiredArgumentBuilder<CommandSourceStack, PlayerSelectorArgumentResolver> players(String name) {
         Objects.requireNonNull(name, "name");
-        return Commands.argument(name, ArgumentTypes.players()).suggests(CommandSuggestions.playerTargets());
+        return Commands.argument(name, PlayerArgument.players()).suggests(CommandSuggestions.playerTargets());
     }
 
     /**

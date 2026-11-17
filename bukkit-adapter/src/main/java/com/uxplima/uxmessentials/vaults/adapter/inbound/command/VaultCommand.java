@@ -12,7 +12,6 @@ import org.bukkit.entity.Player;
 
 import io.papermc.paper.command.brigadier.CommandSourceStack;
 import io.papermc.paper.command.brigadier.Commands;
-import io.papermc.paper.command.brigadier.argument.ArgumentTypes;
 import io.papermc.paper.command.brigadier.argument.resolvers.selector.PlayerSelectorArgumentResolver;
 
 import com.mojang.brigadier.Command;
@@ -26,6 +25,7 @@ import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandFeedback;
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandRegistration;
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandSuggestions;
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.OffTickNames;
+import com.uxplima.uxmessentials.shared.adapter.inbound.command.PlayerArgument;
 import com.uxplima.uxmessentials.shared.adapter.outbound.BukkitRefs;
 import com.uxplima.uxmessentials.shared.application.permission.DestinationPermissions;
 import com.uxplima.uxmessentials.shared.application.port.Scheduler;
@@ -129,7 +129,7 @@ public final class VaultCommand implements CommandRegistration {
                                                 StringArgumentType.getString(ctx, "material"))))))
                 .then(Commands.argument("n", IntegerArgumentType.integer(1))
                         .executes(ctx -> openOwn(ctx, ctx.getArgument("n", Integer.class))))
-                .then(Commands.argument(TARGET, ArgumentTypes.player())
+                .then(Commands.argument(TARGET, PlayerArgument.player())
                         .suggests(CommandSuggestions.singlePlayerTarget())
                         .requires(Gate.permission(OTHERS))
                         .executes(ctx -> openSelected(ctx, DEFAULT_INDEX))

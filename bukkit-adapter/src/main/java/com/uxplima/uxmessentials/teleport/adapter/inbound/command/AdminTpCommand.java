@@ -1,6 +1,5 @@
 package com.uxplima.uxmessentials.teleport.adapter.inbound.command;
 
-import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
 
@@ -9,8 +8,6 @@ import org.bukkit.entity.Player;
 
 import io.papermc.paper.command.brigadier.CommandSourceStack;
 import io.papermc.paper.command.brigadier.Commands;
-import io.papermc.paper.command.brigadier.argument.ArgumentTypes;
-import io.papermc.paper.command.brigadier.argument.resolvers.selector.PlayerSelectorArgumentResolver;
 
 import com.mojang.brigadier.Command;
 import com.mojang.brigadier.arguments.DoubleArgumentType;
@@ -19,12 +16,14 @@ import com.mojang.brigadier.exceptions.CommandSyntaxException;
 import com.mojang.brigadier.tree.LiteralCommandNode;
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandRegistration;
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandSuggestions;
+import com.uxplima.uxmessentials.shared.adapter.inbound.command.PlayerArgument;
 import com.uxplima.uxmessentials.shared.adapter.outbound.BukkitRefs;
 import com.uxplima.uxmessentials.shared.application.permission.TeleportPermissions;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmessentials.shared.domain.Position;
 import com.uxplima.uxmessentials.shared.domain.WorldRef;
+import com.uxplima.uxmessentials.shared.domain.message.SharedMessageKey;
 import com.uxplima.uxmessentials.teleport.adapter.TeleportRefs;
 import com.uxplima.uxmessentials.teleport.adapter.TeleportServices;
 import com.uxplima.uxmessentials.teleport.application.CrossServerStaffTeleport.Named;
@@ -84,11 +83,11 @@ public final class AdminTpCommand extends TeleportCommandSupport implements Comm
 
     @Override
     public LiteralCommandNode<CommandSourceStack> build() {
-        var player = Commands.argument("player", ArgumentTypes.player())
+        var player = Commands.argument("player", PlayerArgument.player())
                 .suggests(CommandSuggestions.singlePlayerTarget())
                 .executes(this::run);
         if (pull == Pull.GO) {
-            player.then(Commands.argument("destination", ArgumentTypes.player())
+            player.then(Commands.argument("destination", PlayerArgument.player())
                     .suggests(CommandSuggestions.singlePlayerTarget())
                     .executes(this::runBetweenPlayers));
         }
@@ -99,7 +98,7 @@ public final class AdminTpCommand extends TeleportCommandSupport implements Comm
         if (pull == Pull.GO) {
             root.then(Commands.literal("at")
                     .requires(Gate.permission(POSITION_PERMISSION))
-                    .then(Commands.argument("player", ArgumentTypes.player())
+                    .then(Commands.argument("player", PlayerArgument.player())
                             .suggests(CommandSuggestions.singlePlayerTarget())
                             .then(positionArguments(this::runTargetPosition))));
             root.then(Commands.argument("x", DoubleArgumentType.doubleArg())
@@ -139,6 +138,7 @@ public final class AdminTpCommand extends TeleportCommandSupport implements Comm
         }
         Optional<Player> target = resolveTarget(ctx);
         if (target.isEmpty()) {
+            unknown(ctx, "player");
             return 0;
         }
         move(sender, target.get());
@@ -185,6 +185,7 @@ public final class AdminTpCommand extends TeleportCommandSupport implements Comm
         Optional<Player> subject = resolveTarget(ctx, "player");
         Optional<Player> destination = resolveTarget(ctx, "destination");
         if (subject.isEmpty() || destination.isEmpty()) {
+            unknown(ctx, subject.isEmpty() ? "player" : "destination");
             return 0;
         }
         PlayerRef subjectRef = ref(subject.get());
@@ -218,8 +219,12 @@ public final class AdminTpCommand extends TeleportCommandSupport implements Comm
     /** {@code /tp at <player> <world> <x> <y> <z> [yaw pitch]} for deterministic console automation. */
     private int runTargetPosition(CommandContext<CommandSourceStack> ctx) throws CommandSyntaxException {
         Optional<Player> subject = resolveTarget(ctx, "player");
+        if (subject.isEmpty()) {
+            unknown(ctx, "player");
+            return 0;
+        }
         Position destination = explicitPosition(ctx);
-        if (subject.isEmpty() || destination == null) {
+        if (destination == null) {
             return 0;
         }
         hop(ref(subject.get()), destination);
@@ -260,17 +265,20 @@ public final class AdminTpCommand extends TeleportCommandSupport implements Comm
 
     // These verbs are deliberately single-target: GO moves the sender to one player and BRING moves one player
     // to the sender, so fanning out over @a is meaningless (you cannot send yourself to many places, and
-    // bringing a whole selector is what /tpall already does). The argument stays ArgumentTypes.player(), which
-    // rejects a multi-match selector at parse time, so a present value resolves to at most one player; a single
-    // resolved element is taken. A selector like @p or a name still resolves the way it always has.
-    private Optional<Player> resolveTarget(CommandContext<CommandSourceStack> ctx) throws CommandSyntaxException {
+    // bringing a whole selector is what /tpall already does). The argument is a single-player PlayerArgument,
+    // which rejects a multi-match selector at parse time, so a present value resolves to at most one player; a
+    // single resolved element is taken. A selector like @p or a name resolves here; a miss is told, never thrown.
+    private Optional<Player> resolveTarget(CommandContext<CommandSourceStack> ctx) {
         return resolveTarget(ctx, "player");
     }
 
-    private Optional<Player> resolveTarget(CommandContext<CommandSourceStack> ctx, String argument)
-            throws CommandSyntaxException {
-        PlayerSelectorArgumentResolver resolver = ctx.getArgument(argument, PlayerSelectorArgumentResolver.class);
-        List<Player> resolved = resolver.resolve(ctx.getSource());
-        return resolved.isEmpty() ? Optional.empty() : Optional.of(resolved.get(0));
+    private Optional<Player> resolveTarget(CommandContext<CommandSourceStack> ctx, String argument) {
+        return resolveHere(ctx, argument);
+    }
+
+    /** Tell the actor why {@code argument} named nobody here. */
+    private void unknown(CommandContext<CommandSourceStack> ctx, String argument) {
+        services.notifier()
+                .send(actor(ctx), PlayerArgument.miss(ctx, argument, SharedMessageKey.COMMAND_UNKNOWN_PLAYER));
     }
 }

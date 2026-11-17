@@ -11,6 +11,7 @@ import com.uxplima.uxmessentials.communication.domain.DeathCausePolicies;
 import com.uxplima.uxmessentials.communication.domain.InfoPage;
 import com.uxplima.uxmessentials.communication.domain.JoinGroupPolicies;
 import com.uxplima.uxmessentials.communication.domain.MessagePolicy;
+import com.uxplima.uxmessentials.communication.domain.ServerSwitchPolicy;
 import com.uxplima.uxmessentials.shared.adapter.outbound.hud.ChannelDisplay;
 import org.jspecify.annotations.NullMarked;
 
@@ -38,6 +39,7 @@ import org.jspecify.annotations.NullMarked;
  * @param motdOnJoin whether the legacy {@code motd} info page is sent to a player when they join
  * @param infoPages the operator's info pages (one auto-registered command each)
  * @param chat the public-chat format policy the chat renderer drives
+ * @param switches how the connection lines treat a player moving between the servers of a network
  */
 @NullMarked
 public record CommunicationContent(
@@ -52,7 +54,8 @@ public record CommunicationContent(
         Optional<String> deathInfoPage,
         boolean motdOnJoin,
         List<InfoPage> infoPages,
-        ChatFormatPolicy chat) {
+        ChatFormatPolicy chat,
+        ServerSwitchPolicy switches) {
 
     public CommunicationContent {
         Objects.requireNonNull(join, "join");
@@ -66,6 +69,7 @@ public record CommunicationContent(
         Objects.requireNonNull(deathInfoPage, "deathInfoPage");
         infoPages = List.copyOf(Objects.requireNonNull(infoPages, "infoPages"));
         Objects.requireNonNull(chat, "chat");
+        Objects.requireNonNull(switches, "switches");
     }
 
     /**
@@ -86,6 +90,7 @@ public record CommunicationContent(
                 Optional.empty(),
                 false,
                 List.of(),
-                ChatFormatPolicy.disabled());
+                ChatFormatPolicy.disabled(),
+                ServerSwitchPolicy.DEFAULT);
     }
 }

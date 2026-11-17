@@ -16,10 +16,12 @@ import com.uxplima.uxmessentials.itemworld.adapter.ItemworldServices;
 import com.uxplima.uxmessentials.itemworld.domain.ItemworldMessageKey;
 import com.uxplima.uxmessentials.itemworld.domain.SubFeatureGroup;
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandRegistration;
+import com.uxplima.uxmessentials.shared.adapter.inbound.command.PlayerArgument;
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.PlayerTargets;
 import com.uxplima.uxmessentials.shared.adapter.outbound.BukkitRefs;
 import com.uxplima.uxmessentials.shared.application.permission.ItemworldPermissions;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
+import com.uxplima.uxmessentials.shared.domain.message.MessageLine;
 import com.uxplima.uxmlib.command.Gate;
 import org.jspecify.annotations.NullMarked;
 
@@ -87,7 +89,8 @@ public final class LightningCommand extends ItemworldCommandSupport implements C
         PlayerRef actor = actor(ctx);
         List<Player> targets = PlayerTargets.resolveAll(ctx, "player");
         if (targets.isEmpty()) {
-            reply(ctx, ItemworldMessageKey.UNKNOWN_TARGET, Map.of("player", typedTarget(ctx)));
+            MessageLine miss = PlayerArgument.miss(ctx, "player", ItemworldMessageKey.UNKNOWN_TARGET);
+            reply(ctx, miss.key(), miss.args());
             return Command.SINGLE_SUCCESS;
         }
         for (Player target : targets) {
@@ -141,13 +144,5 @@ public final class LightningCommand extends ItemworldCommandSupport implements C
         // Paper marks Player#getLocation() nullable (null only for an entity with no world, which a connected
         // player never is), so the fallback is requireNonNull rather than a nullable return.
         return java.util.Objects.requireNonNull(player.getLocation(), "player location");
-    }
-
-    private static String typedTarget(CommandContext<CommandSourceStack> ctx) {
-        return ctx.getNodes().stream()
-                .filter(node -> "player".equals(node.getNode().getName()))
-                .findFirst()
-                .map(node -> node.getRange().get(ctx.getInput()))
-                .orElse("");
     }
 }

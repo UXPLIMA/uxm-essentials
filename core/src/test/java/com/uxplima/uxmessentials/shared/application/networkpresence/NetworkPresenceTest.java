@@ -140,6 +140,52 @@ class NetworkPresenceTest {
     }
 
     @Test
+    void aPlayerArrivingFromABackendTheyAreStillOnCameFromIt() {
+        lobby.track.joined(STEVE);
+        lobby.out.deliverAll(survival.track);
+
+        assertThat(survival.roster.cameFrom(STEVE.uuid(), Duration.ofSeconds(3)))
+                .contains("lobby-1");
+    }
+
+    @Test
+    void aPlayerWhoLeftABackendWithinTheWindowCameFromItAndNotAfterIt() {
+        lobby.track.joined(STEVE);
+        lobby.track.left(STEVE);
+        lobby.out.deliverAll(survival.track);
+
+        clock.advance(Duration.ofSeconds(2));
+        assertThat(survival.roster.cameFrom(STEVE.uuid(), Duration.ofSeconds(3)))
+                .contains("lobby-1");
+        clock.advance(Duration.ofSeconds(2));
+        assertThat(survival.roster.cameFrom(STEVE.uuid(), Duration.ofSeconds(3)))
+                .isEmpty();
+    }
+
+    @Test
+    void aPlayerNoOtherBackendHadCameFromNowhereAndThisBackendDoesNotCount() {
+        survival.track.joined(ALEX);
+
+        assertThat(survival.roster.cameFrom(STEVE.uuid(), Duration.ofSeconds(3)))
+                .isEmpty();
+        assertThat(survival.roster.cameFrom(ALEX.uuid(), Duration.ofSeconds(3))).isEmpty();
+    }
+
+    @Test
+    void aPlayerOnTwoOtherBackendsCameFromTheOneSeenLast() {
+        Backend hub = new Backend("hub-1");
+        lobby.track.joined(STEVE);
+        lobby.out.deliverAll(survival.track);
+        clock.advance(Duration.ofSeconds(1));
+        hub.track.joined(STEVE);
+        lobby.track.left(STEVE);
+        hub.out.deliverAll(survival.track);
+
+        assertThat(survival.roster.cameFrom(STEVE.uuid(), Duration.ofSeconds(3)))
+                .contains("hub-1");
+    }
+
+    @Test
     void aSwitchSeenInOneMillisecondAnswersTheSameBackendEveryTime() {
         Backend hub = new Backend("hub-1");
         survival.track.joined(STEVE);

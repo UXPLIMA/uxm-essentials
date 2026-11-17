@@ -1,5 +1,6 @@
 package com.uxplima.uxmessentials.teleport.adapter.inbound.command;
 
+import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 
@@ -17,6 +18,7 @@ import com.uxplima.uxmessentials.shared.application.permission.TeleportPermissio
 import com.uxplima.uxmessentials.shared.application.port.Messages;
 import com.uxplima.uxmessentials.shared.domain.NameMatch;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
+import com.uxplima.uxmessentials.shared.domain.message.SharedMessageKey;
 import com.uxplima.uxmessentials.teleport.adapter.TeleportServices;
 import com.uxplima.uxmessentials.teleport.domain.TeleportMessageKey;
 import com.uxplima.uxmlib.command.Gate;
@@ -64,14 +66,18 @@ public final class TpBlockCommand extends TeleportCommandSupport implements Comm
         }
         PlayerRef actor = ref(sender);
         String name = ctx.getArgument("player", String.class);
-        NameMatch match = services.players().matchOnlineByName(name);
-        Optional<PlayerRef> target = match.player();
-        if (target.isEmpty()) {
-            services.notifier()
-                    .send(actor, match.miss(TeleportMessageKey.TPA_TARGET_OFFLINE, java.util.Map.of("player", name)));
-            return 0;
-        }
-        apply(actor, target.get());
+        // A block is kept by account, so the player need not be here: one who logged off can be unblocked and one on
+        // another server blocked. The name may need the stored name list, which is read off the tick.
+        services.scheduler().async(() -> {
+            NameMatch match = services.players().matchByName(name);
+            Optional<PlayerRef> target = match.player();
+            if (target.isEmpty()) {
+                services.notifier()
+                        .send(actor, match.miss(SharedMessageKey.COMMAND_UNKNOWN_PLAYER, Map.of("player", name)));
+                return;
+            }
+            apply(actor, target.get());
+        });
         return Command.SINGLE_SUCCESS;
     }
 

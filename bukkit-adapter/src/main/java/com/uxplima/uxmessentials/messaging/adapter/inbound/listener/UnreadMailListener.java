@@ -13,7 +13,10 @@ import com.uxplima.uxmessentials.shared.application.port.Scheduler;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import org.jspecify.annotations.NullMarked;
 
-/** Tells a joining player how much unread mail waits for them, counted on the async lane. */
+/**
+ * Tells a joining player how much unread mail waits for them, counted on the async lane; nothing for a player moving
+ * here from another server of the network.
+ */
 @NullMarked
 public final class UnreadMailListener implements Listener {
 
@@ -29,6 +32,9 @@ public final class UnreadMailListener implements Listener {
     @EventHandler(priority = EventPriority.MONITOR)
     public void onJoin(PlayerJoinEvent event) {
         PlayerRef player = BukkitRefs.toRef(event.getPlayer());
+        if (notice.moving(player)) {
+            return;
+        }
         scheduler.async(() -> notice.joined(player));
     }
 }
