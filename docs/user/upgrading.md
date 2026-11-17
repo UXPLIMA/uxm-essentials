@@ -15,7 +15,8 @@ are not affected.
 ## Offline mode: sanctions follow other spellings of a name
 
 On an offline-mode server a ban, a mute and a jail now follow a player into another spelling of their name, by default
-only into an account first seen after the sanction (`case-variant-sanctions`). The update adds one table,
+into an account with no trace from before the sanction and one that shared a telling address with the sanctioned
+account (`case-variant-sanctions`, `case-variant-address`). The update adds one table,
 `moderation_case_copies`, which records the mutes and jails copied that way; the first server to start on the new
 release creates it, and nothing needs editing. Upgrade every server that shares the database in the same window: a
 server on the previous release does not copy, and does not lift a copy when it lifts the original. See
