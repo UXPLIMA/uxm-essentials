@@ -104,7 +104,13 @@ class SkinSyncTest {
         Backend survival = new Backend();
         survival.cache.find(ADA.uuid());
 
-        assertThat(new DropSkin(origin).drop(ADA.uuid())).isEqualTo(DropSkin.Outcome.DROPPED);
+        DropSkin drop = new DropSkin(
+                origin,
+                new DressLogin(origin, mojang, BedrockSkins.none(), SkinConfig.defaults(), new QuietLog()),
+                new RecordingView(),
+                new Online());
+
+        assertThat(drop.drop(ADA)).isEqualTo(DropSkin.Outcome.DROPPED);
         bus.deliverTo(survival.listener);
 
         assertThat(survival.cache.find(ADA.uuid())).isEmpty();

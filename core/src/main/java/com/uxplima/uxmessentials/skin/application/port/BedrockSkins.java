@@ -3,6 +3,7 @@ package com.uxplima.uxmessentials.skin.application.port;
 import java.util.Optional;
 import java.util.UUID;
 
+import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmessentials.shared.domain.SkinTexture;
 import org.jspecify.annotations.NullMarked;
 
@@ -27,6 +28,11 @@ public interface BedrockSkins {
      * Bedrock gamertag, perhaps with a prefix, and never a Java account to ask Mojang about.
      */
     boolean isBedrock(UUID player);
+
+    /** The Java account a Bedrock player linked to their Xbox account through Floodgate, or empty when none. */
+    default Optional<PlayerRef> linkedJava(UUID player) {
+        return Optional.empty();
+    }
 
     /** The lookup for a server with no Floodgate: nobody is a Bedrock player. */
     static BedrockSkins none() {

@@ -21,6 +21,7 @@ import com.uxplima.uxmessentials.shared.application.module.KernelPorts;
 import com.uxplima.uxmessentials.shared.application.module.ModuleContext;
 import com.uxplima.uxmessentials.skin.adapter.inbound.command.SkinCommand;
 import com.uxplima.uxmessentials.skin.adapter.inbound.listener.SkinLoginListener;
+import com.uxplima.uxmessentials.skin.adapter.outbound.FloodgateLinks;
 import com.uxplima.uxmessentials.skin.adapter.outbound.GeyserBedrockSkins;
 import com.uxplima.uxmessentials.skin.adapter.outbound.MineSkinUploads;
 import com.uxplima.uxmessentials.skin.adapter.outbound.PaperSkinView;
@@ -97,7 +98,8 @@ public final class SkinWiring {
                 new HttpClientFetcher(kernel.log()),
                 kernel.log(),
                 config.bedrockRetries(),
-                () -> config.bedrockSource() && !"none".equals(bedrock.backend()));
+                () -> config.bedrockSource() && !"none".equals(bedrock.backend()),
+                FloodgateLinks.of(server));
 
         DressLogin dressLogin = new DressLogin(repository, kernel.skins(), bedrockSkins, config, kernel.log());
         NamedSkins names = new NamedSkins(kernel.playerLookup(), dressLogin, kernel.skins());
@@ -116,7 +118,7 @@ public final class SkinWiring {
                 setSkin,
                 new ClearSkin(repository, dressLogin, view, kernel.events(), clock),
                 new UpdateSkin(repository, kernel.skins(), names, bedrockSkins, uploads, view, kernel.events(), clock),
-                new DropSkin(repository),
+                new DropSkin(repository, dressLogin, view, kernel.playerLookup()),
                 new DescribeSkin(repository),
                 new PurgeSkinCache(kernel.skins()),
                 kernel.playerLookup(),

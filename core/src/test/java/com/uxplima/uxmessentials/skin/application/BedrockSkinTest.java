@@ -43,9 +43,10 @@ class BedrockSkinTest {
     private static final SkinTexture REFRESHED = new SkinTexture("refreshed", "sig-refreshed");
     private static final SkinTexture STRANGER = new SkinTexture("stranger", "sig-stranger");
     private static final SkinTexture POOL = new SkinTexture("pool", "sig-pool");
+    private static final SkinTexture JAVA_ADA = new SkinTexture("ada", "sig-ada");
 
     private final Rows rows = new Rows();
-    private final Mojang mojang = new Mojang(Map.of("BE_Steve", STRANGER, "Alex", POOL));
+    private final Mojang mojang = new Mojang(Map.of("BE_Steve", STRANGER, "Alex", POOL, "Ada", JAVA_ADA));
     private final Geyser geyser = new Geyser(STEVE.uuid());
     private final RecordingView view = new RecordingView();
 
@@ -67,6 +68,17 @@ class BedrockSkinTest {
 
         assertThat(dressed).map(DressLogin.Dressed::texture).contains(POOL);
         assertThat(mojang.asked).containsExactly("Alex");
+    }
+
+    @Test
+    void aLinkedBedrockJoinerWhoseBedrockSkinCannotBeReadWearsTheirJavaAccountsSkin() {
+        geyser.linked = Optional.of(ADA);
+
+        Optional<DressLogin.Dressed> dressed = dressLogin(SkinConfig.defaults().withDefaultPool(List.of("Alex")))
+                .resolve(STEVE.uuid(), STEVE.name());
+
+        assertThat(dressed).map(DressLogin.Dressed::texture).contains(JAVA_ADA);
+        assertThat(mojang.asked).containsExactly("Ada");
     }
 
     @Test
@@ -168,6 +180,7 @@ class BedrockSkinTest {
     private static final class Geyser implements BedrockSkins {
         private final UUID bedrockPlayer;
         private Optional<SkinTexture> skin = Optional.empty();
+        private Optional<PlayerRef> linked = Optional.empty();
 
         Geyser(UUID bedrockPlayer) {
             this.bedrockPlayer = bedrockPlayer;
@@ -186,6 +199,11 @@ class BedrockSkinTest {
         @Override
         public boolean isBedrock(UUID player) {
             return bedrockPlayer.equals(player);
+        }
+
+        @Override
+        public Optional<PlayerRef> linkedJava(UUID player) {
+            return isBedrock(player) ? linked : Optional.empty();
         }
     }
 

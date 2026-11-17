@@ -12,6 +12,7 @@ import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
 import com.uxplima.uxmessentials.shared.adapter.outbound.skin.HttpFetcher;
 import com.uxplima.uxmessentials.shared.application.port.Logger;
+import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmessentials.shared.domain.SkinTexture;
 import com.uxplima.uxmessentials.skin.application.port.BedrockSkins;
 import org.jspecify.annotations.NullMarked;
@@ -40,6 +41,7 @@ public final class GeyserBedrockSkins implements BedrockSkins {
     private final Logger log;
     private final int retries;
     private final BooleanSupplier available;
+    private final Function<UUID, Optional<PlayerRef>> links;
 
     /**
      * @param xuids how a player's Xbox id is resolved; {@link Optional#empty()} for a Java player
@@ -48,9 +50,15 @@ public final class GeyserBedrockSkins implements BedrockSkins {
      * @param retries how many times a failed request is retried before it is given up
      * @param available whether a Bedrock backend is installed at all, asked on each lookup: this plugin enables
      *     before Floodgate, so an answer kept from its own enable would say none for the life of the server
+     * @param links the Java account a Bedrock player linked, by their uuid; empty when none
      */
     public GeyserBedrockSkins(
-            XuidLookup xuids, HttpFetcher fetcher, Logger log, int retries, BooleanSupplier available) {
+            XuidLookup xuids,
+            HttpFetcher fetcher,
+            Logger log,
+            int retries,
+            BooleanSupplier available,
+            Function<UUID, Optional<PlayerRef>> links) {
         this.xuids = Objects.requireNonNull(xuids, "xuids");
         this.fetcher = Objects.requireNonNull(fetcher, "fetcher");
         this.log = Objects.requireNonNull(log, "log");
@@ -59,6 +67,7 @@ public final class GeyserBedrockSkins implements BedrockSkins {
         }
         this.retries = retries;
         this.available = Objects.requireNonNull(available, "available");
+        this.links = Objects.requireNonNull(links, "links");
     }
 
     @Override
@@ -73,6 +82,11 @@ public final class GeyserBedrockSkins implements BedrockSkins {
     @Override
     public boolean available() {
         return available.getAsBoolean();
+    }
+
+    @Override
+    public Optional<PlayerRef> linkedJava(UUID player) {
+        return links.apply(Objects.requireNonNull(player, "player"));
     }
 
     @Override

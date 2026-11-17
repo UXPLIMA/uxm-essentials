@@ -26,7 +26,7 @@ import org.jspecify.annotations.NullMarked;
  * <ol>
  *   <li>the skin stored for that uuid, which is their own choice and needs no network call at all;
  *   <li>for a Bedrock player, their Bedrock skin, written back to the store so the next join is a plain database
- *       read; for anybody else, the real skin of the paid account with that name, which is what makes a cracked
+ *       read, or when it cannot be read the premium skin of the Java account they linked; for anybody else, the real skin of the paid account with that name, which is what makes a cracked
  *       server look right without anybody typing a command;
  *   <li>an entry from the configured default pool, the same one every time so a player has a face rather than a
  *       new one each join.
@@ -84,6 +84,7 @@ public final class DressLogin {
                 row.map(skin -> skin.source() instanceof SkinSource.Bedrock).orElse(false) || isBedrock(player);
         Optional<Dressed> own = bedrockPlayer
                 ? failSoft("bedrock skin", username, () -> bedrockSkin(player, username, joining))
+                        .or(() -> failSoft("linked java skin", username, () -> linkedSkin(player)))
                 : failSoft("premium skin", username, () -> premiumSkin(username));
         if (own.isPresent()) {
             return own;
@@ -122,6 +123,11 @@ public final class DressLogin {
         }
         return textures.fetchNow(username)
                 .map(texture -> new Dressed(texture, SkinModel.CLASSIC, new SkinSource.ByName(username)));
+    }
+
+    /** The premium skin of the Java account a Bedrock player linked, for when their Bedrock skin cannot be read. */
+    private Optional<Dressed> linkedSkin(UUID player) {
+        return bedrock.linkedJava(player).flatMap(java -> premiumSkin(java.name()));
     }
 
     /** The skin Floodgate and Geyser know this player by, stored at join so the next one needs no lookup. */
