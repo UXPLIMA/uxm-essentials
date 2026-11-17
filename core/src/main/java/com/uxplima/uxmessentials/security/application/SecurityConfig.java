@@ -197,6 +197,8 @@ public record SecurityConfig(
      *     ({@code join-verification.wait-for-login-plugin}, default true)
      * @param revokedAccess what happens to an online player whose factor staff have just cleared
      *     ({@code join-verification.on-access-revoked}, default reverify)
+     * @param switchGrace how long after leaving a backend a proof may still be carried to another one of the network,
+     *     zero to carry none ({@code join-verification.switch-grace-seconds}, default 30)
      */
     public record JoinVerification(
             boolean enabled,
@@ -213,12 +215,14 @@ public record SecurityConfig(
             String holdingArea,
             String transferTo,
             boolean waitForLoginPlugin,
-            RevokedAccess revokedAccess) {
+            RevokedAccess revokedAccess,
+            Duration switchGrace) {
 
         private static final int DEFAULT_TRUST_HOURS = 24;
         private static final int DEFAULT_MAX_ATTEMPTS = 3;
         private static final int DEFAULT_LOCKOUT_SECONDS = 300;
         private static final int DEFAULT_ENTRY_TIMEOUT_SECONDS = 60;
+        private static final int DEFAULT_SWITCH_GRACE_SECONDS = 30;
         private static final String DEFAULT_LOCKOUT_REASON = "@security.verify.lockout-ban-reason";
         private static final String LOCKOUT_REASON_PATH = "join-verification.lockout-ban-reason";
 
@@ -237,6 +241,10 @@ public record SecurityConfig(
             Objects.requireNonNull(holdingArea, "holdingArea");
             Objects.requireNonNull(transferTo, "transferTo");
             Objects.requireNonNull(revokedAccess, "revokedAccess");
+            Objects.requireNonNull(switchGrace, "switchGrace");
+            if (switchGrace.isNegative()) {
+                throw new IllegalArgumentException("join-verification switch-grace must not be negative");
+            }
             if (entryTimeout.isNegative()) {
                 throw new IllegalArgumentException("join-verification entry-timeout must not be negative");
             }
@@ -279,7 +287,9 @@ public record SecurityConfig(
                     config.getString("join-verification.holding-area", ""),
                     config.getString("join-verification.transfer-to", ""),
                     config.getBoolean("join-verification.wait-for-login-plugin", true),
-                    RevokedAccess.parse(config.getString("join-verification.on-access-revoked", "reverify")));
+                    RevokedAccess.parse(config.getString("join-verification.on-access-revoked", "reverify")),
+                    Duration.ofSeconds(Math.max(
+                            0, config.getInt("join-verification.switch-grace-seconds", DEFAULT_SWITCH_GRACE_SECONDS))));
         }
 
         /** Whether the lockout ban reason is still the English sentence the shipped file wrote. */

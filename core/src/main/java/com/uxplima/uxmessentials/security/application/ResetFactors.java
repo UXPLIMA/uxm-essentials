@@ -6,6 +6,7 @@ import java.util.UUID;
 import com.uxplima.uxmessentials.security.application.port.TrustStore;
 import com.uxplima.uxmessentials.security.application.port.TwoFactorRegistration;
 import com.uxplima.uxmessentials.security.application.port.TwoFactorRepository;
+import com.uxplima.uxmessentials.security.application.port.VerifiedSessions;
 
 /**
  * The operator's recovery path behind {@code /security reset <player> [totp|pin|all]}: clear a target's factors
@@ -24,10 +25,12 @@ public final class ResetFactors {
 
     private final TwoFactorRepository repository;
     private final TrustStore trustStore;
+    private final VerifiedSessions sessions;
 
-    public ResetFactors(TwoFactorRepository repository, TrustStore trustStore) {
+    public ResetFactors(TwoFactorRepository repository, TrustStore trustStore, VerifiedSessions sessions) {
         this.repository = Objects.requireNonNull(repository, "repository");
         this.trustStore = Objects.requireNonNull(trustStore, "trustStore");
+        this.sessions = Objects.requireNonNull(sessions, "sessions");
     }
 
     /** Clear {@code scope} for {@code playerId}, or report that they held nothing in that scope to clear. */
@@ -43,6 +46,8 @@ public final class ResetFactors {
             case PIN -> repository.clearPin(playerId);
             case ALL -> repository.delete(playerId);
         }
+        // A proof made with a factor that is gone proves nothing on the next backend they move to.
+        sessions.revoke(playerId);
         // A target left with no factor has nothing to verify against, so any remembered device is meaningless.
         if (repository.find(playerId).map(TwoFactorRegistration::hasAnyFactor).orElse(false)) {
             return ResetResult.RESET;

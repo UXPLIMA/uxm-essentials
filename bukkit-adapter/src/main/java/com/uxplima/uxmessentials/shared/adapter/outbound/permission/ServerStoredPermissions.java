@@ -1,0 +1,313 @@
+package com.uxplima.uxmessentials.shared.adapter.outbound.permission;
+
+import java.util.ArrayDeque;
+import java.util.ArrayList;
+import java.util.Deque;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Objects;
+import java.util.Optional;
+import java.util.Set;
+import java.util.UUID;
+import java.util.concurrent.CompletableFuture;
+import java.util.function.Supplier;
+
+import org.bukkit.Server;
+import org.bukkit.permissions.Permission;
+import org.bukkit.permissions.PermissionDefault;
+import org.bukkit.plugin.PluginManager;
+import org.bukkit.plugin.RegisteredServiceProvider;
+
+import com.uxplima.uxmessentials.shared.application.port.Logger;
+import com.uxplima.uxmessentials.shared.application.port.NetworkPresence;
+import com.uxplima.uxmessentials.shared.application.port.Scheduler;
+import com.uxplima.uxmessentials.shared.application.port.StoredPermissions;
+import com.uxplima.uxmessentials.shared.domain.OnlinePlayer;
+import com.uxplima.uxmessentials.shared.domain.PlayerRef;
+import org.jspecify.annotations.NullMarked;
+import org.jspecify.annotations.Nullable;
+
+/**
+ * Reads a node for a player who is not online here. It fails closed: a grant found anywhere counts, and the node is
+ * answered as not held only when every source that could grant it was read and none did.
+ *
+ * <p>A player online on another backend is asked about over the bus first, and that backend reads the node live: that
+ * answer is the truth. Without a bus, or without an answer, every store this server has is read as for an offline
+ * player, together with the operator default, and only a grant counts: anything else is no answer, since that
+ * backend's own operator list and permission store are not read here.
+ *
+ * <p>An offline player is read from every source this server has, and any one granting the node is enough:
+ *
+ * <ul>
+ *   <li>LuckPerms, loaded from its storage on the async lane, in any context (see {@link LuckPermsNodeStore});
+ *   <li>the permission plugin registered with Vault, when LuckPerms is not that plugin (see {@link VaultNodeStore});
+ *   <li>the node's declared default against this backend's own operator list, including the defaults of the
+ *       permissions that grant it as a child. On a network each backend has its own operator list, and this one is
+ *       read;
+ *   <li>what the backends recorded the player holding when they were last there, when such a record is given.
+ * </ul>
+ *
+ * <p>Everything taken from the server (the defaults, the operator list, the provider, an offline player's name) is
+ * read on the calling server thread before anything leaves it.
+ */
+@NullMarked
+public final class ServerStoredPermissions implements StoredPermissions {
+
+    private static final String VAULT_PERMISSION = "net.milkbowl.vault.permission.Permission";
+    private static final String LUCKPERMS = "LuckPerms";
+
+    private final Server server;
+    private final Scheduler scheduler;
+    private final NetworkPresence presence;
+    private final Logger log;
+
+    @Nullable private final NodeStore luckPerms;
+
+    private final Supplier<@Nullable NodeStore> vault;
+    private final Optional<BusPermissionReads> bus;
+    private final Optional<StoredPermissions> recorded;
+
+    ServerStoredPermissions(
+            Server server,
+            Scheduler scheduler,
+            NetworkPresence presence,
+            Logger log,
+            @Nullable NodeStore luckPerms,
+            Supplier<@Nullable NodeStore> vault,
+            Optional<BusPermissionReads> bus,
+            Optional<StoredPermissions> recorded) {
+        this.server = Objects.requireNonNull(server, "server");
+        this.scheduler = Objects.requireNonNull(scheduler, "scheduler");
+        this.presence = Objects.requireNonNull(presence, "presence");
+        this.log = Objects.requireNonNull(log, "log");
+        this.luckPerms = luckPerms;
+        this.vault = Objects.requireNonNull(vault, "vault");
+        this.bus = Objects.requireNonNull(bus, "bus");
+        this.recorded = Objects.requireNonNull(recorded, "recorded");
+    }
+
+    /**
+     * The reader for this server: LuckPerms when it is enabled, the Vault permission provider, and the server's own
+     * defaults and operators; for a player on another backend, that backend through {@code bus} (empty off the network).
+     * {@code recorded} is what the backends saw the player hold when they were last there, read as one more store.
+     */
+    public static ServerStoredPermissions of(
+            Server server,
+            Scheduler scheduler,
+            NetworkPresence presence,
+            Logger log,
+            Optional<BusPermissionReads> bus,
+            Optional<StoredPermissions> recorded) {
+        // Constructed by a direct new past the guard, so a server without LuckPerms never loads its classes.
+        NodeStore luckPerms = LuckPermsAccess.isPresent(server) ? new LuckPermsNodeStore() : null;
+        boolean luckPermsRead = luckPerms != null;
+        return new ServerStoredPermissions(
+                server, scheduler, presence, log, luckPerms, () -> vaultProvider(server, luckPermsRead), bus, recorded);
+    }
+
+    @Override
+    public CompletableFuture<Answer> read(PlayerRef who, String node) {
+        Objects.requireNonNull(who, "who");
+        Objects.requireNonNull(node, "node");
+        boolean byDefault = byDefault(who.uuid(), node);
+        // Every store is prepared here, on the calling server thread, even one only read after a bus miss: preparing
+        // may read the server (an offline player's name), and the bus answers on another thread.
+        List<NodeStore> sources = storedSources();
+        List<Pending> stored = prepared(sources, who, node);
+        Optional<Pending> seen = recorded.map(record -> new Pending(() -> record.read(who, node), who, node));
+        Optional<String> elsewhere = anotherBackend(who.uuid());
+        if (elsewhere.isPresent()) {
+            CompletableFuture<Answer> live = bus.map(reads -> reads.ask(who, node, elsewhere.get()))
+                    .orElseGet(() -> CompletableFuture.completedFuture(Answer.NO_SOURCE));
+            if (sources.isEmpty()) {
+                // No permission store here, only this backend's operator list, which says nothing of a player on
+                // another one: what the bus said stands.
+                return live;
+            }
+            return live.thenCompose(answer -> answer == Answer.HELD || answer == Answer.NOT_HELD
+                    ? CompletableFuture.completedFuture(answer)
+                    : combined(stored, seen, byDefault).thenApply(read -> onlyAGrant(read, answer)));
+        }
+        return combined(stored, seen, byDefault);
+    }
+
+    /**
+     * What the stores say of a player whose own backend did not answer ({@code missed}): a grant holds, but nothing
+     * here can show the node is not held, since that backend's operator list and its own permission store are not
+     * read here.
+     */
+    private static Answer onlyAGrant(Answer read, Answer missed) {
+        return read == Answer.NOT_HELD ? missed : read;
+    }
+
+    /** The permission stores this server can read: LuckPerms, and the Vault provider when it is another plugin. */
+    private List<NodeStore> storedSources() {
+        List<NodeStore> stores = new ArrayList<>(2);
+        if (luckPerms != null) {
+            stores.add(luckPerms);
+        }
+        NodeStore provider = vault.get();
+        if (provider != null) {
+            stores.add(provider);
+        }
+        return stores;
+    }
+
+    /** Start each store's read here, on the calling thread; a store that cannot start counts as no answer. */
+    private List<Pending> prepared(List<NodeStore> stores, PlayerRef who, String node) {
+        List<Pending> loads = new ArrayList<>(stores.size());
+        for (NodeStore store : stores) {
+            try {
+                loads.add(new Pending(store.prepare(who.uuid(), node), who, node));
+            } catch (RuntimeException failure) {
+                loads.add(new Pending(() -> CompletableFuture.failedFuture(failure), who, node));
+            }
+        }
+        return loads;
+    }
+
+    /**
+     * The answer of every store, the record and the default together: any grant is held, any miss keeps it from not
+     * held. A store that never saw the player is settled by the record only: when the backends recorded them, and none
+     * saw a grant, they are not held.
+     */
+    private CompletableFuture<Answer> combined(List<Pending> loads, Optional<Pending> seen, boolean byDefault) {
+        if (byDefault) {
+            return CompletableFuture.completedFuture(Answer.HELD);
+        }
+        List<CompletableFuture<Answer>> answers = new ArrayList<>(loads.size());
+        for (Pending load : loads) {
+            answers.add(started(load));
+        }
+        CompletableFuture<Answer> recordedAnswer =
+                seen.map(this::started).orElseGet(() -> CompletableFuture.completedFuture(Answer.NO_SOURCE));
+        List<CompletableFuture<Answer>> all = new ArrayList<>(answers);
+        all.add(recordedAnswer);
+        return CompletableFuture.allOf(all.toArray(CompletableFuture[]::new))
+                .thenApply(done ->
+                        combine(answers.stream().map(CompletableFuture::join).toList(), recordedAnswer.join()));
+    }
+
+    /** Run {@code load} on the async lane; one the scheduler refuses while the plugin stops is no answer. */
+    private CompletableFuture<Answer> started(Pending load) {
+        CompletableFuture<Answer> answer = new CompletableFuture<>();
+        try {
+            scheduler.async(() -> load.run(answer));
+        } catch (RuntimeException refused) {
+            answer.complete(Answer.NO_ANSWER);
+        }
+        return answer;
+    }
+
+    /**
+     * {@code stores} answered by the permission stores, {@code record} by what the backends recorded: {@link
+     * Answer#NOT_HELD} there means the player was recorded and no backend saw a grant, {@link Answer#NO_SOURCE} that
+     * no backend recorded them.
+     */
+    private static Answer combine(List<Answer> stores, Answer record) {
+        if (stores.contains(Answer.HELD) || record == Answer.HELD) {
+            return Answer.HELD;
+        }
+        if (stores.contains(Answer.NO_ANSWER) || record == Answer.NO_ANSWER) {
+            return Answer.NO_ANSWER;
+        }
+        if (stores.contains(Answer.NO_SOURCE)) {
+            // A store that never saw the player is settled by what the backends they played on recorded.
+            return record == Answer.NOT_HELD ? Answer.NOT_HELD : Answer.NO_SOURCE;
+        }
+        return Answer.NOT_HELD;
+    }
+
+    /** One store's read, started on the server thread and run on the async lane. */
+    private final class Pending {
+
+        private final NodeStore.Load load;
+        private final PlayerRef who;
+        private final String node;
+
+        Pending(NodeStore.Load load, PlayerRef who, String node) {
+            this.load = load;
+            this.who = who;
+            this.node = node;
+        }
+
+        void run(CompletableFuture<Answer> answer) {
+            try {
+                var unused = load.run().whenComplete((read, failure) -> {
+                    if (failure != null || read == null) {
+                        unread(answer);
+                    } else {
+                        answer.complete(read);
+                    }
+                });
+            } catch (RuntimeException failure) {
+                unread(answer);
+            }
+        }
+
+        private void unread(CompletableFuture<Answer> answer) {
+            log.warn("event=stored_permission_unread player={} node={}", who.name(), node);
+            answer.complete(Answer.NO_ANSWER);
+        }
+    }
+
+    /**
+     * Whether the server grants {@code node} to {@code player} by default against this backend's operator list: the
+     * node's own default (an undeclared node defaults to operators) or the default of any permission that grants it
+     * as a child, however deep.
+     */
+    private boolean byDefault(UUID player, String node) {
+        boolean operator = isOperator(player);
+        PluginManager plugins = server.getPluginManager();
+        Set<Permission> declared = plugins.getPermissions();
+        Deque<String> granting = new ArrayDeque<>(List.of(node));
+        Set<String> seen = new HashSet<>();
+        while (!granting.isEmpty()) {
+            String current = granting.pop();
+            if (!seen.add(current)) {
+                continue;
+            }
+            Permission permission = plugins.getPermission(current);
+            PermissionDefault fallback = permission == null ? Permission.DEFAULT_PERMISSION : permission.getDefault();
+            if (fallback.getValue(operator)) {
+                return true;
+            }
+            for (Permission parent : declared) {
+                if (Boolean.TRUE.equals(parent.getChildren().get(current))) {
+                    granting.push(parent.getName());
+                }
+            }
+        }
+        return false;
+    }
+
+    /** Read from the operator list itself, which answers for a player who is not online. */
+    private boolean isOperator(UUID player) {
+        return server.getOperators().stream().anyMatch(op -> op.getUniqueId().equals(player));
+    }
+
+    private Optional<String> anotherBackend(UUID player) {
+        return presence.find(player).map(OnlinePlayer::server).filter(name -> !name.equals(presence.localServer()));
+    }
+
+    /**
+     * The active permission provider registered with Vault, or null when there is none to read. The highest-priority
+     * registration is the one Vault itself hands out; with LuckPerms read directly, its own Vault registration adds
+     * nothing. Looked up by name so Vault stays optional.
+     */
+    private static @Nullable NodeStore vaultProvider(Server server, boolean luckPermsRead) {
+        Optional<Class<?>> service = server.getServicesManager().getKnownServices().stream()
+                .filter(known -> known.getName().equals(VAULT_PERMISSION))
+                .findFirst();
+        if (service.isEmpty()) {
+            return null;
+        }
+        RegisteredServiceProvider<?> registration = server.getServicesManager().getRegistration(service.get());
+        if (registration == null
+                || (luckPermsRead && registration.getPlugin().getName().equals(LUCKPERMS))) {
+            return null;
+        }
+        // Past the lookup Vault is known to be loaded, so its types resolve.
+        return VaultNodeStore.of(server, registration);
+    }
+}

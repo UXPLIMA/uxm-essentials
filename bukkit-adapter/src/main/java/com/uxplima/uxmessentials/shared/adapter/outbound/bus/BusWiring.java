@@ -58,7 +58,7 @@ public final class BusWiring {
         }
         network.busSecretProblem().ifPresent(problem -> log.warn("{}", problem));
         RemoteSyncRegistry registry = new RemoteSyncRegistry();
-        Carriers carriers = selectTransport(plugin, network, scheduler, log);
+        Carriers carriers = selectTransport(plugin, network, scheduler, registry.receipts(), log);
         BusTransport transport = carriers.transport();
         long bootNonce = bootNonce();
         DuplicateServerNames duplicates = new DuplicateServerNames(
@@ -102,7 +102,8 @@ public final class BusWiring {
      * already fell back to {@code velocity} in {@link NetworkConfig}; this logs the WARN so the operator sees
      * their typo without the enable crashing.
      */
-    private static Carriers selectTransport(Plugin plugin, NetworkConfig network, Scheduler scheduler, Logger log) {
+    private static Carriers selectTransport(
+            Plugin plugin, NetworkConfig network, Scheduler scheduler, CarrierReceipts receipts, Logger log) {
         if (!network.transportRecognized()) {
             log.warn(
                     "unknown network.transport value; falling back to {}. valid: velocity | redis | both",
@@ -110,15 +111,18 @@ public final class BusWiring {
         }
         return switch (network.transport()) {
             case VELOCITY -> {
-                PluginMessagingTransport proxy = pluginMessaging(plugin, network, scheduler, log);
+                PluginMessagingTransport proxy = pluginMessaging(plugin, network, scheduler, receipts, log);
                 yield new Carriers(proxy, proxy, null);
             }
             case REDIS -> {
                 BusTransport redis = redis(plugin, network, scheduler, log);
-                yield new Carriers(redis, null, redis);
+                // The proxy plugin still speaks to each backend over the player's connection: listen for that alone.
+                BusTransport proxyWord =
+                        new ProxyWordTransport(pluginMessaging(plugin, network, scheduler, receipts, log));
+                yield new Carriers(new CompositeBusTransport(proxyWord, redis), null, redis);
             }
             case BOTH -> {
-                PluginMessagingTransport proxy = pluginMessaging(plugin, network, scheduler, log);
+                PluginMessagingTransport proxy = pluginMessaging(plugin, network, scheduler, receipts, log);
                 BusTransport redis = redis(plugin, network, scheduler, log);
                 yield new Carriers(new CompositeBusTransport(proxy, redis), proxy, redis);
             }
@@ -126,7 +130,7 @@ public final class BusWiring {
     }
 
     private static PluginMessagingTransport pluginMessaging(
-            Plugin plugin, NetworkConfig network, Scheduler scheduler, Logger log) {
+            Plugin plugin, NetworkConfig network, Scheduler scheduler, CarrierReceipts receipts, Logger log) {
         return new PluginMessagingTransport(
                 plugin,
                 scheduler,
@@ -134,6 +138,7 @@ public final class BusWiring {
                 network.outboundQueueSize(),
                 network.peerLivenessWindow(),
                 network.busSecret(),
+                receipts,
                 log);
     }
 

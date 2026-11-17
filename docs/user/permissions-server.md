@@ -285,7 +285,7 @@ Contents: [shared](#shared) · [bossbar](#bossbar) · [commandcontrol](#commandc
 | `uxmessentials.security.force` | /security force <player>: force a player to re-verify their second factor on their next action or join. | op |
 | `uxmessentials.security.pin` | /pin: set, change or remove a numeric PIN second factor on your own account. | true |
 | `uxmessentials.security.pin.required` | Must set a PIN before playing. | false |
-| `uxmessentials.security.reset` | /security reset <player> [totp\|pin\|all]: clear a factor a player can no longer prove. | op |
+| `uxmessentials.security.reset` | /security reset <player> [totp\|pin\|all]: clear a factor a player can no longer prove; /security forget-proxy. | op |
 
 ## servertweaks
 

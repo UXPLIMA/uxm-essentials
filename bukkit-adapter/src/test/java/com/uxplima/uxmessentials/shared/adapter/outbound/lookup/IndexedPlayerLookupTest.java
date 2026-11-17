@@ -181,12 +181,22 @@ class IndexedPlayerLookupTest {
 
     @Test
     void offlineModeOnTheTickALoneAccountUnderANameNobodyElseHoldsIsFoundInAnyCase() {
+        names.backWith(new StoredNames(), 10);
         names.record(STEVE.uuid(), STEVE.name());
         onTick = true;
 
         assertThat(lookup.matchByName("STEVE")).isEqualTo(NameMatch.found(STEVE));
         assertThat(lookup.matchByName("Steve")).isEqualTo(NameMatch.found(STEVE));
         assertThat(lookup.matchByNameFromMemory("steve")).isEqualTo(NameMatch.found(STEVE));
+    }
+
+    @Test
+    void offlineModeBeforeTheStoreHasSaidWhichNamesAreSharedALoneAccountIsNotTakenOnTrust() {
+        names.record(STEVE.uuid(), STEVE.name());
+        onTick = true;
+
+        assertThat(lookup.matchByName("STEVE")).isEqualTo(NameMatch.unknown());
+        assertThat(lookup.matchByName("Steve")).isEqualTo(NameMatch.found(STEVE));
     }
 
     @Test

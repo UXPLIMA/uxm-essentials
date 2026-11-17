@@ -13,6 +13,7 @@ import com.uxplima.uxmessentials.moderation.domain.Issuer;
 import com.uxplima.uxmessentials.moderation.domain.JailState;
 import com.uxplima.uxmessentials.shared.application.message.Notifier;
 import com.uxplima.uxmessentials.testing.FakePermissions;
+import com.uxplima.uxmessentials.testing.FakeStoredPermissions;
 import com.uxplima.uxmessentials.testing.MutableClock;
 import com.uxplima.uxmessentials.testing.OnlineLookup;
 import com.uxplima.uxmessentials.testing.QueuedScheduler;
@@ -51,8 +52,8 @@ class ModerationSessionsTest {
             clock);
     private final JailCountdown countdown =
             new JailCountdown(records, live, transfer, new SilentAudit(), new RecordingEvents(), clock);
-    private final StorageLane lane =
-            new StorageLane(scheduler, notifier, new FakePermissions(), new OnlineLookup(), log);
+    private final StorageLane lane = new StorageLane(
+            scheduler, notifier, new FakePermissions(), new FakeStoredPermissions(), new OnlineLookup(), log);
     private final ModerationSessions sessions = new ModerationSessions(records, countdown, lane, clock);
 
     private void jailFor(Duration remaining) {

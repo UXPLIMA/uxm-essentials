@@ -22,8 +22,8 @@ import org.jspecify.annotations.NullMarked;
  * account first enrolled. The decrypted authenticator secret comes back on that row because verification needs it,
  * and it stops here.
  *
- * <p>The registration is a database row, so it goes to a worker. The lockout is an in-memory window, so it is
- * answered where the caller stands.
+ * <p>The registration and the lockout are database rows, so the status goes to a worker. The plain lockout question
+ * is answered where the caller stands, from the lockouts this server knows.
  */
 @NullMarked
 public final class SecurityQueries implements UxmSecurityQuery {
@@ -43,15 +43,19 @@ public final class SecurityQueries implements UxmSecurityQuery {
     @Override
     public CompletableFuture<UxmSecurityStatus> of(UUID playerId) {
         Objects.requireNonNull(playerId, "playerId");
-        boolean lockedOut = isLockedOut(playerId);
         return AsyncQueries.supply(
-                scheduler, () -> view(playerId, repository.find(playerId).orElse(null), lockedOut));
+                scheduler,
+                () -> view(
+                        playerId,
+                        repository.find(playerId).orElse(null),
+                        limiter.isLockedOut(playerId, clock.instant())));
     }
 
     @Override
     public boolean isLockedOut(UUID playerId) {
         Objects.requireNonNull(playerId, "playerId");
-        return limiter.isLockedOut(playerId, clock.instant());
+        // The shared record is a database read; this answer may not wait, so it is what this server knows.
+        return limiter.knownLockedOut(playerId, clock.instant());
     }
 
     /** An account with no row holds no factor, which is a real answer rather than an absent one. */

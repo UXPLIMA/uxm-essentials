@@ -5,6 +5,7 @@ import java.util.Objects;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.EventPriority;
 import org.bukkit.event.Listener;
+import org.bukkit.event.player.AsyncPlayerPreLoginEvent;
 import org.bukkit.event.player.PlayerJoinEvent;
 
 import com.uxplima.uxmessentials.shared.application.port.PlayerNameIndex;
@@ -23,6 +24,17 @@ public final class PlayerNameRecordingListener implements Listener {
 
     public PlayerNameRecordingListener(PlayerNameIndex index) {
         this.index = Objects.requireNonNull(index, "index");
+    }
+
+    /**
+     * Before the login goes on, off the tick: read whether another account holds the name, so the answer is in memory
+     * before the player can be named on the tick.
+     */
+    @EventHandler(priority = EventPriority.MONITOR)
+    public void onPreLogin(AsyncPlayerPreLoginEvent event) {
+        if (event.getLoginResult() == AsyncPlayerPreLoginEvent.Result.ALLOWED) {
+            index.joining(event.getUniqueId(), event.getName());
+        }
     }
 
     @EventHandler(priority = EventPriority.MONITOR)

@@ -6,11 +6,13 @@ import java.util.UUID;
 import com.uxplima.uxmessentials.security.application.port.TrustStore;
 import com.uxplima.uxmessentials.security.application.port.TwoFactorRegistration;
 import com.uxplima.uxmessentials.security.application.port.TwoFactorRepository;
+import com.uxplima.uxmessentials.security.application.port.VerifiedSessions;
 
 /**
  * The read-write behind {@code /2fa force <player>}: put an enrolled target back into the state where the
  * join-verification freeze will make them prove their second factor again. It reads the target's registration and,
- * when they hold a factor, forgets every device trust they have through the {@link TrustStore} - the durable forced
+ * when they hold a factor, forgets every device trust they have through the {@link TrustStore}, and any proof they could carry to another
+ * backend, the durable forced
  * state, so their next join is no longer skipped by the trusted-device bypass and survives a restart. A target with no
  * factor cannot be made to verify against nothing, so nothing is revoked and the caller is told they are not enrolled.
  *
@@ -22,10 +24,12 @@ public final class ForceReverification {
 
     private final TwoFactorRepository repository;
     private final TrustStore trustStore;
+    private final VerifiedSessions sessions;
 
-    public ForceReverification(TwoFactorRepository repository, TrustStore trustStore) {
+    public ForceReverification(TwoFactorRepository repository, TrustStore trustStore, VerifiedSessions sessions) {
         this.repository = Objects.requireNonNull(repository, "repository");
         this.trustStore = Objects.requireNonNull(trustStore, "trustStore");
+        this.sessions = Objects.requireNonNull(sessions, "sessions");
     }
 
     /**
@@ -39,6 +43,8 @@ public final class ForceReverification {
             return ForceResult.NOT_ENROLLED;
         }
         trustStore.revoke(playerId);
+        // A proof carried from another backend would let them past the freeze this is meant to put them through.
+        sessions.revoke(playerId);
         return ForceResult.FORCED;
     }
 

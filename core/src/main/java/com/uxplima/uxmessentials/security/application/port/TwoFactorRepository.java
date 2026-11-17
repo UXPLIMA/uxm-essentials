@@ -11,7 +11,7 @@ import com.uxplima.uxmessentials.security.domain.TwoFactorSecret;
  * ledger holds). One row per player carries at most one PIN and one TOTP secret; the two enrol independently.
  *
  * <p>The port draws the crypto boundary deliberately. The <b>PIN is one-way hashed</b> at rest, so it is written
- * through {@link #setPin} and checked through {@link #verifyPin} (which re-hashes the candidate), the plaintext
+ * through {@link #setPin} and checked through {@link #pinCheck} (which re-hashes the candidate), the plaintext
  * never leaves the adapter and the hash never leaves the store. The <b>TOTP secret is encrypted, not hashed</b>,
  * because verification needs the shared secret back: {@link #enableTotp} encrypts it and {@link #find} returns it
  * decrypted. The application holds neither key nor cipher; it only names this contract.
@@ -27,8 +27,27 @@ public interface TwoFactorRepository {
     /** Hash and persist {@code plaintextPin} as the player's PIN factor, stamping the enrolment instant if new. */
     void setPin(UUID playerId, String plaintextPin);
 
+    /**
+     * Read the player's stored PIN, ready to compare candidates against. Every read that can fail (the row, the stored
+     * hash's form) happens here, before any candidate is looked at, so a failure says nothing about one. The check
+     * re-hashes a candidate and compares in constant time; it matches nothing when no PIN is set.
+     */
+    PinCheck pinCheck(UUID playerId);
+
     /** Re-hash {@code candidate} and compare in constant time against the stored PIN; false when no PIN is set. */
-    boolean verifyPin(UUID playerId, String candidate);
+    default boolean verifyPin(UUID playerId, String candidate) {
+        return pinCheck(playerId).matches(candidate);
+    }
+
+    /** A stored PIN, read and ready: comparing a candidate reads nothing more. */
+    @FunctionalInterface
+    interface PinCheck {
+
+        /** A check that matches nothing: the player has no PIN. */
+        PinCheck NONE = candidate -> false;
+
+        boolean matches(String candidate);
+    }
 
     /**
      * Drop only the player's TOTP secret, leaving any PIN they hold intact. The two factors are independent, so
