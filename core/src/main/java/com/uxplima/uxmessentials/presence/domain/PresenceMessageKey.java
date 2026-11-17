@@ -47,6 +47,7 @@ public enum PresenceMessageKey implements MessageKey {
     NICK_INVALID("presence.nick-invalid"),
     NICK_TARGET_UNKNOWN("presence.nick-target-unknown"),
     NICK_TAKEN("presence.nick-taken"),
+    NICK_CONFLICT("presence.nick-conflict"),
 
     // /whois. Staff identity/status summary for one visible online player
     WHOIS_RESULT("presence.whois-result"),

@@ -50,7 +50,6 @@ import com.uxplima.uxmessentials.shared.application.message.Notifier;
 import com.uxplima.uxmessentials.shared.application.module.KernelPorts;
 import com.uxplima.uxmessentials.shared.application.module.ModuleContext;
 import com.uxplima.uxmessentials.shared.application.permission.SocialPermissions;
-import com.uxplima.uxmessentials.shared.application.port.PlayerNameRepository;
 import com.uxplima.uxmessentials.shared.application.settings.SettingsSessions;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmlib.menu.Menus;
@@ -109,23 +108,22 @@ public final class PresenceWiring {
         InMemoryPresenceStore store = new InMemoryPresenceStore(clock, vanishLookup);
         PresenceAudience audience = new BukkitPresenceAudience();
         Notifier notifier = new Notifier(kernel.messages(), kernel.messageSink());
-        // The nicks every backend shares: read at login, shown at join, written back and announced when they change,
-        // and read again when another backend announces a change for a player here.
+        // The nicks every backend shares: read at login, shown at join, claimed in the database and announced when
+        // they change, and read again when another backend announces a change for a player here.
         NickRecords nickRecords = PresenceStores.nicks(persistence);
         PlayerNicks nicks = new PlayerNicks(
                 nickRecords,
+                PlayerNameRepositories.jooq(persistence),
                 new BukkitNickDisplay(plugin.getServer(), kernel.scheduler()),
                 kernel.scheduler(),
                 kernel.log(),
-                clock,
                 PlayerSettingsSync.announcer(bus.publisher()));
         PlayerSettingsSync.register(bus.registry(), nicks.settings());
         HeldSettingsListener heldNicks = new HeldSettingsListener(
                 new SettingsSessions(nicks.settings(), kernel.scheduler()), kernel.playerLookup());
         heldNicks.adoptOnline(plugin.getServer().getOnlinePlayers());
 
-        PresenceServices services = assemble(
-                kernel, store, audience, notifier, nicks, nickRecords, PlayerNameRepositories.jooq(persistence));
+        PresenceServices services = assemble(kernel, store, audience, notifier, nicks, nickRecords);
         AfkSweep sweep = new AfkSweep(
                 kernel.scheduler(),
                 store,
@@ -168,8 +166,8 @@ public final class PresenceWiring {
         commands.add(new PresenceSettingsCommand(services, kernel.messages(), kernel.scheduler(), settingsView));
         List<Listener> listeners = new ArrayList<>(listeners(kernel, settings, services, store, notifier));
         listeners.add(heldNicks);
-        listeners.add(new NickJoinListener(plugin, nicks));
-        return new Wired(commands, List.copyOf(listeners), sweep, store, services, running, clock);
+        listeners.add(new NickJoinListener(plugin, nicks, kernel.scheduler(), kernel.log()));
+        return new Wired(commands, List.copyOf(listeners), sweep, store, services, nicks, running, clock);
     }
 
     private static List<Listener> listeners(
@@ -197,14 +195,13 @@ public final class PresenceWiring {
             PresenceAudience audience,
             Notifier notifier,
             PlayerNicks nicks,
-            NickRecords nickRecords,
-            PlayerNameRepository names) {
+            NickRecords nickRecords) {
         var events = kernel.events();
         Clock clock = Clock.systemUTC();
         MarkAfk markAfk = new MarkAfk(store, audience, notifier, events, clock);
         ClearAfkOnActivity clearAfk = new ClearAfkOnActivity(store, audience, notifier, events, clock);
-        SetNick setNick = new SetNick(nicks, nickRecords, names, kernel.scheduler(), notifier, kernel.log());
-        ClearNick clearNick = new ClearNick(nicks, notifier);
+        SetNick setNick = new SetNick(nicks, kernel.scheduler(), notifier, kernel.log());
+        ClearNick clearNick = new ClearNick(nicks, kernel.scheduler(), notifier, kernel.log());
         return new PresenceServices(
                 markAfk, clearAfk, setNick, clearNick, new NickOwners(nickRecords, kernel.playerLookup()));
     }
@@ -219,6 +216,7 @@ public final class PresenceWiring {
      * @param afkSweep the self-rescheduling AFK idle sweep, armed by the caller
      * @param store the in-memory presence map, cleared on stop
      * @param services the constructed use cases, exposing the cross-context vanish query
+     * @param nicks the players' nicks, told when a joining player's name is stored
      * @param running the flag flipped false on stop so the sweep exits
      * @param clock the presence clock the {@code afk_duration} placeholder measures against
      */
@@ -228,6 +226,7 @@ public final class PresenceWiring {
             AfkSweep afkSweep,
             InMemoryPresenceStore store,
             PresenceServices services,
+            PlayerNicks nicks,
             AtomicBoolean running,
             Clock clock) {
 
@@ -237,6 +236,7 @@ public final class PresenceWiring {
             Objects.requireNonNull(afkSweep, "afkSweep");
             Objects.requireNonNull(store, "store");
             Objects.requireNonNull(services, "services");
+            Objects.requireNonNull(nicks, "nicks");
             Objects.requireNonNull(running, "running");
             Objects.requireNonNull(clock, "clock");
         }

@@ -3,7 +3,6 @@ package com.uxplima.uxmessentials.presence.adapter.inbound.command;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
-import java.util.Optional;
 
 import org.bukkit.Bukkit;
 import org.bukkit.command.CommandSender;
@@ -83,21 +82,23 @@ public final class WhoisCommand extends PresenceCommandSupport implements Comman
         // iterating Bukkit.getOnlinePlayers() off it); the matched player's live status fields are then read on that
         // player's own entity thread, and the one reply lands on the sender's own thread.
         scheduler.onGlobal(() -> {
-            Player match = VisibleNameMatch.find(sender, query);
-            if (match == null) {
-                Optional<OnlinePlayer> elsewhere = network.findElsewhere(query, sender);
+            VisibleNameMatch.Found found = VisibleNameMatch.find(sender, query, network);
+            if (found instanceof VisibleNameMatch.Elsewhere(OnlinePlayer elsewhere)) {
                 replyOnSenderThread(
                         sender,
-                        () -> elsewhere.ifPresentOrElse(
-                                found -> feedback.send(
-                                        sender,
-                                        PresenceMessageKey.WHOIS_RESULT_ELSEWHERE,
-                                        Map.of(
-                                                "name", found.player().name(),
-                                                "uuid", found.player().uuid().toString(),
-                                                "server", found.server())),
-                                () -> feedback.send(
-                                        sender, PresenceMessageKey.WHOIS_NOT_FOUND, Map.of("query", query))));
+                        () -> feedback.send(
+                                sender,
+                                PresenceMessageKey.WHOIS_RESULT_ELSEWHERE,
+                                Map.of(
+                                        "name", elsewhere.player().name(),
+                                        "uuid", elsewhere.player().uuid().toString(),
+                                        "server", elsewhere.server())));
+                return;
+            }
+            if (!(found instanceof VisibleNameMatch.Here(Player match))) {
+                replyOnSenderThread(
+                        sender,
+                        () -> feedback.send(sender, PresenceMessageKey.WHOIS_NOT_FOUND, Map.of("query", query)));
                 return;
             }
             PlayerRef matchRef = BukkitRefs.toRef(match);

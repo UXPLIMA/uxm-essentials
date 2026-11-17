@@ -6,10 +6,13 @@ needs a setting it did not need before.
 ## Nicks are kept in the database
 
 A `/nick` is kept in the new `player_nicks` table, so it survives a relog and follows the player to every server; it
-was lost before. A nick saved in a server's player data by an earlier version is taken over at the player's next join
-to that server, when the database holds none. A nick that is another account's name in any case, or another player's
-nick, is refused; a player may wear their own name, a Bedrock player's dotted one too. A server still on an older
-release does not show the shared nick, so upgrade every server of the network in the same window.
+was lost before. A nick that is another account's name in any case, or another player's nick, is refused; a player may
+wear their own name, a Bedrock player's dotted one too. One nick has one holder across the database, so two servers
+cannot hand it out at once, and a nick that copied a name before its account first joined is cleared when it joins.
+A nick saved in a server's player data by an earlier version is taken over at the player's next join to that server,
+under the same rules, when the database holds none; one that is taken is dropped. `/realname` also answers for a nick
+whose player is offline or on another server. A server still on an older release does not show the shared nick, so
+upgrade every server of the network in the same window.
 
 ## Lists name the players of every server
 

@@ -933,7 +933,8 @@ public final class PluginModule {
                 wiredKernel.resolver()::resolve,
                 networkPresence.presence(),
                 networkPresence.track(),
-                wiredKernel.networkClaims());
+                wiredKernel.networkClaims(),
+                wiredKernel.nameIndex());
         bus.start();
         networkPresence.start();
         // Every module has registered its resync by now. The proxy cannot relay a frame to an empty backend, so the
@@ -1290,7 +1291,8 @@ public final class PluginModule {
             Function<com.uxplima.uxmessentials.shared.domain.PlayerRef, Locale> languages,
             NetworkPresence presence,
             com.uxplima.uxmessentials.shared.application.networkpresence.TrackNetworkPresence presenceTrack,
-            Optional<com.uxplima.uxmessentials.shared.application.ledger.NetworkClaims> networkClaims) {
+            Optional<com.uxplima.uxmessentials.shared.application.ledger.NetworkClaims> networkClaims,
+            CachingPlayerNameIndex nameIndex) {
         // teleport is wired before homes/warps (registry order is dependency-first), so its engine is
         // captured and handed to the contexts that delegate teleport execution to it.
         // The cross-server hop every teleport kind shares, built before any of them wires so each registers its
@@ -1307,6 +1309,7 @@ public final class PluginModule {
         links.claimLedger = ClaimLedgers.claims(persistence);
         links.kitResets = ClaimLedgers.kitResets(persistence);
         links.livePeers = livePeers;
+        links.nameIndex = nameIndex;
         links.proxyAnswering = () -> busHealth
                 .proxy()
                 .map(link -> link.answeredWithin(System.currentTimeMillis(), busHealth.answerWindow()))
@@ -3477,6 +3480,11 @@ public final class PluginModule {
         wired.listeners().forEach(resources::addListener);
         wired.startBackgroundWork();
         resources.onClose(wired::stop);
+        // A name joining here takes back a nick another player copied from it while it was free.
+        CachingPlayerNameIndex nameIndex = links.nameIndex;
+        if (nameIndex != null) {
+            resources.onClose(nameIndex.afterStored(wired.nicks()::nameJoined));
+        }
         links.placeholders.presence(new StorePresencePlaceholders(wired.store(), wired.clock()));
         links.queries.register(UxmPresenceQuery.class, new PresenceQueries(wired.store()));
         links.actions.register(
@@ -4096,6 +4104,8 @@ public final class PluginModule {
         private java.util.function.BooleanSupplier proxyAnswering = () -> false;
         // Whether this backend is part of a network (network.enabled), which is when a jail can be on another one.
         private boolean networked;
+        // The name index behind the lookup port, told when a joining player's name is stored.
+        private @Nullable CachingPlayerNameIndex nameIndex;
         // The players of the other backends a viewer may see; none until the network view is built at wiring start.
         private com.uxplima.uxmessentials.shared.adapter.outbound.lookup.VisibleNetwork visibleNetwork =
                 com.uxplima.uxmessentials.shared.adapter.outbound.lookup.VisibleNetwork.NONE;
