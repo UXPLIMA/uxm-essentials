@@ -10,8 +10,11 @@ import java.util.Objects;
 import java.util.UUID;
 
 import com.uxplima.uxmessentials.moderation.application.port.CaseCopies;
+import com.uxplima.uxmessentials.moderation.domain.JailState;
+import com.uxplima.uxmessentials.moderation.domain.MuteState;
 import com.uxplima.uxmessentials.persistence.jooq.tables.records.ModerationCaseCopiesRecord;
 import com.uxplima.uxmessentials.persistence.runtime.JooqRepository;
+import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import org.jooq.DSLContext;
 import org.jspecify.annotations.NullMarked;
 
@@ -26,16 +29,59 @@ public final class JooqCaseCopies extends JooqRepository implements CaseCopies {
         super(dsl);
     }
 
+    /** The record goes in first, so a copy that cannot be stored takes its record back out with it. */
     @Override
-    public void record(Copy copy) {
+    public boolean copyMute(PlayerRef target, MuteState expected, MuteState copy, Instant at, Copy record) {
+        Objects.requireNonNull(target, "target");
+        Objects.requireNonNull(expected, "expected");
         Objects.requireNonNull(copy, "copy");
-        write(dsl -> dsl.insertInto(MODERATION_CASE_COPIES)
-                .set(MODERATION_CASE_COPIES.TARGET, copy.target().toString())
-                .set(MODERATION_CASE_COPIES.KIND, copy.kind().name())
-                .set(MODERATION_CASE_COPIES.ORIGIN, copy.origin().toString())
-                .set(MODERATION_CASE_COPIES.ISSUED_AT, copy.issuedAt().toEpochMilli())
+        Objects.requireNonNull(at, "at");
+        Objects.requireNonNull(record, "record");
+        try {
+            return write(dsl -> {
+                ModerationWrites.ensureSeenRow(dsl, target, at);
+                insert(dsl, record);
+                if (!ModerationWrites.replaceMute(dsl, target, expected, copy)) {
+                    throw new Superseded();
+                }
+                return true;
+            });
+        } catch (Superseded superseded) {
+            return false;
+        }
+    }
+
+    @Override
+    public boolean copyJail(PlayerRef target, JailState.Active copy, Instant at, Copy record) {
+        Objects.requireNonNull(target, "target");
+        Objects.requireNonNull(copy, "copy");
+        Objects.requireNonNull(at, "at");
+        Objects.requireNonNull(record, "record");
+        return write(dsl -> {
+            ModerationWrites.ensureSeenRow(dsl, target, at);
+            insert(dsl, record);
+            return ModerationWrites.saveJail(dsl, target, copy) == 1;
+        });
+    }
+
+    private static void insert(DSLContext dsl, Copy record) {
+        dsl.insertInto(MODERATION_CASE_COPIES)
+                .set(MODERATION_CASE_COPIES.TARGET, record.target().toString())
+                .set(MODERATION_CASE_COPIES.KIND, record.kind().name())
+                .set(MODERATION_CASE_COPIES.ORIGIN, record.origin().toString())
+                .set(MODERATION_CASE_COPIES.ISSUED_AT, record.issuedAt().toEpochMilli())
                 .onConflictDoNothing()
-                .execute());
+                .execute();
+    }
+
+    /** Rolls the copy's transaction back when the mute it was to replace changed meanwhile. */
+    private static final class Superseded extends RuntimeException {
+
+        private static final long serialVersionUID = 1L;
+
+        Superseded() {
+            super(null, null, false, false);
+        }
     }
 
     @Override

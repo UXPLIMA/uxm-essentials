@@ -10,9 +10,11 @@ final class Logins {
     static LoginEnforcement.Decision check(
             LoginEnforcement login, PlayerRef who, String ip, boolean hasBypass, boolean exempt) {
         LoginEnforcement.Standing standing = login.read(who, ip);
-        login.carryOver(standing);
         LoginEnforcement.Decision decision = login.decide(standing, hasBypass, exempt);
         login.record(standing, !decision.allowed());
+        if (decision.allowed()) {
+            login.carryOver(standing);
+        }
         return decision;
     }
 }

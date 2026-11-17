@@ -34,14 +34,13 @@ import com.uxplima.uxmessentials.shared.domain.message.MessageKey;
  * <ul>
  *   <li>{@link #read} fetches everything the check needs from storage. It runs at pre-login, off the tick, where no
  *       {@code Player} exists yet and so no permission can be read.
- *   <li>{@link #carryOver} gives the account the mute and the jail it inherits, so every check that reads its own
- *       mute or jail, on this server and the others, holds it from the moment it joins. It writes to storage, so it
- *       runs right after the read, still off the tick.
  *   <li>{@link #decide} weighs what was read against the two permission answers (the lockdown bypass and the
  *       punishment exemption). It touches no storage, so it runs at login, on the server thread, where the
  *       permissions are attached.
- *   <li>{@link #record} writes the last-seen row and the alt-detection audit line once the outcome is known. It
- *       writes to storage, so it goes back off the tick.
+ *   <li>{@link #record} writes the alt-detection audit line once the outcome is known, and {@link #carryOver} gives
+ *       an allowed account the mute and the jail it inherits, so every check that reads its own mute or jail, on this
+ *       server and the others, holds it. Both write to storage, so they go back off the tick. The seen row is the
+ *       join's to write: a refused login leaves none.
  * </ul>
  *
  * <p>The refusal text is rendered through the {@link Notifier}, so the disconnect screen is in the player's language.
@@ -106,13 +105,13 @@ public final class LoginEnforcement {
                 repository.loadTempban(who),
                 repository.activeIpBan(ip, now),
                 ipAlts.onAddress(ip, who.uuid()),
-                caseVariants.atLogin(who, now));
+                caseVariants.atLogin(who, ip, now));
     }
 
     /**
      * Give {@code standing}'s account the mute and the jail it inherits from another spelling of its name, through the
-     * {@link CarryOver} the server was built with. It writes to storage, so call it off the tick, before the login is
-     * decided.
+     * {@link CarryOver} the server was built with. Call it only for a login that was allowed, so a refused one leaves
+     * nothing behind. It writes to storage, so call it off the tick.
      */
     public void carryOver(Standing standing) {
         Objects.requireNonNull(standing, "standing");
@@ -171,12 +170,13 @@ public final class LoginEnforcement {
     }
 
     /**
-     * Record that {@code standing}'s player tried to log in, and audit the other accounts on their address when there
-     * are any or the login was {@code refused}. It writes to storage, so call it off the tick.
+     * Audit the other accounts on {@code standing}'s address when there are any or the login was {@code refused}. It
+     * writes to storage, so call it off the tick.
      */
     public void record(Standing standing, boolean refused) {
         Objects.requireNonNull(standing, "standing");
-        repository.recordSeen(standing.who(), Optional.of(standing.ip()), clock.instant());
+        // The seen row, first seen included, is written by the join, not here: a refused login must leave no trace a
+        // sanction on another spelling of the name would count as an account that existed before it.
         // The address history itself is written by the kernel recorder on join. Alt detection here keys off the
         // connecting address: /alts walks a player's whole history, but a login is one address.
         if (refused || !standing.alts().isEmpty()) {

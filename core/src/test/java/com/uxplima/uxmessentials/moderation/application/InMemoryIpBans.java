@@ -151,7 +151,7 @@ final class InMemoryIpBans implements ModerationRepository {
 
     @Override
     public void recordSeen(PlayerRef who, Optional<String> ip, Instant at) {
-        // Last-seen records are not what these tests look at.
+        seen.compute(who.uuid(), (uuid, old) -> old == null ? SeenRecord.firstJoin(who, ip, at) : old.touched(at, ip));
     }
 
     @Override

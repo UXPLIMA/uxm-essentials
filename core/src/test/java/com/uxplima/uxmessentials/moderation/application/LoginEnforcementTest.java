@@ -10,7 +10,6 @@ import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 
-import com.uxplima.uxmessentials.moderation.application.port.CaseCopies;
 import com.uxplima.uxmessentials.moderation.application.port.JailSync;
 import com.uxplima.uxmessentials.moderation.application.port.NameHolders;
 import com.uxplima.uxmessentials.moderation.application.port.SanctionSync;
@@ -19,7 +18,6 @@ import com.uxplima.uxmessentials.moderation.domain.Issuer;
 import com.uxplima.uxmessentials.moderation.domain.JailState;
 import com.uxplima.uxmessentials.moderation.domain.ModerationMessageKey;
 import com.uxplima.uxmessentials.moderation.domain.MuteState;
-import com.uxplima.uxmessentials.moderation.domain.SeenRecord;
 import com.uxplima.uxmessentials.moderation.domain.TempbanState;
 import com.uxplima.uxmessentials.shared.application.IpAlts;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
@@ -40,6 +38,17 @@ class LoginEnforcementTest {
     private static final PlayerRef UPPER_STEVE = new PlayerRef(UUID.randomUUID(), "STEVE");
 
     private final InMemoryIpBans repository = new InMemoryIpBans();
+    private final InMemoryCaseCopies copies = new InMemoryCaseCopies(repository);
+    /** The earliest trace of each account, as the seen rows, the name list and the player files would give it. */
+    private final java.util.Map<UUID, java.time.Instant> traced = new java.util.HashMap<>();
+
+    private final CaseVariantSanctions.AccountTraces traces =
+            account -> Optional.ofNullable(traced.get(account.uuid()));
+    /** The accounts each account shared an address with. */
+    private final java.util.Map<UUID, java.util.Set<UUID>> addresses = new java.util.HashMap<>();
+
+    private final CaseVariantSanctions.AddressLinks links =
+            (account, address) -> addresses.getOrDefault(account, java.util.Set.of());
     private final RecordingNotifier notifier = new RecordingNotifier();
     private final LoginEnforcement login = new LoginEnforcement(
             repository,
@@ -142,7 +151,6 @@ class LoginEnforcementTest {
     @Test
     void offlineModeEverySpellingIsReachedWhenTheServerSaysSo() {
         banSteve();
-        repository.saveMute(STEVE, STEVES_MUTE);
         playingSinceLastMonth(UPPER_STEVE);
         LoginEnforcement everySpelling =
                 offlineMode(name -> List.of(STEVE, UPPER_STEVE), false, CaseVariantSanctions.Reach.ALL);
@@ -151,7 +159,6 @@ class LoginEnforcementTest {
 
         assertThat(decision.allowed()).isFalse();
         assertThat(decision.kickReason()).contains(ModerationMessageKey.TEMPBAN_KICK.key());
-        assertThat(repository.loadMute(UPPER_STEVE).expiry()).isEqualTo(STEVES_MUTE.expiry());
     }
 
     @Test
@@ -177,7 +184,30 @@ class LoginEnforcementTest {
     }
 
     private void playingSinceLastMonth(PlayerRef account) {
-        repository.recordSeen(SeenRecord.firstJoin(account, Optional.of(HOME), NOW.minus(Duration.ofDays(30))));
+        traced.put(account.uuid(), NOW.minus(Duration.ofDays(30)));
+    }
+
+    @Test
+    void offlineModeALookAlikeFromTheSameConnectionIsReachedHoweverOld() {
+        banSteve();
+        playingSinceLastMonth(UPPER_STEVE);
+        addresses.put(UPPER_STEVE.uuid(), java.util.Set.of(STEVE.uuid()));
+
+        LoginEnforcement.Decision decision =
+                Logins.check(offlineMode(name -> List.of(STEVE, UPPER_STEVE), false), UPPER_STEVE, HOME, false, false);
+
+        assertThat(decision.allowed()).isFalse();
+        assertThat(decision.kickReason()).contains(ModerationMessageKey.TEMPBAN_KICK.key());
+    }
+
+    @Test
+    void offlineModeARefusedLoginLeavesNoTraceThatWouldLaterPassForAnOldAccount() {
+        banSteve();
+        LoginEnforcement offline = offlineMode(name -> List.of(STEVE), false);
+
+        Logins.check(offline, UPPER_STEVE, HOME, false, false);
+
+        assertThat(repository.seen(UPPER_STEVE)).isEmpty();
     }
 
     private LoginEnforcement offlineMode(NameHolders holders, boolean refuseCaseVariants) {
@@ -192,10 +222,10 @@ class LoginEnforcementTest {
                 notifier.notifier(),
                 new SilentAudit(),
                 CLOCK,
-                new CaseVariantSanctions(repository, holders, reach),
+                new CaseVariantSanctions(repository, holders, reach, copies, traces, links),
                 new CaseVariantCopies(
                         repository,
-                        CaseCopies.NONE,
+                        copies,
                         notifier.notifier(),
                         new SanctionHistoryRecorder(new RecordedHistory(), CLOCK),
                         new OnlinePlayers(),

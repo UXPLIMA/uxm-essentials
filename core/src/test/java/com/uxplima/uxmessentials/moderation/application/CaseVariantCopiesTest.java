@@ -7,14 +7,10 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 import java.time.Duration;
 import java.util.ArrayList;
-import java.util.Collection;
-import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Optional;
-import java.util.Set;
 import java.util.UUID;
 
-import com.uxplima.uxmessentials.moderation.application.port.CaseCopies;
 import com.uxplima.uxmessentials.moderation.application.port.JailSync;
 import com.uxplima.uxmessentials.moderation.application.port.NameHolders;
 import com.uxplima.uxmessentials.moderation.application.port.SanctionSync;
@@ -47,7 +43,7 @@ class CaseVariantCopiesTest {
             NOW.plus(Duration.ofDays(1)), Issuer.of(ALEX), Optional.of("slurs"), NOW.minus(Duration.ofHours(1)));
 
     private final InMemoryIpBans repository = new InMemoryIpBans();
-    private final KeptCopies kept = new KeptCopies();
+    private final InMemoryCaseCopies kept = new InMemoryCaseCopies(repository);
     private final RecordingNotifier notifier = new RecordingNotifier();
     private final RecordedHistory history = new RecordedHistory();
     private final SanctionHistoryRecorder recorder = new SanctionHistoryRecorder(history, CLOCK);
@@ -162,6 +158,35 @@ class CaseVariantCopiesTest {
     }
 
     @Test
+    void aCopyTheStoreCannotKeepLeavesNothingBehind() {
+        repository.saveMute(STEVE, STEVES_MUTE);
+        kept.goDown();
+
+        org.assertj.core.api.Assertions.assertThatThrownBy(() -> logIn(UPPER_STEVE, CaseVariantSanctions.Reach.NEWER))
+                .isInstanceOf(IllegalStateException.class);
+
+        assertThat(repository.loadMute(UPPER_STEVE)).isEqualTo(MuteState.none());
+        assertThat(kept.kept()).isEmpty();
+        assertThat(history.entries()).isEmpty();
+        assertThat(delivered).isEmpty();
+    }
+
+    @Test
+    void aRefusedLoginIsGivenNoCopy() {
+        repository.saveMute(STEVE, STEVES_MUTE);
+        repository.saveTempban(
+                STEVE,
+                com.uxplima.uxmessentials.moderation.domain.TempbanState.active(
+                        NOW.plus(Duration.ofDays(1)), Issuer.of(ALEX), Optional.of("cheating"), NOW));
+
+        logIn(UPPER_STEVE, CaseVariantSanctions.Reach.NEWER);
+
+        assertThat(repository.loadMute(UPPER_STEVE)).isEqualTo(MuteState.none());
+        assertThat(repository.seen(UPPER_STEVE)).isEmpty();
+        assertThat(kept.kept()).isEmpty();
+    }
+
+    @Test
     void unjailingTheOriginalReleasesTheCopyItMade() {
         JailState.Active cell = (JailState.Active)
                 JailState.permanent("cell", Issuer.of(ALEX), Optional.of("grief"), NOW.minus(Duration.ofHours(1)));
@@ -188,30 +213,5 @@ class CaseVariantCopiesTest {
                 copies::carryOver,
                 false);
         Logins.check(login, who, HOME, false, false);
-    }
-
-    /** The copies kept in memory, every one ever made. */
-    private static final class KeptCopies implements CaseCopies {
-
-        private final Set<Copy> copies = new LinkedHashSet<>();
-
-        @Override
-        public void record(Copy copy) {
-            copies.add(copy);
-        }
-
-        @Override
-        public List<Copy> heldBy(Collection<UUID> targets) {
-            return copies.stream()
-                    .filter(copy -> targets.contains(copy.target()))
-                    .toList();
-        }
-
-        @Override
-        public List<Copy> madeFrom(UUID origin, Kind kind) {
-            return copies.stream()
-                    .filter(copy -> copy.origin().equals(origin) && copy.kind() == kind)
-                    .toList();
-        }
     }
 }

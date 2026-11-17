@@ -20,15 +20,19 @@ import com.uxplima.uxmessentials.moderation.domain.SeenRecord;
 import com.uxplima.uxmessentials.moderation.domain.TempbanState;
 import com.uxplima.uxmessentials.shared.application.port.Logger;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
+import org.jspecify.annotations.Nullable;
 
 /**
  * The sanctions that follow a player into the other spellings of their name on an offline-mode server, where the uuid
  * is derived from the exact spelling: a banned, muted or jailed {@code Steve} who logs in as {@code STEVE} arrives as
  * another account with no sanction of its own.
  *
- * <p>A sanction reaches another spelling according to {@link Reach}. By default it reaches only an account first seen
- * after the sanction was issued, the look-alike made to get around it; an account that was already playing under its
- * own spelling is taken to be somebody else. {@link Reach#ALL} lets it reach every spelling.
+ * <p>A sanction reaches another spelling according to {@link Reach}. By default it reaches an account that has no
+ * trace from before the sanction was issued ({@link AccountTraces}: a completed join, a stored name, the server's own
+ * player file), the look-alike made to get around it, and any account that ever shared an address with the sanctioned
+ * one ({@link AddressLinks}), however old: a look-alike registered ahead of time from the same connection is the same
+ * person. An account that was already playing under its own spelling from elsewhere is taken to be somebody else.
+ * {@link Reach#ALL} lets it reach every spelling.
  *
  * <p>Only an original follows a player. A mute or a jail an account holds as a copy ({@link CaseCopies}) is never a
  * source, so it is not copied on and never comes back to the account it came from, and a sanction already copied onto
@@ -61,20 +65,64 @@ public final class CaseVariantSanctions {
         }
     }
 
+    /** The earliest instant anything shows an account existed, empty when nothing does. Read off the tick. */
+    @FunctionalInterface
+    public interface AccountTraces {
+
+        Optional<Instant> earliest(PlayerRef account);
+    }
+
+    /**
+     * The accounts that ever connected from an address {@code account} connected from, and from {@code address} when
+     * given (the one a login comes from now). Read off the tick.
+     */
+    @FunctionalInterface
+    public interface AddressLinks {
+
+        /** No address is known: the answer for a store with no address history. */
+        AddressLinks NONE = (account, address) -> Set.of();
+
+        Set<UUID> sharing(UUID account, Optional<String> address);
+    }
+
     private final ModerationRepository repository;
     private final NameHolders holders;
     private final Reach reach;
     private final CaseCopies copies;
+    private final AccountTraces traces;
+    private final AddressLinks links;
 
     public CaseVariantSanctions(ModerationRepository repository, NameHolders holders, Reach reach) {
         this(repository, holders, reach, CaseCopies.NONE);
     }
 
     public CaseVariantSanctions(ModerationRepository repository, NameHolders holders, Reach reach, CaseCopies copies) {
+        this(
+                repository,
+                holders,
+                reach,
+                copies,
+                account -> repository.seen(account).map(SeenRecord::firstSeen),
+                AddressLinks.NONE);
+    }
+
+    /**
+     * @param traces the earliest sign each account existed, which decides whether a sanction is older than it
+     * @param links the accounts that shared an address, which a sanction reaches whatever their age
+     */
+    public CaseVariantSanctions(
+            ModerationRepository repository,
+            NameHolders holders,
+            Reach reach,
+            CaseCopies copies,
+            AccountTraces traces,
+            AddressLinks links) {
         this.repository = Objects.requireNonNull(repository, "repository");
         this.holders = Objects.requireNonNull(holders, "holders");
         this.reach = Objects.requireNonNull(reach, "reach");
         this.copies = Objects.requireNonNull(copies, "copies");
+        this.traces = Objects.requireNonNull(traces, "traces");
+        this.links = Objects.requireNonNull(links, "links");
     }
 
     /** Nothing follows anybody: the answer for a server whose logins are authenticated. */
@@ -83,12 +131,13 @@ public final class CaseVariantSanctions {
     }
 
     /**
-     * What the login of {@code who} inherits from the other spellings of its name: the first active ban, mute and jail
-     * among them that reaches it, each with the account it came from. Reads storage, a fixed number of queries however
-     * many spellings there are, so call it off the tick.
+     * What the login of {@code who} from {@code address} inherits from the other spellings of its name: the first
+     * active ban, mute and jail among them that reaches it, each with the account it came from. Reads storage, a fixed
+     * number of queries however many spellings there are, so call it off the tick.
      */
-    public Inherited atLogin(PlayerRef who, Instant now) {
+    public Inherited atLogin(PlayerRef who, String address, Instant now) {
         Objects.requireNonNull(who, "who");
+        Objects.requireNonNull(address, "address");
         Objects.requireNonNull(now, "now");
         List<PlayerRef> underName = holders.underName(who.name());
         boolean known = underName.stream().anyMatch(holder -> holder.uuid().equals(who.uuid()));
@@ -96,7 +145,7 @@ public final class CaseVariantSanctions {
         if (variants.isEmpty()) {
             return Inherited.nothing(known);
         }
-        Optional<Instant> firstSeen = firstSeen(who);
+        Reaching reaching = new Reaching(who, Optional.of(address));
         List<UUID> asked = new ArrayList<>();
         variants.forEach(variant -> asked.add(variant.uuid()));
         asked.add(who.uuid());
@@ -121,13 +170,13 @@ public final class CaseVariantSanctions {
             if (!ban.isActiveAt(now)
                     && bans.get(variant.uuid()) instanceof TempbanState.Active active
                     && active.isActiveAt(now)
-                    && reaches(firstSeen, active.issuedAt())) {
+                    && reaching.reaches(variant, active.issuedAt())) {
                 ban = active;
             }
             MuteState variantMute = mutes.getOrDefault(variant.uuid(), MuteState.none());
             if (!mute.isActiveAt(now)
                     && variantMute.isActiveAt(now)
-                    && reaches(firstSeen, issuedAt(variantMute))
+                    && reaching.reaches(variant, issuedAt(variantMute))
                     && original(variant, CaseCopies.Kind.MUTE, issuedAt(variantMute), held, givenBefore)) {
                 mute = variantMute;
                 muteFrom = Optional.of(variant);
@@ -135,7 +184,7 @@ public final class CaseVariantSanctions {
             if (!jail.isActiveAt(now)
                     && jails.get(variant.uuid()) instanceof JailState.Active active
                     && active.isActiveAt(now)
-                    && reaches(firstSeen, active.issuedAt())
+                    && reaching.reaches(variant, active.issuedAt())
                     && original(variant, CaseCopies.Kind.JAIL, active.issuedAt(), held, givenBefore)) {
                 jail = active;
                 jailFrom = Optional.of(variant);
@@ -155,10 +204,11 @@ public final class CaseVariantSanctions {
         if (reach == Reach.ALL || variants.isEmpty()) {
             return variants;
         }
-        // The holders are capped and a ban is rare, so one first-seen read per spelling is a bounded cost.
+        // The holders are capped and a ban is rare, so one trace read per spelling is a bounded cost.
+        Set<UUID> sharing = links.sharing(banned.uuid(), Optional.empty());
         List<PlayerRef> reached = new ArrayList<>();
         for (PlayerRef variant : variants) {
-            if (reaches(firstSeen(variant), issuedAt)) {
+            if (sharing.contains(variant.uuid()) || newerThan(traces.earliest(variant), issuedAt)) {
                 reached.add(variant);
             }
         }
@@ -175,14 +225,43 @@ public final class CaseVariantSanctions {
         return !held.contains(sanction) && !givenBefore.contains(sanction);
     }
 
-    private Optional<Instant> firstSeen(PlayerRef who) {
-        return reach == Reach.ALL ? Optional.empty() : repository.seen(who).map(SeenRecord::firstSeen);
+    /** An account with no trace anywhere is new; one with any trace from before the sanction was somebody already. */
+    private static boolean newerThan(Optional<Instant> earliest, Instant issuedAt) {
+        return earliest.map(first -> first.isAfter(issuedAt)).orElse(true);
     }
 
-    /** An account never seen is new; one seen before the sanction was issued was already somebody else. */
-    private boolean reaches(Optional<Instant> firstSeen, Instant issuedAt) {
-        return reach == Reach.ALL
-                || firstSeen.map(first -> first.isAfter(issuedAt)).orElse(true);
+    /** Whether a variant's sanction reaches one joining account; each fact is read once, and only when asked. */
+    private final class Reaching {
+
+        private final PlayerRef who;
+        private final Optional<String> address;
+        private Optional<Instant> earliest = Optional.empty();
+        private boolean earliestRead;
+        private @Nullable Set<UUID> sharing;
+
+        Reaching(PlayerRef who, Optional<String> address) {
+            this.who = who;
+            this.address = address;
+        }
+
+        boolean reaches(PlayerRef variant, Instant issuedAt) {
+            if (reach == Reach.ALL) {
+                return true;
+            }
+            if (!earliestRead) {
+                earliest = traces.earliest(who);
+                earliestRead = true;
+            }
+            if (newerThan(earliest, issuedAt)) {
+                return true;
+            }
+            Set<UUID> linked = sharing;
+            if (linked == null) {
+                linked = links.sharing(who.uuid(), address);
+                sharing = linked;
+            }
+            return linked.contains(variant.uuid());
+        }
     }
 
     private static List<PlayerRef> otherSpellings(PlayerRef who, List<PlayerRef> underName) {

@@ -82,8 +82,9 @@ public final class CaseVariantCopies {
 
     /**
      * Give {@code who} the mute and the jail of {@code inherited}, each unless the account already has an active one of
-     * its own. Called at pre-login, before the login is decided, so the checks on join already hold it. Writes to
-     * storage, so call it off the tick.
+     * its own. Called once the login is allowed, on the player's storage lane ahead of the join's own work there, so
+     * the jail on join already finds the copy; the copied mute is published as an event, which the in-memory mute
+     * takes whether the join's read of it lands before or after. Writes to storage, so call it off the tick.
      */
     public void carryOver(PlayerRef who, CaseVariantSanctions.Inherited inherited) {
         Objects.requireNonNull(who, "who");
@@ -96,19 +97,21 @@ public final class CaseVariantCopies {
         if (muteFrom.isEmpty() && jailFrom.isEmpty()) {
             return;
         }
-        repository.ensureUserExists(who, now);
         muteFrom.ifPresent(from -> {
             MuteState own = repository.loadMute(who);
-            if (!own.isActiveAt(now)) {
-                giveMute(who, own, inherited.mute(), from);
+            if (!own.isActiveAt(now) && giveMute(who, own, inherited.mute(), from)) {
+                events.publish(new PlayerMuted(who, repository.loadMute(who), now));
             }
         });
         if (jailFrom.isPresent()
                 && inherited.jail() instanceof JailState.Active held
                 && !repository.loadJail(who).isActiveAt(now)) {
-            repository.saveJail(who, held);
-            copies.record(new CaseCopies.Copy(
-                    who.uuid(), CaseCopies.Kind.JAIL, jailFrom.get().uuid(), held.issuedAt()));
+            copies.copyJail(
+                    who,
+                    held,
+                    now,
+                    new CaseCopies.Copy(
+                            who.uuid(), CaseCopies.Kind.JAIL, jailFrom.get().uuid(), held.issuedAt()));
         }
     }
 
@@ -140,13 +143,16 @@ public final class CaseVariantCopies {
                         MuteState.timed(timed.until(), timed.issuer(), text, timed.issuedAt(), Optional.of(drawn));
                     case MuteState.None none -> none;
                 };
-        if (!(copy instanceof MuteState.None) && repository.replaceMute(who, current, copy)) {
-            Instant issuedAt = CaseVariantSanctions.issuedAt(copy);
-            copies.record(new CaseCopies.Copy(who.uuid(), CaseCopies.Kind.MUTE, from.uuid(), issuedAt));
-            history.inheritedMute(issuer(copy), who, drawn, text, copy.expiry());
-            return true;
+        if (copy instanceof MuteState.None) {
+            return false;
         }
-        return false;
+        Instant issuedAt = CaseVariantSanctions.issuedAt(copy);
+        CaseCopies.Copy record = new CaseCopies.Copy(who.uuid(), CaseCopies.Kind.MUTE, from.uuid(), issuedAt);
+        if (!copies.copyMute(who, current, copy, clock.instant(), record)) {
+            return false;
+        }
+        history.inheritedMute(issuer(copy), who, drawn, text, copy.expiry());
+        return true;
     }
 
     private void liftMutes(PlayerRef origin) {

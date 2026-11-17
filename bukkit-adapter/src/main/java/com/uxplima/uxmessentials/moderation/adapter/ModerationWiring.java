@@ -32,6 +32,7 @@ import com.uxplima.uxmessentials.moderation.adapter.outbound.ConfigJailDirectory
 import com.uxplima.uxmessentials.moderation.adapter.outbound.DiscordPunishmentAudit;
 import com.uxplima.uxmessentials.moderation.adapter.outbound.InMemoryCommandSpyStore;
 import com.uxplima.uxmessentials.moderation.adapter.outbound.JailServerAdoption;
+import com.uxplima.uxmessentials.moderation.adapter.outbound.KnownAccountTraces;
 import com.uxplima.uxmessentials.moderation.adapter.outbound.LoggingModerationAudit;
 import com.uxplima.uxmessentials.moderation.adapter.outbound.PermissionSanctionBroadcast;
 import com.uxplima.uxmessentials.moderation.adapter.outbound.PlayerLookupTargetResolver;
@@ -245,11 +246,14 @@ public final class ModerationWiring {
         // name; with authenticated logins a case variant of a name is somebody else and nothing is read. The name
         // case is asked live, since a proxy network can turn out to be offline-mode while the server runs.
         CaseCopies caseCopies = ModerationStores.caseCopies(persistence);
+        JooqPlayerNameRepository storedNames = new JooqPlayerNameRepository(persistence.dsl());
         CaseVariantSanctions caseVariants = new CaseVariantSanctions(
                 repository,
-                new StoredNameHolders(new JooqPlayerNameRepository(persistence.dsl()), kernel.playerLookup()::nameCase),
+                new StoredNameHolders(storedNames, kernel.playerLookup()::nameCase),
                 settings.caseVariantSanctions(),
-                caseCopies);
+                caseCopies,
+                new KnownAccountTraces(repository, storedNames, plugin.getServer()),
+                new IpAlts(ipHistory, ipTokens)::sharingAnyAddress);
         ModerationServices services = assemble(
                 plugin,
                 auditChannel,
