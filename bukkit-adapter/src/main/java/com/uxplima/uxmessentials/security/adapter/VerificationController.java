@@ -223,6 +223,9 @@ public final class VerificationController implements KeypadActions {
             Instant now = clock.instant();
             lane.run(viewer.uuid(), "security_session_release_failed", () -> carry.left(viewer.uuid(), serverId, now));
         }
+        // A half-made PIN must not outlive the session it was being made in: kept, it would take the next join's
+        // entries as a new PIN rather than as proof of the one that exists by then.
+        enrolment.abandon(viewer.uuid());
         Player live = Bukkit.getPlayer(viewer.uuid());
         if (live != null) {
             gameMode.restore(live);
@@ -296,10 +299,13 @@ public final class VerificationController implements KeypadActions {
             // from: this is the path an operator's `/security reset` takes, and it is exactly when they should be
             // made to set a new one rather than quietly left with no factor at all.
             if (permissions.has(ref, PIN_REQUIRED_PERMISSION)) {
-                scheduler.onEntity(ref, () -> beginEnrolment(ref));
+                scheduler.onEntity(ref, () -> beginEnrolment(ref, token));
                 return;
             }
             sessions.clear(ref.uuid());
+            // A forced re-verify can land while a prompt is already up; with nothing left to prove it must go too,
+            // or it would sit there asking for an answer nothing waits on.
+            keypad.closeIfAsking(ref);
             return;
         }
         boolean totpEnabled = registration.totpEnabled();
@@ -340,7 +346,7 @@ public final class VerificationController implements KeypadActions {
             // held instead and made to set one now, because "you must have a factor" means nothing if not having one
             // is the way past it.
             if (permissions.has(ref, PIN_REQUIRED_PERMISSION)) {
-                scheduler.onEntity(ref, () -> beginEnrolment(ref));
+                scheduler.onEntity(ref, () -> beginEnrolment(ref, token));
                 return;
             }
             sessions.clear(ref.uuid());
@@ -390,14 +396,18 @@ public final class VerificationController implements KeypadActions {
         sessions.clear(ref.uuid());
     }
 
-    /** Hold {@code ref} at the create-a-PIN pad; the freeze stays on until they have one. */
-    private void beginEnrolment(PlayerRef ref) {
+    /**
+     * Hold {@code ref} at the create-a-PIN pad; the freeze stays on until they have one, or until the entry timeout
+     * runs out, exactly as it would at the verify pad.
+     */
+    private void beginEnrolment(PlayerRef ref, long token) {
         Player live = Bukkit.getPlayer(ref.uuid());
         if (live == null || !live.isOnline()) {
             sessions.clear(ref.uuid());
             return;
         }
         enrolment.begin(live, ref);
+        startEntryTimeout(ref, token);
     }
 
     private void beginFreeze(PlayerRef ref, boolean totpEnabled, long token) {
@@ -406,6 +416,9 @@ public final class VerificationController implements KeypadActions {
             sessions.clear(ref.uuid());
             return;
         }
+        // They hold a factor now, so this freeze is answered by proving it; a create-a-PIN session left from before
+        // must not be the one that takes their entries.
+        enrolment.abandon(ref.uuid());
         // A spectator cannot click any window the server opens, so move them somewhere they can before the keypad
         // goes up; the mode they had is put back the moment they verify or leave.
         gameMode.apply(live);
@@ -482,12 +495,12 @@ public final class VerificationController implements KeypadActions {
             case WRONG -> fail(player, viewer, new AttemptLimiter.Outcome(false, checked.remaining()), reopenOnFailure);
             case UNAVAILABLE -> {
                 notify(viewer, SecurityMessageKey.SECURITY_VERIFY_UNAVAILABLE);
-                if (reopenOnFailure) {
-                    reopenKeypad(player, viewer);
-                }
+                askAgain(player, viewer, reopenOnFailure);
             }
-            case BUSY, LOCKED_NOW, ALREADY_LOCKED -> {
-                // Busy: the check already running answers. Locked out: handled above.
+            // The check already running answers too; a typed entry is gone once submitted, so this one asks again.
+            case BUSY -> askAgain(player, viewer, reopenOnFailure);
+            case LOCKED_NOW, ALREADY_LOCKED -> {
+                // Handled above.
             }
         }
     }
@@ -526,6 +539,8 @@ public final class VerificationController implements KeypadActions {
         feedback.failure(viewer, outcome.remaining());
         if (reopenOnFailure) {
             reopenKeypad(player, viewer);
+        } else {
+            keypad.retry(player, viewer);
         }
     }
 
@@ -548,6 +563,15 @@ public final class VerificationController implements KeypadActions {
         boolean banned = config.lockoutBans() && lockoutBan.ban(viewer, config.lockout(), config.lockoutBanReason());
         events.publish(new AccountLockedOut(viewer, config.lockout(), banned));
         return banned;
+    }
+
+    /** Ask for the entry again: the keypad after an authenticator prompt, or the typed prompt a submission ended. */
+    private void askAgain(Player player, PlayerRef viewer, boolean reopenOnFailure) {
+        if (reopenOnFailure) {
+            reopenKeypad(player, viewer);
+        } else {
+            keypad.retry(player, viewer);
+        }
     }
 
     private void reopenKeypad(Player player, PlayerRef viewer) {
@@ -604,6 +628,7 @@ public final class VerificationController implements KeypadActions {
     }
 
     private void kick(PlayerRef viewer, SecurityMessageKey key) {
+        enrolment.abandon(viewer.uuid());
         Player live = Bukkit.getPlayer(viewer.uuid());
         if (live != null && live.isOnline()) {
             keypad.closeFor(viewer);

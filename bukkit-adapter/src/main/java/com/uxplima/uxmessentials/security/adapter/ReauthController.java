@@ -166,12 +166,12 @@ public final class ReauthController implements KeypadActions {
             case WRONG -> fail(player, viewer, new AttemptLimiter.Outcome(false, checked.remaining()), reopenOnFailure);
             case UNAVAILABLE -> {
                 notify(viewer, SecurityMessageKey.SECURITY_VERIFY_UNAVAILABLE);
-                if (reopenOnFailure) {
-                    reopenKeypad(player, viewer);
-                }
+                askAgain(player, viewer, reopenOnFailure);
             }
-            case BUSY, LOCKED_NOW, ALREADY_LOCKED -> {
-                // Busy: the check already running answers. Locked out: handled above.
+            // The check already running answers too; a typed entry is gone once submitted, so this one asks again.
+            case BUSY -> askAgain(player, viewer, reopenOnFailure);
+            case LOCKED_NOW, ALREADY_LOCKED -> {
+                // Handled above.
             }
         }
     }
@@ -199,6 +199,8 @@ public final class ReauthController implements KeypadActions {
         notify(viewer, SecurityMessageKey.SECURITY_REAUTH_FAILED);
         if (reopenOnFailure) {
             reopenKeypad(player, viewer);
+        } else {
+            keypad.retry(player, viewer);
         }
     }
 
@@ -206,6 +208,15 @@ public final class ReauthController implements KeypadActions {
     private void allow(PlayerRef ref, String commandLine) {
         reauthState.stamp(ref.uuid(), clock.instant());
         scheduler.onEntity(ref, () -> redispatch(ref, commandLine));
+    }
+
+    /** Ask for the entry again: the keypad after an authenticator prompt, or the typed prompt a submission ended. */
+    private void askAgain(Player player, PlayerRef viewer, boolean reopenOnFailure) {
+        if (reopenOnFailure) {
+            reopenKeypad(player, viewer);
+        } else {
+            keypad.retry(player, viewer);
+        }
     }
 
     private void reopenKeypad(Player player, PlayerRef viewer) {

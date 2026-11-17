@@ -4,6 +4,7 @@ import java.nio.file.Path;
 import java.time.Clock;
 import java.util.List;
 import java.util.Objects;
+import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.BooleanSupplier;
 
 import org.bukkit.event.Listener;
@@ -19,6 +20,7 @@ import com.uxplima.uxmessentials.security.adapter.inbound.command.SecurityComman
 import com.uxplima.uxmessentials.security.adapter.inbound.command.TwoFactorCommand;
 import com.uxplima.uxmessentials.security.adapter.inbound.gui.PinKeypadView;
 import com.uxplima.uxmessentials.security.adapter.inbound.gui.PinKeypadWindowListener;
+import com.uxplima.uxmessentials.security.adapter.inbound.listener.PinEntryChatGuard;
 import com.uxplima.uxmessentials.security.adapter.inbound.listener.ReauthCommandListener;
 import com.uxplima.uxmessentials.security.adapter.inbound.listener.SecurityGuardListener;
 import com.uxplima.uxmessentials.security.adapter.inbound.listener.SecurityJoinListener;
@@ -51,7 +53,6 @@ import com.uxplima.uxmessentials.shared.application.module.ModuleContext;
 import com.uxplima.uxmessentials.shared.application.port.IpHistoryStore;
 import com.uxplima.uxmessentials.shared.application.port.IpTokens;
 import com.uxplima.uxmessentials.shared.application.port.NetworkPresence;
-import com.uxplima.uxmlib.gui.input.TextInput;
 import com.uxplima.uxmlib.menu.Menus;
 import com.uxplima.uxmlib.menu.binding.MenuBindings;
 import org.jspecify.annotations.NullMarked;
@@ -74,7 +75,7 @@ public final class SecurityWiring {
             Plugin plugin,
             ModuleContext ctx,
             Persistence persistence,
-            TextInput textInput,
+            SecureEntryInput entryInput,
             Menus menus,
             MenuBindings menuBindings,
             LockoutBan lockoutBan,
@@ -86,7 +87,7 @@ public final class SecurityWiring {
         Objects.requireNonNull(plugin, "plugin");
         Objects.requireNonNull(ctx, "ctx");
         Objects.requireNonNull(persistence, "persistence");
-        Objects.requireNonNull(textInput, "textInput");
+        Objects.requireNonNull(entryInput, "entryInput");
         Objects.requireNonNull(menus, "menus");
         Objects.requireNonNull(menuBindings, "menuBindings");
         Objects.requireNonNull(lockoutBan, "lockoutBan");
@@ -157,7 +158,17 @@ public final class SecurityWiring {
         // both flows feel the same. The keypad plays the tap sound itself; the controller plays the outcomes.
         VerificationFeedback feedback =
                 new VerificationFeedback(config.feedback(), kernel.scheduler(), kernel.messages(), kernel.log());
-        PinKeypadView keypad = new PinKeypadView(menus, kernel.messages(), feedback, kernel.scheduler());
+        // A Bedrock player is shown menus as forms, which cannot carry a pad that redraws after each tap, so they
+        // type the whole entry into one text prompt instead; a Java player keeps the pad.
+        PinKeypadView keypad = new PinKeypadView(
+                menus,
+                new TextInputPinPrompt(entryInput),
+                sessions::isPending,
+                id -> sessions.isPending(id) || reauthSessions.isPending(id),
+                kernel.messages(),
+                feedback,
+                kernel.scheduler(),
+                kernel.log());
         FreezeGameMode freezeGameMode =
                 new FreezeGameMode(plugin, config.joinVerification().spectator());
         // The module's own two teleports (into the holding area and back out) announce themselves here, because the
@@ -174,10 +185,12 @@ public final class SecurityWiring {
         VerifyTwoFactor verify = new VerifyTwoFactor(repository, twoFactor.codeWindow());
         // One check in flight per player across the join freeze and the op re-auth, each reserved on the budget first.
         ProofChecks checks = new ProofChecks(verify, limiter, kernel.log(), clock);
-        TextInputTotpPrompt totpPrompt = new TextInputTotpPrompt(textInput);
+        TextInputTotpPrompt totpPrompt = new TextInputTotpPrompt(entryInput);
         // The create-a-PIN pad: shown to a player holding uxmessentials.security.pin.required who has no factor, so
         // "you must have a PIN" is enforceable rather than advisory. It writes through the same SetPin the /pin
         // command uses, so a PIN made here obeys the same length and blocked-list rules.
+        // Built after the enrolment controller it hands players back to, so the enrolment reaches it through this.
+        AtomicReference<VerificationController> verification = new AtomicReference<>();
         PinEnrolmentController enrolment = new PinEnrolmentController(
                 setPin,
                 twoFactor.pinPolicy(),
@@ -188,7 +201,13 @@ public final class SecurityWiring {
                 freezeGameMode,
                 kernel.scheduler(),
                 kernel.messages(),
-                kernel.messageSink());
+                kernel.messageSink(),
+                ref -> {
+                    VerificationController built = verification.get();
+                    if (built != null) {
+                        built.forceReverify(ref);
+                    }
+                });
         // A proof carries across a switch only on a network; off it every join is a login and proves the factor.
         SessionCarry carry = new SessionCarry(
                 verifiedSessions,
@@ -238,6 +257,7 @@ public final class SecurityWiring {
                 kernel.messageSink(),
                 kernel.log(),
                 clock);
+        verification.set(controller);
         // The two /security operator verbs. Force revokes the target's device trust (the durable forced state, so
         // their next join re-verifies even from a trusted device), paired with the immediate online freeze driven
         // through the controller above. Reset is the recovery door: the one path that clears a factor without proving
@@ -301,7 +321,7 @@ public final class SecurityWiring {
                 kernel.messageSink(),
                 clock);
         KeypadRouter router =
-                new KeypadRouter(reauthSessions, enrolmentSessions, controller, reauthController, enrolment);
+                new KeypadRouter(reauthSessions, enrolmentSessions, sessions, controller, reauthController, enrolment);
         // The keypad renders through the menu engine: register its per-button actions (routed to whichever verify flow
         // the player is in), its masked-display / digit-label placeholders and its spec now that the router exists. The
         // close listener is the one behaviour the engine does not model: reopening the window if a still-frozen player
@@ -324,7 +344,9 @@ public final class SecurityWiring {
                                 .isPresent(),
                         kernel.messages(),
                         kernel.messageSink()),
-                new PinKeypadWindowListener(menus, keypad, sessions),
+                new PinKeypadWindowListener(menus, keypad),
+                new PinEntryChatGuard(
+                        id -> sessions.isPending(id) || keypad.isEntering(id), kernel.messages(), kernel.messageSink()),
                 new ReauthCommandListener(
                         opProtection.enabled(), opProtection.policy(), reauthState, reauthController, clock),
                 new SecurityGuardListener(clientGuard, brands));
