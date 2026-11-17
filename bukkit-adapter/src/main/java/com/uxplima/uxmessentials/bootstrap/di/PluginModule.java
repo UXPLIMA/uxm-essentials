@@ -1353,7 +1353,8 @@ public final class PluginModule {
         // Who is online on the other backends, as far as a viewer may see them, for every list, picker and suggestion
         // that names the players online. The see level is a permission read, the same with the vanish module off.
         links.visibleNetwork = com.uxplima.uxmessentials.shared.adapter.outbound.lookup.VisibleNetwork.of(
-                new com.uxplima.uxmessentials.shared.application.networkpresence.NetworkPlayers(presence),
+                new com.uxplima.uxmessentials.shared.application.networkpresence.NetworkPlayers(
+                        presence, kernel.playerLookup()::nameCase),
                 new com.uxplima.uxmessentials.vanish.adapter.outbound.BukkitVanishLevelResolver()::seeLevel);
         com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandSuggestions.network(links.visibleNetwork);
         resources.onClose(() -> com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandSuggestions.network(
