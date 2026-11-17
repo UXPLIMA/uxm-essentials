@@ -225,6 +225,7 @@ import com.uxplima.uxmessentials.shared.adapter.outbound.api.ActionContexts;
 import com.uxplima.uxmessentials.shared.adapter.outbound.api.BukkitEventBridge;
 import com.uxplima.uxmessentials.shared.adapter.outbound.api.EventBridgeRegistry;
 import com.uxplima.uxmessentials.shared.adapter.outbound.api.EventBridges;
+import com.uxplima.uxmessentials.shared.adapter.outbound.api.PlayerQueries;
 import com.uxplima.uxmessentials.shared.adapter.outbound.api.QueryContexts;
 import com.uxplima.uxmessentials.shared.adapter.outbound.bus.Bus;
 import com.uxplima.uxmessentials.shared.adapter.outbound.bus.BusWiring;
@@ -637,7 +638,8 @@ public final class PluginModule {
                 new EngineMenuApi(menuBindings, menuItemRenderer, runtimeIcons),
                 queries,
                 actions,
-                new CommandFeedback(kernel.messages()));
+                new CommandFeedback(kernel.messages()),
+                new PlayerQueries(kernel.playerLookup(), kernel.scheduler()));
         plugin.getServer()
                 .getServicesManager()
                 .register(UxmEssentialsApi.class, devApi, plugin, ServicePriority.Normal);
