@@ -63,7 +63,7 @@ class VisibleNetworkTest {
         TrackNetworkPresence track = new TrackNetworkPresence(roster, NetworkPresenceBroadcast.NONE, NO_NAMES, CLOCK);
         track.remoteJoined("lobby-1", new RosterStamp(1L, 1L), STEVE, PresenceTraits.PLAIN);
         track.remoteJoined("lobby-1", new RosterStamp(1L, 2L), HIDDEN, new PresenceTraits(2, false));
-        network = VisibleNetwork.of(new NetworkPlayers(roster), player -> alexSees);
+        network = VisibleNetwork.of(new NetworkPlayers(roster, () -> NameCase.INSENSITIVE), player -> alexSees);
         CommandSuggestions.network(network);
     }
 

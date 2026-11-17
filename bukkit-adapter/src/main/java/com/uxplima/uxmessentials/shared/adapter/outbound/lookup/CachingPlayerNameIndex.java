@@ -134,23 +134,66 @@ public final class CachingPlayerNameIndex implements PlayerNameIndex {
         return found.stream().map(PlayerName::ref).toList();
     }
 
+    /**
+     * {@inheritDoc}
+     *
+     * <p>The store is the word on who holds a name: every backend writes it, while the memory hears only of the joins
+     * here and of those the network announces. A remembered holder is kept only where the memory is newer than the
+     * store, as for a join whose row is still being written or a name learned from another backend; a holder the
+     * store has seen since under another name is let go from under this one, and a newer holder than any remembered
+     * is remembered, so the tick answers the same from then on. Most recently seen first.
+     */
     @Override
     public List<PlayerRef> storedUnder(String name) {
         Objects.requireNonNull(name, "name");
         PlayerNameRepository store = repository.get();
-        List<PlayerRef> remembered = byName(name);
         if (store == null) {
-            return remembered;
+            return byName(name);
         }
-        // Memory first: a name learned from another backend is not written here, and the store has every other.
-        Map<UUID, PlayerRef> holders = new LinkedHashMap<>();
-        for (PlayerRef held : remembered) {
-            holders.put(held.uuid(), held);
-        }
+        Map<UUID, PlayerName> holders = new LinkedHashMap<>();
         for (PlayerName row : store.underName(name, STORED_HOLDERS)) {
-            holders.putIfAbsent(row.uuid(), row.ref());
+            holders.putIfAbsent(row.uuid(), row);
         }
-        return List.copyOf(holders.values());
+        List<PlayerName> remembered = heldUnder(name);
+        for (PlayerName held : remembered) {
+            PlayerName stored = holders.get(held.uuid());
+            if (stored == null) {
+                // Not under this name in the store: renamed since on another backend, or its row is not written yet.
+                Optional<PlayerName> current = store.byUuid(held.uuid());
+                if (current.isPresent() && current.get().lastSeen() >= held.lastSeen()) {
+                    rememberIfNewer(current.get());
+                    continue;
+                }
+                holders.put(held.uuid(), held);
+            } else if (held.lastSeen() > stored.lastSeen()) {
+                holders.put(held.uuid(), held);
+            }
+        }
+        List<PlayerName> found = new ArrayList<>(holders.values());
+        found.sort(Comparator.comparingLong(PlayerName::lastSeen).reversed());
+        // A newer holder than any the memory has under the name took it: held from now on, so the tick names them.
+        // A name the memory holds nobody under stays out of the window, which keeps the accounts seen here lately.
+        long newestRemembered =
+                remembered.stream().mapToLong(PlayerName::lastSeen).max().orElse(Long.MAX_VALUE);
+        if (!found.isEmpty() && found.getFirst().lastSeen() > newestRemembered) {
+            rememberIfNewer(found.getFirst());
+        }
+        return found.stream().map(PlayerName::ref).toList();
+    }
+
+    /** The rows the memory holds under {@code name}, in any case. */
+    private List<PlayerName> heldUnder(String name) {
+        String key = key(name.strip());
+        List<PlayerName> found = new ArrayList<>();
+        synchronized (lock) {
+            for (UUID account : byLowerName.getOrDefault(key, Set.of())) {
+                PlayerName row = byAccount.get(account);
+                if (row != null) {
+                    found.add(row);
+                }
+            }
+        }
+        return found;
     }
 
     @Override
@@ -280,6 +323,20 @@ public final class CachingPlayerNameIndex implements PlayerNameIndex {
     private void rememberIfAbsent(PlayerName row) {
         synchronized (lock) {
             if (byAccount.containsKey(row.uuid())) {
+                return;
+            }
+            remember(row);
+        }
+    }
+
+    /**
+     * Hold a row read from the store unless the memory already has a word on the account at least as new, so a read
+     * never undoes a join or a learned name that landed while it ran.
+     */
+    private void rememberIfNewer(PlayerName row) {
+        synchronized (lock) {
+            PlayerName held = byAccount.get(row.uuid());
+            if (held != null && held.lastSeen() >= row.lastSeen()) {
                 return;
             }
             remember(row);

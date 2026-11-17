@@ -32,8 +32,15 @@ import org.jspecify.annotations.NullMarked;
  * case is ambiguous rather than a guess. A name only one account matches, in another case, means that account only
  * when the durable store confirms nobody else holds the name: the memory is a window of recent names, and an older
  * account spelled as typed may sit outside it. The store is read only off the tick; on the tick such a name answers
- * unknown. The server's own cache, the last fallback, matches any case and is held to the exact spelling. It is
- * asked only off the tick too: whether its account has played here is read from the player's data file, and a tick
+ * unknown.
+ *
+ * <p>Off the tick, who the memory remembers under a name is confirmed against the store in either mode, since every
+ * backend writes the store and the memory hears only of some joins: a name that changed hands on a backend this one
+ * has no word from resolves to its new holder, not the one remembered. On the tick the memory answers alone, so a
+ * typed name never waits on the database there. A connected player spelled as typed needs no confirming.
+ *
+ * <p>The server's own cache, the last fallback, matches any case and is held to the exact spelling. It is asked only
+ * off the tick too: whether its account has played here is read from the player's data file, and a tick
  * thread never waits on the disk for a typed name.
  *
  * <p>Whether a player is connected, and who a connected player is, is answered from the {@link OnlinePlayerIndex}
@@ -113,11 +120,8 @@ public final class IndexedPlayerLookup implements PlayerLookup {
             if (!connected.isEmpty()) {
                 return NameMatch.found(connected.getLast());
             }
-            List<PlayerRef> known = index.byName(name);
-            if (known.isEmpty() && mayReadStore) {
-                // Memory holds a window of accounts; the store holds every account any backend has seen.
-                known = index.storedUnder(name);
-            }
+            // Off the tick the store has the last word: every backend writes it, and memory may hold an old holder.
+            List<PlayerRef> known = mayReadStore ? index.storedUnder(name) : index.byName(name);
             if (!known.isEmpty()) {
                 return NameMatch.found(known.getFirst());
             }
@@ -140,29 +144,27 @@ public final class IndexedPlayerLookup implements PlayerLookup {
         for (PlayerRef player : connected.reversed()) {
             candidates.putIfAbsent(player.uuid(), player);
         }
-        for (PlayerRef player : index.byName(typed)) {
+        Optional<PlayerRef> connectedAsTyped = spelledAs(typed, candidates);
+        if (connectedAsTyped.isPresent()) {
+            return NameMatch.found(connectedAsTyped.get());
+        }
+        // Off the tick the store confirms who the memory remembers, and adds the accounts the memory let go.
+        for (PlayerRef player : mayReadStore ? index.storedUnder(typed) : index.byName(typed)) {
             candidates.putIfAbsent(player.uuid(), player);
         }
         Optional<PlayerRef> exact = spelledAs(typed, candidates);
         if (exact.isPresent()) {
             return NameMatch.found(exact.get());
         }
-        if (candidates.size() > 1) {
-            return NameMatch.ambiguous(typed, candidates.values());
-        }
         if (!mayReadStore) {
+            if (candidates.size() > 1) {
+                return NameMatch.ambiguous(typed, candidates.values());
+            }
             // The store cannot be read here, but the index knows from memory whether the name has other holders: a
             // lone account under a name nobody else holds is the one meant.
             return candidates.size() == 1 && !index.shared(typed)
                     ? NameMatch.found(candidates.values().iterator().next())
                     : NameMatch.unknown();
-        }
-        for (PlayerRef stored : index.storedUnder(typed)) {
-            candidates.putIfAbsent(stored.uuid(), stored);
-        }
-        exact = spelledAs(typed, candidates);
-        if (exact.isPresent()) {
-            return NameMatch.found(exact.get());
         }
         return switch (candidates.size()) {
             case 0 -> NameMatch.unknown();
