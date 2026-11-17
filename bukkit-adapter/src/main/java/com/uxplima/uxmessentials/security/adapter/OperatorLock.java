@@ -38,7 +38,9 @@ import org.jspecify.annotations.Nullable;
  * cache, which matches any case, may vouch for a uuid only when the name it holds is the one typed. An {@code /op}
  * whose name the server would resolve to another spelling, an online player's or one in its profile cache, is
  * refused whether or not the list is on: the server finds the player by name in any case, so it would make that
- * other account the operator. An {@code /op} run through {@code /execute ... run} is read the same way. The name case is asked on every
+ * other account the operator. An {@code /op} run through {@code /execute ... run} is read the same way. An op an
+ * alias in {@code commands.yml} or a datapack function runs never passes through a command event, so it is not read
+ * before it runs; the sweep still holds the result to the list. The name case is asked on every
  * check, since a server can turn out to be offline-mode while it runs.
  */
 @NullMarked
