@@ -340,7 +340,13 @@ public final class HologramsWiring {
         listMenu.register(menuBindings, plugin.getDataFolder().toPath(), kernel.log());
         return new Wired(
                 HologramCommands.all(
-                        services, kernel.messages(), hologramNames, npcNames, listMenu, kernel.scheduler()),
+                        services,
+                        kernel.messages(),
+                        hologramNames,
+                        npcNames,
+                        listMenu,
+                        kernel.scheduler(),
+                        kernel.playerLookup()),
                 renderer,
                 view,
                 repository,

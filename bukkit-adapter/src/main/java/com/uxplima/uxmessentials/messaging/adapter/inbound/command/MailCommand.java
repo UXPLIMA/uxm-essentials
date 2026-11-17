@@ -26,7 +26,9 @@ import com.uxplima.uxmessentials.shared.adapter.outbound.BukkitRefs;
 import com.uxplima.uxmessentials.shared.application.permission.SocialPermissions;
 import com.uxplima.uxmessentials.shared.application.port.MessageSink;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
+import com.uxplima.uxmessentials.shared.domain.NameMatch;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
+import com.uxplima.uxmessentials.shared.domain.message.MessageLine;
 import com.uxplima.uxmlib.command.Gate;
 import org.jspecify.annotations.NullMarked;
 
@@ -119,9 +121,11 @@ public final class MailCommand extends MessagingCommandSupport implements Comman
         PlayerRef from = ref(sender);
         String name = ctx.getArgument("player", String.class);
         // Mail is for somebody who is not there, so the recipient may be offline, as /msg resolves one.
-        Optional<PlayerRef> recipient = services.players().findByName(name);
+        NameMatch match = services.players().matchByName(name);
+        Optional<PlayerRef> recipient = match.player();
         if (recipient.isEmpty()) {
-            notify(from, UNKNOWN_PLAYER, Map.of("player", name));
+            MessageLine miss = match.miss(UNKNOWN_PLAYER, Map.of("player", name));
+            notify(from, miss.key(), miss.args());
             return 0;
         }
         services.sendMail().send(from, recipient.get(), text);

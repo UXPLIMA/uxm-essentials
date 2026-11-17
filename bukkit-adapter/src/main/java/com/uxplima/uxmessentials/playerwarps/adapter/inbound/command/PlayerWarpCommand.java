@@ -38,6 +38,7 @@ import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandRegistrat
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandSuggestions;
 import com.uxplima.uxmessentials.shared.application.permission.DestinationPermissions;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
+import com.uxplima.uxmessentials.shared.domain.NameMatch;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmessentials.shared.domain.Position;
 import com.uxplima.uxmessentials.shared.domain.Result;
@@ -574,9 +575,10 @@ public final class PlayerWarpCommand extends PlayerWarpCommandSupport implements
         String playerName = ctx.getArgument("player", String.class);
         PlayerRef admin = actor(ctx);
         services.scheduler().async(() -> {
-            Optional<PlayerRef> newOwner = services.players().findByName(playerName);
+            NameMatch match = services.players().matchByName(playerName);
+            Optional<PlayerRef> newOwner = match.player();
             if (newOwner.isEmpty()) {
-                onPlayer(admin, () -> unknownPlayer(sender, playerName));
+                onPlayer(admin, () -> unknownPlayer(sender, playerName, match));
                 return;
             }
             Result<Unit, PlayerWarpError> result =
@@ -692,9 +694,10 @@ public final class PlayerWarpCommand extends PlayerWarpCommandSupport implements
         PlayerRef viewer = actor(ctx);
         String ownerName = ctx.getArgument("player", String.class);
         services.scheduler().async(() -> {
-            Optional<PlayerRef> owner = services.players().findByName(ownerName);
+            NameMatch match = services.players().matchByName(ownerName);
+            Optional<PlayerRef> owner = match.player();
             if (owner.isEmpty()) {
-                onPlayer(viewer, () -> unknownPlayer(sender, ownerName));
+                onPlayer(viewer, () -> unknownPlayer(sender, ownerName, match));
                 return;
             }
             services.listPlayerWarps().publicOf(viewer, owner.get(), owner.get().name());

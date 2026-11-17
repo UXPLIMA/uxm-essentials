@@ -7,8 +7,10 @@ import java.util.stream.Collectors;
 import com.uxplima.uxmessentials.shared.application.message.Notifier;
 import com.uxplima.uxmessentials.shared.application.port.MessageSink;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
+import com.uxplima.uxmessentials.shared.domain.NameMatch;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmessentials.shared.domain.message.MessageKey;
+import com.uxplima.uxmessentials.shared.domain.message.MessageLine;
 import com.uxplima.uxmessentials.vaults.domain.VaultAmount;
 import com.uxplima.uxmessentials.vaults.domain.VaultSize;
 import com.uxplima.uxmessentials.vaults.domain.VaultsMessageKey;
@@ -130,7 +132,13 @@ public final class VaultNotifier {
 
     /** Tell {@code actor} the audited player name resolved to nobody. */
     public void unknownTarget(PlayerRef actor, String name) {
-        send(actor, VaultsMessageKey.VAULT_ADMIN_UNKNOWN_TARGET, Map.of("player", name));
+        unknownTarget(actor, name, NameMatch.unknown());
+    }
+
+    /** Tell {@code actor} the audited player name resolved to nobody, or to several case variants. */
+    public void unknownTarget(PlayerRef actor, String name, NameMatch match) {
+        MessageLine miss = match.miss(VaultsMessageKey.VAULT_ADMIN_UNKNOWN_TARGET, Map.of("player", name));
+        send(actor, miss.key(), miss.args());
     }
 
     /** Tell {@code sender} the command is player-only (a console actor cannot open a GUI). */

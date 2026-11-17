@@ -7,7 +7,6 @@ import java.util.Objects;
 import java.util.Optional;
 
 import org.bukkit.Bukkit;
-import org.bukkit.OfflinePlayer;
 import org.bukkit.command.CommandSender;
 import org.bukkit.entity.Player;
 
@@ -24,8 +23,10 @@ import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandSuggestio
 import com.uxplima.uxmessentials.shared.adapter.outbound.BukkitRefs;
 import com.uxplima.uxmessentials.shared.application.permission.PlayerstatePermissions;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
+import com.uxplima.uxmessentials.shared.domain.NameMatch;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmessentials.shared.domain.message.MessageKey;
+import com.uxplima.uxmessentials.shared.domain.message.MessageLine;
 import com.uxplima.uxmessentials.shared.domain.message.SharedMessageKey;
 import com.uxplima.uxmlib.command.Sender;
 import org.jspecify.annotations.NullMarked;
@@ -162,20 +163,22 @@ abstract class PlayerstateCommandSupport {
             reply(sender, NO_PERMISSION, Map.of());
             return Optional.empty();
         }
-        Player online = Bukkit.getPlayerExact(typed);
-        if (online != null) {
-            return Optional.of(BukkitRefs.toRef(online));
+        // The server's own name lookup matches any case, and two offline-mode accounts can be online under case
+        // variants of one name; the lookup answers only for the one meant.
+        NameMatch match = services.players().matchOnlineByName(typed);
+        if (match.player().isEmpty()) {
+            MessageLine miss = match.miss(UNKNOWN_PLAYER, Map.of("player", typed));
+            reply(sender, miss.key(), miss.args());
         }
-        reply(sender, UNKNOWN_PLAYER, Map.of("player", typed));
-        return Optional.empty();
+        return match.player();
     }
 
     /**
      * Resolve the optional {@code player} string argument to a target that may be <em>offline</em>, for the
      * storage-viewing verbs ({@code /invsee}, {@code /endersee}). An absent argument is the sender; a present one
-     * resolves only when the sender holds {@link #OTHERS_PERMISSION}. An exact online name first, then a cached
-     * offline profile (non-blocking, from the server's user cache); anything else is the unknown-player
-     * rejection. Unlike {@link #resolveTarget}, the argument is a plain word so an offline name can be typed (an
+     * resolves only when the sender holds {@link #OTHERS_PERMISSION}. A connected player first, then an account the
+     * server has seen (non-blocking, from memory and the server's user cache); anything else is the unknown-player
+     * rejection, or the ambiguity line when several case variants of the name exist. Unlike {@link #resolveTarget}, the argument is a plain word so an offline name can be typed (an
      * online-player selector resolves online names only).
      */
     final Optional<PlayerRef> resolveStorageTarget(CommandContext<CommandSourceStack> ctx, CommandSender sender) {
@@ -191,16 +194,12 @@ abstract class PlayerstateCommandSupport {
             reply(sender, NO_PERMISSION, Map.of());
             return Optional.empty();
         }
-        Player online = Bukkit.getPlayerExact(typed);
-        if (online != null) {
-            return Optional.of(BukkitRefs.toRef(online));
+        NameMatch match = services.players().matchByName(typed);
+        if (match.player().isEmpty()) {
+            MessageLine miss = match.miss(UNKNOWN_PLAYER, Map.of("player", typed));
+            reply(sender, miss.key(), miss.args());
         }
-        OfflinePlayer offline = Bukkit.getOfflinePlayerIfCached(typed);
-        if (offline != null && offline.getName() != null) {
-            return Optional.of(new PlayerRef(offline.getUniqueId(), offline.getName()));
-        }
-        reply(sender, UNKNOWN_PLAYER, Map.of("player", typed));
-        return Optional.empty();
+        return match.player();
     }
 
     /** Tab-completion of online player names for the storage verbs' {@code player} argument. */

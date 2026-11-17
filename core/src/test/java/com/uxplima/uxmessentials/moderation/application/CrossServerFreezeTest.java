@@ -8,7 +8,6 @@ import java.util.ArrayList;
 import java.util.Collection;
 import java.util.HashSet;
 import java.util.List;
-import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
 import java.util.function.Function;
@@ -21,6 +20,7 @@ import com.uxplima.uxmessentials.shared.application.networkpresence.RosterStamp;
 import com.uxplima.uxmessentials.shared.application.networkpresence.TrackNetworkPresence;
 import com.uxplima.uxmessentials.shared.application.port.NetworkPresenceBroadcast;
 import com.uxplima.uxmessentials.shared.application.port.PlayerNameIndex;
+import com.uxplima.uxmessentials.shared.domain.NameCase;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmessentials.shared.domain.message.MessageKey;
 import com.uxplima.uxmessentials.shared.network.FreezeChanged;
@@ -42,8 +42,8 @@ class CrossServerFreezeTest {
 
     private static final PlayerNameIndex NO_NAMES = new PlayerNameIndex() {
         @Override
-        public Optional<PlayerRef> byName(String name) {
-            return Optional.empty();
+        public List<PlayerRef> byName(String name) {
+            return List.of();
         }
 
         @Override
@@ -154,7 +154,7 @@ class CrossServerFreezeTest {
 
         Backend(String name) {
             this.name = name;
-            this.roster = new NetworkRoster(name, clock, Duration.ofSeconds(90));
+            this.roster = new NetworkRoster(name, clock, Duration.ofSeconds(90), () -> NameCase.INSENSITIVE);
             this.track = new TrackNetworkPresence(roster, NetworkPresenceBroadcast.NONE, NO_NAMES, clock);
             FreezeSync bus = new FreezeSync() {
                 @Override

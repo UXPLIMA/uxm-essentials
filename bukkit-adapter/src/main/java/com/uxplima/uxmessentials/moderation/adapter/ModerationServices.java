@@ -4,6 +4,7 @@ import java.util.Objects;
 
 import com.uxplima.uxmessentials.moderation.application.Ban;
 import com.uxplima.uxmessentials.moderation.application.BanIp;
+import com.uxplima.uxmessentials.moderation.application.CaseVariantCopies;
 import com.uxplima.uxmessentials.moderation.application.CheckBan;
 import com.uxplima.uxmessentials.moderation.application.CheckMute;
 import com.uxplima.uxmessentials.moderation.application.ClearWarns;
@@ -95,6 +96,7 @@ public final class ModerationServices {
     private final StaffRollback staffRollback;
     private final JailCountdown jailCountdown;
     private final LoginEnforcement loginEnforcement;
+    private final CaseVariantCopies caseVariantCopies;
     private final Lockdown lockdown;
     private final ModerationRepository repository;
     private final PlayerLookup players;
@@ -141,6 +143,7 @@ public final class ModerationServices {
         this.staffRollback = Objects.requireNonNull(builder.staffRollback, "staffRollback");
         this.jailCountdown = Objects.requireNonNull(builder.jailCountdown, "jailCountdown");
         this.loginEnforcement = Objects.requireNonNull(builder.loginEnforcement, "loginEnforcement");
+        this.caseVariantCopies = Objects.requireNonNull(builder.caseVariantCopies, "caseVariantCopies");
         this.lockdown = Objects.requireNonNull(builder.lockdown, "lockdown");
         this.repository = Objects.requireNonNull(builder.repository, "repository");
         this.players = Objects.requireNonNull(builder.players, "players");
@@ -304,6 +307,11 @@ public final class ModerationServices {
         return loginEnforcement;
     }
 
+    /** The mutes and jails copied onto other spellings of a name, which follow their original. */
+    public CaseVariantCopies caseVariantCopies() {
+        return caseVariantCopies;
+    }
+
     public Lockdown lockdown() {
         return lockdown;
     }
@@ -367,6 +375,7 @@ public final class ModerationServices {
         private @org.jspecify.annotations.Nullable StaffRollback staffRollback;
         private @org.jspecify.annotations.Nullable JailCountdown jailCountdown;
         private @org.jspecify.annotations.Nullable LoginEnforcement loginEnforcement;
+        private @org.jspecify.annotations.Nullable CaseVariantCopies caseVariantCopies;
         private @org.jspecify.annotations.Nullable Lockdown lockdown;
         private @org.jspecify.annotations.Nullable ModerationRepository repository;
         private @org.jspecify.annotations.Nullable PlayerLookup players;
@@ -560,6 +569,11 @@ public final class ModerationServices {
 
         Builder jailCountdown(JailCountdown value) {
             this.jailCountdown = value;
+            return this;
+        }
+
+        Builder caseVariantCopies(CaseVariantCopies value) {
+            this.caseVariantCopies = value;
             return this;
         }
 

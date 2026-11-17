@@ -53,7 +53,12 @@ class WorldGuardImportRunsTest {
                 GuardConfig.from(new Defaults(), "lobby", warnings::add),
                 warnings::add);
         return new WorldGuardImporter(
-                plugins.resolve("uxmEssentials"), service, new UntouchedBackups(), lane, warnings::add);
+                plugins.resolve("uxmEssentials"),
+                service,
+                new UntouchedBackups(),
+                lane,
+                warnings::add,
+                new NoPlayers());
     }
 
     @Test
@@ -238,6 +243,25 @@ class WorldGuardImportRunsTest {
         @Override
         public List<String> list() {
             return List.of();
+        }
+    }
+
+    /** Nobody the import could name: these runs never get as far as resolving members. */
+    private static final class NoPlayers implements com.uxplima.uxmessentials.shared.application.port.PlayerLookup {
+
+        @Override
+        public java.util.Optional<com.uxplima.uxmessentials.shared.domain.PlayerRef> findOnlineByName(String name) {
+            return java.util.Optional.empty();
+        }
+
+        @Override
+        public java.util.Optional<com.uxplima.uxmessentials.shared.domain.PlayerRef> findByUuid(java.util.UUID uuid) {
+            return java.util.Optional.empty();
+        }
+
+        @Override
+        public boolean isOnline(java.util.UUID uuid) {
+            return false;
         }
     }
 }

@@ -10,8 +10,11 @@ import org.bukkit.Server;
 import org.bukkit.event.Listener;
 
 import com.uxplima.uxmessentials.persistence.runtime.Persistence;
+import com.uxplima.uxmessentials.persistence.skin.CachedSkinRepository;
 import com.uxplima.uxmessentials.persistence.skin.SkinRepositories;
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandRegistration;
+import com.uxplima.uxmessentials.shared.adapter.outbound.bus.Bus;
+import com.uxplima.uxmessentials.shared.adapter.outbound.bus.SkinSync;
 import com.uxplima.uxmessentials.shared.adapter.outbound.skin.HttpClientFetcher;
 import com.uxplima.uxmessentials.shared.adapter.outbound.skin.MineSkinService;
 import com.uxplima.uxmessentials.shared.application.module.KernelPorts;
@@ -50,7 +53,8 @@ import org.jspecify.annotations.NullMarked;
  * nothing.
  *
  * <p>The login listener stops dressing anybody the moment the module stops, through the flag the returned stop hook
- * clears, so a disable or a reload cannot leave a half-wired lookup running against a connection.
+ * clears, so a disable or a reload cannot leave a half-wired lookup running against a connection. The same flag
+ * stops the bus listener that dresses a player again when their skin changes on another server.
  */
 @NullMarked
 public final class SkinWiring {
@@ -59,17 +63,26 @@ public final class SkinWiring {
 
     /** Build the skin adapters and use cases from {@code ctx}, {@code persistence} and the resolved detector. */
     public static Wired wire(
-            ModuleContext ctx, Persistence persistence, Server server, BedrockDetector bedrock, Path dataFolder) {
+            ModuleContext ctx,
+            Persistence persistence,
+            Server server,
+            BedrockDetector bedrock,
+            Path dataFolder,
+            Bus bus) {
         Objects.requireNonNull(ctx, "ctx");
         Objects.requireNonNull(persistence, "persistence");
         Objects.requireNonNull(server, "server");
         Objects.requireNonNull(bedrock, "bedrock");
         Objects.requireNonNull(dataFolder, "dataFolder");
+        Objects.requireNonNull(bus, "bus");
         SkinConfig config = SkinConfig.from(ctx.config());
         KernelPorts kernel = ctx.kernel();
         Clock clock = Clock.systemUTC();
 
-        SkinRepository repository = SkinRepositories.cached(persistence);
+        // Every write goes through the broadcaster, so a peer forgets its cached row and the server the player is on
+        // dresses them again; the cache under it is what that peer listener invalidates.
+        CachedSkinRepository cache = SkinRepositories.cached(persistence);
+        SkinRepository repository = SkinSync.repository(cache, bus.publisher(), kernel.log());
         SkinView view = new PaperSkinView(server, kernel.scheduler());
         MineSkinService mineSkins = new MineSkinService(
                 kernel.scheduler(),
@@ -113,7 +126,11 @@ public final class SkinWiring {
 
         AtomicBoolean dressing = new AtomicBoolean(true);
         SkinLoginListener login = new SkinLoginListener(
-                dressLogin, kernel.scheduler(), kernel.log(), config.loginTimeout(), dressing::get);
+                dressLogin, kernel.scheduler(), kernel.log(), config.loginTimeout(), dressing::get, cache::invalidate);
+        bus.registry()
+                .register(SkinSync.listener(
+                        cache, dressLogin, view, kernel.playerLookup(), kernel.scheduler(), dressing::get));
+        bus.registry().registerPlayerCacheDrop(cache::invalidateAll);
 
         return new Wired(List.of(command), List.of(login), repository, () -> dressing.set(false));
     }

@@ -17,6 +17,7 @@ final class OnlinePlayers implements Sanctions {
 
     private final Map<PlayerRef, String> addresses = new LinkedHashMap<>();
     private final Map<PlayerRef, String> kicked = new LinkedHashMap<>();
+    private final List<PlayerRef> released = new java.util.ArrayList<>();
 
     OnlinePlayers connect(PlayerRef player, String address) {
         addresses.put(player, address);
@@ -26,6 +27,11 @@ final class OnlinePlayers implements Sanctions {
     /** {@code player} disconnects on their own. */
     void leave(PlayerRef player) {
         addresses.remove(player);
+    }
+
+    /** Every player released from jail, in order. */
+    List<PlayerRef> released() {
+        return List.copyOf(released);
     }
 
     /** Each kicked player and the screen text they read. */
@@ -78,6 +84,6 @@ final class OnlinePlayers implements Sanctions {
 
     @Override
     public void releaseFromJail(PlayerRef target) {
-        throw new UnsupportedOperationException();
+        released.add(target);
     }
 }

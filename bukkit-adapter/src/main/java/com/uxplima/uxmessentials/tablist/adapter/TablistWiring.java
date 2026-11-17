@@ -79,8 +79,8 @@ public final class TablistWiring {
         // the nametag wiring. The skin resolver reads online textures inline and fetches offline names off the tick
         // thread through the kernel Scheduler, caching the result.
         TabListPackets packets = new NmsTabListPackets(new PacketSender(new ChannelResolver()));
-        TablistSkinResolver skinResolver =
-                new TablistSkinResolver(new BukkitMojangProfileSource(kernel.skins()), kernel.scheduler());
+        TablistSkinResolver skinResolver = new TablistSkinResolver(
+                new BukkitMojangProfileSource(kernel.skins(), kernel.playerLookup()), kernel.scheduler());
 
         // The opt-in "suppress real players" interception (TAB-C): a pipeline splices a per-viewer interceptor that
         // rewrites outbound player-info packets to force every non-filler entry unlisted while the viewer's selected

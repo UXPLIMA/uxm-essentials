@@ -7,6 +7,7 @@ import com.uxplima.uxmessentials.shared.application.port.MessageSink;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmessentials.shared.domain.message.MessageKey;
+import com.uxplima.uxmessentials.shared.domain.message.MessageLine;
 
 /**
  * Pairs the {@link Messages} resolution port with the {@link MessageSink} delivery port so a use case tells a
@@ -33,6 +34,11 @@ public final class Notifier {
         Objects.requireNonNull(key, "key");
         Objects.requireNonNull(placeholders, "placeholders");
         sink.deliver(viewer, messages.resolve(viewer, key, placeholders));
+    }
+
+    /** Resolve and deliver a line chosen elsewhere, such as the reply to a player name that matched nobody. */
+    public void send(PlayerRef viewer, MessageLine line) {
+        send(viewer, line.key(), line.args());
     }
 
     /** Resolve and deliver {@code key} with no placeholders. */

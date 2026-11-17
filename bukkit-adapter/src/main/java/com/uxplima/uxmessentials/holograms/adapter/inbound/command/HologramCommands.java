@@ -8,6 +8,7 @@ import com.uxplima.uxmessentials.holograms.adapter.HologramServices;
 import com.uxplima.uxmessentials.holograms.adapter.inbound.gui.HologramListMenu;
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandRegistration;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
+import com.uxplima.uxmessentials.shared.application.port.PlayerLookup;
 import com.uxplima.uxmessentials.shared.application.port.Scheduler;
 import org.jspecify.annotations.NullMarked;
 
@@ -34,7 +35,8 @@ public final class HologramCommands {
             Supplier<? extends Collection<String>> hologramNames,
             Supplier<? extends Collection<String>> npcNames,
             HologramListMenu listMenu,
-            Scheduler scheduler) {
-        return List.of(new HologramCommand(services, messages, hologramNames, npcNames, listMenu, scheduler));
+            Scheduler scheduler,
+            PlayerLookup players) {
+        return List.of(new HologramCommand(services, messages, hologramNames, npcNames, listMenu, scheduler, players));
     }
 }

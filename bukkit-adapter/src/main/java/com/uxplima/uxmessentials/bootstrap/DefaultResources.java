@@ -184,6 +184,7 @@ final class DefaultResources {
             "modules/warps/gui/warp-manager.conf",
             "modules/warps/gui/warp-sounds.conf",
             "modules/warps/gui/warp-welcome.conf",
+            "modules/warps/gui/warp-welcome-entry.conf",
             "modules/worlds/gui/world-create.conf",
             "modules/worlds/gui/world-generation.conf",
             "modules/worlds/gui/world-grid.conf",

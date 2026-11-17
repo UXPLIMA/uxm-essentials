@@ -210,6 +210,7 @@ import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.vocab.Requireme
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.vocab.SoundActions;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.vocab.StringConditions;
 import com.uxplima.uxmessentials.shared.adapter.inbound.ip.IpHistoryRecorder;
+import com.uxplima.uxmessentials.shared.adapter.inbound.lookup.NameCaseEvidenceListener;
 import com.uxplima.uxmessentials.shared.adapter.inbound.lookup.OnlinePlayerIndexListener;
 import com.uxplima.uxmessentials.shared.adapter.inbound.lookup.PlayerNameRecordingListener;
 import com.uxplima.uxmessentials.shared.adapter.inbound.networkpresence.NetworkPresenceListener;
@@ -553,6 +554,9 @@ public final class PluginModule {
         // Who is connected, for the lookup port's online answers. The players already online are seeded here, on
         // the enable thread, so a plugin reload does not forget them.
         resources.addListener(new OnlinePlayerIndexListener(wiredKernel.online()));
+        // Only a completed join is evidence of an offline-mode network, never the players a reload finds online: a
+        // fake player another plugin keeps in the list carries a version 3 uuid on any server.
+        resources.addListener(new NameCaseEvidenceListener(wiredKernel.nameCase()));
         for (Player online : plugin.getServer().getOnlinePlayers()) {
             wiredKernel
                     .online()
@@ -570,7 +574,12 @@ public final class PluginModule {
         // does not forget them; their join frames are dropped by the stopped transport, and the first roster
         // announcement after the bus starts carries them instead.
         NetworkPresenceWiring.Wired networkPresence = NetworkPresenceWiring.wire(
-                bus.bus(), NetworkConfig.from(config), nameIndex, kernel.scheduler(), kernel.log());
+                bus.bus(),
+                NetworkConfig.from(config),
+                nameIndex,
+                wiredKernel.nameCase(),
+                kernel.scheduler(),
+                kernel.log());
         resources.onClose(networkPresence::stop);
         resources.addListener(new NetworkPresenceListener(networkPresence.track()));
         for (Player online : plugin.getServer().getOnlinePlayers()) {
@@ -810,7 +819,7 @@ public final class PluginModule {
         // MenuVocabulary signature untouched. The toast action pops through uxmLib's advancement-toast service,
         // which routes its cleanup through the library's Folia-aware scheduler.
         Toasts menuToasts = new Toasts(plugin, new PaperScheduler(plugin));
-        MessagingActions.register(menuBindings, menuToasts, kernel.log());
+        MessagingActions.register(menuBindings, menuToasts, kernel.playerLookup(), kernel.log());
         // The player/command slice (chat-as-player, command-as-op, commandevent, command/console-random) registers
         // alongside the generic actions; like the messaging slice it has its own entry point so the MenuVocabulary
         // signature stays untouched. It reuses the same stateless click-command runner npc/holograms build, so the
@@ -1758,7 +1767,7 @@ public final class PluginModule {
         } else if (module.id().equals(ModuleId.of("servertweaks"))) {
             wireServerTweaks(plugin, ctx, resources, links);
         } else if (module.id().equals(ModuleId.of("skin"))) {
-            wireSkin(plugin, ctx, persistence, resources, links);
+            wireSkin(plugin, ctx, persistence, resources, links, bus);
         }
     }
 
@@ -1767,7 +1776,8 @@ public final class PluginModule {
             ModuleContext ctx,
             Persistence persistence,
             CloseableResources resources,
-            ContextLinks links) {
+            ContextLinks links,
+            Bus bus) {
         // skin builds its jOOQ repository over persistence.dsl() and registers the /skin command plus the pre-login
         // listener that dresses a joining player before their entity exists (no respawn, no re-send, no flicker).
         // Every lookup that leaves the server - a name at Mojang, an image at MineSkin, a Bedrock skin at the Geyser
@@ -1781,7 +1791,8 @@ public final class PluginModule {
                 persistence,
                 plugin.getServer(),
                 Objects.requireNonNullElse(resources.bedrock(), BedrockDetector.NONE),
-                plugin.getDataFolder().toPath());
+                plugin.getDataFolder().toPath(),
+                bus);
         wired.commands().forEach(resources::addCommand);
         wired.listeners().forEach(resources::addListener);
         resources.onClose(wired.stop());
@@ -2041,6 +2052,7 @@ public final class PluginModule {
                 ctx.kernel().messages(),
                 ctx.kernel().messageSink(),
                 ctx.kernel().log(),
+                ctx.kernel().playerLookup()::nameCase,
                 SecurityConfig.AllowedOperators.from(ctx.config()).list());
         resources.addListener(new OperatorLockListener(operators));
         AutoCloseable sweep = operators.startSweep();
@@ -3105,10 +3117,22 @@ public final class PluginModule {
         }
         resources.onClose(wired::stop);
         resources.worldPhase().run("jail server claim", wired.jailServerAdoption());
-        // A mute or unmute issued here updates the in-memory mute of a connected player as it lands.
+        // A mute or unmute issued here updates the in-memory mute of a connected player as it lands. A ban issued here
+        // also removes the other spellings of the banned name it reaches, and a lift or a longer mute reaches the
+        // copies its sanction made on other spellings; both read storage, so they run on the async lane.
         subscribeUntilClose(ctx, resources, event -> {
             if (event instanceof com.uxplima.uxmessentials.moderation.domain.event.ModerationEvent moderation) {
                 wired.mutePolicy().onEvent(moderation);
+            }
+            if (event instanceof com.uxplima.uxmessentials.moderation.domain.event.PlayerTempbanned banned) {
+                ctx.kernel().scheduler().async(() -> wired.bans().onBanned(banned));
+            }
+            if (event instanceof com.uxplima.uxmessentials.moderation.domain.event.PlayerUnmuted
+                    || event instanceof com.uxplima.uxmessentials.moderation.domain.event.PlayerUnjailed
+                    || event instanceof com.uxplima.uxmessentials.moderation.domain.event.PlayerMuted) {
+                com.uxplima.uxmessentials.moderation.domain.event.ModerationEvent change =
+                        (com.uxplima.uxmessentials.moderation.domain.event.ModerationEvent) event;
+                ctx.kernel().scheduler().async(() -> wired.copies().onEvent(change));
             }
         });
         // Connected players' mutes are read again every minute, and after an import that stored sanctions, so a

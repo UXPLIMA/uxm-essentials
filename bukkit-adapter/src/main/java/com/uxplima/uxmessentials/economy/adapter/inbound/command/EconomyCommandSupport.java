@@ -29,6 +29,7 @@ import com.uxplima.uxmessentials.shared.adapter.outbound.BukkitRefs;
 import com.uxplima.uxmessentials.shared.adapter.outbound.permission.CatalogPermissionCheck;
 import com.uxplima.uxmessentials.shared.application.permission.EconomyPermissions;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
+import com.uxplima.uxmessentials.shared.domain.NameMatch;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmessentials.shared.domain.Result;
 import com.uxplima.uxmessentials.shared.domain.message.MessageKey;
@@ -170,9 +171,9 @@ abstract class EconomyCommandSupport {
         services.notifier().send(viewer, EconomyMessageKey.CURRENCY_UNKNOWN, Map.of("currencies", valid));
     }
 
-    /** Tell {@code viewer} the named pay target could not be resolved. */
-    final void rejectUnknownTarget(PlayerRef viewer, String name) {
-        services.notifier().send(viewer, EconomyMessageKey.PAY_TARGET_UNKNOWN, Map.of("player", name));
+    /** Tell {@code viewer} the named target could not be resolved: nobody by that name, or several case variants. */
+    final void rejectUnknownTarget(PlayerRef viewer, String name, NameMatch match) {
+        services.notifier().send(viewer, match.miss(EconomyMessageKey.PAY_TARGET_UNKNOWN, Map.of("player", name)));
     }
 
     /**

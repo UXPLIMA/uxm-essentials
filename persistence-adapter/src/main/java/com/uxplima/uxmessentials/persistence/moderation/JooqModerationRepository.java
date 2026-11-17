@@ -17,6 +17,7 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.UUID;
+import java.util.function.Function;
 
 import com.uxplima.uxmessentials.moderation.application.port.ModerationRepository;
 import com.uxplima.uxmessentials.moderation.domain.BanEntry;
@@ -32,6 +33,9 @@ import com.uxplima.uxmessentials.moderation.domain.Warn;
 import com.uxplima.uxmessentials.persistence.runtime.JooqRepository;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import org.jooq.DSLContext;
+import org.jooq.Record;
+import org.jooq.Table;
+import org.jooq.TableField;
 import org.jspecify.annotations.NullMarked;
 
 /**
@@ -45,7 +49,7 @@ import org.jspecify.annotations.NullMarked;
 @NullMarked
 public final class JooqModerationRepository extends JooqRepository implements ModerationRepository {
 
-    /** Players per mute query in {@link #loadMutes}. */
+    /** Players per query in the reads that take many players at once. */
     static final int MUTE_BATCH = 500;
 
     public JooqModerationRepository(DSLContext dsl) {
@@ -71,21 +75,44 @@ public final class JooqModerationRepository extends JooqRepository implements Mo
     /** One query per {@value #MUTE_BATCH} players, so a full server's refresh stays within any database's IN list. */
     @Override
     public Map<UUID, MuteState> loadMutes(Collection<PlayerRef> targets) {
+        return loadEach(targets, MODERATION_MUTES, MODERATION_MUTES.TARGET, MuteState.none(), ModerationRows::toMute);
+    }
+
+    @Override
+    public Map<UUID, JailState> loadJails(Collection<PlayerRef> targets) {
+        return loadEach(targets, MODERATION_JAILS, MODERATION_JAILS.TARGET, JailState.none(), ModerationRows::toJail);
+    }
+
+    @Override
+    public Map<UUID, TempbanState> loadTempbans(Collection<PlayerRef> targets) {
+        return loadEach(
+                targets,
+                MODERATION_TEMPBANS,
+                MODERATION_TEMPBANS.TARGET,
+                TempbanState.none(),
+                ModerationRows::toTempban);
+    }
+
+    /** Every target's row of {@code table}, {@code none} for those with no row, in IN queries of bounded size. */
+    private <R extends Record, S> Map<UUID, S> loadEach(
+            Collection<PlayerRef> targets,
+            Table<R> table,
+            TableField<R, String> targetColumn,
+            S none,
+            Function<R, S> toState) {
         Objects.requireNonNull(targets, "targets");
-        Map<UUID, MuteState> mutes = new HashMap<>();
+        Map<UUID, S> states = new HashMap<>();
         List<String> ids = new ArrayList<>();
         for (PlayerRef target : targets) {
-            mutes.put(target.uuid(), MuteState.none());
+            states.put(target.uuid(), none);
             ids.add(target.uuid().toString());
         }
         for (int from = 0; from < ids.size(); from += MUTE_BATCH) {
             List<String> batch = ids.subList(from, Math.min(from + MUTE_BATCH, ids.size()));
-            read(dsl -> dsl.selectFrom(MODERATION_MUTES)
-                            .where(MODERATION_MUTES.TARGET.in(batch))
-                            .fetch())
-                    .forEach(row -> mutes.put(UUID.fromString(row.getTarget()), ModerationRows.toMute(row)));
+            read(dsl -> dsl.selectFrom(table).where(targetColumn.in(batch)).fetch())
+                    .forEach(row -> states.put(UUID.fromString(row.get(targetColumn)), toState.apply(row)));
         }
-        return mutes;
+        return states;
     }
 
     @Override
@@ -265,6 +292,14 @@ public final class JooqModerationRepository extends JooqRepository implements Mo
         Objects.requireNonNull(ip, "ip");
         Objects.requireNonNull(at, "at");
         write(dsl -> ModerationWrites.recordSeen(dsl, who, ip.orElse(null), at));
+    }
+
+    @Override
+    public void touchSeen(PlayerRef who, Optional<String> ip, Instant at) {
+        Objects.requireNonNull(who, "who");
+        Objects.requireNonNull(ip, "ip");
+        Objects.requireNonNull(at, "at");
+        write(dsl -> ModerationWrites.touchSeen(dsl, who, ip.orElse(null), at));
     }
 
     @Override

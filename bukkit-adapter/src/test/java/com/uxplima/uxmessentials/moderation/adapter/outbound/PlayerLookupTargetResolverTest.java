@@ -8,6 +8,7 @@ import java.util.UUID;
 
 import com.uxplima.uxmessentials.shared.application.port.NetworkPresence;
 import com.uxplima.uxmessentials.shared.application.port.PlayerLookup;
+import com.uxplima.uxmessentials.shared.domain.NameCase;
 import com.uxplima.uxmessentials.shared.domain.OnlinePlayer;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import org.junit.jupiter.api.Test;
@@ -18,7 +19,14 @@ class PlayerLookupTargetResolverTest {
     private static final PlayerRef ONLINE_ELSEWHERE = new PlayerRef(UUID.randomUUID(), "Steve");
     private static final PlayerRef CACHED_OWNER = new PlayerRef(UUID.randomUUID(), "steve");
 
+    private NameCase nameCase = NameCase.INSENSITIVE;
+
     private final PlayerLookup offlineCache = new PlayerLookup() {
+        @Override
+        public NameCase nameCase() {
+            return nameCase;
+        }
+
         @Override
         public Optional<PlayerRef> findOnlineByName(String name) {
             return Optional.empty();
@@ -45,14 +53,25 @@ class PlayerLookupTargetResolverTest {
         PlayerLookupTargetResolver resolver = new PlayerLookupTargetResolver(
                 presence(List.of(new OnlinePlayer(ONLINE_ELSEWHERE, "lobby-1"))), offlineCache);
 
-        assertThat(resolver.resolve("STEVE").map(PlayerRef::uuid)).contains(ONLINE_ELSEWHERE.uuid());
+        assertThat(resolver.resolve("STEVE").player().map(PlayerRef::uuid)).contains(ONLINE_ELSEWHERE.uuid());
     }
 
     @Test
     void aPlayerOnlineNowhereFallsBackToTheOfflineCache() {
         PlayerLookupTargetResolver resolver = new PlayerLookupTargetResolver(presence(List.of()), offlineCache);
 
-        assertThat(resolver.resolve("steve").map(PlayerRef::uuid)).contains(CACHED_OWNER.uuid());
+        assertThat(resolver.resolve("steve").player().map(PlayerRef::uuid)).contains(CACHED_OWNER.uuid());
+    }
+
+    @Test
+    void offlineModePresenceSettlesOnlyTheSpellingThatWasTyped() {
+        nameCase = NameCase.SENSITIVE;
+        PlayerLookupTargetResolver resolver = new PlayerLookupTargetResolver(
+                presence(List.of(new OnlinePlayer(ONLINE_ELSEWHERE, "lobby-1"))), offlineCache);
+
+        assertThat(resolver.resolve("Steve").player().map(PlayerRef::uuid)).contains(ONLINE_ELSEWHERE.uuid());
+        // "steve" is another offline-mode account than the "Steve" online elsewhere.
+        assertThat(resolver.resolve("steve").player().map(PlayerRef::uuid)).contains(CACHED_OWNER.uuid());
     }
 
     private static NetworkPresence presence(List<OnlinePlayer> online) {

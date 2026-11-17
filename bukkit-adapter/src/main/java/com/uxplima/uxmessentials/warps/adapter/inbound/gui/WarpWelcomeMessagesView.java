@@ -5,6 +5,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
 import java.util.Objects;
+import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Function;
 
 import org.bukkit.Material;
@@ -32,10 +33,14 @@ import org.jspecify.annotations.Nullable;
  * Registers the per-warp welcome-messages list editor with the menu engine and opens it. A three-row list panel for
  * one warp reached from the editor's welcome button: one entry per stored welcome message across the top two rows,
  * an add button, a back button to the editor, and a clear-all button on the bottom row. A left click on an entry
- * edits its text through the input seam, a right click deletes it, and a shift click cycles its delivery type; the
- * add button writes a new message through the input seam; the clear button drops every message; the back button
- * reopens the warp editor. Each mutation saves the edited warp through the shared {@link EditableWarp} loader and
- * re-opens this list with the new subject so the operator sees the result.
+ * opens that message's own panel, a right click deletes it, and a shift click cycles its delivery type; the add
+ * button writes a new message through the input seam; the clear button drops every message; the back button reopens
+ * the warp editor. Each mutation saves the edited warp through the shared {@link EditableWarp} loader and re-opens
+ * this list with the new subject so the operator sees the result.
+ *
+ * <p>The message panel offers every change the list makes, each as a left click: rewrite the text, cycle the delivery
+ * type, delete the message, or go back to the list. A Bedrock player in a chest cannot send a shift click, so no
+ * change to a message may need one.
  *
  * <p>A save writes the warp's row, so it runs on the async lane and never on the click's tick; the list is re-opened
  * on the viewer's entity thread once the write has finished, so the operator sees the saved result. Saves of one warp
@@ -57,6 +62,11 @@ public final class WarpWelcomeMessagesView {
     public static final String SPEC_ID = "warp-welcome";
 
     private static final String SPEC_RESOURCE = "modules/warps/gui/warp-welcome.conf";
+
+    /** The engine spec id the one-message panel registers and opens under. */
+    public static final String ENTRY_SPEC_ID = "warp-welcome-entry";
+
+    private static final String ENTRY_SPEC_RESOURCE = "modules/warps/gui/warp-welcome-entry.conf";
     private static final int ROWS = 3;
 
     /** The entry grid's capacity: the top two rows of the three-row chest, as the old fixed view drew. */
@@ -105,18 +115,25 @@ public final class WarpWelcomeMessagesView {
         bindings.list("warps:welcome", ctx -> subject(ctx).entries());
         bindings.placeholder(
                 "warp_welcome_material",
-                ctx -> materialFor(entry(ctx).message().type()).name());
+                ctx -> materialFor(shown(ctx).message().type()).name());
         bindings.placeholder(
-                "warp_welcome_index", ctx -> Integer.toString(entry(ctx).index() + 1));
-        bindings.placeholder("warp_welcome_text", ctx -> entry(ctx).message().message());
-        bindings.placeholder("warp_welcome_type", ctx -> entry(ctx).message().type());
-        bindings.action("warps:welcome-edit", this::editEntry);
+                "warp_welcome_index", ctx -> Integer.toString(shown(ctx).index() + 1));
+        bindings.placeholder("warp_welcome_text", ctx -> shown(ctx).message().message());
+        bindings.placeholder("warp_welcome_type", ctx -> shown(ctx).message().type());
+        // An operator's list file from before the panel binds its left click to welcome-edit, so that name opens it.
+        bindings.action("warps:welcome-edit", this::openEntry);
         bindings.action("warps:welcome-remove", this::removeEntry);
         bindings.action("warps:welcome-cycle", this::cycleEntry);
         bindings.action("warps:welcome-add", this::add);
         bindings.action("warps:welcome-clear", this::clear);
         bindings.action("warps:welcome-back", this::back);
+        bindings.action("warps:welcome-entry-text", this::panelText);
+        bindings.action("warps:welcome-entry-cycle", this::panelCycle);
+        bindings.action("warps:welcome-entry-remove", this::panelRemove);
+        bindings.action("warps:welcome-entry-back", this::panelBack);
         menus.registerSpec(SPEC_ID, MenuSpecs.loadOrBundled(SPEC_RESOURCE, dataFolder, ROWS, EngineLog.of(log)));
+        menus.registerSpec(
+                ENTRY_SPEC_ID, MenuSpecs.loadOrBundled(ENTRY_SPEC_RESOURCE, dataFolder, ROWS, EngineLog.of(log)));
     }
 
     /**
@@ -147,56 +164,125 @@ public final class WarpWelcomeMessagesView {
         return new WelcomeList(warpName, warpOwner, List.copyOf(entries));
     }
 
-    /** Left-click an entry: capture replacement text through the input seam; cancel re-opens the list unchanged. */
-    private void editEntry(MenuActionContext ctx) {
-        WelcomeList list = subject(ctx);
-        IndexedWelcome target = entry(ctx);
+    /** Left-click an entry: open the panel for that one message. */
+    private void openEntry(MenuActionContext ctx) {
+        openPanel(ctx.player(), BukkitRefs.toRef(ctx.viewer()), new WelcomeEntry(subject(ctx), entry(ctx)));
+    }
+
+    private void openPanel(Player player, PlayerRef viewer, WelcomeEntry panel) {
+        scheduler.onEntity(viewer, () -> menus.open(player, ENTRY_SPEC_ID, panel));
+    }
+
+    /** Right-click an entry: drop it, then save and re-open. */
+    private void removeEntry(MenuActionContext ctx) {
+        saveThenOpen(ctx, subject(ctx), removing(entry(ctx)));
+    }
+
+    /** Shift-click an entry: cycle its delivery type, keeping its text, then save and re-open. */
+    private void cycleEntry(MenuActionContext ctx) {
+        saveThenOpen(ctx, subject(ctx), cycling(entry(ctx), new AtomicReference<>()));
+    }
+
+    /** The panel's text button: capture replacement text through the input seam; cancel shows the panel unchanged. */
+    private void panelText(MenuActionContext ctx) {
+        WelcomeEntry panel = ctx.subject(WelcomeEntry.class);
         Player player = ctx.player();
         PlayerRef viewer = BukkitRefs.toRef(ctx.viewer());
         player.closeInventory();
         textInput.prompt(
                 player,
                 InputRequest.of("warp.welcome", WarpsMessageKey.WARP_EDITOR_WELCOME_PROMPT.key()),
-                input -> applyEdit(player, viewer, list, target, input),
-                () -> open(player, viewer, list.warpName(), list.warpOwner()));
+                input -> {
+                    AtomicReference<@Nullable IndexedWelcome> saved = new AtomicReference<>();
+                    saveThenPanel(player, viewer, panel.list(), rewriting(panel.entry(), input, saved), saved);
+                },
+                () -> openPanel(player, viewer, panel));
+    }
+
+    /** The panel's type button: move the message to the next delivery type, then show the panel on the result. */
+    private void panelCycle(MenuActionContext ctx) {
+        WelcomeEntry panel = ctx.subject(WelcomeEntry.class);
+        AtomicReference<@Nullable IndexedWelcome> saved = new AtomicReference<>();
+        saveThenPanel(ctx.player(), BukkitRefs.toRef(ctx.viewer()), panel.list(), cycling(panel.entry(), saved), saved);
+    }
+
+    /** The panel's delete button: drop the message, then go back to the list. */
+    private void panelRemove(MenuActionContext ctx) {
+        WelcomeEntry panel = ctx.subject(WelcomeEntry.class);
+        saveThenOpen(ctx, panel.list(), removing(panel.entry()));
+    }
+
+    /** The panel's back button: the list again, read fresh. */
+    private void panelBack(MenuActionContext ctx) {
+        WelcomeList list = ctx.subject(WelcomeEntry.class).list();
+        open(ctx.player(), BukkitRefs.toRef(ctx.viewer()), list.warpName(), list.warpOwner());
     }
 
     /** Replace the entry's text, keeping its delivery type, then save and re-open. Package-private for the test. */
     void applyEdit(Player player, PlayerRef viewer, WelcomeList list, IndexedWelcome target, String input) {
-        saveThenOpen(player, viewer, list, messages -> {
-            int at = locate(messages, target);
-            if (at < 0) {
-                return null;
-            }
-            messages.set(at, new WelcomeMessage(input, messages.get(at).type()));
-            return messages;
-        });
+        saveThenOpen(player, viewer, list, rewriting(target, input, new AtomicReference<>()));
     }
 
-    /** Right-click an entry: drop it, then save and re-open. */
-    private void removeEntry(MenuActionContext ctx) {
-        IndexedWelcome target = entry(ctx);
-        saveThenOpen(ctx, subject(ctx), messages -> {
+    /** An edit that drops {@code target}, or saves nothing when it is gone. */
+    private static Function<List<WelcomeMessage>, @Nullable List<WelcomeMessage>> removing(IndexedWelcome target) {
+        return messages -> {
             int at = locate(messages, target);
             if (at < 0) {
                 return null;
             }
             messages.remove(at);
             return messages;
-        });
+        };
     }
 
-    /** Shift-click an entry: cycle its delivery type, keeping its text, then save and re-open. */
-    private void cycleEntry(MenuActionContext ctx) {
-        IndexedWelcome target = entry(ctx);
-        saveThenOpen(ctx, subject(ctx), messages -> {
+    /** An edit that gives {@code target} new text, keeping its type, and records the message as saved. */
+    private static Function<List<WelcomeMessage>, @Nullable List<WelcomeMessage>> rewriting(
+            IndexedWelcome target, String text, AtomicReference<@Nullable IndexedWelcome> saved) {
+        return messages -> {
+            int at = locate(messages, target);
+            if (at < 0) {
+                return null;
+            }
+            WelcomeMessage changed = new WelcomeMessage(text, messages.get(at).type());
+            messages.set(at, changed);
+            saved.set(new IndexedWelcome(at, changed));
+            return messages;
+        };
+    }
+
+    /** An edit that moves {@code target} to the next delivery type, keeping its text, and records it as saved. */
+    private static Function<List<WelcomeMessage>, @Nullable List<WelcomeMessage>> cycling(
+            IndexedWelcome target, AtomicReference<@Nullable IndexedWelcome> saved) {
+        return messages -> {
             int at = locate(messages, target);
             if (at < 0) {
                 return null;
             }
             WelcomeMessage existing = messages.get(at);
-            messages.set(at, new WelcomeMessage(existing.message(), nextType(existing.type())));
+            WelcomeMessage changed = new WelcomeMessage(existing.message(), nextType(existing.type()));
+            messages.set(at, changed);
+            saved.set(new IndexedWelcome(at, changed));
             return messages;
+        };
+    }
+
+    /**
+     * Save a panel edit, then show the panel again on the message as it was saved. When an earlier save removed the
+     * message, nothing is saved and there is no panel to show, so the list opens instead.
+     */
+    private void saveThenPanel(
+            Player player,
+            PlayerRef viewer,
+            WelcomeList list,
+            Function<List<WelcomeMessage>, @Nullable List<WelcomeMessage>> edit,
+            AtomicReference<@Nullable IndexedWelcome> saved) {
+        save(player, viewer, list, edit, () -> {
+            IndexedWelcome now = saved.get();
+            if (now == null) {
+                open(player, viewer, list.warpName(), list.warpOwner());
+            } else {
+                openPanel(player, viewer, new WelcomeEntry(list, now));
+            }
         });
     }
 
@@ -262,6 +348,16 @@ public final class WarpWelcomeMessagesView {
             PlayerRef viewer,
             WelcomeList list,
             Function<List<WelcomeMessage>, @Nullable List<WelcomeMessage>> edit) {
+        save(player, viewer, list, edit, () -> open(player, viewer, list.warpName(), list.warpOwner()));
+    }
+
+    /** As {@link #saveThenOpen}, running {@code then} on the viewer's thread once the save has finished. */
+    private void save(
+            Player player,
+            PlayerRef viewer,
+            WelcomeList list,
+            Function<List<WelcomeMessage>, @Nullable List<WelcomeMessage>> edit,
+            Runnable then) {
         editorView.edit(
                 list.warpName(),
                 list.warpOwner(),
@@ -273,7 +369,7 @@ public final class WarpWelcomeMessagesView {
                         warp.setWelcomeMessages(next);
                     }
                 },
-                () -> open(player, viewer, list.warpName(), list.warpOwner()));
+                then);
     }
 
     private static Material materialFor(String type) {
@@ -305,12 +401,16 @@ public final class WarpWelcomeMessagesView {
         return ctx.subject(WelcomeList.class);
     }
 
-    private IndexedWelcome entry(MenuContext ctx) {
+    private IndexedWelcome entry(MenuActionContext ctx) {
         return ctx.entry(IndexedWelcome.class);
     }
 
-    private IndexedWelcome entry(MenuActionContext ctx) {
-        return ctx.entry(IndexedWelcome.class);
+    /** The message a line is drawn for: the list row it sits on, or the one message a panel shows. */
+    private IndexedWelcome shown(MenuContext ctx) {
+        if (ctx.entry().orElse(null) instanceof IndexedWelcome row) {
+            return row;
+        }
+        return ctx.subject(WelcomeEntry.class).entry();
     }
 
     /**
@@ -341,6 +441,21 @@ public final class WarpWelcomeMessagesView {
 
         public IndexedWelcome {
             Objects.requireNonNull(message, "message");
+        }
+    }
+
+    /**
+     * The subject of an open message panel: the list it was opened from, which names the warp, and the one message
+     * it shows.
+     *
+     * @param list the welcome list the panel belongs to
+     * @param entry the message the panel shows
+     */
+    public record WelcomeEntry(WelcomeList list, IndexedWelcome entry) {
+
+        public WelcomeEntry {
+            Objects.requireNonNull(list, "list");
+            Objects.requireNonNull(entry, "entry");
         }
     }
 }

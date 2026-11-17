@@ -19,7 +19,9 @@ import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandSuggestio
 import com.uxplima.uxmessentials.shared.application.permission.SocialPermissions;
 import com.uxplima.uxmessentials.shared.application.port.MessageSink;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
+import com.uxplima.uxmessentials.shared.domain.NameMatch;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
+import com.uxplima.uxmessentials.shared.domain.message.MessageLine;
 import com.uxplima.uxmlib.command.Gate;
 import org.jspecify.annotations.NullMarked;
 
@@ -73,9 +75,11 @@ public final class IgnoreCommand extends MessagingCommandSupport implements Comm
         }
         PlayerRef owner = ref(sender);
         String name = ctx.getArgument("player", String.class);
-        Optional<PlayerRef> target = services.players().findByName(name);
+        NameMatch match = services.players().matchByName(name);
+        Optional<PlayerRef> target = match.player();
         if (target.isEmpty()) {
-            notify(owner, UNKNOWN_PLAYER, Map.of("player", name));
+            MessageLine miss = match.miss(UNKNOWN_PLAYER, Map.of("player", name));
+            notify(owner, miss.key(), miss.args());
             return 0;
         }
         services.ignore().ignore(owner, target.get());

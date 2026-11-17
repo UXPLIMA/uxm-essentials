@@ -15,6 +15,7 @@ import com.uxplima.uxmessentials.shared.adapter.outbound.style.StyledText;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmessentials.shared.domain.message.MessageKey;
+import com.uxplima.uxmessentials.shared.domain.message.MessageLine;
 import org.jspecify.annotations.NullMarked;
 
 /**
@@ -54,6 +55,11 @@ public final class CommandFeedback {
     /** Resolve {@code key} for {@code sender} with {@code placeholders} and send it with the prefix folded in. */
     public void send(CommandSender sender, MessageKey key, Map<String, String> placeholders) {
         sender.sendMessage(render(sender, key, placeholders));
+    }
+
+    /** Send a line chosen elsewhere, such as the reply to a player name that matched no single account. */
+    public void send(CommandSender sender, MessageLine line) {
+        send(sender, line.key(), line.args());
     }
 
     /**

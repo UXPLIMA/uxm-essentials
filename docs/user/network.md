@@ -19,8 +19,9 @@ or does across servers.
 
 A server of the network that has no business in the shared database (a creative or build server) keeps the same
 `storage` block and sets `storage.local-only = true`: it stays on its own SQLite file. Moving an existing SQLite
-server to the shared database is `storage.copy-from-file = true` with the new type, for one restart; the log says
-how many rows were copied, and tables that already hold rows are left alone.
+server to the shared database is `storage.copy-from-file = true` with the new type, for one restart; the log says how many rows were copied, and tables that already hold rows are left alone.
+
+A proxy in offline mode (a cracked network) makes `Steve` and `steve` two players, but a backend reads the proxy's mode from Paper's proxy settings, which default to online. With `lookup.name-case = "auto"` (the default) the first offline-mode join corrects that, logs the warning `event=name_case_detected` and keeps it in `name-case.state` in the plugin folder, so the next start is right before anybody joins. Set `lookup.name-case = "sensitive"` in `config.conf` on every backend to have it right from the first join; `"insensitive"` forgets a kept switch.
 
 Every `network` key is read on start. A change needs a restart.
 
@@ -206,6 +207,7 @@ shared: each backend reads its own `config.conf` and module files, so keep them 
 | Trade | Escrow | Two players on different servers trade | `trade` `cross-server` |
 | Vote | Party counter | A party pays players on every server | `voteparty.network-rewards` in `vote`, default on |
 | Playtime | Daily rows | Time on every server adds up | none |
+| Skin | Each player's chosen skin | A change is worn at once on the server the player is on | none |
 
 ### Cross-server moves
 
@@ -359,8 +361,7 @@ same everywhere so transaction times agree.
   Use a proxy chat plugin for network chat.
 - AFK state, `/back`, `/rtp`, `/spawn` and respawns: they stay on the server the player is on.
 - `/kick` and `/freeze` of a player on another server, and `/invsee` or `/endersee` of one.
-- Warps, homes, player warps, worlds and teleports to another server while that module's `cross-server` switch is
-  off.
+- Warps, homes, player warps, worlds and teleports to another server while their `cross-server` switch is off.
 - Settings files, message files and menus. Copy them to every backend that should behave the same.
 - Command control: configure the `commandcontrol` module on each backend; the proxy jar gates only proxy commands.
 

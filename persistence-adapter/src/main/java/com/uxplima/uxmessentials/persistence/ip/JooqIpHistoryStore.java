@@ -3,6 +3,7 @@ package com.uxplima.uxmessentials.persistence.ip;
 import static com.uxplima.uxmessentials.persistence.jooq.tables.IpHistory.IP_HISTORY;
 
 import java.time.Instant;
+import java.util.Collection;
 import java.util.List;
 import java.util.Objects;
 import java.util.Set;
@@ -14,6 +15,7 @@ import com.uxplima.uxmessentials.shared.application.port.IpHistoryStore;
 import com.uxplima.uxmessentials.shared.domain.IpAssociation;
 import org.jooq.InsertOnDuplicateSetMoreStep;
 import org.jooq.Record;
+import org.jooq.impl.DSL;
 import org.jspecify.annotations.Nullable;
 
 /**
@@ -77,6 +79,50 @@ public final class JooqIpHistoryStore extends JooqRepository implements IpHistor
                         dsl.select(IP_HISTORY.IP_TOKEN).from(IP_HISTORY).where(IP_HISTORY.UUID.eq(account.toString()))))
                 .fetch(row ->
                         new IpAssociation(UUID.fromString(row.get(IP_HISTORY.UUID)), row.get(IP_HISTORY.IP_TOKEN))));
+    }
+
+    @Override
+    public List<UsedAddress> usedBy(UUID account, int limit) {
+        Objects.requireNonNull(account, "account");
+        if (limit <= 0) {
+            return List.of();
+        }
+        return read(dsl -> dsl.select(IP_HISTORY.IP_TOKEN, IP_HISTORY.IP)
+                .from(IP_HISTORY)
+                .where(IP_HISTORY.UUID.eq(account.toString()))
+                .orderBy(IP_HISTORY.LAST_SEEN.desc())
+                .limit(limit)
+                .fetch(row -> new UsedAddress(row.value1(), row.value2())));
+    }
+
+    @Override
+    public Set<String> quietTokens(Collection<String> ipTokens, int most) {
+        Objects.requireNonNull(ipTokens, "ipTokens");
+        if (ipTokens.isEmpty()) {
+            return Set.of();
+        }
+        return Set.copyOf(read(dsl -> dsl.select(IP_HISTORY.IP_TOKEN)
+                .from(IP_HISTORY)
+                .where(IP_HISTORY.IP_TOKEN.in(ipTokens))
+                .groupBy(IP_HISTORY.IP_TOKEN)
+                .having(DSL.countDistinct(IP_HISTORY.UUID).le(most))
+                .fetch(IP_HISTORY.IP_TOKEN)));
+    }
+
+    @Override
+    public Set<UUID> accountsOnTokens(Collection<String> ipTokens, int limit) {
+        Objects.requireNonNull(ipTokens, "ipTokens");
+        if (ipTokens.isEmpty() || limit <= 0) {
+            return Set.of();
+        }
+        return read(dsl -> dsl.selectDistinct(IP_HISTORY.UUID)
+                        .from(IP_HISTORY)
+                        .where(IP_HISTORY.IP_TOKEN.in(ipTokens))
+                        .limit(limit)
+                        .fetch(IP_HISTORY.UUID))
+                .stream()
+                .map(UUID::fromString)
+                .collect(Collectors.toUnmodifiableSet());
     }
 
     @Override

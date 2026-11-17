@@ -71,7 +71,8 @@ public final class BossBarWiring {
                 remaining,
                 Instant::now,
                 kernel.scheduler(),
-                kernel.messages()));
+                kernel.messages(),
+                kernel.playerLookup()));
         List<Listener> listeners = List.of(new BossBarConnectionListener(renderer, announcements, kernel.scheduler()));
         Runnable reload = () -> {
             settings.reload();

@@ -1,7 +1,9 @@
 package com.uxplima.uxmessentials.shared.application.port;
 
 import java.time.Instant;
+import java.util.Collection;
 import java.util.List;
+import java.util.Objects;
 import java.util.Set;
 import java.util.UUID;
 
@@ -45,4 +47,30 @@ public interface IpHistoryStore {
      * account seen only while it was). The STRICT ban fan-out and {@code /seenip} read this; no alt lookup does.
      */
     Set<String> addressesOf(UUID account);
+
+    /**
+     * The addresses {@code account} connected from, most recently used first and at most {@code limit} of them, each
+     * as its token with the raw address when it was kept. The default knows none.
+     */
+    default List<UsedAddress> usedBy(UUID account, int limit) {
+        return List.of();
+    }
+
+    /** Of {@code ipTokens}, the ones at most {@code most} distinct accounts were ever seen on. The default knows none. */
+    default Set<String> quietTokens(Collection<String> ipTokens, int most) {
+        return Set.of();
+    }
+
+    /** The distinct accounts seen on any of {@code ipTokens}, at most {@code limit} of them. The default knows none. */
+    default Set<UUID> accountsOnTokens(Collection<String> ipTokens, int limit) {
+        return Set.of();
+    }
+
+    /** One address an account used: its token, and the address itself when it was kept. */
+    record UsedAddress(String token, @Nullable String address) {
+
+        public UsedAddress {
+            Objects.requireNonNull(token, "token");
+        }
+    }
 }

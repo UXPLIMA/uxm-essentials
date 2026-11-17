@@ -11,8 +11,10 @@ import com.uxplima.uxmessentials.shared.adapter.outbound.BukkitRefs;
 import com.uxplima.uxmessentials.shared.application.port.MessageSink;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
 import com.uxplima.uxmessentials.shared.application.port.Scheduler;
+import com.uxplima.uxmessentials.shared.domain.NameMatch;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmessentials.shared.domain.message.MessageKey;
+import com.uxplima.uxmessentials.shared.domain.message.MessageLine;
 import com.uxplima.uxmlib.gui.input.InputRequest;
 import com.uxplima.uxmlib.gui.input.TextInput;
 import org.jspecify.annotations.NullMarked;
@@ -86,12 +88,12 @@ final class CheckTargetPrompt {
     void checkByName(PlayerRef actor, String name) {
         String typed = name.strip();
         scheduler.async(() -> {
-            Optional<PlayerRef> target = services.targets().resolve(typed);
+            NameMatch match = services.targets().resolve(typed);
+            Optional<PlayerRef> target = match.player();
             if (target.isEmpty()) {
-                sink.deliver(
-                        actor,
-                        messages.resolve(
-                                actor, ModerationCommandSupport.UNKNOWN_PLAYER, java.util.Map.of("player", typed)));
+                MessageLine miss =
+                        match.miss(ModerationCommandSupport.UNKNOWN_PLAYER, java.util.Map.of("player", typed));
+                sink.deliver(actor, messages.resolve(actor, miss.key(), miss.args()));
                 return;
             }
             check.accept(actor, target.get());

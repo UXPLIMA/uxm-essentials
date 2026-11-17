@@ -28,7 +28,9 @@ import com.uxplima.uxmessentials.shared.application.port.Messages;
 import com.uxplima.uxmessentials.shared.application.port.PlayerLookup;
 import com.uxplima.uxmessentials.shared.application.port.Scheduler;
 import com.uxplima.uxmessentials.shared.domain.AltGroup;
+import com.uxplima.uxmessentials.shared.domain.NameMatch;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
+import com.uxplima.uxmessentials.shared.domain.message.MessageLine;
 import com.uxplima.uxmessentials.shared.domain.message.SharedMessageKey;
 import com.uxplima.uxmlib.command.Gate;
 import com.uxplima.uxmlib.command.Sender;
@@ -81,9 +83,11 @@ public final class IpAltsCommand extends SecurityCommandSupport implements Comma
     }
 
     private void report(CommandSender sender, String name) {
-        Optional<PlayerRef> target = lookup.findByName(name);
+        NameMatch match = lookup.matchByName(name);
+        Optional<PlayerRef> target = match.player();
         if (target.isEmpty()) {
-            notifySender(sender, SharedMessageKey.COMMAND_UNKNOWN_PLAYER, Map.of("player", name));
+            MessageLine miss = match.miss(SharedMessageKey.COMMAND_UNKNOWN_PLAYER, Map.of("player", name));
+            notifySender(sender, miss.key(), miss.args());
             return;
         }
         PlayerRef found = target.get();

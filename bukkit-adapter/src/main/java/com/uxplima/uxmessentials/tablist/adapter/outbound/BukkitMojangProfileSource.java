@@ -3,11 +3,12 @@ package com.uxplima.uxmessentials.tablist.adapter.outbound;
 import java.util.Objects;
 import java.util.Optional;
 
-import org.bukkit.Bukkit;
 import org.bukkit.entity.Player;
 
 import com.destroystokyo.paper.profile.PlayerProfile;
 import com.destroystokyo.paper.profile.ProfileProperty;
+import com.uxplima.uxmessentials.shared.adapter.outbound.lookup.OnlineByName;
+import com.uxplima.uxmessentials.shared.application.port.PlayerLookup;
 import com.uxplima.uxmessentials.shared.application.port.SkinTextures;
 import com.uxplima.uxmessentials.shared.domain.SkinTexture;
 import com.uxplima.uxmlib.packet.tablist.TabSkin;
@@ -33,14 +34,16 @@ public final class BukkitMojangProfileSource implements MojangProfileSource {
     private static final String TEXTURES_PROPERTY = "textures";
 
     private final SkinTextures skins;
+    private final PlayerLookup players;
 
-    public BukkitMojangProfileSource(SkinTextures skins) {
+    public BukkitMojangProfileSource(SkinTextures skins, PlayerLookup players) {
         this.skins = Objects.requireNonNull(skins, "skins");
+        this.players = Objects.requireNonNull(players, "players");
     }
 
     @Override
     public Optional<TabSkin> onlineTexture(String name) {
-        Player online = Bukkit.getPlayerExact(name);
+        Player online = OnlineByName.player(players, name);
         if (online == null) {
             return Optional.empty();
         }

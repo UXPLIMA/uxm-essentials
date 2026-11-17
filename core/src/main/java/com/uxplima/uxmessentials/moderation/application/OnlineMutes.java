@@ -17,6 +17,7 @@ import com.uxplima.uxmessentials.messaging.application.port.MutePolicy;
 import com.uxplima.uxmessentials.moderation.application.port.ModerationRepository;
 import com.uxplima.uxmessentials.moderation.domain.MuteState;
 import com.uxplima.uxmessentials.moderation.domain.event.ModerationEvent;
+import com.uxplima.uxmessentials.moderation.domain.event.MuteInherited;
 import com.uxplima.uxmessentials.moderation.domain.event.PlayerMuted;
 import com.uxplima.uxmessentials.moderation.domain.event.PlayerUnmuted;
 import com.uxplima.uxmessentials.shared.application.port.Logger;
@@ -92,6 +93,8 @@ public final class OnlineMutes implements MutePolicy {
         Objects.requireNonNull(event, "event");
         if (event instanceof PlayerMuted muted) {
             set(muted.target().uuid(), Optional.of(muted.mute()));
+        } else if (event instanceof MuteInherited inherited) {
+            set(inherited.target().uuid(), Optional.of(inherited.mute()));
         } else if (event instanceof PlayerUnmuted unmuted) {
             set(unmuted.target().uuid(), Optional.of(MuteState.none()));
         }
