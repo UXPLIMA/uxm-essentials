@@ -13,8 +13,10 @@ import org.bukkit.Bukkit;
 import org.bukkit.entity.Player;
 import org.bukkit.inventory.ItemStack;
 
+import com.uxplima.uxmessentials.shared.adapter.outbound.lookup.OnlineByName;
 import com.uxplima.uxmessentials.shared.application.port.MessageSink;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
+import com.uxplima.uxmessentials.shared.application.port.PlayerLookup;
 import com.uxplima.uxmessentials.shared.application.port.Scheduler;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmessentials.trade.adapter.outbound.TradeItemBytes;
@@ -60,6 +62,7 @@ public final class CrossServerTradeView {
     private final CrossTradeWindow window;
     private final TradeSessions localSessions;
     private final CrossServerInvites invites;
+    private final PlayerLookup players;
     private final ConcurrentHashMap<UUID, CrossTradeHolder> sessions = new ConcurrentHashMap<>();
 
     /**
@@ -74,6 +77,7 @@ public final class CrossServerTradeView {
             TradeBus bus,
             CrossTradeWindow window,
             TradeSessions localSessions,
+            PlayerLookup players,
             Function<TradePresence, CrossServerInvites> invites) {
         this.messages = Objects.requireNonNull(messages, "messages");
         this.messageSink = Objects.requireNonNull(messageSink, "messageSink");
@@ -82,6 +86,7 @@ public final class CrossServerTradeView {
         this.bus = Objects.requireNonNull(bus, "bus");
         this.window = Objects.requireNonNull(window, "window");
         this.localSessions = Objects.requireNonNull(localSessions, "localSessions");
+        this.players = Objects.requireNonNull(players, "players");
         this.invites = Objects.requireNonNull(invites, "invites").apply(new LivePresence());
     }
 
@@ -487,7 +492,7 @@ public final class CrossServerTradeView {
 
         @Override
         public Optional<PlayerRef> onlineByName(String name) {
-            Player player = Bukkit.getPlayerExact(name);
+            Player player = OnlineByName.player(players, name);
             return player != null && player.isOnline() ? Optional.of(ref(player)) : Optional.empty();
         }
 

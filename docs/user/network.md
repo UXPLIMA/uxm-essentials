@@ -19,8 +19,9 @@ or does across servers.
 
 A server of the network that has no business in the shared database (a creative or build server) keeps the same
 `storage` block and sets `storage.local-only = true`: it stays on its own SQLite file. Moving an existing SQLite
-server to the shared database is `storage.copy-from-file = true` with the new type, for one restart; the log says
-how many rows were copied, and tables that already hold rows are left alone.
+server to the shared database is `storage.copy-from-file = true` with the new type, for one restart; the log says how many rows were copied, and tables that already hold rows are left alone.
+
+A proxy in offline mode (a cracked network) makes `Steve` and `steve` two players, but a backend reads the proxy's mode from Paper's proxy settings, which default to online. With `lookup.name-case = "auto"` (the default) the first offline-mode join corrects that, logs the warning `event=name_case_detected` and keeps it in `name-case.state` in the plugin folder, so the next start is right before anybody joins. Set `lookup.name-case = "sensitive"` in `config.conf` on every backend to have it right from the first join; `"insensitive"` forgets a kept switch.
 
 Every `network` key is read on start. A change needs a restart.
 
@@ -267,10 +268,9 @@ used on whichever server holds the player, when that server has its world. Detai
 
 Every backend knows which server each online player is on, from what the others announce with their heartbeats.
 With the network on, `/msg` and `/reply` reach a player on another server; that server applies the recipient's own
-message toggle, reply setting, ignore list and vanish. A spy holding `uxmessentials.msg.socialspy` sees every
-private message once, on any server. `/msgtoggle`, `/rtoggle`, `/broadcasttoggle`, `/socialspy` and who `/reply`
-answers follow the player to every server. `/helpop` and staff chat reach the staff of every server with the
-sender's server in the line. `/seen` reports a player connected elsewhere as online there.
+message toggle, reply setting, ignore list and vanish. A spy holding `uxmessentials.msg.socialspy` sees every private
+message once, on any server; message switches and the `/reply` partner follow the player. `/helpop` and staff chat
+reach the staff of every server with the sender's server in the line. `/seen` reports a player elsewhere as online.
 
 A vanished player is hidden on every server only with `cross-server = true` in `modules/vanish/config.conf` on
 every backend; a backend with it off shows them. Vanish is kept in the database, so a player switching servers stays

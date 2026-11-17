@@ -23,7 +23,10 @@ public record DrawnReason(ModerationMessageKey line, Map<String, String> args) {
 
     /** The catalog lines a sanction reason can be drawn from. */
     private static final Set<ModerationMessageKey> LINES = EnumSet.of(
-            ModerationMessageKey.MOD_WARN_ESCALATION_REASON, ModerationMessageKey.MOD_WARN_ESCALATION_REASON_BARE);
+            ModerationMessageKey.MOD_WARN_ESCALATION_REASON,
+            ModerationMessageKey.MOD_WARN_ESCALATION_REASON_BARE,
+            ModerationMessageKey.MOD_CASE_VARIANT_REASON,
+            ModerationMessageKey.MOD_CASE_VARIANT_REASON_BARE);
 
     public DrawnReason {
         Objects.requireNonNull(line, "line");
@@ -46,6 +49,20 @@ public record DrawnReason(ModerationMessageKey line, Map<String, String> args) {
                         ModerationMessageKey.MOD_WARN_ESCALATION_REASON, Map.of("count", total, "reason", text)))
                 .orElseGet(() ->
                         new DrawnReason(ModerationMessageKey.MOD_WARN_ESCALATION_REASON_BARE, Map.of("count", total)));
+    }
+
+    /**
+     * The reason of a sanction copied onto another spelling of a name on an offline-mode server: the account it came
+     * from and that sanction's reason, or the account alone when it gave none.
+     */
+    public static DrawnReason inherited(String from, Optional<String> reason) {
+        Objects.requireNonNull(from, "from");
+        Objects.requireNonNull(reason, "reason");
+        return reason.filter(text -> !text.isBlank())
+                .map(text -> new DrawnReason(
+                        ModerationMessageKey.MOD_CASE_VARIANT_REASON, Map.of("player", from, "reason", text)))
+                .orElseGet(() ->
+                        new DrawnReason(ModerationMessageKey.MOD_CASE_VARIANT_REASON_BARE, Map.of("player", from)));
     }
 
     /** The drawn reason stored under {@code key} with {@code args}; empty when the key names no reason line. */

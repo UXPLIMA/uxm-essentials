@@ -18,9 +18,11 @@ import com.uxplima.uxmessentials.shared.application.port.Logger;
 import com.uxplima.uxmessentials.shared.application.port.MessageSink;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
 import com.uxplima.uxmessentials.shared.application.port.Scheduler;
+import com.uxplima.uxmessentials.shared.domain.NameMatch;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmessentials.shared.domain.message.GuiMessageKey;
 import com.uxplima.uxmessentials.shared.domain.message.MessageKey;
+import com.uxplima.uxmessentials.shared.domain.message.MessageLine;
 import com.uxplima.uxmlib.gui.input.InputRequest;
 import com.uxplima.uxmlib.gui.input.TextInput;
 import com.uxplima.uxmlib.menu.Menus;
@@ -177,11 +179,12 @@ public final class PlayerPickerView {
     void resolveTyped(Player viewer, PlayerRef viewerRef, Request request, String input) {
         String name = input.strip();
         scheduler.async(() -> {
-            Optional<PlayerRef> resolved = request.offlineResolver().apply(name);
+            NameMatch match = request.offlineResolver().apply(name);
+            Optional<PlayerRef> resolved = match.player();
             scheduler.onEntity(viewerRef, () -> {
                 if (resolved.isEmpty()) {
-                    sink.deliver(
-                            viewerRef, messages.resolve(viewerRef, request.unknownPlayerKey(), Map.of("player", name)));
+                    MessageLine miss = match.miss(request.unknownPlayerKey(), Map.of("player", name));
+                    sink.deliver(viewerRef, messages.resolve(viewerRef, miss.key(), miss.args()));
                     open(viewer, viewerRef, request);
                     return;
                 }
@@ -246,14 +249,14 @@ public final class PlayerPickerView {
      *
      * @param title the menu-title catalog key
      * @param onPick invoked with the chosen target (a clicked head, or a resolved typed name)
-     * @param offlineResolver maps a typed name to a target, or empty when the name is unknown
+     * @param offlineResolver maps a typed name to the target it names, nobody, or several case variants
      * @param unknownPlayerKey the reply key for an unresolvable typed name (filled with {@code {player}})
      * @param footerButtons extra bottom-row buttons that are not a player pick (empty for the sanction callers)
      */
     public record Request(
             MessageKey title,
             Consumer<PlayerRef> onPick,
-            Function<String, Optional<PlayerRef>> offlineResolver,
+            Function<String, NameMatch> offlineResolver,
             MessageKey unknownPlayerKey,
             List<FooterButton> footerButtons) {
 
@@ -269,7 +272,7 @@ public final class PlayerPickerView {
         public Request(
                 MessageKey title,
                 Consumer<PlayerRef> onPick,
-                Function<String, Optional<PlayerRef>> offlineResolver,
+                Function<String, NameMatch> offlineResolver,
                 MessageKey unknownPlayerKey) {
             this(title, onPick, offlineResolver, unknownPlayerKey, List.of());
         }

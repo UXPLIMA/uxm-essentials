@@ -325,7 +325,7 @@ public final class EconomyWiring {
             // only the port left every one of them finding nothing and paying nothing, however much this
             // ledger was holding.
             ForeignEconomyProviders.publishNative(
-                    plugin, resolved, currencies, settings.registerPriority(), kernel.log());
+                    plugin, resolved, currencies, settings.registerPriority(), kernel.playerLookup(), kernel.log());
         }
         return new ResolvedEconomy(resolved, backends, resolved == nativeProvider, false);
     }

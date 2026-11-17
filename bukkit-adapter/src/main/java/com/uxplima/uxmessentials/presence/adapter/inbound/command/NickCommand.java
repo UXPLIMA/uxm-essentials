@@ -24,7 +24,9 @@ import com.uxplima.uxmessentials.presence.domain.PresenceMessageKey;
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandRegistration;
 import com.uxplima.uxmessentials.shared.application.permission.SocialPermissions;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
+import com.uxplima.uxmessentials.shared.application.port.PlayerLookup;
 import com.uxplima.uxmessentials.shared.application.port.Scheduler;
+import com.uxplima.uxmessentials.shared.domain.NameMatch;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmlib.command.Args;
 import com.uxplima.uxmlib.command.Gate;
@@ -53,8 +55,11 @@ public final class NickCommand extends PresenceCommandSupport implements Command
     private static final String OFF = "off";
     private static final String CLEAR = "clear";
 
-    public NickCommand(PresenceServices services, Messages messages, Scheduler scheduler) {
+    private final PlayerLookup players;
+
+    public NickCommand(PresenceServices services, Messages messages, Scheduler scheduler, PlayerLookup players) {
         super(services, messages, scheduler);
+        this.players = java.util.Objects.requireNonNull(players, "players");
     }
 
     @Override
@@ -114,9 +119,10 @@ public final class NickCommand extends PresenceCommandSupport implements Command
         PlayerRef actor = ref(sender);
         String targetName = StringArgumentType.getString(ctx, "name");
         String nick = StringArgumentType.getString(ctx, "value");
-        Optional<PlayerRef> target = onlineByName(targetName);
+        NameMatch match = players.matchOnlineByName(targetName);
+        Optional<PlayerRef> target = match.player();
         if (target.isEmpty()) {
-            reportUnknown(sender, targetName);
+            feedback.send(sender, match.miss(PresenceMessageKey.NICK_TARGET_UNKNOWN, Map.of("player", targetName)));
             return Command.SINGLE_SUCCESS;
         }
         if (nick.equalsIgnoreCase(OFF)) {
@@ -125,15 +131,6 @@ public final class NickCommand extends PresenceCommandSupport implements Command
         }
         services.setNick().set(actor, target.get(), nick);
         return Command.SINGLE_SUCCESS;
-    }
-
-    private void reportUnknown(Player sender, String name) {
-        feedback.send(sender, PresenceMessageKey.NICK_TARGET_UNKNOWN, Map.of("player", name));
-    }
-
-    private static Optional<PlayerRef> onlineByName(String name) {
-        Player target = Bukkit.getPlayerExact(name);
-        return target == null ? Optional.empty() : Optional.of(ref(target));
     }
 
     /**

@@ -6,6 +6,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.TreeSet;
 import java.util.UUID;
 
 import com.uxplima.uxmessentials.moderation.application.port.ModerationAudit;
@@ -21,7 +22,14 @@ import com.uxplima.uxmessentials.shared.domain.message.MessageKey;
 /**
  * The ban-on-login check, split along the threads it runs on. For the connecting UUID and address it weighs, in order:
  * a server-wide lockdown (the broadest gate, only bypass holders pass), then an active per-UUID tempban, then an
- * active IP ban on the connecting address. Any match refuses the login before player data loads.
+ * active ban on an account whose name differs from the login's only in case, then an active IP ban on the connecting
+ * address, then, when the server refuses them, a new account under a case variant of a known name. Any match refuses
+ * the login before player data loads.
+ *
+ * <p>The case variants matter on an offline-mode server only, where the uuid is derived from the exact spelling: a
+ * banned {@code Steve} who logs in as {@code STEVE} arrives as another account with no ban of its own.
+ * {@link CaseVariantSanctions} says which bans, mutes and jails follow the login there; it reads nothing while names
+ * are not case-sensitive, where a case variant of a sanctioned name is somebody else.
  *
  * <ul>
  *   <li>{@link #read} fetches everything the check needs from storage. It runs at pre-login, off the tick, where no
@@ -29,8 +37,10 @@ import com.uxplima.uxmessentials.shared.domain.message.MessageKey;
  *   <li>{@link #decide} weighs what was read against the two permission answers (the lockdown bypass and the
  *       punishment exemption). It touches no storage, so it runs at login, on the server thread, where the
  *       permissions are attached.
- *   <li>{@link #record} writes the last-seen row and the alt-detection audit line once the outcome is known. It
- *       writes to storage, so it goes back off the tick.
+ *   <li>{@link #record} writes the alt-detection audit line once the outcome is known, and {@link #carryOver} gives
+ *       an allowed account the mute and the jail it inherits, so every check that reads its own mute or jail, on this
+ *       server and the others, holds it. Both write to storage, so they go back off the tick. The seen row is the
+ *       join's to write: a refused login leaves none.
  * </ul>
  *
  * <p>The refusal text is rendered through the {@link Notifier}, so the disconnect screen is in the player's language.
@@ -42,14 +52,39 @@ public final class LoginEnforcement {
     private final Notifier notifier;
     private final ModerationAudit audit;
     private final Clock clock;
+    private final CaseVariantSanctions caseVariants;
+    private final CarryOver carryOver;
+    private final boolean refuseCaseVariants;
 
+    /** The check for a server whose logins are authenticated, where a name has one owner in any case. */
     public LoginEnforcement(
             ModerationRepository repository, IpAlts ipAlts, Notifier notifier, ModerationAudit audit, Clock clock) {
+        this(repository, ipAlts, notifier, audit, clock, CaseVariantSanctions.none(repository), CarryOver.NONE, false);
+    }
+
+    /**
+     * @param caseVariants the sanctions that follow a login from the other spellings of its name
+     * @param carryOver gives the joining account the mute and the jail it inherits
+     * @param refuseCaseVariants whether a new account under a case variant of a known name is refused even when no
+     *     ban is involved
+     */
+    public LoginEnforcement(
+            ModerationRepository repository,
+            IpAlts ipAlts,
+            Notifier notifier,
+            ModerationAudit audit,
+            Clock clock,
+            CaseVariantSanctions caseVariants,
+            CarryOver carryOver,
+            boolean refuseCaseVariants) {
         this.repository = Objects.requireNonNull(repository, "repository");
         this.ipAlts = Objects.requireNonNull(ipAlts, "ipAlts");
         this.notifier = Objects.requireNonNull(notifier, "notifier");
         this.audit = Objects.requireNonNull(audit, "audit");
         this.clock = Objects.requireNonNull(clock, "clock");
+        this.caseVariants = Objects.requireNonNull(caseVariants, "caseVariants");
+        this.carryOver = Objects.requireNonNull(carryOver, "carryOver");
+        this.refuseCaseVariants = refuseCaseVariants;
     }
 
     /**
@@ -69,7 +104,18 @@ public final class LoginEnforcement {
                 repository.isLockedDown(),
                 repository.loadTempban(who),
                 repository.activeIpBan(ip, now),
-                ipAlts.onAddress(ip, who.uuid()));
+                ipAlts.onAddress(ip, who.uuid()),
+                caseVariants.atLogin(who, ip, now));
+    }
+
+    /**
+     * Give {@code standing}'s account the mute and the jail it inherits from another spelling of its name, through the
+     * {@link CarryOver} the server was built with. Call it only for a login that was allowed, so a refused one leaves
+     * nothing behind. It writes to storage, so call it off the tick.
+     */
+    public void carryOver(Standing standing) {
+        Objects.requireNonNull(standing, "standing");
+        carryOver.carryOver(standing.who(), standing.inherited());
     }
 
     /**
@@ -88,6 +134,10 @@ public final class LoginEnforcement {
         if (standing.tempban() instanceof TempbanState.Active ban && ban.isActiveAt(now)) {
             return Decision.deny(BanScreen.of(ban, now).render(notifier, who));
         }
+        // The same person under another spelling: the ban follows them, exempt or not, as it does on their own uuid.
+        if (standing.inherited().ban() instanceof TempbanState.Active ban && ban.isActiveAt(now)) {
+            return Decision.deny(BanScreen.of(ban, now).render(notifier, who));
+        }
         Optional<IpBan> ipBan = standing.ipBan().filter(ban -> !exempt && ban.isActiveAt(now));
         if (ipBan.isPresent()) {
             IpBan ban = ipBan.get();
@@ -99,16 +149,38 @@ public final class LoginEnforcement {
                             SanctionReasons.read(notifier::render, who, ban.reason(), ban.drawnReason())
                                     .orElse(""))));
         }
+        // An account that already joined keeps joining: the option stops new look-alikes, it does not pick between
+        // accounts the server already has.
+        CaseVariantSanctions.Inherited inherited = standing.inherited();
+        if (refuseCaseVariants && !inherited.known() && !inherited.variants().isEmpty()) {
+            return Decision.deny(render(
+                    who,
+                    ModerationMessageKey.MOD_LOGIN_NAME_VARIANT,
+                    Map.of("player", who.name(), "matches", spellings(inherited.variants()))));
+        }
         return Decision.allow();
     }
 
+    private static String spellings(List<PlayerRef> variants) {
+        TreeSet<String> names = new TreeSet<>();
+        for (PlayerRef variant : variants) {
+            names.add(variant.name());
+        }
+        return String.join(", ", names);
+    }
+
     /**
-     * Record that {@code standing}'s player tried to log in, and audit the other accounts on their address when there
-     * are any or the login was {@code refused}. It writes to storage, so call it off the tick.
+     * Audit the other accounts on {@code standing}'s address when there are any or the login was {@code refused}. It
+     * writes to storage, so call it off the tick.
      */
     public void record(Standing standing, boolean refused) {
         Objects.requireNonNull(standing, "standing");
-        repository.recordSeen(standing.who(), Optional.of(standing.ip()), clock.instant());
+        // The seen row is the join's to create, so a refused login leaves no trace a sanction on another spelling of
+        // the name would count as an account that existed before it. A refused login of an account seen before still
+        // moves its last address and last-seen on, which /banip <player> and /seenip read.
+        if (refused) {
+            repository.touchSeen(standing.who(), Optional.of(standing.ip()), clock.instant());
+        }
         // The address history itself is written by the kernel recorder on join. Alt detection here keys off the
         // connecting address: /alts walks a player's whole history, but a login is one address.
         if (refused || !standing.alts().isEmpty()) {
@@ -120,9 +192,20 @@ public final class LoginEnforcement {
         return notifier.render(who, key, ph);
     }
 
+    /** Gives a joining account the mute and the jail it inherits ({@link CaseVariantCopies#carryOver}). */
+    @FunctionalInterface
+    public interface CarryOver {
+
+        /** Nothing is ever inherited: the answer for a server whose logins are authenticated. */
+        CarryOver NONE = (who, inherited) -> {};
+
+        void carryOver(PlayerRef who, CaseVariantSanctions.Inherited inherited);
+    }
+
     /**
      * What storage said about one login: whether the server is locked down, the player's tempban, the IP ban on
-     * their address, and the other accounts seen on that address.
+     * their address, the other accounts seen on that address, and, on an offline-mode server, what the login inherits
+     * from the other spellings of its name.
      */
     public record Standing(
             PlayerRef who,
@@ -130,7 +213,8 @@ public final class LoginEnforcement {
             boolean lockedDown,
             TempbanState tempban,
             Optional<IpBan> ipBan,
-            List<UUID> alts) {
+            List<UUID> alts,
+            CaseVariantSanctions.Inherited inherited) {
 
         public Standing {
             Objects.requireNonNull(who, "who");
@@ -138,6 +222,7 @@ public final class LoginEnforcement {
             Objects.requireNonNull(tempban, "tempban");
             Objects.requireNonNull(ipBan, "ipBan");
             alts = List.copyOf(alts);
+            Objects.requireNonNull(inherited, "inherited");
         }
     }
 

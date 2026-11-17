@@ -6,6 +6,7 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.UUID;
+import java.util.function.Supplier;
 
 import org.bukkit.OfflinePlayer;
 import org.bukkit.Server;
@@ -21,6 +22,7 @@ import com.uxplima.uxmessentials.shared.application.port.Logger;
 import com.uxplima.uxmessentials.shared.application.port.MessageSink;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
 import com.uxplima.uxmessentials.shared.application.port.Scheduler;
+import com.uxplima.uxmessentials.shared.domain.NameCase;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import org.jspecify.annotations.NullMarked;
 import org.jspecify.annotations.Nullable;
@@ -31,6 +33,15 @@ import org.jspecify.annotations.Nullable;
  * listed is refused, from a player or from the console. Reading the command text cannot catch every route to operator
  * ({@code /execute ... run op}, an alias, a plugin calling {@code setOp}), so the online operators are also checked one
  * tick after any command runs and every few seconds besides. The list is swapped whole on reload.
+ *
+ * <p>On an offline-mode server a listed name matches only as spelled ({@link OperatorList}), and the server's user
+ * cache, which matches any case, may vouch for a uuid only when the name it holds is the one typed. An {@code /op}
+ * whose name the server would resolve to another spelling, an online player's or one in its profile cache, is
+ * refused whether or not the list is on: the server finds the player by name in any case, so it would make that
+ * other account the operator. An {@code /op} run through {@code /execute ... run} is read the same way. An op an
+ * alias in {@code commands.yml} or a datapack function runs never passes through a command event, so it is not read
+ * before it runs; the sweep still holds the result to the list. The name case is asked on every
+ * check, since a server can turn out to be offline-mode while it runs.
  */
 @NullMarked
 public final class OperatorLock {
@@ -46,15 +57,23 @@ public final class OperatorLock {
     private final Messages messages;
     private final MessageSink sink;
     private final Logger log;
+    private final Supplier<NameCase> names;
     private volatile OperatorList list;
 
     public OperatorLock(
-            Server server, Scheduler scheduler, Messages messages, MessageSink sink, Logger log, OperatorList list) {
+            Server server,
+            Scheduler scheduler,
+            Messages messages,
+            MessageSink sink,
+            Logger log,
+            Supplier<NameCase> names,
+            OperatorList list) {
         this.server = Objects.requireNonNull(server, "server");
         this.scheduler = Objects.requireNonNull(scheduler, "scheduler");
         this.messages = Objects.requireNonNull(messages, "messages");
         this.sink = Objects.requireNonNull(sink, "sink");
         this.log = Objects.requireNonNull(log, "log");
+        this.names = Objects.requireNonNull(names, "names");
         this.list = Objects.requireNonNull(list, "list");
     }
 
@@ -69,7 +88,9 @@ public final class OperatorLock {
      */
     public boolean enforce(Player player) {
         OperatorList current = list;
-        if (!current.enabled() || !player.isOp() || current.permits(player.getUniqueId(), player.getName())) {
+        if (!current.enabled()
+                || !player.isOp()
+                || current.permits(player.getUniqueId(), player.getName(), names.get())) {
             return false;
         }
         player.setOp(false);
@@ -88,15 +109,25 @@ public final class OperatorLock {
      * told why. A selector such as {@code @a} is refused outright, since it can name anybody.
      */
     public boolean refuses(CommandSender sender, String command) {
-        OperatorList current = list;
-        if (!current.enabled()) {
-            return false;
-        }
         Optional<String> target = opTarget(command);
-        if (target.isEmpty() || (!target.get().startsWith("@") && permitted(current, target.get()))) {
+        if (target.isEmpty()) {
             return false;
         }
         PlayerRef who = CommandFeedback.refOf(sender);
+        Optional<String> otherSpelling = anotherCase(target.get());
+        if (otherSpelling.isPresent()) {
+            sink.deliver(
+                    who,
+                    messages.resolve(
+                            who,
+                            SecurityMessageKey.SECURITY_OPERATORS_OTHER_SPELLING,
+                            Map.of("player", target.get(), "match", otherSpelling.get())));
+            return true;
+        }
+        OperatorList current = list;
+        if (!current.enabled() || (!target.get().startsWith("@") && permitted(current, target.get()))) {
+            return false;
+        }
         sink.deliver(
                 who,
                 messages.resolve(who, SecurityMessageKey.SECURITY_OPERATORS_REFUSED, Map.of("player", target.get())));
@@ -126,27 +157,68 @@ public final class OperatorLock {
         }
     }
 
-    private boolean permitted(OperatorList current, String name) {
-        OfflinePlayer known = server.getOfflinePlayerIfCached(name);
-        @Nullable UUID id = known == null ? null : known.getUniqueId();
-        return current.permits(id, name);
+    /**
+     * On an offline-mode server, the spelling of the account the server's own {@code /op} would pick for {@code name}
+     * when it is not the one typed. The server looks the name up in any case, among the online players first and then
+     * in its profile cache, so it would make that other account the operator, online or not, and with the list off
+     * for good.
+     */
+    private Optional<String> anotherCase(String name) {
+        if (name.startsWith("@") || names.get() != NameCase.SENSITIVE) {
+            return Optional.empty();
+        }
+        Player online = server.getPlayerExact(name);
+        if (online != null) {
+            return online.getName().equals(name) ? Optional.empty() : Optional.of(online.getName());
+        }
+        OfflinePlayer cached = server.getOfflinePlayerIfCached(name);
+        String spelled = cached == null ? null : cached.getName();
+        return spelled == null || spelled.equals(name) ? Optional.empty() : Optional.of(spelled);
     }
 
-    /** The player an {@code /op} or {@code /namespace:op} command names, or empty for any other command. */
+    private boolean permitted(OperatorList current, String name) {
+        NameCase nameCase = names.get();
+        OfflinePlayer known = server.getOfflinePlayerIfCached(name);
+        @Nullable UUID id = known == null ? null : known.getUniqueId();
+        if (nameCase == NameCase.SENSITIVE && known != null && !name.equals(known.getName())) {
+            // The cache matched another spelling, which is another account here.
+            id = null;
+        }
+        return current.permits(id, name, nameCase);
+    }
+
+    /**
+     * The player an {@code /op} or {@code /namespace:op} command names, also when it is what an {@code /execute ... run}
+     * runs, through any number of nested {@code execute}s; empty for any other command.
+     */
     static Optional<String> opTarget(String command) {
         String body = command.strip();
         if (body.startsWith("/")) {
             body = body.substring(1);
         }
-        String[] words = body.split("\\s+", 3);
-        if (words.length < 2) {
-            return Optional.empty();
+        String[] words = body.split("\\s+", -1);
+        int at = 0;
+        while (at < words.length) {
+            String root = unqualified(words[at]);
+            if (root.equals("op")) {
+                return at + 1 < words.length ? Optional.of(words[at + 1]) : Optional.empty();
+            }
+            if (!root.equals("execute")) {
+                return Optional.empty();
+            }
+            int run = at + 1;
+            while (run < words.length && !words[run].equalsIgnoreCase("run")) {
+                run++;
+            }
+            at = run + 1;
         }
-        String root = words[0].toLowerCase(Locale.ROOT);
-        int colon = root.indexOf(':');
-        if (!(colon < 0 ? root : root.substring(colon + 1)).equals("op")) {
-            return Optional.empty();
-        }
-        return Optional.of(words[1]);
+        return Optional.empty();
+    }
+
+    /** {@code word} lower-cased without a {@code namespace:} in front. */
+    private static String unqualified(String word) {
+        String lower = word.toLowerCase(Locale.ROOT);
+        int colon = lower.indexOf(':');
+        return colon < 0 ? lower : lower.substring(colon + 1);
     }
 }

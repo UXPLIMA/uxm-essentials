@@ -9,12 +9,12 @@ import java.time.ZoneOffset;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
-import java.util.Optional;
 import java.util.UUID;
 
 import com.uxplima.uxmessentials.shared.application.networkpresence.NetworkRoster;
 import com.uxplima.uxmessentials.shared.application.networkpresence.TrackNetworkPresence;
 import com.uxplima.uxmessentials.shared.application.port.PlayerNameIndex;
+import com.uxplima.uxmessentials.shared.domain.NameCase;
 import com.uxplima.uxmessentials.shared.domain.OnlinePlayer;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmessentials.shared.network.BusChannel;
@@ -31,8 +31,8 @@ class NetworkPresenceSyncTest {
 
     private static final PlayerNameIndex NO_NAMES = new PlayerNameIndex() {
         @Override
-        public Optional<PlayerRef> byName(String name) {
-            return Optional.empty();
+        public List<PlayerRef> byName(String name) {
+            return List.of();
         }
 
         @Override
@@ -42,13 +42,13 @@ class NetworkPresenceSyncTest {
         public void learn(UUID uuid, String name) {}
     };
 
-    private final NetworkRoster survival = new NetworkRoster("survival-1", CLOCK, LIVENESS);
+    private final NetworkRoster survival = new NetworkRoster("survival-1", CLOCK, LIVENESS, () -> NameCase.INSENSITIVE);
     private final Wire lobbyToSurvival = new Wire(
             "lobby-1",
             NetworkPresenceSync.listener(new TrackNetworkPresence(
                     survival, NetworkPresenceSync.publisher(new Wire("survival-1", message -> {})), NO_NAMES, CLOCK)));
     private final TrackNetworkPresence lobby = new TrackNetworkPresence(
-            new NetworkRoster("lobby-1", CLOCK, LIVENESS),
+            new NetworkRoster("lobby-1", CLOCK, LIVENESS, () -> NameCase.INSENSITIVE),
             NetworkPresenceSync.publisher(lobbyToSurvival),
             NO_NAMES,
             CLOCK);

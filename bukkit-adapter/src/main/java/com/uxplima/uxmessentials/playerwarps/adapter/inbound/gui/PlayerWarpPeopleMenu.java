@@ -36,6 +36,7 @@ import com.uxplima.uxmessentials.shared.application.port.Logger;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
 import com.uxplima.uxmessentials.shared.application.port.PlayerLookup;
 import com.uxplima.uxmessentials.shared.application.port.Scheduler;
+import com.uxplima.uxmessentials.shared.domain.NameMatch;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmlib.menu.Menus;
 import com.uxplima.uxmlib.menu.binding.MenuBindings;
@@ -262,9 +263,10 @@ public final class PlayerWarpPeopleMenu {
             return;
         }
         scheduler.async(() -> {
-            Optional<PlayerRef> target = players.findByName(typed);
+            NameMatch match = players.matchByName(typed);
+            Optional<PlayerRef> target = match.player();
             if (target.isEmpty()) {
-                notifier.send(viewer, PlayerwarpsMessageKey.PWARP_INVALID_NAME, Map.of("value", typed));
+                notifier.send(viewer, match.miss(PlayerwarpsMessageKey.PWARP_INVALID_NAME, Map.of("value", typed)));
                 open(ctx.viewer(), warp, kind);
                 return;
             }

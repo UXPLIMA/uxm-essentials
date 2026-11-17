@@ -45,6 +45,7 @@ import com.uxplima.uxmessentials.shared.adapter.outbound.style.StyledText;
 import com.uxplima.uxmessentials.shared.application.permission.ContentPermissions;
 import com.uxplima.uxmessentials.shared.application.port.Logger;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
+import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmessentials.shared.domain.message.SharedMessageKey;
 import com.uxplima.uxmlib.menu.Menus;
 import com.uxplima.uxmlib.menu.binding.MenuBindings;
@@ -487,26 +488,17 @@ public final class GuardMenus {
         bindings.action("guard-role-add", ctx -> {
             RolesView view = ctx.subject(RolesView.class);
             String name = ctx.arg().strip();
-            OfflinePlayer target = Bukkit.getOfflinePlayerIfCached(name);
-            if (target == null) {
-                Player online = Bukkit.getPlayerExact(name);
-                target = online;
-            }
-            if (target == null) {
-                feedback.send(ctx.player(), GuardMessageKey.ERROR_UNKNOWN_PLAYER, Map.of("player", name));
+            Optional<PlayerRef> named = command.player(ctx.player(), name);
+            if (named.isEmpty()) {
                 openRoles(ctx.player(), view.key());
                 return;
             }
+            PlayerRef target = named.get();
             if (roleCycle(ctx.player(), view.key()).isEmpty()) {
                 feedback.send(ctx.player(), GuardMessageKey.ERROR_NOT_MANAGER);
                 return;
             }
-            setRole(
-                    ctx.player(),
-                    view.key(),
-                    target.getUniqueId(),
-                    target.getName() == null ? name : target.getName(),
-                    RoleName.MEMBER);
+            setRole(ctx.player(), view.key(), target.uuid(), target.name(), RoleName.MEMBER);
         });
         bindings.action("guard:roles-back", ctx -> {
             RegionKey key = ctx.subject(RolesView.class).key();

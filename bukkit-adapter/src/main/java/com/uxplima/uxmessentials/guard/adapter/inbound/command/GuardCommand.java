@@ -71,7 +71,9 @@ import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandRegistrat
 import com.uxplima.uxmessentials.shared.adapter.outbound.BukkitRefs;
 import com.uxplima.uxmessentials.shared.adapter.outbound.style.StyledText;
 import com.uxplima.uxmessentials.shared.application.permission.ContentPermissions;
+import com.uxplima.uxmessentials.shared.application.port.PlayerLookup;
 import com.uxplima.uxmessentials.shared.application.port.Scheduler;
+import com.uxplima.uxmessentials.shared.domain.NameMatch;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmessentials.shared.domain.Result;
 import com.uxplima.uxmessentials.shared.domain.ServerScope;
@@ -101,6 +103,7 @@ public final class GuardCommand implements CommandRegistration {
     private final Runnable reload;
     private final BiConsumer<Player, Runnable> onPlayer;
     private final Scheduler scheduler;
+    private final PlayerLookup players;
     private final boolean rgAlias;
 
     public GuardCommand(
@@ -115,6 +118,7 @@ public final class GuardCommand implements CommandRegistration {
             Runnable reload,
             BiConsumer<Player, Runnable> onPlayer,
             Scheduler scheduler,
+            PlayerLookup players,
             boolean rgAlias) {
         this.guard = Objects.requireNonNull(guard, "guard");
         this.service = guard.service();
@@ -128,6 +132,7 @@ public final class GuardCommand implements CommandRegistration {
         this.reload = Objects.requireNonNull(reload, "reload");
         this.onPlayer = Objects.requireNonNull(onPlayer, "onPlayer");
         this.scheduler = Objects.requireNonNull(scheduler, "scheduler");
+        this.players = Objects.requireNonNull(players, "players");
         this.rgAlias = rgAlias;
     }
 
@@ -654,11 +659,11 @@ public final class GuardCommand implements CommandRegistration {
                     "Give or take a region role");
             return;
         }
-        OfflinePlayer target = offline(args[1]);
-        if (target == null) {
-            feedback.send(sender, GuardMessageKey.ERROR_UNKNOWN_PLAYER, Map.of("player", args[1]));
+        Optional<PlayerRef> named = player(sender, args[1]);
+        if (named.isEmpty()) {
             return;
         }
+        PlayerRef target = named.get();
         boolean clear = args[2].equalsIgnoreCase("clear") || args[2].equalsIgnoreCase("temizle");
         RoleName role;
         try {
@@ -674,7 +679,7 @@ public final class GuardCommand implements CommandRegistration {
                             .map(RoleName::manages)
                             .orElse(false);
             boolean allowedRole = role == null || role.equals(RoleName.MEMBER) || role.equals(RoleName.GUEST);
-            boolean targetManaged = region.flatMap(r -> r.roleOf(target.getUniqueId()))
+            boolean targetManaged = region.flatMap(r -> r.roleOf(target.uuid()))
                     .map(r -> !r.manages())
                     .orElse(true);
             if (!(sender.hasPermission(ContentPermissions.GUARD_ROLE) || (manages && allowedRole && targetManaged))) {
@@ -682,8 +687,8 @@ public final class GuardCommand implements CommandRegistration {
                 return;
             }
         }
-        UUID id = target.getUniqueId();
-        String name = target.getName() == null ? args[1] : target.getName();
+        UUID id = target.uuid();
+        String name = target.name();
         Map<String, String> values =
                 Map.of("region", key.get().id().value(), "player", name, "role", role == null ? "-" : role.value());
         edit(
@@ -1139,11 +1144,11 @@ public final class GuardCommand implements CommandRegistration {
             feedback.usage(sender, "guard test", "<player> <action> [region]", "Check a decision for anyone");
             return;
         }
-        OfflinePlayer target = offline(args[0]);
-        if (target == null) {
-            feedback.send(sender, GuardMessageKey.ERROR_UNKNOWN_PLAYER, Map.of("player", args[0]));
+        Optional<PlayerRef> named = player(sender, args[0]);
+        if (named.isEmpty()) {
             return;
         }
+        PlayerRef target = named.get();
         String world;
         int x;
         int y;
@@ -1174,9 +1179,9 @@ public final class GuardCommand implements CommandRegistration {
             feedback.send(sender, GuardMessageKey.ERROR_PLAYER_ONLY);
             return;
         }
-        Player online = target.getPlayer();
-        GuardSubject subject = online != null ? new BukkitSubject(online) : offlineSubject(target.getUniqueId());
-        explain(sender, subject, target.getName() == null ? args[0] : target.getName(), args[1], world, x, y, z);
+        Player online = Bukkit.getPlayer(target.uuid());
+        GuardSubject subject = online != null ? new BukkitSubject(online) : offlineSubject(target.uuid());
+        explain(sender, subject, target.name(), args[1], world, x, y, z);
     }
 
     private void explain(
@@ -1800,13 +1805,17 @@ public final class GuardCommand implements CommandRegistration {
         return "south";
     }
 
-    private static @Nullable OfflinePlayer offline(String name) {
-        Player online = Bukkit.getPlayerExact(name);
-        if (online != null) {
-            return online;
+    /**
+     * The player a typed name names, online or seen here before, or empty after telling {@code sender} why not: nobody
+     * by that name, or several offline-mode accounts that differ only in case and none spelled as typed. The server's
+     * own name lookups match in any case and would pick one of them.
+     */
+    public Optional<PlayerRef> player(CommandSender sender, String name) {
+        NameMatch match = players.matchByName(name);
+        if (match.player().isEmpty()) {
+            feedback.send(sender, match.miss(GuardMessageKey.ERROR_UNKNOWN_PLAYER, Map.of("player", name)));
         }
-        OfflinePlayer cached = Bukkit.getOfflinePlayerIfCached(name);
-        return cached != null && cached.hasPlayedBefore() ? cached : null;
+        return match.player();
     }
 
     private static String name(UUID id) {

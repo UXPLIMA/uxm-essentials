@@ -32,6 +32,7 @@ import com.uxplima.uxmessentials.shared.application.port.MessageSink;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
 import com.uxplima.uxmessentials.shared.application.port.PlayerLookup;
 import com.uxplima.uxmessentials.shared.application.port.Scheduler;
+import com.uxplima.uxmessentials.shared.domain.NameMatch;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmessentials.shared.domain.message.SharedMessageKey;
 import com.uxplima.uxmlib.command.Args;
@@ -146,9 +147,10 @@ public final class InvrestoreCommand implements CommandRegistration {
             return 0;
         }
         String name = StringArgumentType.getString(ctx, "player");
-        Optional<PlayerRef> target = lookup.findByName(name);
+        NameMatch match = lookup.matchByName(name);
+        Optional<PlayerRef> target = match.player();
         if (target.isEmpty()) {
-            feedback.send(staff, SharedMessageKey.COMMAND_UNKNOWN_PLAYER, Map.of("player", name));
+            feedback.send(staff, match.miss(SharedMessageKey.COMMAND_UNKNOWN_PLAYER, Map.of("player", name)));
             return Command.SINGLE_SUCCESS;
         }
         listView.open(BukkitRefs.toRef(staff), target.get());
@@ -177,9 +179,10 @@ public final class InvrestoreCommand implements CommandRegistration {
         }
         String name = StringArgumentType.getString(ctx, "player");
         int index = IntegerArgumentType.getInteger(ctx, "index");
-        Optional<PlayerRef> resolved = lookup.findByName(name);
+        NameMatch match = lookup.matchByName(name);
+        Optional<PlayerRef> resolved = match.player();
         if (resolved.isEmpty()) {
-            feedback.send(staff, SharedMessageKey.COMMAND_UNKNOWN_PLAYER, Map.of("player", name));
+            feedback.send(staff, match.miss(SharedMessageKey.COMMAND_UNKNOWN_PLAYER, Map.of("player", name)));
             return Command.SINGLE_SUCCESS;
         }
         PlayerRef staffRef = BukkitRefs.toRef(staff);

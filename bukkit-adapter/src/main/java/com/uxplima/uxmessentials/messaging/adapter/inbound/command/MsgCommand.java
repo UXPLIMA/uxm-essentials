@@ -19,8 +19,10 @@ import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandSuggestio
 import com.uxplima.uxmessentials.shared.application.permission.SocialPermissions;
 import com.uxplima.uxmessentials.shared.application.port.MessageSink;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
+import com.uxplima.uxmessentials.shared.domain.NameMatch;
 import com.uxplima.uxmessentials.shared.domain.OnlinePlayer;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
+import com.uxplima.uxmessentials.shared.domain.message.MessageLine;
 import com.uxplima.uxmlib.command.Gate;
 import org.jspecify.annotations.NullMarked;
 
@@ -101,9 +103,11 @@ public final class MsgCommand extends MessagingCommandSupport implements Command
             services.relay().send(from, elsewhere.get(), text);
             return Command.SINGLE_SUCCESS;
         }
-        Optional<PlayerRef> offline = services.players().findByName(name);
+        NameMatch match = services.players().matchByName(name);
+        Optional<PlayerRef> offline = match.player();
         if (offline.isEmpty()) {
-            notify(from, UNKNOWN_PLAYER, Map.of("player", name));
+            MessageLine miss = match.miss(UNKNOWN_PLAYER, Map.of("player", name));
+            notify(from, miss.key(), miss.args());
             return 0;
         }
         // The offline path: a played-before profile that is not online. The 4-arg send with targetOnline=false

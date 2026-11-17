@@ -27,6 +27,7 @@ import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandSuggestio
 import com.uxplima.uxmessentials.shared.adapter.outbound.BukkitRefs;
 import com.uxplima.uxmessentials.shared.application.permission.DestinationPermissions;
 import com.uxplima.uxmessentials.shared.application.port.Scheduler;
+import com.uxplima.uxmessentials.shared.domain.NameMatch;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmessentials.shared.domain.Result;
 import com.uxplima.uxmessentials.vaults.adapter.VaultServices;
@@ -249,9 +250,10 @@ public final class VaultCommand implements CommandRegistration {
         }
         PlayerRef actor = BukkitRefs.toRef(staff);
         String typed = StringArgumentType.getString(ctx, "player");
-        Optional<PlayerRef> owner = services.kernel().playerLookup().findByName(typed);
+        NameMatch match = services.kernel().playerLookup().matchByName(typed);
+        Optional<PlayerRef> owner = match.player();
         if (owner.isEmpty()) {
-            notifier.unknownTarget(actor, typed);
+            notifier.unknownTarget(actor, typed, match);
             return Command.SINGLE_SUCCESS;
         }
         // A DB write, run it off the tick thread; the use case audits the override and notifies the actor.

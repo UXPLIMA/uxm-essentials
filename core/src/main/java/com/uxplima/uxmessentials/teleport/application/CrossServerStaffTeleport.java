@@ -136,11 +136,11 @@ public final class CrossServerStaffTeleport {
         Optional<OnlinePlayer> subject = locate(subjectName);
         Optional<OnlinePlayer> destination = locate(destinationName);
         if (subject.isEmpty() || !enabled()) {
-            offline(actor, subjectName.name());
+            missing(actor, subjectName.name());
             return;
         }
         if (destination.isEmpty()) {
-            offline(actor, destinationName.name());
+            missing(actor, destinationName.name());
             return;
         }
         PlayerRef mover = subject.get().player();
@@ -332,6 +332,13 @@ public final class CrossServerStaffTeleport {
 
     private boolean isHere(OnlinePlayer where) {
         return where.server().equals(network.localServer());
+    }
+
+    /** Nobody online is the one {@code name} names: offline, or several case variants of it are online. */
+    private void missing(PlayerRef actor, String name) {
+        notifier.send(
+                actor,
+                presence.matchByName(name).miss(TeleportError.TARGET_OFFLINE.messageKey(), Map.of("player", name)));
     }
 
     private void offline(PlayerRef actor, String name) {

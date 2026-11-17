@@ -5,12 +5,27 @@ needs a setting it did not need before.
 
 ## Messaging switches follow the player
 
-`/msgtoggle`, `/rtoggle`, `/broadcasttoggle`, `/socialspy` (with the players watched) and who `/reply` answers are
-now kept in the database and follow a player to every server of the network. Social spy stays on across a relog and
-a restart until the staff member turns it off; it shows nothing to anyone who no longer holds
-`uxmessentials.msg.socialspy`. A switch an older release kept on one server is taken over the next time the player
-joins that server. The update adds three tables: `player_switches`, `messaging_spy_targets` and
-`messaging_reply_partners`.
+`/msgtoggle`, `/rtoggle`, `/broadcasttoggle`, `/socialspy` and the `/reply` partner are kept in three new tables and
+follow the player to every server. Social spy stays on across a relog, and shows nothing without its node.
+
+## Offline mode: names match as spelled
+
+On an offline-mode server, or a network whose proxy runs in offline mode, `Steve` and `steve` are now two players: a
+command, the console, a vote and the REST API find a name only as spelled when another account holds it in another
+case, and answer with the spellings to choose from (see [network.md](network.md) for `lookup.name-case`). Another
+plugin's name-based Vault calls follow the same rule: a deposit or a balance asked for a spelling no account has, when
+another case of it names more than one account, now fails instead of reaching one of them. Plugins that pay by uuid
+are not affected.
+
+## Offline mode: sanctions follow other spellings of a name
+
+On an offline-mode server a ban, a mute and a jail now follow a player into another spelling of their name, by default
+into an account with no trace from before the sanction and one that shared a telling address with the sanctioned
+account (`case-variant-sanctions`, `case-variant-address`). The update adds one table,
+`moderation_case_copies`, which records the mutes and jails copied that way; the first server to start on the new
+release creates it, and nothing needs editing. Upgrade every server that shares the database in the same window: a
+server on the previous release does not copy, and does not lift a copy when it lifts the original. See
+[moderation.md](moderation.md#how-a-login-is-checked).
 
 ## A PIN is ASCII digits only
 

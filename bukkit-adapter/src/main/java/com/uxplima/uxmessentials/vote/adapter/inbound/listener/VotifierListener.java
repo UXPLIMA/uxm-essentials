@@ -1,6 +1,7 @@
 package com.uxplima.uxmessentials.vote.adapter.inbound.listener;
 
 import java.lang.reflect.Method;
+import java.nio.charset.StandardCharsets;
 import java.time.Instant;
 import java.util.Objects;
 import java.util.Optional;
@@ -15,6 +16,7 @@ import org.bukkit.plugin.Plugin;
 
 import com.uxplima.uxmessentials.shared.application.port.Logger;
 import com.uxplima.uxmessentials.shared.application.port.PlayerLookup;
+import com.uxplima.uxmessentials.shared.domain.NameMatch;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmessentials.vote.adapter.VoteServices;
 import com.uxplima.uxmessentials.vote.domain.Vote;
@@ -117,9 +119,16 @@ public final class VotifierListener implements Listener {
     }
 
     private PlayerRef resolveVoter(String username) {
-        Optional<PlayerRef> known = players.findByName(username);
-        if (known.isPresent()) {
-            return known.get();
+        NameMatch known = players.matchByName(username);
+        if (known instanceof NameMatch.Found found) {
+            return found.ref();
+        }
+        if (known instanceof NameMatch.Ambiguous) {
+            // Offline mode, and accounts exist under other spellings only: the vote is for the account this exact
+            // spelling logs in as, which the server derives the same way. Asking the server by name would match a
+            // case variant instead.
+            UUID id = UUID.nameUUIDFromBytes(("OfflinePlayer:" + username).getBytes(StandardCharsets.UTF_8));
+            return new PlayerRef(id, username);
         }
         // Nobody by that name has ever joined, so the vote is for a player still to arrive: derive the uuid the
         // way the server would and let the reward wait for them. The by-name resolution costs a Mojang round-trip

@@ -18,7 +18,11 @@ import com.uxplima.uxmessentials.itemworld.domain.ItemworldMessageKey;
 import com.uxplima.uxmessentials.itemworld.domain.SubFeatureGroup;
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandRegistration;
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandSuggestions;
+import com.uxplima.uxmessentials.shared.adapter.outbound.BukkitRefs;
+import com.uxplima.uxmessentials.shared.adapter.outbound.lookup.OnlineByName;
 import com.uxplima.uxmessentials.shared.application.permission.ItemworldPermissions;
+import com.uxplima.uxmessentials.shared.domain.NameMatch;
+import com.uxplima.uxmessentials.shared.domain.message.MessageLine;
 import com.uxplima.uxmlib.command.Gate;
 import org.jspecify.annotations.NullMarked;
 
@@ -69,9 +73,13 @@ public final class EnderClearCommand extends ItemworldCommandSupport implements 
         if (self == null) {
             return Command.SINGLE_SUCCESS;
         }
-        Player subject = name.map(n -> self.getServer().getPlayerExact(n)).orElse(self);
+        NameMatch match = name.map(n -> services.kernel().playerLookup().matchOnlineByName(n))
+                .orElse(NameMatch.found(BukkitRefs.toRef(self)));
+        Player subject = name.isEmpty() ? self : OnlineByName.player(match);
         if (subject == null) {
-            reply(ctx, ItemworldMessageKey.UNKNOWN_TARGET, Map.of("player", name.orElse(self.getName())));
+            MessageLine miss =
+                    match.miss(ItemworldMessageKey.UNKNOWN_TARGET, Map.of("player", name.orElse(self.getName())));
+            reply(ctx, miss.key(), miss.args());
             return Command.SINGLE_SUCCESS;
         }
         clear(ctx, self, subject);

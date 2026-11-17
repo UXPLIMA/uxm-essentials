@@ -19,6 +19,7 @@ import com.uxplima.uxmessentials.shared.application.permission.EnforcementPermis
 import com.uxplima.uxmessentials.shared.application.port.Messages;
 import com.uxplima.uxmessentials.shared.application.port.PlayerLookup;
 import com.uxplima.uxmessentials.shared.application.port.Scheduler;
+import com.uxplima.uxmessentials.shared.domain.NameMatch;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmessentials.shared.domain.message.SharedMessageKey;
 import com.uxplima.uxmessentials.staff.adapter.StaffServices;
@@ -84,10 +85,12 @@ public final class StaffModeCommand extends StaffCommandSupport implements Comma
 
     private int toggleOther(CommandContext<CommandSourceStack> ctx) {
         String name = ctx.getArgument("player", String.class);
-        Optional<PlayerRef> target = players.findOnlineByName(name);
+        NameMatch match = players.matchOnlineByName(name);
+        Optional<PlayerRef> target = match.player();
         if (target.isEmpty()) {
             feedback.send(
-                    Sender.audience(ctx.getSource()), SharedMessageKey.COMMAND_UNKNOWN_PLAYER, Map.of("player", name));
+                    Sender.audience(ctx.getSource()),
+                    match.miss(SharedMessageKey.COMMAND_UNKNOWN_PLAYER, Map.of("player", name)));
             return 0;
         }
         toggle(target.get());
