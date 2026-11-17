@@ -13,6 +13,7 @@ import java.util.Objects;
 import java.util.Optional;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.function.Predicate;
 import java.util.function.Supplier;
 
 import com.uxplima.uxmessentials.shared.application.port.NetworkPresence;
@@ -72,6 +73,7 @@ public final class NetworkRoster implements NetworkPresence {
     private final Clock clock;
     private final long livenessMillis;
     private final Supplier<NameCase> names;
+    private final Predicate<String> sharedName;
     private final ConcurrentHashMap<UUID, PlayerRef> local = new ConcurrentHashMap<>();
     private final ConcurrentHashMap<String, Remote> remotes = new ConcurrentHashMap<>();
 
@@ -82,9 +84,23 @@ public final class NetworkRoster implements NetworkPresence {
      * @param names how names are told apart, asked on every lookup
      */
     public NetworkRoster(String localServer, Clock clock, Duration livenessWindow, Supplier<NameCase> names) {
+        this(localServer, clock, livenessWindow, names, name -> true);
+    }
+
+    /**
+     * @param sharedName whether more than one account may hold a name in some case, answered without reading storage;
+     *     a lone player online under another spelling of a name nobody else holds is found by it
+     */
+    public NetworkRoster(
+            String localServer,
+            Clock clock,
+            Duration livenessWindow,
+            Supplier<NameCase> names,
+            Predicate<String> sharedName) {
         this.localServer = Objects.requireNonNull(localServer, "localServer");
         this.clock = Objects.requireNonNull(clock, "clock");
         this.names = Objects.requireNonNull(names, "names");
+        this.sharedName = Objects.requireNonNull(sharedName, "sharedName");
         Objects.requireNonNull(livenessWindow, "livenessWindow");
         if (localServer.isBlank()) {
             throw new IllegalArgumentException("localServer must not be blank");
@@ -175,9 +191,22 @@ public final class NetworkRoster implements NetworkPresence {
                 }
             }
         }
-        return variants.size() > 1
-                ? new Resolved(Optional.empty(), NameMatch.ambiguous(wanted, variants.values()))
-                : Resolved.NOBODY;
+        if (variants.size() > 1) {
+            return new Resolved(Optional.empty(), NameMatch.ambiguous(wanted, variants.values()));
+        }
+        // A lone player online in another case is the one meant only when no other account holds the name: an
+        // offline account spelled as typed would be somebody else.
+        if (variants.size() == 1 && !sharedName.test(wanted)) {
+            PlayerRef lone = variants.values().iterator().next();
+            for (List<OnlinePlayer> where : List.of(locals, remotes)) {
+                for (OnlinePlayer presence : where) {
+                    if (presence.player().equals(lone)) {
+                        return Resolved.of(presence);
+                    }
+                }
+            }
+        }
+        return Resolved.NOBODY;
     }
 
     /** A name lookup: the presence found, and the match that says why there is none. */

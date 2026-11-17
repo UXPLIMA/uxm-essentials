@@ -57,4 +57,13 @@ class JooqPlayerNameRepositoryTest {
                 .containsExactly(new PlayerName(upper, "ALEX", 200L), new PlayerName(ALEX, "Alex", 100L));
         assertThat(names.underName("alex", 1)).containsExactly(new PlayerName(upper, "ALEX", 200L));
     }
+
+    @Test
+    void onlyANameMoreThanOneAccountHoldsIsShared() {
+        names.upsert(new PlayerName(ALEX, "Alex", 100L));
+        names.upsert(new PlayerName(new UUID(0L, 4L), "ALEX", 200L));
+        names.upsert(new PlayerName(new UUID(0L, 5L), "Steve", 300L));
+
+        assertThat(names.sharedNames()).containsExactly("alex");
+    }
 }

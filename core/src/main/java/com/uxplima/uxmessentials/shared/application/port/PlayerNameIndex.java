@@ -33,6 +33,15 @@ public interface PlayerNameIndex {
         return byName(name);
     }
 
+    /**
+     * Whether more than one account may hold {@code name} in some case, so a lone account found under it in another
+     * case is not known to be the one meant. Answers from memory, so it is safe on the tick. The default says yes,
+     * for an index that cannot tell.
+     */
+    default boolean shared(String name) {
+        return true;
+    }
+
     /** Note that {@code uuid} is joining under {@code name}. */
     void record(UUID uuid, String name);
 
