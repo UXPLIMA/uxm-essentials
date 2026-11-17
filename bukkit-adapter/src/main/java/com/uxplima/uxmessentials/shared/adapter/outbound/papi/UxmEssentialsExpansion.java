@@ -74,7 +74,9 @@ public final class UxmEssentialsExpansion extends PlaceholderExpansion implement
         }
         PlayerRef who = refOf(player);
         boolean online = isOnline(player.getUniqueId());
-        return resolver.resolve(who, online, key.get()).orElse(null);
+        return resolver.resolve(who, online, key.get())
+                .map(value -> MarkupPass.shown(key.get(), value))
+                .orElse(null);
     }
 
     /**
@@ -89,7 +91,8 @@ public final class UxmEssentialsExpansion extends PlaceholderExpansion implement
         if (viewer == null || target == null) {
             return null;
         }
-        return key.flatMap(k -> resolver.resolveRelational(refOf(viewer), refOf(target), k))
+        return key.flatMap(k -> resolver.resolveRelational(refOf(viewer), refOf(target), k)
+                        .map(value -> MarkupPass.shown(k, value)))
                 .orElse(null);
     }
 

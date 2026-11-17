@@ -131,7 +131,7 @@ public final class BukkitRankRequirementEvaluator implements RankRequirementEval
                 node -> CatalogPermissionCheck.has(player, node),
                 player.getWorld().getName(),
                 player.getGameMode().name(),
-                PlaceholderApiSupport.messageBridge(who.uuid()));
+                PlaceholderApiSupport.valueBridge(who.uuid()));
         return ConditionParser.parse(value).matches(ctx);
     }
 

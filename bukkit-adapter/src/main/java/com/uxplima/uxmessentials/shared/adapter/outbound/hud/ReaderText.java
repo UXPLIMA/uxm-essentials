@@ -71,7 +71,7 @@ public final class ReaderText {
      */
     public static ReaderText forServer(Function<UUID, Affix> affixes) {
         return new ReaderText(
-                HudText::isCatalogLine, HudText::lineFor, affixes, PlaceholderApiSupport::relationalBridge);
+                HudText::isCatalogLine, HudText::lineFor, affixes, PlaceholderApiSupport::relationalMarkupBridge);
     }
 
     /** Whether {@code source} about {@code target} reads differently for different readers. */

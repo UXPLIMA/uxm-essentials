@@ -10,7 +10,30 @@ import java.util.Objects;
  */
 public final class TypedText {
 
+    /** The characters that follow an {@code &} or {@code §} in a legacy colour, format or hex code. */
+    private static final String LEGACY_CODES = "0123456789abcdefklmnorx#";
+
+    /** What a legacy code is written as instead: a full-width ampersand, which reads the same and is no code. */
+    private static final char NO_CODE = '\uff06';
+
     private TypedText() {}
+
+    /**
+     * {@code typed} with no colour or format code a legacy line would read: an {@code &} or {@code §} followed by a
+     * code character is written as a full-width ampersand.
+     */
+    public static String withoutLegacyCodes(String typed) {
+        Objects.requireNonNull(typed, "typed");
+        StringBuilder kept = new StringBuilder(typed.length());
+        for (int i = 0; i < typed.length(); i++) {
+            char character = typed.charAt(i);
+            boolean code = (character == '&' || character == '\u00a7')
+                    && i + 1 < typed.length()
+                    && LEGACY_CODES.indexOf(Character.toLowerCase(typed.charAt(i + 1))) >= 0;
+            kept.append(code ? NO_CODE : character);
+        }
+        return kept.toString();
+    }
 
     /**
      * {@code typed} with every {@code <} and every backslash escaped, whatever follows it, so a line it is put into

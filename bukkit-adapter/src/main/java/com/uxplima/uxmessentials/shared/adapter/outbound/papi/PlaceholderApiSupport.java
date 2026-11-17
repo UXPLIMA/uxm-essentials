@@ -30,9 +30,14 @@ import org.jspecify.annotations.NullMarked;
  *
  * <p>It does two things. {@link #registerExpansion} builds the {@link UxmEssentialsExpansion}s over the wired
  * {@link PlaceholderContexts}, one per {@link PlaceholderRoute}, and registers them, returning a handle whose
- * {@link Registration#close()} unregisters them on plugin disable. {@link #messageBridge} produces the pre-parse
- * transform the {@code BukkitMessageSink} applies before MiniMessage parses, so an operator's catalog line may embed
- * {@code %papi%} placeholders; without PlaceholderAPI the transform is the identity, a no-op.
+ * {@link Registration#close()} unregisters them on plugin disable. {@link #markupBridge} produces the pre-parse
+ * transform a line goes through before MiniMessage parses it, so an operator's catalog line may embed
+ * {@code %papi%} placeholders; {@link #valueBridge} fills a text that is read as a value, such as a requirement.
+ * Without PlaceholderAPI both are the identity, a no-op.
+ *
+ * <p>The two differ only in our own values. A markup bridge fills inside a {@link MarkupPass}, where a value our
+ * expansion answers goes in as the words it holds, so a name a player chose cannot become markup in our line; a value
+ * bridge, and every other plugin, gets our values as they are.
  */
 @NullMarked
 public final class PlaceholderApiSupport {
@@ -101,21 +106,39 @@ public final class PlaceholderApiSupport {
     }
 
     /**
-     * The pre-parse transform the message sink applies to a rendered template for {@code viewer} before
-     * MiniMessage parses it: {@code PlaceholderAPI.setPlaceholders(viewer, source)} when PlaceholderAPI is
-     * present, the identity otherwise. The viewer is resolved from the uuid at call time so an offline
-     * viewer (a console/system delivery) is a silent identity transform.
+     * The transform a line drawn for {@code viewer} goes through before MiniMessage parses it:
+     * {@code PlaceholderAPI.setPlaceholders(viewer, source)} in a {@link MarkupPass} when PlaceholderAPI is present,
+     * the identity otherwise. The viewer is resolved from the uuid at call time so an offline viewer (a console or
+     * system delivery) is a silent identity transform.
      */
-    public static UnaryOperator<String> messageBridge(java.util.UUID viewer) {
+    public static UnaryOperator<String> markupBridge(java.util.UUID viewer) {
         Objects.requireNonNull(viewer, "viewer");
         if (!isPresent()) {
             return UnaryOperator.identity();
         }
-        return source -> expand(viewer, source);
+        return markupBridge(viewer, PlaceholderAPI::setPlaceholders);
     }
 
-    private static String expand(java.util.UUID viewer, String source) {
-        return expand(viewer, source, PlaceholderAPI::setPlaceholders);
+    /** {@link #markupBridge(java.util.UUID)} over {@code fill}. Package-private: a test supplies the filler. */
+    static UnaryOperator<String> markupBridge(java.util.UUID viewer, BiFunction<OfflinePlayer, String, String> fill) {
+        return source -> MarkupPass.during(() -> expand(viewer, source, fill));
+    }
+
+    /**
+     * The transform for a text read as a value rather than shown, such as either side of a requirement or a balance
+     * a backend reads back: the same fill as {@link #markupBridge}, with every value as it is.
+     */
+    public static UnaryOperator<String> valueBridge(java.util.UUID viewer) {
+        Objects.requireNonNull(viewer, "viewer");
+        if (!isPresent()) {
+            return UnaryOperator.identity();
+        }
+        return valueBridge(viewer, PlaceholderAPI::setPlaceholders);
+    }
+
+    /** {@link #valueBridge(java.util.UUID)} over {@code fill}. Package-private: a test supplies the filler. */
+    static UnaryOperator<String> valueBridge(java.util.UUID viewer, BiFunction<OfflinePlayer, String, String> fill) {
+        return source -> expand(viewer, source, fill);
     }
 
     /**
@@ -137,9 +160,10 @@ public final class PlaceholderApiSupport {
      * The transform that fills the relational placeholders ({@code %rel_...%}) of a text drawn for {@code viewer}
      * about {@code target}: a chat line or a tab row is drawn once for every reader, so a value that depends on who
      * reads it belongs there. The identity when PlaceholderAPI is absent, when the text holds no relational
-     * placeholder, or when either player is not online, because the relation needs both.
+     * placeholder, or when either player is not online, because the relation needs both. It fills in a
+     * {@link MarkupPass}, since both surfaces parse the result.
      */
-    public static UnaryOperator<String> relationalBridge(java.util.UUID viewer, java.util.UUID target) {
+    public static UnaryOperator<String> relationalMarkupBridge(java.util.UUID viewer, java.util.UUID target) {
         Objects.requireNonNull(viewer, "viewer");
         Objects.requireNonNull(target, "target");
         if (!isPresent()) {
@@ -153,8 +177,9 @@ public final class PlaceholderApiSupport {
             Player two = Bukkit.getPlayer(target);
             return one == null || two == null
                     ? source
-                    : PlaceholderShield.around(text -> PlaceholderAPI.setRelationalPlaceholders(one, two, text))
-                            .apply(source);
+                    : MarkupPass.during(() -> PlaceholderShield.around(
+                                    text -> PlaceholderAPI.setRelationalPlaceholders(one, two, text))
+                            .apply(source));
         };
     }
 
@@ -169,15 +194,15 @@ public final class PlaceholderApiSupport {
      * entity, not one per player). It resolves server-global placeholders ({@code %server_online%}, time,
      * TPS, …) against a {@code null} player and leaves player-relative tokens for the operator to avoid;
      * the identity transform when PlaceholderAPI is absent. Per-player-relative resolution would need a
-     * per-viewer hologram, which the shared-text renderer does not spawn.
+     * per-viewer hologram, which the shared-text renderer does not spawn. It fills in a {@link MarkupPass}.
      */
-    public static UnaryOperator<String> globalBridge() {
+    public static UnaryOperator<String> globalMarkupBridge() {
         if (!isPresent()) {
             return UnaryOperator.identity();
         }
         UnaryOperator<String> fill =
                 PlaceholderShield.around(text -> PlaceholderAPI.setPlaceholders((OfflinePlayer) null, text));
-        return source -> hasPlaceholder(source) ? fill.apply(source) : source;
+        return source -> hasPlaceholder(source) ? MarkupPass.during(() -> fill.apply(source)) : source;
     }
 
     /**

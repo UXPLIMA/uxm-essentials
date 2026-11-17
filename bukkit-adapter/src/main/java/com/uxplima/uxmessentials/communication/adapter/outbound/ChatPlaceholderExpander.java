@@ -10,7 +10,7 @@ import org.jspecify.annotations.NullMarked;
  * Expands a speaker's PlaceholderAPI {@code %token%} placeholders in the public chat format before MiniMessage
  * parses it, keeping PlaceholderAPI a soft dependency exactly as the message sink's bridge does. When
  * PlaceholderAPI is installed the {@link #create()} factory returns a bridge over
- * {@link PlaceholderApiSupport#messageBridge(UUID)} (the same seam the announcer and catalog lines expand
+ * {@link PlaceholderApiSupport#markupBridge(UUID)} (the same seam the announcer and catalog lines expand
  * through); when it is absent {@link #identity()} leaves the format untouched, so a {@code %token%} an operator
  * authored survives verbatim rather than blanking out.
  *
@@ -49,13 +49,14 @@ public interface ChatPlaceholderExpander {
             public String expand(UUID who, String text) {
                 Objects.requireNonNull(who, "who");
                 Objects.requireNonNull(text, "text");
-                return PlaceholderApiSupport.messageBridge(who).apply(text);
+                return PlaceholderApiSupport.markupBridge(who).apply(text);
             }
 
             @Override
             public String expandRelational(UUID reader, UUID speaker, String text) {
                 Objects.requireNonNull(text, "text");
-                return PlaceholderApiSupport.relationalBridge(reader, speaker).apply(text);
+                return PlaceholderApiSupport.relationalMarkupBridge(reader, speaker)
+                        .apply(text);
             }
         };
     }

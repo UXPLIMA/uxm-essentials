@@ -87,7 +87,7 @@ public final class HudText {
     public static Component render(UUID viewer, String miniMessageSource) {
         Objects.requireNonNull(viewer, "viewer");
         Objects.requireNonNull(miniMessageSource, "miniMessageSource");
-        String expanded = PlaceholderApiSupport.messageBridge(viewer).apply(lineFor(viewer, miniMessageSource));
+        String expanded = PlaceholderApiSupport.markupBridge(viewer).apply(lineFor(viewer, miniMessageSource));
         return parse(expanded);
     }
 

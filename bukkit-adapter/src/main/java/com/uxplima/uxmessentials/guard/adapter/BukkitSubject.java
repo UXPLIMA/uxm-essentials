@@ -46,7 +46,7 @@ public final class BukkitSubject implements GuardSubject {
         } catch (IllegalArgumentException malformed) {
             return false;
         }
-        UnaryOperator<String> bridge = PlaceholderApiSupport.messageBridge(player.getUniqueId());
+        UnaryOperator<String> bridge = PlaceholderApiSupport.valueBridge(player.getUniqueId());
         return parsed.comparison().test(bridge.apply(parsed.left()), bridge.apply(parsed.right()));
     }
 

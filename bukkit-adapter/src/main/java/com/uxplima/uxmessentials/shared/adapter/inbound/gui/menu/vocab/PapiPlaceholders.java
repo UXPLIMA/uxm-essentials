@@ -8,7 +8,6 @@ import org.bukkit.entity.Player;
 import com.uxplima.uxmessentials.shared.adapter.outbound.papi.PlaceholderApiSupport;
 import com.uxplima.uxmlib.menu.binding.MenuBindings;
 import com.uxplima.uxmlib.menu.runtime.MenuContext;
-import me.clip.placeholderapi.PlaceholderAPI;
 import org.jspecify.annotations.NullMarked;
 
 /**
@@ -53,6 +52,8 @@ public final class PapiPlaceholders {
         if (player == null) {
             return "";
         }
-        return PlaceholderAPI.setPlaceholders(player, "%" + id.substring(PREFIX.length()) + "%");
+        // A menu draws the value into its MiniMessage text, so it is filled as markup is.
+        return PlaceholderApiSupport.markupBridge(player.getUniqueId())
+                .apply("%" + id.substring(PREFIX.length()) + "%");
     }
 }

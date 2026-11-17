@@ -33,7 +33,7 @@ final class KitItemPlaceholders {
     /** The name/lore transform for {@code recipient}: PlaceholderAPI when {@code enabled} and present, else identity. */
     static UnaryOperator<String> bridgeFor(java.util.UUID recipient, boolean enabled) {
         if (enabled && PlaceholderApiSupport.isPresent()) {
-            return PlaceholderApiSupport.messageBridge(recipient);
+            return PlaceholderApiSupport.markupBridge(recipient);
         }
         return UnaryOperator.identity();
     }

@@ -61,18 +61,20 @@ final class SocialPlaceholderKeys {
                         PlaceholderScope.RELATIONAL,
                         TRADE),
                 PlaceholderSpec.of(
-                        "prefix",
-                        "The chat prefix of the player the line is about, a catalogue-line prefix read in the viewer's"
-                                + " language.",
-                        "[VIP] ",
-                        PlaceholderScope.RELATIONAL,
-                        COMMUNICATION),
+                                "prefix",
+                                "The chat prefix of the player the line is about, a catalogue-line prefix read in the viewer's"
+                                        + " language.",
+                                "[VIP] ",
+                                PlaceholderScope.RELATIONAL,
+                                COMMUNICATION)
+                        .operatorMarkup(),
                 PlaceholderSpec.of(
-                        "suffix",
-                        "The chat suffix of the player the line is about, read the same way.",
-                        " *",
-                        PlaceholderScope.RELATIONAL,
-                        COMMUNICATION));
+                                "suffix",
+                                "The chat suffix of the player the line is about, read the same way.",
+                                " *",
+                                PlaceholderScope.RELATIONAL,
+                                COMMUNICATION)
+                        .operatorMarkup());
     }
 
     private static List<PlaceholderSpec> presence() {
@@ -190,17 +192,19 @@ final class SocialPlaceholderKeys {
                         PlaceholderScope.SESSION,
                         COMMUNICATION),
                 PlaceholderSpec.of(
-                        "communication_prefix",
-                        "The player's chat prefix, a catalogue-line prefix read in the player's own language.",
-                        "[VIP] ",
-                        PlaceholderScope.SESSION,
-                        COMMUNICATION),
+                                "communication_prefix",
+                                "The player's chat prefix, a catalogue-line prefix read in the player's own language.",
+                                "[VIP] ",
+                                PlaceholderScope.SESSION,
+                                COMMUNICATION)
+                        .operatorMarkup(),
                 PlaceholderSpec.of(
-                        "communication_suffix",
-                        "The player's chat suffix, read the same way.",
-                        " *",
-                        PlaceholderScope.SESSION,
-                        COMMUNICATION));
+                                "communication_suffix",
+                                "The player's chat suffix, read the same way.",
+                                " *",
+                                PlaceholderScope.SESSION,
+                                COMMUNICATION)
+                        .operatorMarkup());
     }
 
     private static List<PlaceholderSpec> staff() {

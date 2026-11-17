@@ -86,7 +86,7 @@ public final class GuiText implements com.uxplima.uxmlib.gui.GuiText {
         // answered on somebody else's screen.
         String template = messages.resolveAsWritten(who, reference.key(), reference.arguments());
         String expanded = PlaceholderApiSupport.hasPlaceholder(template)
-                ? PlaceholderApiSupport.messageBridge(viewer.getUniqueId()).apply(template)
+                ? PlaceholderApiSupport.markupBridge(viewer.getUniqueId()).apply(template)
                 : template;
         return StyledText.render(CatalogMessages.fill(expanded, engine));
     }
