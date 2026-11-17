@@ -65,6 +65,7 @@ import com.uxplima.uxmessentials.shared.application.message.Notifier;
 import com.uxplima.uxmessentials.shared.application.module.KernelPorts;
 import com.uxplima.uxmessentials.shared.application.module.ModuleContext;
 import com.uxplima.uxmessentials.shared.application.port.PlayerClaimLedger;
+import com.uxplima.uxmlib.bedrock.BedrockDetector;
 import com.uxplima.uxmlib.gui.input.TextInput;
 import com.uxplima.uxmlib.menu.Menus;
 import com.uxplima.uxmlib.menu.binding.MenuBindings;
@@ -110,7 +111,8 @@ public final class KitsWiring {
             GuiLayouts guiLayouts,
             TextInput textInput,
             Menus menus,
-            MenuBindings menuBindings) {
+            MenuBindings menuBindings,
+            BedrockDetector bedrock) {
         Objects.requireNonNull(plugin, "plugin");
         Objects.requireNonNull(ctx, "ctx");
         Objects.requireNonNull(economy, "economy");
@@ -142,7 +144,7 @@ public final class KitsWiring {
                 networkClaims.<KitClaimStore>map(NetworkKitClaims::new).orElseGet(localClaims::orElseThrow);
         KitUnlockStore unlocks = new PdcKitUnlocks(plugin);
         KitGranter granter = new BukkitKitGranter(kernel.log());
-        KitActionRunner actionRunner = new BukkitKitActionRunner(kernel.scheduler(), kernel.log());
+        KitActionRunner actionRunner = new BukkitKitActionRunner(kernel.scheduler(), kernel.log(), bedrock);
         Notifier notifier = new Notifier(kernel.messages(), kernel.messageSink());
         GuiLayout menuLayout = guiLayouts.load("kits", "kits-menu", GuiLayout.paginatedDefault(Material.CHEST));
         GuiLayout previewLayout = guiLayouts.load(

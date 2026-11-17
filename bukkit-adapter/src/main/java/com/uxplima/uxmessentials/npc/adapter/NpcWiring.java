@@ -94,6 +94,7 @@ import com.uxplima.uxmessentials.shared.application.module.ModuleContext;
 import com.uxplima.uxmessentials.shared.application.permission.ContentPermissions;
 import com.uxplima.uxmessentials.shared.application.port.ClickActionEconomy;
 import com.uxplima.uxmessentials.shared.domain.LocalServer;
+import com.uxplima.uxmlib.bedrock.BedrockDetector;
 import com.uxplima.uxmlib.gui.input.TextInput;
 import com.uxplima.uxmlib.menu.EntityEditorLayout;
 import com.uxplima.uxmlib.menu.Menus;
@@ -145,7 +146,8 @@ public final class NpcWiring {
             TextInput textInput,
             ManagementGuiRegistry guiRegistry,
             Menus menus,
-            MenuBindings menuBindings) {
+            MenuBindings menuBindings,
+            BedrockDetector bedrock) {
         Objects.requireNonNull(plugin, "plugin");
         Objects.requireNonNull(ctx, "ctx");
         Objects.requireNonNull(persistence, "persistence");
@@ -231,7 +233,8 @@ public final class NpcWiring {
                 kernel.messages(),
                 NpcMessageKey.NPC_ACTION_COST_DENIED,
                 EquipmentPayloads::resolve,
-                kernel.log());
+                kernel.log(),
+                bedrock);
         NpcInteractionListener interaction = new NpcInteractionListener(
                 renderer,
                 repository,
@@ -239,7 +242,8 @@ public final class NpcWiring {
                 actionRunner,
                 kernel.scheduler(),
                 kernel.log(),
-                settings.clickCooldown());
+                settings.clickCooldown(),
+                bedrock);
         List<Listener> listeners = List.of(new NpcLifecycleListener(renderer), interaction);
         AutoCloseable refreshTask = kernel.scheduler().repeatGlobal(renderer::refresh, REFRESH_PERIOD, REFRESH_PERIOD);
         Duration lookPeriod = settings.lookPeriod();

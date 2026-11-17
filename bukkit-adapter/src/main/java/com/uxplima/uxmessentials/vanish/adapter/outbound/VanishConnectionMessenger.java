@@ -16,7 +16,6 @@ import net.kyori.adventure.text.minimessage.tag.resolver.Placeholder;
 import net.kyori.adventure.text.minimessage.tag.resolver.TagResolver;
 
 import com.uxplima.uxmessentials.shared.adapter.outbound.BukkitRefs;
-import com.uxplima.uxmessentials.shared.adapter.outbound.action.ResolvedNameFill;
 import com.uxplima.uxmessentials.shared.adapter.outbound.hud.HudText;
 import com.uxplima.uxmessentials.shared.adapter.outbound.papi.PlaceholderApiSupport;
 import com.uxplima.uxmessentials.shared.adapter.outbound.style.ChatCentre;
@@ -29,6 +28,8 @@ import com.uxplima.uxmessentials.vanish.application.VanishConfig;
 import com.uxplima.uxmessentials.vanish.application.port.VanishLevelResolver;
 import com.uxplima.uxmessentials.vanish.domain.VanishLevel;
 import com.uxplima.uxmessentials.vanish.domain.VanishLevels;
+import com.uxplima.uxmlib.bedrock.BedrockDetector;
+import com.uxplima.uxmlib.condition.action.NameFill;
 import com.uxplima.uxmlib.text.CenteredTextPadder;
 import org.jspecify.annotations.NullMarked;
 
@@ -64,13 +65,19 @@ public final class VanishConnectionMessenger {
     private final Messages messages;
     private final VanishLevelResolver levels;
     private final VanishConfig config;
+    private final BedrockDetector bedrock;
 
     public VanishConnectionMessenger(
-            Scheduler scheduler, Messages messages, VanishLevelResolver levels, VanishConfig config) {
+            Scheduler scheduler,
+            Messages messages,
+            VanishLevelResolver levels,
+            VanishConfig config,
+            BedrockDetector bedrock) {
         this.scheduler = Objects.requireNonNull(scheduler, "scheduler");
         this.messages = Objects.requireNonNull(messages, "messages");
         this.levels = Objects.requireNonNull(levels, "levels");
         this.config = Objects.requireNonNull(config, "config");
+        this.bedrock = Objects.requireNonNull(bedrock, "bedrock");
     }
 
     /** Broadcast the fake quit line when {@code who} vanishes. */
@@ -134,7 +141,7 @@ public final class VanishConnectionMessenger {
         UnaryOperator<String> once = source -> expanded.computeIfAbsent(source, subject);
         for (Recipient recipient : recipients) {
             Pending pending = recipient.pending();
-            subjectLine(pending.line(), who.name(), once)
+            subjectLine(pending.line(), who.name(), bedrock.namePrefix(), once)
                     .ifPresent(line -> scheduler.onEntity(recipient.ref(), () -> {
                         String prefix = PlaceholderApiSupport.markupBridge(
                                         recipient.ref().uuid())
@@ -149,12 +156,16 @@ public final class VanishConnectionMessenger {
      * line however many viewers share it. A viewer adds only their language's line and their language's prefix.
      */
     static List<Optional<Component>> finish(
-            List<Pending> pending, String name, Component display, UnaryOperator<String> subject) {
+            List<Pending> pending,
+            String name,
+            String bedrockPrefix,
+            Component display,
+            UnaryOperator<String> subject) {
         Map<String, String> expanded = new HashMap<>();
         UnaryOperator<String> once = source -> expanded.computeIfAbsent(source, subject);
         List<Optional<Component>> lines = new ArrayList<>(pending.size());
         for (Pending line : pending) {
-            lines.add(render(line.line(), name, display, once, line.prefix()));
+            lines.add(render(line.line(), name, bedrockPrefix, display, once, line.prefix()));
         }
         return lines;
     }
@@ -173,19 +184,26 @@ public final class VanishConnectionMessenger {
      * {@code line} finished the way every other chat line is: {@code {player}} as the bare {@code name},
      * {@code <display_name>} as the {@code display} component, the subject's placeholders through {@code bridge},
      * {@code <prefix>} as {@code prefix}, and a leading {@code <center>} drawn in the middle of the chat. Empty when the
-     * line is blank, or when the name is one no account could have, which is never filled in.
+     * line is blank, or when the name could change what the line does, which is never filled in. {@code bedrockPrefix}
+     * is the prefix the server's Bedrock bridge gives its players' names.
      */
     static Optional<Component> render(
-            String line, String name, Component display, UnaryOperator<String> bridge, String prefix) {
-        return subjectLine(line, name, bridge).map(expanded -> draw(expanded, display, prefix));
+            String line,
+            String name,
+            String bedrockPrefix,
+            Component display,
+            UnaryOperator<String> bridge,
+            String prefix) {
+        return subjectLine(line, name, bedrockPrefix, bridge).map(expanded -> draw(expanded, display, prefix));
     }
 
     /** {@code line} with {@code {player}} as {@code name} and the subject's placeholders read through {@code bridge}. */
-    private static Optional<String> subjectLine(String line, String name, UnaryOperator<String> bridge) {
+    private static Optional<String> subjectLine(
+            String line, String name, String bedrockPrefix, UnaryOperator<String> bridge) {
         if (line.isBlank()) {
             return Optional.empty();
         }
-        return ResolvedNameFill.into(line, name).map(bridge);
+        return NameFill.intoConnected(line, name, bedrockPrefix).map(bridge);
     }
 
     /** An {@link #subjectLine expanded} line drawn with the subject's display name and the reader's prefix. */

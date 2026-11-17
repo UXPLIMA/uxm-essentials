@@ -1927,7 +1927,8 @@ public final class PluginModule {
                         kernel.messages(),
                         com.uxplima.uxmessentials.guard.domain.GuardMessageKey.DENY,
                         com.uxplima.uxmlib.item.SerializedItems::decode,
-                        kernel.log());
+                        kernel.log(),
+                        Objects.requireNonNullElse(resources.bedrock(), BedrockDetector.NONE));
         com.uxplima.uxmessentials.shared.application.port.Logger audit = links.auditChannel.logger();
         GuardWiring.Wired wired = GuardWiring.wire(
                 plugin,
@@ -2275,8 +2276,17 @@ public final class PluginModule {
                 : Optional.empty();
         Optional<RankEconomy> economy = bridge.map(RankEconomy.class::cast);
         Optional<OwedCredits> owed = bridge.map(OwedCredits.class::cast);
-        RanksWiring.Wired wired =
-                RanksWiring.wire(plugin, ctx, persistence, economy, owed, bus, guiRegistry, menus, menuBindings);
+        RanksWiring.Wired wired = RanksWiring.wire(
+                plugin,
+                ctx,
+                persistence,
+                economy,
+                owed,
+                bus,
+                guiRegistry,
+                menus,
+                menuBindings,
+                Objects.requireNonNullElse(resources.bedrock(), BedrockDetector.NONE));
         wired.commands().forEach(resources::addCommand);
         // Registered before the online players are loaded, so a quit in between cannot leave a stale entry behind.
         resources.addListener(wired.cacheListener());
@@ -2880,7 +2890,8 @@ public final class PluginModule {
                 guiLayouts,
                 textInput,
                 menus,
-                menuBindings);
+                menuBindings,
+                Objects.requireNonNullElse(resources.bedrock(), BedrockDetector.NONE));
         wired.commands().forEach(resources::addCommand);
         wired.listeners().forEach(resources::addListener);
         resources.onClose(wired::stop);
@@ -3456,8 +3467,14 @@ public final class PluginModule {
         // degrades to "no one is hidden". On stop the store is cleared so a disable/reload leaves no residual state.
         com.uxplima.uxmessentials.shared.application.networkpresence.TrackNetworkPresence presenceTrack =
                 Objects.requireNonNull(links.presenceTrack, "presenceTrack");
-        VanishWiring.Wired wired =
-                VanishWiring.wire(plugin, ctx, persistence, bus, links.presence, presenceTrack::retrait);
+        VanishWiring.Wired wired = VanishWiring.wire(
+                plugin,
+                ctx,
+                persistence,
+                bus,
+                links.presence,
+                presenceTrack::retrait,
+                Objects.requireNonNullElse(resources.bedrock(), BedrockDetector.NONE));
         wired.commands().forEach(resources::addCommand);
         wired.listeners().forEach(resources::addListener);
         resources.onClose(wired::stop);
@@ -3653,7 +3670,8 @@ public final class PluginModule {
                 guiLayouts,
                 textInput,
                 menus,
-                menuBindings);
+                menuBindings,
+                Objects.requireNonNullElse(resources.bedrock(), BedrockDetector.NONE));
         wired.commands().forEach(resources::addCommand);
         resources.worldPhase().run("hologram spawn", wired::spawnStored);
         // A viewer keeps the words they were drawn until the hologram changes, so the catalogue and the theme a
@@ -3960,7 +3978,8 @@ public final class PluginModule {
                 textInput,
                 guiRegistry,
                 menus,
-                menuBindings);
+                menuBindings,
+                Objects.requireNonNullElse(resources.bedrock(), BedrockDetector.NONE));
         wired.commands().forEach(resources::addCommand);
         wired.listeners().forEach(resources::addListener);
         resources.worldPhase().run("npc spawn", wired::spawnStored);

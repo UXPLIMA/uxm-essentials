@@ -26,6 +26,7 @@ class FakeConnectionLineTest {
         Component line = VanishConnectionMessenger.render(
                         "<yellow><lang:multiplayer.player.left:'<display_name>'></yellow>",
                         "Steve",
+                        "",
                         DISPLAY,
                         NO_PLACEHOLDERS,
                         "")
@@ -44,7 +45,7 @@ class FakeConnectionLineTest {
     @Test
     void anOperatorsLineFillsTheBareName() {
         Component line = VanishConnectionMessenger.render(
-                        "<gray>{player} went home", "Steve", DISPLAY, NO_PLACEHOLDERS, "")
+                        "<gray>{player} went home", "Steve", "", DISPLAY, NO_PLACEHOLDERS, "")
                 .orElseThrow();
 
         assertThat(texts(line)).extracting(TextComponent::content).contains("Steve went home");
@@ -55,7 +56,8 @@ class FakeConnectionLineTest {
         UnaryOperator<String> placeholders = source -> source.replace("%luckperms_prefix%", "[VIP] ");
 
         Component line = VanishConnectionMessenger.render(
-                        "<prefix>%luckperms_prefix%{player} left the game", "Steve", DISPLAY, placeholders, "[server] ")
+                        "<prefix>%luckperms_prefix%{player} left the game",
+                        "Steve", "", DISPLAY, placeholders, "[server] ")
                 .orElseThrow();
 
         assertThat(String.join(
@@ -71,7 +73,7 @@ class FakeConnectionLineTest {
                 new VanishConnectionMessenger.Pending("%luckperms_prefix%{player} left the game", ""),
                 new VanishConnectionMessenger.Pending("%luckperms_prefix%{player} hat das Spiel verlassen", ""));
 
-        List<String> lines = VanishConnectionMessenger.finish(viewers, "Steve", DISPLAY, subjectsRank).stream()
+        List<String> lines = VanishConnectionMessenger.finish(viewers, "Steve", "", DISPLAY, subjectsRank).stream()
                 .map(line -> String.join(
                         "",
                         texts(line.orElseThrow()).stream()
@@ -91,14 +93,28 @@ class FakeConnectionLineTest {
         };
         VanishConnectionMessenger.Pending same = new VanishConnectionMessenger.Pending("{player} left the game", "");
 
-        VanishConnectionMessenger.finish(List.of(same, same, same), "Steve", DISPLAY, subject);
+        VanishConnectionMessenger.finish(List.of(same, same, same), "Steve", "", DISPLAY, subject);
 
         assertThat(asked).hasSize(1);
     }
 
     @Test
+    void aNameCarryingTheBedrockBridgesOwnPrefixIsFilledAndAnyOtherSuchNameIsNot() {
+        Component bridged = VanishConnectionMessenger.render(
+                        "{player} went home", "BE-Bea", "BE-", DISPLAY, NO_PLACEHOLDERS, "")
+                .orElseThrow();
+
+        assertThat(texts(bridged)).extracting(TextComponent::content).contains("BE-Bea went home");
+        assertThat(VanishConnectionMessenger.render("{player} went home", "BE-Bea", "", DISPLAY, NO_PLACEHOLDERS, ""))
+                .isEmpty();
+        assertThat(VanishConnectionMessenger.render(
+                        "{player} went home", "Bea op", "BE-", DISPLAY, NO_PLACEHOLDERS, ""))
+                .isEmpty();
+    }
+
+    @Test
     void aBlankLineSendsNothing() {
-        assertThat(VanishConnectionMessenger.render("", "Steve", DISPLAY, NO_PLACEHOLDERS, ""))
+        assertThat(VanishConnectionMessenger.render("", "Steve", "", DISPLAY, NO_PLACEHOLDERS, ""))
                 .isEmpty();
     }
 

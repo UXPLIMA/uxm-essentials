@@ -312,7 +312,9 @@ public final class WarpEditorView {
     /** Capture a password through the input seam, then save it and re-open; cancel re-opens unchanged. */
     private void promptPassword(MenuActionContext ctx) {
         WarpEditTarget target = subject(ctx);
-        prompt(ctx, "warp.password", WarpsMessageKey.WARP_EDITOR_PASSWORD_PROMPT, target, input -> {
+        InputRequest request = InputRequest.of("warp.password", WarpsMessageKey.WARP_EDITOR_PASSWORD_PROMPT.key())
+                .asSecret();
+        prompt(ctx, request, target, input -> {
             mutateThenReopen(ctx, target, warp -> warp.setPassword(Optional.of(input)));
         });
     }
@@ -409,9 +411,18 @@ public final class WarpEditorView {
             MessageKey promptKey,
             WarpEditTarget target,
             java.util.function.Consumer<String> action) {
+        prompt(ctx, InputRequest.of(inputKey, promptKey.key()), target, action);
+    }
+
+    /** Drive the shared input seam with {@code request}: the overload a secret, the password, goes through. */
+    private void prompt(
+            MenuActionContext ctx,
+            InputRequest request,
+            WarpEditTarget target,
+            java.util.function.Consumer<String> action) {
         Player player = ctx.player();
         player.closeInventory();
-        textInput.prompt(player, InputRequest.of(inputKey, promptKey.key()), action, () -> reopen(ctx, target));
+        textInput.prompt(player, request, action, () -> reopen(ctx, target));
     }
 
     /** Apply a mutation to the edited warp, then re-open the editor so the operator sees the result. */

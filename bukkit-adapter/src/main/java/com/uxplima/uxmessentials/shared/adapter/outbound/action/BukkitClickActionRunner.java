@@ -33,6 +33,8 @@ import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmessentials.shared.domain.action.ClickAction;
 import com.uxplima.uxmessentials.shared.domain.action.ClickActionType;
 import com.uxplima.uxmessentials.shared.domain.message.MessageKey;
+import com.uxplima.uxmlib.bedrock.BedrockDetector;
+import com.uxplima.uxmlib.condition.action.NameFill;
 import org.jspecify.annotations.NullMarked;
 import org.jspecify.annotations.Nullable;
 
@@ -74,6 +76,9 @@ public final class BukkitClickActionRunner implements ClickActionRunner {
     /** Picks the chosen offset within a {@code RANDOM} group; given the group size it returns {@code [0, size)}. */
     private final IntUnaryOperator pickOffset;
 
+    /** The Bedrock bridge, whose configured name prefix a connected player's name may carry. */
+    private final BedrockDetector bedrock;
+
     public BukkitClickActionRunner(
             ClickCommandRunner commandRunner,
             ServerConnector connector,
@@ -83,7 +88,8 @@ public final class BukkitClickActionRunner implements ClickActionRunner {
             Messages messages,
             MessageKey costDeniedKey,
             Function<String, Optional<ItemStack>> serializedResolver,
-            Logger log) {
+            Logger log,
+            BedrockDetector bedrock) {
         this(
                 commandRunner,
                 connector,
@@ -94,7 +100,8 @@ public final class BukkitClickActionRunner implements ClickActionRunner {
                 costDeniedKey,
                 serializedResolver,
                 log,
-                ThreadLocalRandom.current()::nextInt);
+                ThreadLocalRandom.current()::nextInt,
+                bedrock);
     }
 
     /**
@@ -111,12 +118,14 @@ public final class BukkitClickActionRunner implements ClickActionRunner {
             MessageKey costDeniedKey,
             Function<String, Optional<ItemStack>> serializedResolver,
             Logger log,
-            IntUnaryOperator pickOffset) {
+            IntUnaryOperator pickOffset,
+            BedrockDetector bedrock) {
         this.commandRunner = Objects.requireNonNull(commandRunner, "commandRunner");
         this.connector = Objects.requireNonNull(connector, "connector");
         this.scheduler = Objects.requireNonNull(scheduler, "scheduler");
         this.log = Objects.requireNonNull(log, "log");
         this.pickOffset = Objects.requireNonNull(pickOffset, "pickOffset");
+        this.bedrock = Objects.requireNonNull(bedrock, "bedrock");
         this.gates = new ClickActionGates(
                 Objects.requireNonNull(permissions, "permissions"),
                 Objects.requireNonNull(economy, "economy"),
@@ -257,7 +266,7 @@ public final class BukkitClickActionRunner implements ClickActionRunner {
     }
 
     private void dispatch(Player viewer, ClickAction action) {
-        Optional<String> filled = ResolvedNameFill.into(action.value(), viewer.getName());
+        Optional<String> filled = NameFill.intoConnected(action.value(), viewer.getName(), bedrock.namePrefix());
         if (filled.isEmpty()) {
             log.warn(
                     "event=click_action_skipped type={} player={} reason=not_an_account_name",

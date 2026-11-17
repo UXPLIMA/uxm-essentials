@@ -22,9 +22,10 @@ import com.uxplima.uxmessentials.npc.domain.NpcName;
 import com.uxplima.uxmessentials.shared.adapter.outbound.BukkitRefs;
 import com.uxplima.uxmessentials.shared.adapter.outbound.action.ClickActionRunner;
 import com.uxplima.uxmessentials.shared.adapter.outbound.action.ClickCommandRunner;
-import com.uxplima.uxmessentials.shared.adapter.outbound.action.ResolvedNameFill;
 import com.uxplima.uxmessentials.shared.application.port.Logger;
 import com.uxplima.uxmessentials.shared.application.port.Scheduler;
+import com.uxplima.uxmlib.bedrock.BedrockDetector;
+import com.uxplima.uxmlib.condition.action.NameFill;
 import org.jspecify.annotations.NullMarked;
 
 /**
@@ -68,6 +69,7 @@ public final class NpcInteractionListener implements Listener {
     private final long cooldownMillis;
     private final LongSupplier clock;
     private final Cache<String, Long> lastClick;
+    private final BedrockDetector bedrock;
 
     public NpcInteractionListener(
             NpcRenderer renderer,
@@ -76,8 +78,18 @@ public final class NpcInteractionListener implements Listener {
             ClickActionRunner actionRunner,
             Scheduler scheduler,
             Logger log,
-            Duration clickCooldown) {
-        this(renderer, repository, runner, actionRunner, scheduler, log, clickCooldown, System::currentTimeMillis);
+            Duration clickCooldown,
+            BedrockDetector bedrock) {
+        this(
+                renderer,
+                repository,
+                runner,
+                actionRunner,
+                scheduler,
+                log,
+                clickCooldown,
+                System::currentTimeMillis,
+                bedrock);
     }
 
     NpcInteractionListener(
@@ -88,7 +100,8 @@ public final class NpcInteractionListener implements Listener {
             Scheduler scheduler,
             Logger log,
             Duration clickCooldown,
-            LongSupplier clock) {
+            LongSupplier clock,
+            BedrockDetector bedrock) {
         this.renderer = Objects.requireNonNull(renderer, "renderer");
         this.repository = Objects.requireNonNull(repository, "repository");
         this.runner = Objects.requireNonNull(runner, "runner");
@@ -98,6 +111,7 @@ public final class NpcInteractionListener implements Listener {
         this.cooldownMillis =
                 Objects.requireNonNull(clickCooldown, "clickCooldown").toMillis();
         this.clock = Objects.requireNonNull(clock, "clock");
+        this.bedrock = Objects.requireNonNull(bedrock, "bedrock");
         // Each entry stores the millisecond deadline at which that click's cooldown elapses (now + the effective
         // cooldown), so the per-NPC override and the global default each block for their own window with no loss of
         // precision. The cache is bounded by size alone (LRU): a passed deadline is swept on access and in
@@ -173,7 +187,7 @@ public final class NpcInteractionListener implements Listener {
     }
 
     private void run(Player player, String rawCommand) {
-        Optional<String> filled = ResolvedNameFill.into(rawCommand, player.getName());
+        Optional<String> filled = NameFill.intoConnected(rawCommand, player.getName(), bedrock.namePrefix());
         if (filled.isEmpty()) {
             log.warn("event=npc_command_skipped player={} reason=not_an_account_name", player.getUniqueId());
             return;
