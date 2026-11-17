@@ -1911,7 +1911,8 @@ public final class PluginModule {
         GuardQueries queries = new GuardQueries(wired.service());
         links.queries.register(UxmRegionsQuery.class, queries);
         links.queries.register(com.uxplima.uxmessentials.api.query.UxmGuardQuery.class, queries);
-        links.placeholders.regions(new GuardRegionsPlaceholders(plugin.getServer(), wired.service()));
+        links.placeholders.regions(new GuardRegionsPlaceholders(
+                plugin.getServer(), wired.service(), ctx.kernel().playerLookup()));
     }
 
     private static void wireInvrollback(
