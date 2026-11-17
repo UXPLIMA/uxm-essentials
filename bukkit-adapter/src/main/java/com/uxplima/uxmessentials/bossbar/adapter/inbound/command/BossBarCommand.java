@@ -2,6 +2,7 @@ package com.uxplima.uxmessentials.bossbar.adapter.inbound.command;
 
 import java.time.Duration;
 import java.time.Instant;
+import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
@@ -15,11 +16,13 @@ import org.bukkit.entity.Player;
 
 import io.papermc.paper.command.brigadier.CommandSourceStack;
 import io.papermc.paper.command.brigadier.Commands;
+import io.papermc.paper.command.brigadier.argument.resolvers.selector.PlayerSelectorArgumentResolver;
 
 import com.mojang.brigadier.Command;
 import com.mojang.brigadier.arguments.StringArgumentType;
 import com.mojang.brigadier.builder.RequiredArgumentBuilder;
 import com.mojang.brigadier.context.CommandContext;
+import com.mojang.brigadier.exceptions.CommandSyntaxException;
 import com.mojang.brigadier.suggestion.SuggestionProvider;
 import com.mojang.brigadier.tree.LiteralCommandNode;
 import com.uxplima.uxmessentials.bossbar.adapter.outbound.BossBarAnnouncements;
@@ -30,14 +33,11 @@ import com.uxplima.uxmessentials.bossbar.domain.BossBarDefinition;
 import com.uxplima.uxmessentials.bossbar.domain.BossBarMessageKey;
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandFeedback;
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandRegistration;
-import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandSuggestions;
+import com.uxplima.uxmessentials.shared.adapter.inbound.command.PlayerArgument;
 import com.uxplima.uxmessentials.shared.adapter.outbound.BukkitRefs;
-import com.uxplima.uxmessentials.shared.adapter.outbound.lookup.OnlineByName;
 import com.uxplima.uxmessentials.shared.application.permission.ContentPermissions;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
-import com.uxplima.uxmessentials.shared.application.port.PlayerLookup;
 import com.uxplima.uxmessentials.shared.application.port.Scheduler;
-import com.uxplima.uxmessentials.shared.domain.NameMatch;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmessentials.shared.domain.message.SharedMessageKey;
 import com.uxplima.uxmlib.command.Args;
@@ -55,7 +55,8 @@ import org.jspecify.annotations.Nullable;
  * is written {@code 30s}, {@code 5m}, {@code 1h30m}.
  *
  * <p>A player is named as a word and looked up among the players online, so a name that is not there reads this
- * plugin's own line in the sender's language rather than the server's selector error.
+ * plugin's own line in the sender's language rather than the server's selector error. A player's bars are drawn by
+ * the server they are on, so one on another server is answered with that server, to run the command there.
  */
 @NullMarked
 public final class BossBarCommand implements CommandRegistration {
@@ -76,7 +77,6 @@ public final class BossBarCommand implements CommandRegistration {
     private final Supplier<Instant> clock;
     private final Scheduler scheduler;
     private final CommandFeedback feedback;
-    private final PlayerLookup players;
 
     /**
      * @param redrawEverybody draws every player's bars now, after an announcement
@@ -91,8 +91,7 @@ public final class BossBarCommand implements CommandRegistration {
             BiFunction<UUID, Duration, String> remaining,
             Supplier<Instant> clock,
             Scheduler scheduler,
-            Messages messages,
-            PlayerLookup players) {
+            Messages messages) {
         this.toggle = Objects.requireNonNull(toggle, "toggle");
         this.renderer = Objects.requireNonNull(renderer, "renderer");
         this.announcements = Objects.requireNonNull(announcements, "announcements");
@@ -102,7 +101,6 @@ public final class BossBarCommand implements CommandRegistration {
         this.clock = Objects.requireNonNull(clock, "clock");
         this.scheduler = Objects.requireNonNull(scheduler, "scheduler");
         this.feedback = new CommandFeedback(Objects.requireNonNull(messages, "messages"));
-        this.players = Objects.requireNonNull(players, "players");
     }
 
     @Override
@@ -147,7 +145,7 @@ public final class BossBarCommand implements CommandRegistration {
 
     private int other(CommandContext<CommandSourceStack> ctx, Choice choice) {
         CommandSender sender = Sender.audience(ctx.getSource());
-        @Nullable Player target = online(sender, StringArgumentType.getString(ctx, PLAYER));
+        @Nullable Player target = online(ctx, sender);
         if (target == null) {
             return 0;
         }
@@ -191,7 +189,7 @@ public final class BossBarCommand implements CommandRegistration {
 
     private int send(CommandContext<CommandSourceStack> ctx) {
         CommandSender sender = Sender.audience(ctx.getSource());
-        @Nullable Player target = online(sender, StringArgumentType.getString(ctx, PLAYER));
+        @Nullable Player target = online(ctx, sender);
         if (target == null) {
             return 0;
         }
@@ -209,13 +207,23 @@ public final class BossBarCommand implements CommandRegistration {
         return Command.SINGLE_SUCCESS;
     }
 
-    private @Nullable Player online(CommandSender sender, String name) {
-        NameMatch match = players.matchOnlineByName(name);
-        @Nullable Player player = OnlineByName.player(match);
-        if (player == null) {
-            feedback.send(sender, match.miss(SharedMessageKey.COMMAND_UNKNOWN_PLAYER, Map.of(PLAYER, name)));
+    /**
+     * The player online here the {@code player} argument names, or {@code null} after telling the sender why not: the
+     * server a player on another backend is on, since their bars are drawn there, or that nobody has the name.
+     */
+    private @Nullable Player online(CommandContext<CommandSourceStack> ctx, CommandSender sender) {
+        List<Player> resolved;
+        try {
+            resolved = ctx.getArgument(PLAYER, PlayerSelectorArgumentResolver.class)
+                    .resolve(ctx.getSource());
+        } catch (CommandSyntaxException unmatched) {
+            resolved = List.of();
         }
-        return player;
+        if (resolved.isEmpty()) {
+            feedback.send(sender, PlayerArgument.miss(ctx, PLAYER, SharedMessageKey.COMMAND_UNKNOWN_PLAYER));
+            return null;
+        }
+        return resolved.get(0);
     }
 
     private Optional<BossBarDefinition> bar(CommandSender sender, String id) {
@@ -238,8 +246,8 @@ public final class BossBarCommand implements CommandRegistration {
         return remaining.apply(CommandFeedback.refOf(sender).uuid(), length);
     }
 
-    private RequiredArgumentBuilder<CommandSourceStack, String> playerArgument() {
-        return Commands.argument(PLAYER, Args.token()).suggests(CommandSuggestions.onlinePlayers());
+    private RequiredArgumentBuilder<CommandSourceStack, PlayerSelectorArgumentResolver> playerArgument() {
+        return PlayerArgument.single(PLAYER);
     }
 
     private RequiredArgumentBuilder<CommandSourceStack, String> barArgument() {
