@@ -3999,7 +3999,8 @@ public final class PluginModule {
                 menuBindings,
                 (player, votes) -> links.boards.add(player, "votes", votes),
                 links.network.transport() == NetworkConfig.Transport.BOTH,
-                links.presence);
+                links.presence,
+                Objects.requireNonNullElse(resources.bedrock(), BedrockDetector.NONE));
         // Every vote is counted on the votes board; its all-time board reads the stored tallies, so a reset shows.
         // The windows open when the board first runs start from the tallies, counted in the server's own zone like
         // the vote module counts them.

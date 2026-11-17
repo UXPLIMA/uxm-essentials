@@ -1,11 +1,9 @@
 package com.uxplima.uxmessentials.vote.adapter.inbound.listener;
 
 import java.lang.reflect.Method;
-import java.nio.charset.StandardCharsets;
 import java.time.Instant;
 import java.util.Objects;
 import java.util.Optional;
-import java.util.UUID;
 
 import org.bukkit.Bukkit;
 import org.bukkit.event.Event;
@@ -15,11 +13,8 @@ import org.bukkit.event.Listener;
 import org.bukkit.plugin.Plugin;
 
 import com.uxplima.uxmessentials.shared.application.port.Logger;
-import com.uxplima.uxmessentials.shared.application.port.PlayerLookup;
-import com.uxplima.uxmessentials.shared.domain.NameMatch;
-import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmessentials.vote.adapter.VoteServices;
-import com.uxplima.uxmessentials.vote.domain.Vote;
+import com.uxplima.uxmessentials.vote.application.ReceiveNamedVote;
 import com.uxplima.uxmessentials.vote.domain.VoterNameRules;
 import org.jspecify.annotations.NullMarked;
 
@@ -45,15 +40,15 @@ public final class VotifierListener implements Listener {
 
     private final Plugin plugin;
     private final VoteServices services;
-    private final PlayerLookup players;
+    private final ReceiveNamedVote receive;
     private final VoterNameRules nameRules;
     private final Logger log;
 
     public VotifierListener(
-            Plugin plugin, VoteServices services, PlayerLookup players, VoterNameRules nameRules, Logger log) {
+            Plugin plugin, VoteServices services, ReceiveNamedVote receive, VoterNameRules nameRules, Logger log) {
         this.plugin = Objects.requireNonNull(plugin, "plugin");
         this.services = Objects.requireNonNull(services, "services");
-        this.players = Objects.requireNonNull(players, "players");
+        this.receive = Objects.requireNonNull(receive, "receive");
         this.nameRules = Objects.requireNonNull(nameRules, "nameRules");
         this.log = Objects.requireNonNull(log, "log");
     }
@@ -92,7 +87,8 @@ public final class VotifierListener implements Listener {
     }
 
     /**
-     * Validate the raw username and, when it passes, resolve the voter and dispatch the vote. A junk Votifier
+     * Validate the raw username and, when it passes, credit the vote to the account it names or park it for a player
+     * still to join ({@link ReceiveNamedVote}). A junk Votifier
      * username (empty, {@code "null"}, over-long, or off the name policy) would mint a phantom leaderboard entry
      * and pay a reward into a non-existent player, so it is rejected, logged and dropped, before any vote is
      * built (no tally, no queue, no cooldown). Package-private as the test seam for the validation gate.
@@ -102,8 +98,9 @@ public final class VotifierListener implements Listener {
             log.warn("event=vote_rejected reason=invalid_name name={} service={}", username, service);
             return;
         }
-        PlayerRef voter = resolveVoter(username);
-        services.handleVote().handle(new Vote(voter, service, Instant.now()));
+        if (receive.receive(username, service, Instant.now()) == ReceiveNamedVote.Outcome.PARKED) {
+            log.debug("event=vote_parked name={} service={}", username, service);
+        }
     }
 
     private Optional<RawVote> readRaw(Event event) {
@@ -116,27 +113,6 @@ public final class VotifierListener implements Listener {
             log.warn("event=vote_read_failed error={}", String.valueOf(failure.getMessage()));
             return Optional.empty();
         }
-    }
-
-    private PlayerRef resolveVoter(String username) {
-        NameMatch known = players.matchByName(username);
-        if (known instanceof NameMatch.Found found) {
-            return found.ref();
-        }
-        if (known instanceof NameMatch.Ambiguous) {
-            // Offline mode, and accounts exist under other spellings only: the vote is for the account this exact
-            // spelling logs in as, which the server derives the same way. Asking the server by name would match a
-            // case variant instead.
-            UUID id = UUID.nameUUIDFromBytes(("OfflinePlayer:" + username).getBytes(StandardCharsets.UTF_8));
-            return new PlayerRef(id, username);
-        }
-        // Nobody by that name has ever joined, so the vote is for a player still to arrive: derive the uuid the
-        // way the server would and let the reward wait for them. The by-name resolution costs a Mojang round-trip
-        // for an uncached name on an online-mode server, which is why this method only ever runs on the async pool
-        // and never on the Votifier event thread.
-        UUID id = Bukkit.getOfflinePlayer(username).getUniqueId(); // allow-blocking: async pool
-        log.debug("event=vote_voter_unknown name={}", username);
-        return new PlayerRef(id, username);
     }
 
     private Optional<Class<? extends Event>> loadEventClass() {

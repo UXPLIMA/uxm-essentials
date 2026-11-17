@@ -46,6 +46,7 @@ import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmessentials.vote.adapter.inbound.command.VoteCommand;
 import com.uxplima.uxmessentials.vote.adapter.inbound.command.VotePartyCommand;
 import com.uxplima.uxmessentials.vote.adapter.inbound.gui.VoteSitesMenu;
+import com.uxplima.uxmessentials.vote.adapter.inbound.listener.ParkedVoteJoinListener;
 import com.uxplima.uxmessentials.vote.adapter.inbound.listener.VoteJoinListener;
 import com.uxplima.uxmessentials.vote.adapter.inbound.listener.VotifierListener;
 import com.uxplima.uxmessentials.vote.adapter.outbound.BoardCountingVotes;
@@ -62,12 +63,14 @@ import com.uxplima.uxmessentials.vote.adapter.outbound.VoteDiscordSettings;
 import com.uxplima.uxmessentials.vote.adapter.outbound.api.VoteApiWrites;
 import com.uxplima.uxmessentials.vote.application.AddPartyCount;
 import com.uxplima.uxmessentials.vote.application.ApplyQueuedRewards;
+import com.uxplima.uxmessentials.vote.application.BindParkedVotes;
 import com.uxplima.uxmessentials.vote.application.BroadcastSettings;
 import com.uxplima.uxmessentials.vote.application.ForceParty;
 import com.uxplima.uxmessentials.vote.application.GiveVote;
 import com.uxplima.uxmessentials.vote.application.HandleVote;
 import com.uxplima.uxmessentials.vote.application.PartyConfig;
 import com.uxplima.uxmessentials.vote.application.PayRemoteVote;
+import com.uxplima.uxmessentials.vote.application.ReceiveNamedVote;
 import com.uxplima.uxmessentials.vote.application.ResetVoterTotals;
 import com.uxplima.uxmessentials.vote.application.RewardEngine;
 import com.uxplima.uxmessentials.vote.application.RewardNetworkParty;
@@ -82,6 +85,7 @@ import com.uxplima.uxmessentials.vote.application.VotePartyStatus;
 import com.uxplima.uxmessentials.vote.application.VoteReminderEligibility;
 import com.uxplima.uxmessentials.vote.application.port.BroadcastThrottle;
 import com.uxplima.uxmessentials.vote.application.port.BroadcastVisibility;
+import com.uxplima.uxmessentials.vote.application.port.ParkedVotes;
 import com.uxplima.uxmessentials.vote.application.port.RemoteVoter;
 import com.uxplima.uxmessentials.vote.application.port.RewardApplier;
 import com.uxplima.uxmessentials.vote.application.port.VoteAudience;
@@ -95,6 +99,7 @@ import com.uxplima.uxmessentials.vote.domain.VoterNameRules;
 import com.uxplima.uxmessentials.vote.domain.event.VotePartyTriggered;
 import com.uxplima.uxmessentials.vote.domain.reward.RewardCatalog;
 import com.uxplima.uxmessentials.vote.domain.reward.RewardSpec;
+import com.uxplima.uxmlib.bedrock.BedrockDetector;
 import com.uxplima.uxmlib.menu.Menus;
 import com.uxplima.uxmlib.menu.binding.MenuBindings;
 import org.jspecify.annotations.NullMarked;
@@ -152,7 +157,8 @@ public final class VoteWiring {
             MenuBindings menuBindings,
             ObjLongConsumer<UUID> board,
             boolean bothCarriers,
-            NetworkPresence presence) {
+            NetworkPresence presence,
+            BedrockDetector bedrock) {
         Objects.requireNonNull(plugin, "plugin");
         Objects.requireNonNull(ctx, "ctx");
         Objects.requireNonNull(persistence, "persistence");
@@ -162,6 +168,7 @@ public final class VoteWiring {
         Objects.requireNonNull(menus, "menus");
         Objects.requireNonNull(menuBindings, "menuBindings");
         Objects.requireNonNull(presence, "presence");
+        Objects.requireNonNull(bedrock, "bedrock");
         KernelPorts kernel = ctx.kernel();
         CachedVoteRepository cachedRepository = VoteRepositories.cachedConcrete(persistence, kernel.log());
         VoteRepository repository =
@@ -311,11 +318,17 @@ public final class VoteWiring {
                     null);
         }
 
-        VotifierListener votifier =
-                new VotifierListener(plugin, services, kernel.playerLookup(), nameRules, kernel.log());
+        // A vote for a name no account answers to yet is parked under the name, never credited to an id made up from
+        // it, and credited when a player with that name first joins any server of the database.
+        ParkedVotes parked = VoteRepositories.parked(persistence);
+        ReceiveNamedVote receive =
+                new ReceiveNamedVote(kernel.playerLookup(), parked, bedrock::namePrefix, services.handleVote()::handle);
+        VotifierListener votifier = new VotifierListener(plugin, services, receive, nameRules, kernel.log());
+        ParkedVoteJoinListener parkedJoin = new ParkedVoteJoinListener(
+                new BindParkedVotes(parked, services.handleVote()::handle), bedrock, kernel.scheduler(), kernel.log());
         List<CommandRegistration> commands = List.of(
                 new VoteCommand(services, () -> ListDisplayMode.from(ctx.config())), new VotePartyCommand(services));
-        List<Listener> listeners = List.of(votifier, joinListener);
+        List<Listener> listeners = List.of(votifier, joinListener, parkedJoin);
         return new Wired(
                 commands,
                 listeners,
