@@ -1,6 +1,7 @@
 package com.uxplima.uxmessentials.shared.application.port;
 
 import java.util.List;
+import java.util.Optional;
 import java.util.UUID;
 
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
@@ -31,6 +32,23 @@ public interface PlayerNameIndex {
      */
     default List<PlayerRef> storedUnder(String name) {
         return byName(name);
+    }
+
+    /**
+     * The account {@code uuid} under the name it was last seen with, from memory; empty when the memory does not hold
+     * it. Safe on the tick. The default holds nothing.
+     */
+    default Optional<PlayerRef> byUuid(UUID uuid) {
+        return Optional.empty();
+    }
+
+    /**
+     * Like {@link #byUuid}, but complete: it also reads the durable store, which every backend writes, so an account
+     * seen only on another server, or let go from memory, is named too. It reads storage, so it is called off the
+     * tick. The default answers from memory.
+     */
+    default Optional<PlayerRef> storedByUuid(UUID uuid) {
+        return byUuid(uuid);
     }
 
     /**

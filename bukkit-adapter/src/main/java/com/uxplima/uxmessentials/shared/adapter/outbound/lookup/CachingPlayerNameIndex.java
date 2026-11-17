@@ -11,6 +11,7 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
@@ -100,6 +101,17 @@ public final class CachingPlayerNameIndex implements PlayerNameIndex {
         log.info("event=name_index_warmed rows={}", String.valueOf(recent.size()));
     }
 
+    /**
+     * Read again which names more than one account holds, after rows were added to the store without passing through
+     * this index. Reads the database, so the caller runs it off the tick thread.
+     */
+    public void rereadSharedNames() {
+        PlayerNameRepository store = repository.get();
+        if (store != null) {
+            sharedNames.addAll(store.sharedNames());
+        }
+    }
+
     @Override
     public List<PlayerRef> byName(String name) {
         Objects.requireNonNull(name, "name");
@@ -139,6 +151,28 @@ public final class CachingPlayerNameIndex implements PlayerNameIndex {
             holders.putIfAbsent(row.uuid(), row.ref());
         }
         return List.copyOf(holders.values());
+    }
+
+    @Override
+    public Optional<PlayerRef> byUuid(UUID uuid) {
+        Objects.requireNonNull(uuid, "uuid");
+        synchronized (lock) {
+            return Optional.ofNullable(byAccount.get(uuid)).map(PlayerName::ref);
+        }
+    }
+
+    @Override
+    public Optional<PlayerRef> storedByUuid(UUID uuid) {
+        Objects.requireNonNull(uuid, "uuid");
+        Optional<PlayerRef> held = byUuid(uuid);
+        PlayerNameRepository store = repository.get();
+        if (held.isPresent() || store == null) {
+            return held;
+        }
+        Optional<PlayerName> stored = store.byUuid(uuid);
+        // Read once, held from now on: a list shown again, on the tick too, names the account from memory.
+        stored.ifPresent(this::rememberIfAbsent);
+        return stored.map(PlayerName::ref);
     }
 
     @Override
@@ -236,6 +270,19 @@ public final class CachingPlayerNameIndex implements PlayerNameIndex {
                 oldest.remove();
                 unlink(gone);
             }
+        }
+    }
+
+    /**
+     * Hold a row read from the store, unless the memory already has a newer word on the account (a join or a learned
+     * name since the read began).
+     */
+    private void rememberIfAbsent(PlayerName row) {
+        synchronized (lock) {
+            if (byAccount.containsKey(row.uuid())) {
+                return;
+            }
+            remember(row);
         }
     }
 

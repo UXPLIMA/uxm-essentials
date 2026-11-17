@@ -6,6 +6,7 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Locale;
 import java.util.Objects;
+import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
 
@@ -67,6 +68,15 @@ public final class JooqPlayerNameRepository extends JooqRepository implements Pl
                 .orderBy(PLAYER_NAMES.LAST_SEEN.desc())
                 .limit(limit)
                 .fetch(row -> new PlayerName(UUID.fromString(row.value1()), row.value2(), row.value3())));
+    }
+
+    @Override
+    public Optional<PlayerName> byUuid(UUID uuid) {
+        Objects.requireNonNull(uuid, "uuid");
+        return read(dsl -> dsl.select(PLAYER_NAMES.UUID, PLAYER_NAMES.NAME, PLAYER_NAMES.LAST_SEEN)
+                .from(PLAYER_NAMES)
+                .where(PLAYER_NAMES.UUID.eq(uuid.toString()))
+                .fetchOptional(row -> new PlayerName(UUID.fromString(row.value1()), row.value2(), row.value3())));
     }
 
     @Override

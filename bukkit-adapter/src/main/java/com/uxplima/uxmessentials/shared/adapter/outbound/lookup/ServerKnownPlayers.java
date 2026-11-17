@@ -1,4 +1,4 @@
-package com.uxplima.uxmessentials.economy.adapter.outbound;
+package com.uxplima.uxmessentials.shared.adapter.outbound.lookup;
 
 import java.time.Duration;
 import java.util.ArrayList;
@@ -18,7 +18,6 @@ import java.util.function.ToIntFunction;
 import org.bukkit.OfflinePlayer;
 import org.bukkit.Server;
 
-import com.uxplima.uxmessentials.economy.application.port.KnownPlayers;
 import com.uxplima.uxmessentials.persistence.lookup.JooqPlayerNameRepository;
 import com.uxplima.uxmessentials.shared.application.port.Logger;
 import com.uxplima.uxmessentials.shared.application.port.Scheduler;
@@ -26,16 +25,18 @@ import com.uxplima.uxmessentials.shared.domain.PlayerName;
 import org.jspecify.annotations.NullMarked;
 
 /**
- * Adds the players this server knows from its own player data to the shared name list before a sweep, so a player who
- * last joined before the list was written on this server is reached too. A Bedrock player through Floodgate is there
- * with the id and the prefixed name Floodgate gives them.
+ * Adds the players this server knows from its own player data to the shared name list, so a player who last joined
+ * before the list was written on this server is named and found too. Each backend of a network adds its own: one
+ * server's players are not in another's data. It adds only what the list lacks, so it is run at every start and before
+ * every sweep over all players. A Bedrock player through Floodgate is there with the id and the prefixed name
+ * Floodgate gives them.
  *
  * <p>Only the ids are taken on the global region, the one thread allowed to list the server's players. A name and a
  * last-seen time of a player who is offline come from their data file, so they are read here off the tick, a chunk at
  * a time, and only for the players the list lacks; a large server's tick never waits on its disk for this.
  */
 @NullMarked
-public final class ServerKnownPlayers implements KnownPlayers {
+public final class ServerKnownPlayers {
 
     private static final Duration WAIT = Duration.ofSeconds(30);
     private static final int CHUNK = 500;
@@ -90,9 +91,11 @@ public final class ServerKnownPlayers implements KnownPlayers {
         this.log = Objects.requireNonNull(log, "log");
     }
 
-    /** Off the tick: the caller is a sweep starting on the async lane. */
-    @Override
-    public void recordAll() {
+    /**
+     * Record every player this server knows that the shared list does not have yet, answering how many it added. Off
+     * the tick: it waits on the global region and reads player data files. Best effort.
+     */
+    public int recordAll() {
         CompletableFuture<List<UUID>> listed = new CompletableFuture<>();
         scheduler.onGlobal(() -> {
             try {
@@ -106,10 +109,10 @@ public final class ServerKnownPlayers implements KnownPlayers {
             all = listed.get(WAIT.toMillis(), TimeUnit.MILLISECONDS);
         } catch (InterruptedException interrupted) {
             Thread.currentThread().interrupt();
-            return;
+            return 0;
         } catch (ExecutionException | TimeoutException failure) {
             log.warn("event=known_players_unread reason={}", failure.toString());
-            return;
+            return 0;
         }
         Set<UUID> have = known.get();
         List<UUID> missing = new ArrayList<>();
@@ -134,5 +137,6 @@ public final class ServerKnownPlayers implements KnownPlayers {
         if (added > 0) {
             log.info("event=known_players_recorded added={}", added);
         }
+        return added;
     }
 }
