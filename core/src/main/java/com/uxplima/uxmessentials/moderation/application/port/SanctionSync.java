@@ -1,5 +1,7 @@
 package com.uxplima.uxmessentials.moderation.application.port;
 
+import java.util.Optional;
+
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 
 /**
@@ -43,4 +45,11 @@ public interface SanctionSync {
 
     /** Announce that {@code ip} was banned so a peer kicks the players it has connected from that address. */
     void ipBanChanged(String ip);
+
+    /**
+     * Ask the backend {@code server}, which {@code target} is connected to, to kick them with {@code reason}. Staff
+     * here already checked and recorded the kick. Without a bus no player is connected elsewhere, so the default
+     * has nothing to send.
+     */
+    default void kickElsewhere(PlayerRef target, String server, Optional<String> reason) {}
 }

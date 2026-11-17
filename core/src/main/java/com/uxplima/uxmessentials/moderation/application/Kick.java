@@ -6,6 +6,7 @@ import java.util.Optional;
 
 import com.uxplima.uxmessentials.moderation.application.port.ModerationAudit;
 import com.uxplima.uxmessentials.moderation.application.port.SanctionBroadcast;
+import com.uxplima.uxmessentials.moderation.application.port.SanctionSync;
 import com.uxplima.uxmessentials.moderation.application.port.Sanctions;
 import com.uxplima.uxmessentials.moderation.domain.DrawnReason;
 import com.uxplima.uxmessentials.moderation.domain.ModerationError;
@@ -27,9 +28,9 @@ import com.uxplima.uxmessentials.shared.domain.message.MessageKey;
  * and the target's kick screen intact. A successful kick is recorded in the append-only sanction history so it
  * surfaces in {@code /history} and {@code /staffhistory}: a kick carries no expiry.
  *
- * <p>A target connected to another backend is refused with that backend's name before anything is written: this
- * backend cannot disconnect them, and a kick recorded and announced without happening would mislead staff. A target
- * who is on no server at all is refused as offline for the same reason.
+ * <p>A target connected to another backend is kicked there: the kick is checked and recorded here, and the backend
+ * holding the connection closes it, through {@link SanctionSync#kickElsewhere}. A target who is on no server at all
+ * is refused as offline, since a kick recorded and announced without happening would mislead staff.
  */
 public final class Kick {
 
@@ -41,6 +42,7 @@ public final class Kick {
     private final SanctionBroadcast broadcast;
     private final NetworkPresence presence;
     private final LiveTargetCheck live;
+    private final SanctionSync sync;
 
     public Kick(
             Sanctions sanctions,
@@ -50,6 +52,19 @@ public final class Kick {
             SanctionHistoryRecorder history,
             SanctionBroadcast broadcast,
             NetworkPresence presence) {
+        this(sanctions, guard, notifier, audit, history, broadcast, presence, SanctionSync.NONE);
+    }
+
+    /** @param sync carries a kick to the backend a target is connected to when that is not this one */
+    public Kick(
+            Sanctions sanctions,
+            ModerationGuard guard,
+            Notifier notifier,
+            ModerationAudit audit,
+            SanctionHistoryRecorder history,
+            SanctionBroadcast broadcast,
+            NetworkPresence presence,
+            SanctionSync sync) {
         this.sanctions = Objects.requireNonNull(sanctions, "sanctions");
         this.guard = Objects.requireNonNull(guard, "guard");
         this.notifier = Objects.requireNonNull(notifier, "notifier");
@@ -57,7 +72,8 @@ public final class Kick {
         this.history = Objects.requireNonNull(history, "history");
         this.broadcast = Objects.requireNonNull(broadcast, "broadcast");
         this.presence = Objects.requireNonNull(presence, "presence");
-        this.live = new LiveTargetCheck(presence, this.notifier);
+        this.live = new LiveTargetCheck(presence);
+        this.sync = Objects.requireNonNull(sync, "sync");
     }
 
     /** Kick {@code target} with an optional reason, or refuse an exempt, offline or elsewhere target. */
@@ -84,10 +100,8 @@ public final class Kick {
         Objects.requireNonNull(target, "target");
         Objects.requireNonNull(reason, "reason");
         Objects.requireNonNull(drawn, "drawn");
-        if (live.refusedElsewhere(told, target)) {
-            return Result.err(ModerationError.TARGET_ELSEWHERE);
-        }
-        if (!presence.isOnline(target.uuid())) {
+        Optional<String> elsewhere = live.elsewhere(target);
+        if (elsewhere.isEmpty() && !presence.isOnline(target.uuid())) {
             notifier.send(told, ModerationMessageKey.KICK_OFFLINE, Map.of("player", target.name()));
             return Result.err(ModerationError.TARGET_OFFLINE);
         }
@@ -96,8 +110,13 @@ public final class Kick {
             notifier.send(told, ModerationError.TARGET_EXEMPT.messageKey());
             return Result.err(ModerationError.TARGET_EXEMPT);
         }
-        MessageKey key = ModerationMessageKey.KICK_KICKED;
-        sanctions.kick(target, key, notifier.render(target, key, Map.of("reason", reason.orElse(""))));
+        if (elsewhere.isPresent()) {
+            // Only the backend holding the connection can close it; it shows the kick screen in the player's language.
+            sync.kickElsewhere(target, elsewhere.get(), reason);
+        } else {
+            MessageKey key = ModerationMessageKey.KICK_KICKED;
+            sanctions.kick(target, key, notifier.render(target, key, Map.of("reason", reason.orElse(""))));
+        }
         history.kick(actor, target, reason, drawn);
         audit.kicked(actor, target, true, reason);
         notifier.send(told, ModerationMessageKey.KICK_APPLIED, Map.of("player", target.name()));

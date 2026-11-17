@@ -23,6 +23,16 @@ class FreezeChangedTest {
     }
 
     @Test
+    void theServerAFreezeIsHeldOnCrossesTheWire() {
+        FreezeChanged sent = new FreezeChanged("lobby", FRAME, ALEX, "Alex", true, 1_763_300_000_000L, "survival");
+
+        FreezeChanged received = (FreezeChanged) NetworkMessageCodec.decode(NetworkMessageCodec.encode(sent));
+
+        assertThat(received.heldOn()).isEqualTo("survival");
+        assertThat(received).isEqualTo(sent);
+    }
+
+    @Test
     void aResetCrossesTheWireUnchanged() {
         FreezeReset sent = new FreezeReset("lobby", 1_763_300_000_000L);
 

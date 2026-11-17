@@ -15,7 +15,7 @@ public interface FreezeSync {
     /** Announces nothing: with the network off the freeze held here is the only one. */
     FreezeSync NONE = new FreezeSync() {
         @Override
-        public void freezeChanged(PlayerRef target, boolean frozen, Instant at) {
+        public void freezeChanged(PlayerRef target, boolean frozen, Instant at, String heldOn) {
             // No peers to tell.
         }
 
@@ -25,8 +25,11 @@ public interface FreezeSync {
         }
     };
 
-    /** Announce that {@code target} was frozen ({@code frozen}) or released here at {@code at}. */
-    void freezeChanged(PlayerRef target, boolean frozen, Instant at);
+    /**
+     * Announce that {@code target} was frozen ({@code frozen}) or released here at {@code at}, while connected to the
+     * backend {@code heldOn}, where the proxy keeps a frozen player.
+     */
+    void freezeChanged(PlayerRef target, boolean frozen, Instant at, String heldOn);
 
     /**
      * Announce that this backend holds no freeze as of {@code at}, because it just started; whatever the proxy kept

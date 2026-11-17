@@ -1,18 +1,23 @@
 package com.uxplima.uxmessentials.security.adapter;
 
+import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Optional;
 
 import org.bukkit.Server;
 import org.bukkit.entity.Player;
 
 import com.uxplima.uxmessentials.security.domain.SecurityMessageKey;
+import com.uxplima.uxmessentials.shared.adapter.outbound.bus.RemoteSyncListener;
+import com.uxplima.uxmessentials.shared.adapter.outbound.bus.StaffActions;
 import com.uxplima.uxmessentials.shared.application.permission.EnforcementPermissions;
 import com.uxplima.uxmessentials.shared.application.port.Logger;
 import com.uxplima.uxmessentials.shared.application.port.MessageSink;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
 import com.uxplima.uxmessentials.shared.application.port.Scheduler;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
+import com.uxplima.uxmessentials.shared.network.StaffActionFrame.Action;
 import org.jspecify.annotations.NullMarked;
 
 /**
@@ -23,7 +28,8 @@ import org.jspecify.annotations.NullMarked;
  * inside the {@link MessageSink}. A join is infrequent, so the per-notice scan of the online set is acceptable.
  *
  * <p>No raw IP or secret is ever passed in. The alt notice carries player names and a count, the client notice a
- * brand, so the log line is safe.
+ * brand, so the log line is safe, and so is the copy sent to the other backends of a network, whose staff see the
+ * notice too. The log line is written once, on the backend the player joined.
  */
 @NullMarked
 public final class SecurityStaffNotifier {
@@ -31,18 +37,26 @@ public final class SecurityStaffNotifier {
     /** The node a player must hold to receive the alt/flagged-client staff notice. */
     public static final String NOTIFY_NODE = EnforcementPermissions.SECURITY_ALTS_NOTIFY;
 
+    /** The notices a backend shows when another sends them; anything else in a notice frame is not for this module. */
+    private static final List<SecurityMessageKey> NOTICES =
+            List.of(SecurityMessageKey.SECURITY_ALTS_NOTIFY, SecurityMessageKey.SECURITY_CLIENT_FLAGGED);
+
     private final Server server;
     private final Scheduler scheduler;
     private final Messages messages;
     private final MessageSink sink;
     private final Logger log;
+    private final StaffActions network;
 
-    public SecurityStaffNotifier(Server server, Scheduler scheduler, Messages messages, MessageSink sink, Logger log) {
+    /** @param network carries each notice to the staff on the other backends */
+    public SecurityStaffNotifier(
+            Server server, Scheduler scheduler, Messages messages, MessageSink sink, Logger log, StaffActions network) {
         this.server = Objects.requireNonNull(server, "server");
         this.scheduler = Objects.requireNonNull(scheduler, "scheduler");
         this.messages = Objects.requireNonNull(messages, "messages");
         this.sink = Objects.requireNonNull(sink, "sink");
         this.log = Objects.requireNonNull(log, "log");
+        this.network = Objects.requireNonNull(network, "network");
     }
 
     /** Notify staff of {@code key} rendered with {@code placeholders}, and log the same in plain form. */
@@ -53,6 +67,19 @@ public final class SecurityStaffNotifier {
         Map<String, String> safe = Map.copyOf(placeholders);
         log.info(logLine);
         scheduler.onGlobal(() -> fanOut(key, safe));
+        network.notice(key.key(), safe);
+    }
+
+    /** A listener that shows this backend's staff the notices another backend sent. */
+    public RemoteSyncListener listener() {
+        return StaffActions.listener(
+                network.serverId(),
+                Action.STAFF_NOTICE,
+                frame -> notice(frame.key()).ifPresent(key -> scheduler.onGlobal(() -> fanOut(key, frame.values()))));
+    }
+
+    private static Optional<SecurityMessageKey> notice(String key) {
+        return NOTICES.stream().filter(notice -> notice.key().equals(key)).findFirst();
     }
 
     private void fanOut(SecurityMessageKey key, Map<String, String> placeholders) {
