@@ -7,6 +7,7 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
 import java.util.UUID;
+import java.util.function.BiConsumer;
 import java.util.function.Consumer;
 
 import com.uxplima.uxmessentials.persistence.vote.CachedVoteRepository;
@@ -74,27 +75,20 @@ public final class VoteSync {
      */
     static final Duration LATE_COPY_GRACE = Duration.ofSeconds(60);
 
-    /**
-     * How often, and how far apart, a server paying a vote received elsewhere looks for the queued rewards again: the
-     * receiving server writes the queue on its async lane, so the announcement can arrive before the rows do.
-     */
-    static final int PAY_ATTEMPTS = 3;
-
-    static final Duration PAY_RETRY = Duration.ofSeconds(1);
-
     private VoteSync() {}
 
     /**
      * A {@link RemoteVoter} that announces a vote credited to a player on another server as a {@link VoteRewardsQueued}
-     * frame, so that server pays the queued rewards now. A lost announcement only means the rewards wait for the
-     * player's next join.
+     * frame, so that server pays the queued rewards now. Each announcement carries a fresh vote id, which is what lets a
+     * receiver drop the second copy of one frame. A lost announcement only means the rewards wait for the player's next
+     * join.
      */
     public static RemoteVoter remoteVoter(BusPublisher bus, Logger log) {
         Objects.requireNonNull(bus, "bus");
         Objects.requireNonNull(log, "log");
         return (voter, serviceName) -> {
             try {
-                bus.publish(new VoteRewardsQueued(bus.serverId(), voter.uuid(), serviceName));
+                bus.publish(new VoteRewardsQueued(bus.serverId(), UUID.randomUUID(), voter.uuid(), serviceName));
             } catch (RuntimeException failure) {
                 log.error("failed to announce the queued vote rewards of player " + voter.uuid(), failure);
             }
@@ -102,28 +96,31 @@ public final class VoteSync {
     }
 
     /**
-     * A listener that, on a remote {@link VoteRewardsQueued} for a player online here, pays them what is queued, off the
-     * tick. A drain that finds nothing yet is tried again a few times, since the queue may not be written yet; the
-     * drain removes what it pays, so a second copy of the frame, or the player's next join, pays nothing twice.
+     * A listener that, on a remote {@link VoteRewardsQueued} for a player online here, hands the player and the vote site
+     * to {@code pay} ({@link PayRemoteVote#pay}) off the tick. The sender announces a vote only once its rewards are
+     * stored, so one drain finds them all. A vote id already paid here is dropped, since with
+     * {@code network.transport = both} each frame arrives twice and the vote must be published once. Whether the player
+     * is here is asked again on the async lane: one who left meanwhile keeps the queue for their next join, rather than
+     * having commands run for a player who is not here.
      */
-    public static RemoteSyncListener queuedListener(PayRemoteVote pay, PlayerLookup players, Scheduler scheduler) {
+    public static RemoteSyncListener queuedListener(
+            BiConsumer<PlayerRef, String> pay, PlayerLookup players, Scheduler scheduler) {
         Objects.requireNonNull(pay, "pay");
         Objects.requireNonNull(players, "players");
         Objects.requireNonNull(scheduler, "scheduler");
+        RecentIds paid = new RecentIds();
         return message -> {
-            if (message instanceof VoteRewardsQueued queued && players.isOnline(queued.player())) {
+            if (message instanceof VoteRewardsQueued queued
+                    && players.isOnline(queued.player())
+                    && paid.firstTime(queued.voteId())) {
                 players.findByUuid(queued.player())
-                        .ifPresent(voter -> scheduler.async(
-                                () -> payOrRetry(pay, scheduler, voter, queued.service(), PAY_ATTEMPTS)));
+                        .ifPresent(voter -> scheduler.async(() -> {
+                            if (players.isOnline(voter.uuid())) {
+                                pay.accept(voter, queued.service());
+                            }
+                        }));
             }
         };
-    }
-
-    private static void payOrRetry(
-            PayRemoteVote pay, Scheduler scheduler, PlayerRef voter, String service, int attemptsLeft) {
-        if (!pay.pay(voter, service) && attemptsLeft > 1) {
-            scheduler.asyncAfter(PAY_RETRY, () -> payOrRetry(pay, scheduler, voter, service, attemptsLeft - 1));
-        }
     }
 
     /** A {@link VoteRepository} that broadcasts a {@link VoteCounterChanged} after every counter mutation. */

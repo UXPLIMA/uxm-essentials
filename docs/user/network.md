@@ -120,9 +120,10 @@ network {
   at most once a minute, and the doctor reads `REFUSED`. Keep every backend on the same secret and release, and their
   clocks in time. A client sending forged frames shows the same way.
 - The signed time also stops a captured frame from being replayed later. Within the 60 seconds, private messages,
-  staff chat, helpop, teleport requests, jails, presence, world changes and vote parties carry an id and act once,
-  trade signals are settled by the shared escrow, and a repeated cache update is harmless. A vanish change carries no
-  order, so without the proxy plugin a client could hold one back or repeat it within that time.
+  staff chat, helpop, teleport requests, jails, presence, world changes, vote parties and votes paid on another
+  server carry an id and act once, trade signals are settled by the shared escrow, and a repeated cache update is
+  harmless. A vanish change carries no order, so without the proxy plugin a client could hold one back or repeat it
+  within that time.
 - Signing proves who sent a frame; it does not hide what a frame says. Without the proxy plugin, or on a backend
   players can join directly, the client carrying the frames can read them: private messages, staff chat, helpop and
   IP bans among them. Install the proxy plugin to keep them private.
@@ -206,7 +207,7 @@ shared: each backend reads its own `config.conf` and module files, so keep them 
 | Holograms, NPCs, main spawn | Definitions, with a scope | Edits show on every server in scope | `network.shared-sets` |
 | Guard | Regions, with a scope | Edits apply on every server in scope | none; shared sets in `modules/guard/config.conf` |
 | Trade | Escrow | Two players on different servers trade | `trade` `cross-server` |
-| Vote | Party counter, queued rewards | A party pays players on every server; a vote for a player on another server pays them there at once | `voteparty.network-rewards` in `vote`, default on |
+| Vote | Party counter, queued rewards | A party pays players on every server; a vote for a player on another server pays them there at once | `voteparty.network-rewards` and `claim.auto` in `vote`, default on |
 | Playtime | Daily rows | Time on every server adds up | none |
 | Skin | Each player's chosen skin | A change is worn at once on the server the player is on | none |
 

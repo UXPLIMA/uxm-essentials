@@ -3,6 +3,7 @@ package com.uxplima.uxmessentials.persistence.vote;
 import java.util.Objects;
 
 import com.uxplima.uxmessentials.persistence.runtime.Persistence;
+import com.uxplima.uxmessentials.shared.application.port.Logger;
 import com.uxplima.uxmessentials.vote.application.port.VoteRepository;
 import org.jspecify.annotations.NullMarked;
 
@@ -19,9 +20,9 @@ public final class VoteRepositories {
     private VoteRepositories() {}
 
     /** A counter-cached jOOQ {@link VoteRepository} over the shared persistence DSL. */
-    public static VoteRepository cached(Persistence persistence) {
+    public static VoteRepository cached(Persistence persistence, Logger log) {
         Objects.requireNonNull(persistence, "persistence");
-        return new CachedVoteRepository(new JooqVoteRepository(persistence.dsl()));
+        return new CachedVoteRepository(new JooqVoteRepository(persistence.dsl(), log));
     }
 
     /**
@@ -31,8 +32,8 @@ public final class VoteRepositories {
      * this overload exposes the decorator only so the invalidation seam can reach
      * {@link CachedVoteRepository#invalidate()}.
      */
-    public static CachedVoteRepository cachedConcrete(Persistence persistence) {
+    public static CachedVoteRepository cachedConcrete(Persistence persistence, Logger log) {
         Objects.requireNonNull(persistence, "persistence");
-        return new CachedVoteRepository(new JooqVoteRepository(persistence.dsl()));
+        return new CachedVoteRepository(new JooqVoteRepository(persistence.dsl(), log));
     }
 }

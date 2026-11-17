@@ -77,27 +77,57 @@ class RemoteVoteTest {
     }
 
     @Test
+    void theOtherServerIsToldOnlyOnceEveryRewardOfTheVoteIsQueued() {
+        HeldApplier held = new HeldApplier(queue);
+        HandleVote lobby = lobby(new Where(false, true), held, DIAMOND, DIAMOND);
+
+        lobby.handle(new Vote(ALEX, "PlanetMinecraft", AT));
+
+        assertThat(told).as("nothing is stored yet").isEmpty();
+        held.store();
+        assertThat(queue.rows.get(ALEX)).containsExactly("give {player} diamond", "give {player} diamond");
+        assertThat(told).containsExactly(ALEX.name() + "@PlanetMinecraft");
+    }
+
+    @Test
     void theServerThePlayerIsOnPaysTheQueuedRewardsOnceAndPublishesTheVote() {
         lobby(new Where(false, true)).handle(new Vote(ALEX, "PlanetMinecraft", AT));
-        PayRemoteVote survival = new PayRemoteVote(
-                new ApplyQueuedRewards(queue, (commands, name) -> commands.forEach(c -> paid.add(name + ":" + c))),
-                survivalEvents);
+        ApplyQueuedRewards drain =
+                new ApplyQueuedRewards(queue, (commands, name) -> commands.forEach(c -> paid.add(name + ":" + c)));
+        PayRemoteVote survival = new PayRemoteVote(drain, survivalEvents);
 
-        assertThat(survival.pay(ALEX, "PlanetMinecraft")).isTrue();
-        assertThat(survival.pay(ALEX, "PlanetMinecraft"))
-                .as("a second copy pays nothing")
-                .isFalse();
+        assertThat(survival.pay(ALEX, "PlanetMinecraft")).isEqualTo(1);
+        assertThat(drain.applyFor(ALEX)).as("the next join pays nothing").isZero();
 
         assertThat(paid).containsExactly("Alex:give {player} diamond");
         assertThat(survivalEvents.published()).containsExactly(new VoteReceived(ALEX, "PlanetMinecraft"));
     }
 
+    @Test
+    void aVoteWhoseRewardsRunNoCommandIsStillPublishedOnTheServerThePlayerIsOn() {
+        RewardSpec thanksOnly = new RewardSpec(
+                100, Optional.empty(), List.of(), List.of("<green>thanks"), List.of(), List.of(), Set.of());
+        lobby(new Where(false, true), applier, thanksOnly).handle(new Vote(ALEX, "PlanetMinecraft", AT));
+        PayRemoteVote survival = new PayRemoteVote(
+                new ApplyQueuedRewards(queue, (commands, name) -> commands.forEach(c -> paid.add(name + ":" + c))),
+                survivalEvents);
+
+        assertThat(told).containsExactly(ALEX.name() + "@PlanetMinecraft");
+        assertThat(survival.pay(ALEX, "PlanetMinecraft")).isZero();
+        assertThat(paid).isEmpty();
+        assertThat(survivalEvents.published()).containsExactly(new VoteReceived(ALEX, "PlanetMinecraft"));
+    }
+
     private HandleVote lobby(VoteContext where) {
+        return lobby(where, applier, DIAMOND);
+    }
+
+    private HandleVote lobby(VoteContext where, RewardApplier rewards, RewardSpec... perVote) {
         return new HandleVote(
                 queue,
                 new RewardEngine(
-                        new RewardCatalog(List.of(DIAMOND), Map.of(), List.of(), List.of(), List.of()), Set.of()),
-                applier,
+                        new RewardCatalog(List.of(perVote), Map.of(), List.of(), List.of(), List.of()), Set.of()),
+                rewards,
                 where,
                 List::of,
                 new BroadcastSettings(BroadcastType.ONLINE_ONLY, Duration.ZERO, Set.of(), Set.of()),
@@ -179,14 +209,45 @@ class RemoteVoteTest {
         public void recordLastVoteAtSite(PlayerRef player, String site, Instant at) {}
     }
 
-    /** Queues a grant for a voter who is not here, as the server's applier does. */
+    /** Queues the commands of a grant for a voter who is not here, as the server's applier does. */
     private record QueueingApplier(SharedQueue queue) implements RewardApplier {
 
         @Override
         public void apply(PlayerRef voter, boolean online, RewardGrant grant) {
-            if (!online) {
+            if (!online && !grant.commands().isEmpty()) {
                 queue.enqueue(new QueuedReward(voter, grant.commands(), AT));
             }
+        }
+    }
+
+    /** Queues the grants of a voter who is not here on a later lane, as the server's applier does, until told to. */
+    private static final class HeldApplier implements RewardApplier {
+
+        private final SharedQueue queue;
+        private final List<Runnable> waiting = new ArrayList<>();
+
+        HeldApplier(SharedQueue queue) {
+            this.queue = queue;
+        }
+
+        @Override
+        public void apply(PlayerRef voter, boolean online, RewardGrant grant) {
+            if (!online) {
+                waiting.add(() -> queue.enqueue(new QueuedReward(voter, grant.commands(), AT)));
+            }
+        }
+
+        @Override
+        public void queueAll(PlayerRef voter, List<RewardGrant> grants, Runnable afterQueued) {
+            waiting.add(() -> {
+                grants.forEach(grant -> queue.enqueue(new QueuedReward(voter, grant.commands(), AT)));
+                afterQueued.run();
+            });
+        }
+
+        void store() {
+            waiting.forEach(Runnable::run);
+            waiting.clear();
         }
     }
 

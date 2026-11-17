@@ -3,6 +3,7 @@ package com.uxplima.uxmessentials.vote.application;
 import java.time.LocalDate;
 import java.time.ZoneId;
 import java.time.temporal.IsoFields;
+import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
@@ -102,18 +103,14 @@ public final class HandleVote {
         boolean streakAdvanced = before.streakDayKey() != after.streakDayKey();
         boolean voterOnline = context.isOnline(voter);
         boolean elsewhere = !voterOnline && context.isOnlineElsewhere(voter);
-        boolean rewarded = creditVoter(vote, after, streakAdvanced, voterOnline);
-        if (elsewhere) {
-            // The rewards are queued in the shared database, so the server the voter is on pays them out now.
-            remote.rewardsQueued(voter, vote.serviceName());
-        }
+        boolean rewarded = creditVoter(vote, after, streakAdvanced, voterOnline, elsewhere);
         maybeBroadcastThanks(vote, after, voterOnline || elsewhere);
         repository.markPartyParticipant(voter);
         boolean partyFired = advanceCounter(vote);
         return new Outcome(rewarded, partyFired);
     }
 
-    private boolean creditVoter(Vote vote, VoteTally after, boolean streakAdvanced, boolean online) {
+    private boolean creditVoter(Vote vote, VoteTally after, boolean streakAdvanced, boolean online, boolean elsewhere) {
         PlayerRef voter = vote.voter();
         RewardContext ctx = new RewardContext(
                 voter,
@@ -124,7 +121,14 @@ public final class HandleVote {
                 streakAdvanced,
                 node -> context.hasPermission(voter, node),
                 context::roll);
-        for (RewardGrant grant : engine.resolve(ctx)) {
+        List<RewardGrant> grants = engine.resolve(ctx);
+        if (elsewhere) {
+            // The server the voter is on pays the shared queue out once it hears of the vote, so it is told only after
+            // every grant is stored: told earlier, it could drain the queue before the last rows land.
+            applier.queueAll(voter, grants, () -> remote.rewardsQueued(voter, vote.serviceName()));
+            return false;
+        }
+        for (RewardGrant grant : grants) {
             applier.apply(voter, online, grant);
         }
         if (online) {

@@ -324,6 +324,7 @@ public final class NetworkMessageCodec {
             case RankActionsKept kept -> writeUuid(out, kept.player());
             case InventoryRestoreKept kept -> writeUuid(out, kept.player());
             case VoteRewardsQueued queued -> {
+                writeUuid(out, queued.voteId());
                 writeUuid(out, queued.player());
                 out.writeUTF(queued.service());
             }
@@ -435,7 +436,7 @@ public final class NetworkMessageCodec {
             case PLAYER_SKIN_CHANGED -> new PlayerSkinChanged(origin, readUuid(in));
             case RANK_ACTIONS_KEPT -> new RankActionsKept(origin, readUuid(in));
             case INVENTORY_RESTORE_KEPT -> new InventoryRestoreKept(origin, readUuid(in));
-            case VOTE_REWARDS_QUEUED -> new VoteRewardsQueued(origin, readUuid(in), in.readUTF());
+            case VOTE_REWARDS_QUEUED -> new VoteRewardsQueued(origin, readUuid(in), readUuid(in), in.readUTF());
         };
     }
 

@@ -163,7 +163,7 @@ public final class VoteWiring {
         Objects.requireNonNull(menuBindings, "menuBindings");
         Objects.requireNonNull(presence, "presence");
         KernelPorts kernel = ctx.kernel();
-        CachedVoteRepository cachedRepository = VoteRepositories.cachedConcrete(persistence);
+        CachedVoteRepository cachedRepository = VoteRepositories.cachedConcrete(persistence, kernel.log());
         VoteRepository repository =
                 new BoardCountingVotes(VoteSync.repository(cachedRepository, bus.publisher()), board);
         Notifier notifier = new Notifier(kernel.messages(), kernel.messageSink());
@@ -226,12 +226,6 @@ public final class VoteWiring {
                 siteCatalog,
                 reminderPrefs,
                 sitesGuiView);
-        // A vote for a player on another server queues the rewards and tells that server, which pays them out now.
-        bus.registry()
-                .register(VoteSync.queuedListener(
-                        new PayRemoteVote(services.applyQueuedRewards(), kernel.events()),
-                        kernel.playerLookup(),
-                        kernel.scheduler()));
 
         // Subscribe the party sound/particle handler to the in-process bus.
         @Nullable Sound sound = BukkitRegistryKeys.resolveSound(ctx.config().getString("voteparty.sound", ""));
@@ -283,6 +277,12 @@ public final class VoteWiring {
         // Build the join listener with reminder support when enabled. Auto-claim drains the offline queue on
         // join (the default); with it off the player pays the queue out with /vote claim.
         boolean autoClaim = ctx.config().getBoolean("claim.auto", true);
+        if (autoClaim) {
+            // A vote for a player on another server queues the rewards and tells this server, which pays them out now.
+            // With auto-claim off the queue waits for /vote claim, so a frame must not pay it out either.
+            PayRemoteVote payRemote = new PayRemoteVote(services.applyQueuedRewards(), kernel.events());
+            bus.registry().register(VoteSync.queuedListener(payRemote::pay, kernel.playerLookup(), kernel.scheduler()));
+        }
         boolean loginNag = ctx.config().getBoolean("reminders.login", true);
         int loginDelaySecs = Math.max(0, ctx.config().getInt("reminders.login-delay-seconds", 5));
         VoteJoinListener joinListener;
