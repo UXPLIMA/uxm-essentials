@@ -110,6 +110,16 @@ class CustomCommandArgumentsScenarioTest {
             actions = ["broadcast:cried %arg_words%"]
             """;
 
+    // A console line picked at random from a list, which the custom command module runs itself.
+    private static final String LOTTERY = """
+            command {
+              name = "lottery"
+              description = "Draw a winner"
+              cost = 0
+            }
+            actions = ["console-random:herald won;herald won"]
+            """;
+
     private static final String REFUSED = "can't take that here";
 
     private RunningPlugin running;
@@ -131,9 +141,8 @@ class CustomCommandArgumentsScenarioTest {
                 MEMO,
                 "commands/custom/crier.conf",
                 CRIER,
-                // The menu engine runs a console line only where the operator lets menus do so.
-                "modules/custommenus/config.conf",
-                "enabled = true\nallow-console = true\n"));
+                "commands/custom/lottery.conf",
+                LOTTERY));
     }
 
     @AfterAll
@@ -153,6 +162,18 @@ class CustomCommandArgumentsScenarioTest {
 
         assertThat(RunningPlugin.said(reader))
                 .contains("announced direct", "announced gift-for-Steve", "announced present-for-Steve");
+        assertThat(running.problems()).isEmpty();
+    }
+
+    @Test
+    void aConsoleLinePickedAtRandomRunsWithTheShippedSettings() {
+        ScenarioPlayer drawer = running.join("Drawer");
+        ScenarioPlayer reader = running.join("Rowan");
+
+        running.run(drawer, "lottery");
+        running.settle();
+
+        assertThat(RunningPlugin.said(reader)).contains("announced won");
         assertThat(running.problems()).isEmpty();
     }
 

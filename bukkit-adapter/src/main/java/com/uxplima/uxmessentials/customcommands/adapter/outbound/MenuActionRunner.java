@@ -1,5 +1,6 @@
 package com.uxplima.uxmessentials.customcommands.adapter.outbound;
 
+import java.time.Duration;
 import java.util.LinkedHashMap;
 import java.util.Locale;
 import java.util.Map;
@@ -10,29 +11,39 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 import org.bukkit.Bukkit;
+import org.bukkit.entity.Player;
 
 import com.uxplima.uxmessentials.customcommands.application.port.ActionRunner;
 import com.uxplima.uxmessentials.customcommands.domain.ActionChain;
 import com.uxplima.uxmessentials.customcommands.domain.ActionStep;
 import com.uxplima.uxmessentials.customcommands.domain.ChainArguments;
 import com.uxplima.uxmessentials.customcommands.domain.CommandLineArguments;
+import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.vocab.CommandActions;
 import com.uxplima.uxmessentials.shared.adapter.outbound.LivePlayers;
+import com.uxplima.uxmessentials.shared.adapter.outbound.action.ClickCommandRunner;
 import com.uxplima.uxmessentials.shared.adapter.outbound.style.StyledText;
 import com.uxplima.uxmessentials.shared.application.port.Logger;
 import com.uxplima.uxmessentials.shared.application.port.Scheduler;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmlib.menu.Menus;
+import com.uxplima.uxmlib.menu.runtime.ActionArguments;
 import com.uxplima.uxmlib.menu.spec.Ref;
 
 /**
  * Runs a custom command's action chain through the menu engine's action vocabulary, so a command does exactly what
  * a menu item does and nothing new had to be invented for it. Argument tokens are expanded before dispatch, a step
- * that carries an offset is scheduled instead of run inline, and the two privileged heads are gated by the module's
- * own policy rather than by whoever wrote the file.
+ * that carries an offset is scheduled instead of run inline, and the privileged heads are gated by the module's own
+ * policy rather than by whoever wrote the file.
+ *
+ * <p>The privileged heads ({@code console}, {@code console-random}, {@code command-as-op}, {@code command-op}) are
+ * carried out here rather than by the menu engine, whose own handlers answer to {@code custommenus} settings written
+ * for menu files. So {@code allow-console-actions} and {@code allow-op-actions} are the only switches a custom command
+ * answers to.
  *
  * <p>A console run has no live player behind it, and the engine's vocabulary is written against one. Rather than
  * let every step quietly evaporate, a chain run for a system actor takes a narrow second path that handles the
- * three console-safe heads ({@code console}, {@code broadcast}, {@code message}) and reports each step it had to
+ * console-safe heads ({@code console}, {@code console-random}, {@code broadcast}, {@code message}) and reports each
+ * step it had to
  * skip by name, so an operator who marked a command {@code console = true} can see which of its steps needed a
  * player.
  */
@@ -41,8 +52,14 @@ public final class MenuActionRunner implements ActionRunner {
     /** The action head that runs its value as the console. */
     private static final String CONSOLE_HEAD = "console";
 
-    /** The action head that runs its value as the player with operator rights briefly granted. */
-    private static final String OP_HEAD = "command-as-op";
+    /** The action head that runs one command, picked at random from a {@code ;} list, as the console. */
+    private static final String CONSOLE_RANDOM_HEAD = "console-random";
+
+    /** The heads that run a command as the console. */
+    private static final Set<String> CONSOLE_HEADS = Set.of(CONSOLE_HEAD, CONSOLE_RANDOM_HEAD);
+
+    /** The heads that run their value as the player with operator rights briefly granted. */
+    private static final Set<String> OP_HEADS = Set.of("command-as-op", "command-op");
 
     /** The action head that broadcasts its value to the whole server. */
     private static final String BROADCAST_HEAD = "broadcast";
@@ -51,7 +68,8 @@ public final class MenuActionRunner implements ActionRunner {
     private static final String MESSAGE_HEAD = "message";
 
     /** The heads that still mean something when the actor is the console rather than a player. */
-    private static final Set<String> CONSOLE_SAFE_HEADS = Set.of(CONSOLE_HEAD, BROADCAST_HEAD, MESSAGE_HEAD);
+    private static final Set<String> CONSOLE_SAFE_HEADS =
+            Set.of(CONSOLE_HEAD, CONSOLE_RANDOM_HEAD, BROADCAST_HEAD, MESSAGE_HEAD);
 
     /** An argument token: {@code %args%} or {@code %arg_<name>%}; {@code group(1)} is the name, absent for the first. */
     private static final Pattern ARGUMENT = Pattern.compile("%(?:args|arg_([^%\\s]+))%");
@@ -70,16 +88,26 @@ public final class MenuActionRunner implements ActionRunner {
     /** The head whose value is a legacy line, where {@code &} and a code character change the colour. */
     private static final String LEGACY_HEAD = "broadcast-legacy";
 
+    /** The key a step's value is resolved under when the engine's argument tokens are filled here. */
+    private static final String VALUE = "value";
+
     /** The characters that follow an {@code &} or {@code §} in a legacy colour, format or hex code. */
     private static final String LEGACY_CODES = "0123456789abcdefklmnorx#";
 
     private final Menus menus;
+    private final ClickCommandRunner commands;
     private final Scheduler scheduler;
     private final Logger log;
     private final Supplier<PrivilegedActions> policy;
 
-    public MenuActionRunner(Menus menus, Scheduler scheduler, Logger log, Supplier<PrivilegedActions> policy) {
+    public MenuActionRunner(
+            Menus menus,
+            ClickCommandRunner commands,
+            Scheduler scheduler,
+            Logger log,
+            Supplier<PrivilegedActions> policy) {
         this.menus = Objects.requireNonNull(menus, "menus");
+        this.commands = Objects.requireNonNull(commands, "commands");
         this.scheduler = Objects.requireNonNull(scheduler, "scheduler");
         this.log = Objects.requireNonNull(log, "log");
         this.policy = Objects.requireNonNull(policy, "policy");
@@ -123,6 +151,11 @@ public final class MenuActionRunner implements ActionRunner {
                 continue;
             }
             audit(token, actor, allowed);
+            String head = head(token);
+            if (CONSOLE_HEADS.contains(head) || OP_HEADS.contains(head)) {
+                runPrivileged(actor, head, withEngineTokens(value(token), values), step.offset());
+                continue;
+            }
             Ref ref = Ref.parse(token);
             // The engine spends a live player, so an action for somebody who has left is dropped rather than run
             // against a name, the same as the engine does when its own lookup misses.
@@ -165,24 +198,76 @@ public final class MenuActionRunner implements ActionRunner {
         }
     }
 
-    /** Carry out one console-safe step on the global thread; a head outside the three never reaches here. */
+    /**
+     * {@code value} with the engine's own {@code %argument_<name>%} tokens filled from {@code values}, as the engine
+     * fills them in a step it runs, so a step written either way behaves the same when it is carried out here.
+     */
+    private static String withEngineTokens(String value, Map<String, String> values) {
+        return ActionArguments.resolve(Map.of(VALUE, value), values).getOrDefault(VALUE, value);
+    }
+
+    /**
+     * Carry out a console or operator step for a player. A step due now is queued on the player's thread, where the
+     * engine runs the other steps, so the chain keeps its order; the console part then runs on the global thread. A
+     * later step runs on the thread its effect needs when it is due.
+     */
+    private void runPrivileged(PlayerRef actor, String head, String value, Duration offset) {
+        if (CONSOLE_HEADS.contains(head)) {
+            Runnable console = () -> onGlobalThread(() -> runAsConsole(head, value));
+            if (offset.isZero()) {
+                scheduler.onEntity(actor, console);
+            } else {
+                scheduler.asyncAfter(offset, () -> scheduler.onGlobal(() -> runAsConsole(head, value)));
+            }
+            return;
+        }
+        Runnable asOp = () -> LivePlayers.of(actor).ifPresent(live -> runAsOp(live, value));
+        if (offset.isZero()) {
+            scheduler.onEntity(actor, asOp);
+        } else {
+            scheduler.laterEntity(actor, offset, asOp);
+        }
+    }
+
+    /** Run {@code task} now when this is the global thread, as it is on a server without regions, else there. */
+    private void onGlobalThread(Runnable task) {
+        if (scheduler.onGlobalThread()) {
+            task.run();
+        } else {
+            scheduler.onGlobal(task);
+        }
+    }
+
+    /** Run {@code value}, or for {@code console-random} one command picked from it, as the console. */
+    private void runAsConsole(String head, String value) {
+        String command = CONSOLE_RANDOM_HEAD.equals(head) ? CommandActions.pickRandom(value) : value;
+        String bare = CommandActions.stripSlash(command);
+        if (!bare.isEmpty()) {
+            commands.runAsConsole(bare);
+        }
+    }
+
+    /** Run {@code value} as {@code player} with operator rights for the one command. */
+    private void runAsOp(Player player, String value) {
+        String bare = CommandActions.stripSlash(value);
+        if (!bare.isEmpty()) {
+            commands.runAsPlayerOp(player, bare);
+        }
+    }
+
+    /** Carry out one console-safe step on the global thread; a head outside the four never reaches here. */
     private void dispatchAsSystem(String head, String value) {
         if (value.isBlank()) {
             return;
         }
         switch (head) {
-            case CONSOLE_HEAD -> Bukkit.dispatchCommand(Bukkit.getConsoleSender(), stripSlash(value));
+            case CONSOLE_HEAD, CONSOLE_RANDOM_HEAD -> runAsConsole(head, value);
             case BROADCAST_HEAD -> Bukkit.broadcast(StyledText.render(value));
             case MESSAGE_HEAD -> Bukkit.getConsoleSender().sendMessage(StyledText.render(value));
             default -> {
                 // Unreachable: the caller filters on CONSOLE_SAFE_HEADS before scheduling anything.
             }
         }
-    }
-
-    /** A command action's value with a single leading slash removed, which is what the dispatcher expects. */
-    private static String stripSlash(String command) {
-        return command.startsWith("/") ? command.substring(1) : command;
     }
 
     /**
@@ -299,10 +384,10 @@ public final class MenuActionRunner implements ActionRunner {
     /** Whether the module's policy allows this action head; every head but the two privileged ones is allowed. */
     private static boolean permitted(String token, PrivilegedActions allowed) {
         String head = head(token);
-        if (CONSOLE_HEAD.equals(head)) {
+        if (CONSOLE_HEADS.contains(head)) {
             return allowed.console();
         }
-        if (OP_HEAD.equals(head)) {
+        if (OP_HEADS.contains(head)) {
             return allowed.op();
         }
         return true;
@@ -311,7 +396,7 @@ public final class MenuActionRunner implements ActionRunner {
     /** Write one line naming who triggered a privileged action, when the policy asks for the audit trail. */
     private void audit(String token, PlayerRef actor, PrivilegedActions allowed) {
         String head = head(token);
-        if (!allowed.audit() || (!CONSOLE_HEAD.equals(head) && !OP_HEAD.equals(head))) {
+        if (!allowed.audit() || (!CONSOLE_HEADS.contains(head) && !OP_HEADS.contains(head))) {
             return;
         }
         log.info("custom command action '{}' run for {}", head, actor.name());

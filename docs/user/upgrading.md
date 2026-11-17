@@ -3,6 +3,18 @@
 What an operator edits when a release renames something an operator's own files or permission grants depend on, or
 needs a setting it did not need before.
 
+## Console and operator actions answer to their own module
+
+A custom command's `console`, `console-random`, `command-as-op` and `command-op` steps now follow only
+`modules/customcommands/config.conf`: `allow-console-actions` for the first two, `allow-op-actions` for the other two.
+Before, they also needed `allow-console` in `modules/custommenus/config.conf`, so with the shipped settings a custom
+command's `console:` step was dropped. It now runs while `allow-console-actions` is on, as that file says. A
+`command-op` step, which used to skip `allow-op-actions`, is held to it like `command-as-op`.
+
+Operator menus keep `allow-console` for `console` and `console-random`, and get `allow-op` for `command-as-op`. A
+menu config without `allow-op` follows `allow-console`, as before; write `allow-op = false` to keep console actions
+in menus but refuse the operator one.
+
 ## Custom command arguments in actions
 
 A value a player types for a custom command now goes into an action only when it fits what the argument allows there;

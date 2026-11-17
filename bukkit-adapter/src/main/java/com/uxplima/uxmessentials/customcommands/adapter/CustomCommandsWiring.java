@@ -28,6 +28,7 @@ import com.uxplima.uxmessentials.customcommands.domain.ChainDepth;
 import com.uxplima.uxmessentials.customcommands.domain.CustomCommand;
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandFeedback;
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandRegistration;
+import com.uxplima.uxmessentials.shared.adapter.outbound.action.BukkitClickCommandRunner;
 import com.uxplima.uxmessentials.shared.adapter.outbound.currency.Currencies;
 import com.uxplima.uxmessentials.shared.application.module.ModuleContext;
 import com.uxplima.uxmlib.menu.Menus;
@@ -82,6 +83,7 @@ public final class CustomCommandsWiring {
         CommandFee fee = new CurrenciesCommandFee(currencies, config::currency);
         MenuActionRunner actions = new MenuActionRunner(
                 menus,
+                new BukkitClickCommandRunner(),
                 ctx.kernel().scheduler(),
                 ctx.kernel().log(),
                 () -> new MenuActionRunner.PrivilegedActions(
