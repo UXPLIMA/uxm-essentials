@@ -381,7 +381,7 @@ same everywhere so transaction times agree.
    [setserver commands](#renaming-a-server-or-fixing-a-wrong-claim), or `/setjail` for a jail.
 5. Run `/uxmess doctor` on each backend once players are on: a connected bus line, the expected peer count and no
    server name failure.
-6. Move permission grants and placeholders to the new names as [upgrading](upgrading.md) describes. That release
+6. Move permission grants and placeholders to the new names as [upgrading-renames](upgrading-renames.md) describes. That release
    renames every exemption node to `uxmessentials.bypass.*` and every placeholder to `%uxm_essentials_<path>%`.
 
 ### Recovering a failed world migration on MySQL or MariaDB
