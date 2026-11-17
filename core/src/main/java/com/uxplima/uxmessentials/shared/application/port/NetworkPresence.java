@@ -1,5 +1,6 @@
 package com.uxplima.uxmessentials.shared.application.port;
 
+import java.time.Duration;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -20,6 +21,12 @@ import com.uxplima.uxmessentials.shared.domain.OnlinePlayer;
  * a player who just switched backends may show on the old one until its quit frame or next heartbeat arrives.
  */
 public interface NetworkPresence {
+
+    /**
+     * How long after a player left another backend their arrival here counts as a move between servers rather than a
+     * join, where nothing configures it otherwise.
+     */
+    Duration SWITCH_WINDOW = Duration.ofSeconds(3);
 
     /** The {@code server-name} of this backend. */
     String localServer();
@@ -52,6 +59,15 @@ public interface NetworkPresence {
 
     /** Every player online on any backend this server knows, ordered by server and then by name. */
     List<OnlinePlayer> online();
+
+    /**
+     * The other backend {@code player} is online on, or left within {@code within}, as far as this server heard: the
+     * backend a player who is joining here comes from when they move across the network. Empty for a player who was on
+     * no other backend lately. The default knows only who is online elsewhere now.
+     */
+    default Optional<String> cameFrom(UUID player, Duration within) {
+        return find(player).map(OnlinePlayer::server).filter(server -> !server.equals(localServer()));
+    }
 
     /** Whether the player with this account is online on any backend this server knows. */
     default boolean isOnline(UUID player) {

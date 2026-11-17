@@ -1298,6 +1298,11 @@ public final class PluginModule {
                 .map(link -> link.answeredWithin(System.currentTimeMillis(), busHealth.answerWindow()))
                 .orElse(false);
         links.networked = NetworkConfig.from(config).enabled();
+        // Whether a joining player is new to the whole network, read during the login from the shared name index.
+        links.firstJoins = new com.uxplima.uxmessentials.shared.application.FirstJoins(
+                PlayerNameRepositories.known(persistence), kernel.log());
+        resources.addListener(new com.uxplima.uxmessentials.shared.adapter.inbound.lookup.FirstJoinListener(
+                links.firstJoins, links.networked, kernel.playerLookup()::isOnline));
         // Install uxmLib's single menu listener once, before any GUI-using module (vaults, itemworld) wires,
         // and tear it down on disable so a reload re-installs cleanly (the static install state is reset).
         Guis.install(plugin);
@@ -2781,6 +2786,7 @@ public final class PluginModule {
                 Optional.ofNullable(links.kitEconomy),
                 links.networkClaims,
                 Objects.requireNonNull(links.claimLedger, "claimLedger"),
+                Objects.requireNonNull(links.firstJoins, "firstJoins"),
                 Objects.requireNonNull(links.kitResets, "kitResets"),
                 guiLayouts,
                 textInput,
@@ -3449,6 +3455,8 @@ public final class PluginModule {
                 announcerSettingsStore,
                 com.uxplima.uxmessentials.persistence.settings.SettingsStores.switches(persistence),
                 bus,
+                new CommunicationWiring.Network(
+                        links.presence, links.networked, Objects.requireNonNull(links.firstJoins, "firstJoins")),
                 engineTheme(resources),
                 guiLayouts,
                 textInput,
@@ -3994,6 +4002,8 @@ public final class PluginModule {
         private java.util.function.BooleanSupplier proxyAnswering = () -> false;
         // Whether this backend is part of a network (network.enabled), which is when a jail can be on another one.
         private boolean networked;
+        // Whether a joining player is new to the network, for the first-join lines and kits; set before any module.
+        private com.uxplima.uxmessentials.shared.application.@org.jspecify.annotations.Nullable FirstJoins firstJoins;
         // The shared target picker, built and registered at enable before any module wires; moderation and the
         // economy admin GUI open it rather than each building one of their own.
         private com.uxplima.uxmessentials.shared.adapter.inbound.gui.@org.jspecify.annotations.Nullable PlayerPickerView
