@@ -41,6 +41,8 @@ The periods are `alltime`, `monthly`, `weekly` and `daily`. `playtime`, `trades`
 | `value_<board>_<period>` | The reader's own value. |
 | `resets_<period>` | The time until a period starts again, in the reader's words (`4d 1h`, `1h 30m`, `12m`), or the word for none for `alltime`. |
 
+A `<head:...>` tag can only name a player to the client, which asks Mojang about the name, so the `_head` keys draw an offline-mode or Bedrock player as the empty head. Where the plugin draws the line itself (a hologram, the scoreboard, the tab list, a boss bar, a nametag), write the key as a tag instead and the head is put in the line: `<uxm_essentials_top_playtime_weekly_1_head>` for a place, `<uxm_essentials_head>` for the reader's own head. An offline-mode or Bedrock player is drawn in the skin they wear on this server, or when they are not here, in the skin the `skin` module stored for them or the one they last wore here. A Mojang account is drawn by its name as before, and a place nobody holds as the `leaderboard.empty-head`. The tags answer the boards on uxmLib's board module, not `balance`. PlaceholderAPI keeps the text keys, since a placeholder value cannot carry a head.
+
 The words come from the `board.*` lines of the messages files. The `economy_baltop_*`, `baltop_position`, `votes_top_*` and `votes_position_*` keys in [placeholders.md](placeholders.md) answer as well.
 
 ## REST add-on

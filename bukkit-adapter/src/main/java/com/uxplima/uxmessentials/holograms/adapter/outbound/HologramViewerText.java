@@ -18,9 +18,11 @@ import net.kyori.adventure.text.minimessage.tag.resolver.TagResolver;
 import com.uxplima.uxmessentials.holograms.domain.Hologram;
 import com.uxplima.uxmessentials.holograms.domain.HologramLine;
 import com.uxplima.uxmessentials.holograms.domain.HologramType;
+import com.uxplima.uxmessentials.shared.adapter.outbound.board.BoardHeads;
 import com.uxplima.uxmessentials.shared.adapter.outbound.hud.HudText;
 import com.uxplima.uxmessentials.shared.adapter.outbound.papi.PlaceholderApiSupport;
 import org.jspecify.annotations.NullMarked;
+import org.jspecify.annotations.Nullable;
 
 /**
  * A text hologram's words, as one viewer reads them: an {@code @key} line in their language, the {@code {player}},
@@ -30,6 +32,9 @@ import org.jspecify.annotations.NullMarked;
  * <p>Resolving reads the viewer's live state, so it runs on the viewer's own thread. A hologram that carries none of
  * that (no token, no catalogue line, one page) reads the same for everybody, and {@link #hasPerViewerText} says so:
  * it is resolved once rather than once per viewer.
+ *
+ * <p>A line with a board head tag ({@code <uxm_essentials_top_kills_weekly_1_head>}) is parsed every time it is
+ * read, since the player at a place changes with the board.
  */
 @NullMarked
 public final class HologramViewerText {
@@ -37,24 +42,27 @@ public final class HologramViewerText {
     private final Function<UUID, UnaryOperator<String>> bridgeFactory;
     private final ParsedText parsed;
     private final Supplier<TagResolver> globalTags;
+    private final BoardHeads heads;
     private final HologramPageState pageState;
 
     public HologramViewerText(
             Function<UUID, UnaryOperator<String>> bridgeFactory,
             MiniMessage miniMessage,
             Supplier<TagResolver> globalTags,
+            BoardHeads heads,
             HologramPageState pageState) {
         this.bridgeFactory = Objects.requireNonNull(bridgeFactory, "bridgeFactory");
         this.parsed = new ParsedText(Objects.requireNonNull(miniMessage, "miniMessage"));
         this.globalTags = Objects.requireNonNull(globalTags, "globalTags");
+        this.heads = Objects.requireNonNull(heads, "heads");
         this.pageState = Objects.requireNonNull(pageState, "pageState");
     }
 
     /**
      * Whether {@code hologram} reads differently from one viewer to the next: a {@link HologramType#TEXT} hologram
      * that has several pages, or a line with a {@code %...%} placeholder, a {@code {player}}, {@code {page}} or
-     * {@code {pages}} token, or an {@code @key} catalogue line. Item, block, head and entity holograms draw their
-     * model only, so a label line on one is never a per-viewer target.
+     * {@code {pages}} token, an {@code @key} catalogue line, or the reader's own head tag. Item, block, head and entity
+     * holograms draw their model only, so a label line on one is never a per-viewer target.
      */
     boolean hasPerViewerText(Hologram hologram) {
         Objects.requireNonNull(hologram, "hologram");
@@ -67,7 +75,8 @@ public final class HologramViewerText {
         for (HologramLine line : hologram.lines()) {
             if (PlaceholderApiSupport.hasPlaceholder(line.value())
                     || HologramTokens.hasToken(line.value())
-                    || HudText.isCatalogLine(line.value())) {
+                    || HudText.isCatalogLine(line.value())
+                    || BoardHeads.mentionsReader(line.value())) {
                 return true;
             }
         }
@@ -102,7 +111,7 @@ public final class HologramViewerText {
             String written = HudText.lineFor(uuid, line.value());
             String tokens = HologramTokens.resolve(written, viewer.getName(), page + 1, pages);
             String source = HologramAnimations.expand(bridge.apply(tokens), phase);
-            resolved.add(parsed.parse(source, tags));
+            resolved.add(parsed.parse(source, withHeads(source, tags, uuid, viewer.getName())));
         }
         return Component.join(JoinConfiguration.newlines(), resolved);
     }
@@ -119,8 +128,13 @@ public final class HologramViewerText {
         List<Component> resolved = new ArrayList<>(hologram.lines().size());
         for (HologramLine line : hologram.lines()) {
             String source = HologramAnimations.expand(globalBridge.apply(line.value()), phase);
-            resolved.add(parsed.parse(source, tags));
+            resolved.add(parsed.parse(source, withHeads(source, tags, null, null)));
         }
         return Component.join(JoinConfiguration.newlines(), resolved);
+    }
+
+    /** {@code tags}, with the board heads beside them when {@code source} holds one, which keeps it from the store. */
+    private TagResolver withHeads(String source, TagResolver tags, @Nullable UUID reader, @Nullable String readerName) {
+        return BoardHeads.mentions(source) ? TagResolver.resolver(heads.tags(reader, readerName), tags) : tags;
     }
 }

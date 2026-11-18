@@ -217,7 +217,7 @@ public final class ScoreboardRenderer {
 
     private ScoreboardFrame frame(Player player, DisplayContent content, ConditionContext context, long tick) {
         Component title = content.title()
-                .map(source -> component(expand(player, source, tick)))
+                .map(source -> component(player, expand(player, source, tick)))
                 .orElse(Component.empty());
         List<ScoreboardFrame.Line> lines = new ArrayList<>();
         for (SidebarLine candidate : content.lineDefinitions()) {
@@ -229,7 +229,7 @@ public final class ScoreboardRenderer {
                 continue;
             }
             lines.add(new ScoreboardFrame.Line(
-                    candidate.id(), component(expanded), numberFormat(player, candidate.numberFormat(), tick)));
+                    candidate.id(), component(player, expanded), numberFormat(player, candidate.numberFormat(), tick)));
             if (lines.size() == MAX_VISIBLE_LINES) {
                 break;
             }
@@ -243,8 +243,8 @@ public final class ScoreboardRenderer {
         return PlaceholderApiSupport.markupBridge(player.getUniqueId()).apply(builtins);
     }
 
-    private static Component component(String expanded) {
-        return HudText.parse(expanded);
+    private static Component component(Player player, String expanded) {
+        return HudText.parse(player.getUniqueId(), expanded);
     }
 
     private ScoreboardNumberFormat numberFormat(Player player, SidebarNumberFormat format, long tick) {
@@ -252,7 +252,7 @@ public final class ScoreboardRenderer {
             case SidebarNumberFormat.Default ignored -> ScoreboardNumberFormat.defaultFormat();
             case SidebarNumberFormat.Blank ignored -> ScoreboardNumberFormat.blank();
             case SidebarNumberFormat.Fixed fixed ->
-                ScoreboardNumberFormat.fixed(component(expand(player, fixed.source(), tick)));
+                ScoreboardNumberFormat.fixed(component(player, expand(player, fixed.source(), tick)));
         };
     }
 

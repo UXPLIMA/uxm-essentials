@@ -151,7 +151,7 @@ public final class BossBarRenderer {
         String left = shown.clock()
                 .map(window -> remaining.apply(player.getUniqueId(), window.remaining(now)))
                 .orElse("");
-        bar.name(HudText.parse(expand(player, shown.bar().text(), tick, left)));
+        bar.name(HudText.parse(player.getUniqueId(), expand(player, shown.bar().text(), tick, left)));
         bar.color(color(expand(player, shown.bar().color(), tick, left)));
         bar.overlay(overlay(expand(player, shown.bar().style(), tick, left)));
         String progress = shown.bar().progress().strip();

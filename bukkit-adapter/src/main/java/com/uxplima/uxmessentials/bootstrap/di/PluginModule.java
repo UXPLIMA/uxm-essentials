@@ -1545,6 +1545,8 @@ public final class PluginModule {
             Persistence persistence,
             CloseableResources resources,
             ContextLinks links) {
+        // A HUD line draws the board head tags as soon as the boards below answer them.
+        com.uxplima.uxmessentials.shared.adapter.outbound.hud.HudText.useBoardHeads(links.boards.heads());
         com.uxplima.uxmlib.board.BoardSettings settings =
                 com.uxplima.uxmessentials.shared.adapter.outbound.board.BoardConfig.read(config);
         var messages = kernel.messages();
@@ -1575,11 +1577,25 @@ public final class PluginModule {
         var boards = built.get();
         resources.addListener(boards.presence());
         boards.presence().loadOnline(plugin.getServer().getOnlinePlayers(), kernel.scheduler()::async);
+        // An offline-mode or Bedrock player's head is drawn from their skin, which a line drawn on a server thread
+        // reads from memory: a player here is held as they join, a holder elsewhere is read from the skin store
+        // after each refresh, on the same async lane.
+        var skins = links.boards.skins();
+        resources.addListener(new com.uxplima.uxmessentials.shared.adapter.outbound.board.BoardSkinListener(skins));
+        for (org.bukkit.entity.Player online : plugin.getServer().getOnlinePlayers()) {
+            kernel.scheduler()
+                    .onEntity(
+                            com.uxplima.uxmessentials.shared.adapter.outbound.BukkitRefs.toRef(online),
+                            () -> skins.arrived(online.getUniqueId(), HeadTextures.worn(online.getPlayerProfile())));
+        }
         com.uxplima.uxmlib.scheduler.TaskHandle refresh = new PaperScheduler(plugin)
-                .asyncTimer(
-                        java.time.Duration.ZERO,
-                        settings.refresh(),
-                        task -> boards.leaderboard().refresh());
+                .asyncTimer(java.time.Duration.ZERO, settings.refresh(), task -> {
+                    boards.leaderboard().refresh();
+                    skins.warm(
+                            com.uxplima.uxmessentials.shared.adapter.outbound.board.BoardSkins.shownOn(
+                                    boards.leaderboard(), settings.size()),
+                            account -> links.storedSkins.of(account));
+                });
         resources.onClose(refresh::cancel);
         resources.onClose(links.boards::close);
         links.placeholders.boardAnswers(boards.answers());
@@ -1869,7 +1885,8 @@ public final class PluginModule {
                 plugin.getServer(),
                 Objects.requireNonNullElse(resources.bedrock(), BedrockDetector.NONE),
                 plugin.getDataFolder().toPath(),
-                bus);
+                bus,
+                links.boards.skins()::wears);
         wired.commands().forEach(resources::addCommand);
         wired.listeners().forEach(resources::addListener);
         resources.onClose(wired.stop());
@@ -3683,7 +3700,8 @@ public final class PluginModule {
                 textInput,
                 menus,
                 menuBindings,
-                Objects.requireNonNullElse(resources.bedrock(), BedrockDetector.NONE));
+                Objects.requireNonNullElse(resources.bedrock(), BedrockDetector.NONE),
+                links.boards.heads());
         wired.commands().forEach(resources::addCommand);
         resources.worldPhase().run("hologram spawn", wired::spawnStored);
         // A viewer keeps the words they were drawn until the hologram changes, so the catalogue and the theme a

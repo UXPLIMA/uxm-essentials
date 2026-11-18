@@ -55,6 +55,8 @@ public final class EssentialsBoards {
     private final Map<String, HeldSnapshot> held = new LinkedHashMap<>();
     private final Map<String, Seed> seeds = new LinkedHashMap<>();
     private final AtomicReference<BoardRecorder> recorder = new AtomicReference<>();
+    private final BoardSkins skins = new BoardSkins();
+    private final BoardHeads heads = new BoardHeads();
 
     /** Add a counter or a record, or a snapshot board that reads its own source, its score shown as a number. */
     public void define(Board board) {
@@ -115,6 +117,16 @@ public final class EssentialsBoards {
         return Map.copyOf(shows);
     }
 
+    /** The skins the heads of offline-mode and Bedrock players are drawn from, filled as they join and refresh. */
+    public BoardSkins skins() {
+        return skins;
+    }
+
+    /** The heads as tags for a line drawn as a component; left as written until {@link #build} stands the boards. */
+    public BoardHeads heads() {
+        return heads;
+    }
+
     /** The words of the boards defined so far. */
     public List<String> words() {
         return new ArrayList<>(boards.keySet());
@@ -154,7 +166,8 @@ public final class EssentialsBoards {
         Standings standings = new Standings(store, leaderboard);
         recorder.set(new BoardRecorder(store, leaderboard, standings, async, clock));
         BoardAnswers answers = new BoardAnswers(
-                leaderboard, standings, text, () -> settings.get().emptyHead());
+                leaderboard, standings, text, () -> settings.get().emptyHead(), player -> Optional.empty(), skins::of);
+        heads.answerFrom(answers);
         return Optional.of(new Built(leaderboard, answers, new BoardPresence(standings, store), standings));
     }
 
