@@ -18,6 +18,8 @@ import net.kyori.adventure.text.format.NamedTextColor;
 import net.kyori.adventure.text.minimessage.MiniMessage;
 import net.kyori.adventure.text.serializer.plain.PlainTextComponentSerializer;
 
+import com.uxplima.uxmessentials.shared.application.port.Logger;
+import com.uxplima.uxmlib.hook.placeholder.PlaceholderRegistry;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -25,15 +27,15 @@ import org.mockbukkit.mockbukkit.MockBukkit;
 import org.mockbukkit.mockbukkit.ServerMock;
 
 /**
- * A value our expansion answers goes into one of our own lines as the words it holds, and to everybody else as it is.
- * PlaceholderAPI is stood in for by a filler that hands each {@code %uxm_essentials_<key>%} to the expansion, the way
- * PlaceholderAPI calls it.
+ * A value we answer goes into one of our own lines as the words it holds, and to everybody else as it is.
+ * PlaceholderAPI and the shared {@code uxm} expansion are stood in for by a filler that hands the key of each
+ * {@code %uxm_essentials_<key>%} to the registry we join with, the way the shared expansion asks it.
  */
 class OurValuesInOurLinesTest {
 
     private static final String CLICK = "<click:run_command:'/op Mallory'>Excalibur</click>";
     private static final String CHAT_FORMAT = "<gray>%uxm_essentials_rank%</gray> holds %uxm_essentials_hand_name%";
-    private static final Pattern OURS = Pattern.compile("%uxm_(essentials_[a-z0-9_]+)%");
+    private static final Pattern OURS = Pattern.compile("%uxm_essentials_([a-z0-9_]+)%");
 
     private ServerMock server;
     private Player mallory;
@@ -92,47 +94,71 @@ class OurValuesInOurLinesTest {
         assertThat(PlaceholderApiSupport.valueBridge(mallory.getUniqueId(), papi)
                         .apply("%uxm_essentials_hand_name%"))
                 .isEqualTo(CLICK);
-        assertThat(expansion(EverySeam.answering(CLICK)).onRequest(mallory, "essentials_hand_name"))
+        assertThat(registry(EverySeam.answering(CLICK)).resolve(mallory, "hand_name"))
                 .isEqualTo(CLICK);
     }
 
     @Test
+    void aKeyWeDoNotHaveIsLeftAsWritten() {
+        BiFunction<OfflinePlayer, String, String> papi = filler(EverySeam.answering(CLICK));
+
+        assertThat(registry(EverySeam.answering(CLICK)).resolve(mallory, "no_such_key_here"))
+                .isNull();
+        assertThat(PlaceholderApiSupport.valueBridge(mallory.getUniqueId(), papi)
+                        .apply("%uxm_essentials_no_such_key_here%"))
+                .isEqualTo("%uxm_essentials_no_such_key_here%");
+    }
+
+    @Test
     void aPassThatFailedLeavesTheNextReadAsItIs() {
-        UxmEssentialsExpansion expansion = expansion(EverySeam.answering(CLICK));
+        PlaceholderRegistry registry = registry(EverySeam.answering(CLICK));
 
         assertThatThrownBy(() -> MarkupPass.during(() -> {
                     throw new IllegalStateException("a placeholder broke the line");
                 }))
                 .isInstanceOf(IllegalStateException.class);
 
-        assertThat(expansion.onRequest(mallory, "essentials_hand_name")).isEqualTo(CLICK);
+        assertThat(registry.resolve(mallory, "hand_name")).isEqualTo(CLICK);
     }
 
     @Test
     void aPassInsideAPassLeavesTheOuterOneStanding() {
-        UxmEssentialsExpansion expansion = expansion(EverySeam.answering(CLICK));
+        PlaceholderRegistry registry = registry(EverySeam.answering(CLICK));
 
         String afterInner = MarkupPass.during(() -> {
-            MarkupPass.during(() -> expansion.onRequest(mallory, "essentials_hand_name"));
-            return expansion.onRequest(mallory, "essentials_hand_name");
+            MarkupPass.during(() -> registry.resolve(mallory, "hand_name"));
+            return registry.resolve(mallory, "hand_name");
         });
 
         assertThat(afterInner).startsWith("\\<click");
-        assertThat(expansion.onRequest(mallory, "essentials_hand_name")).isEqualTo(CLICK);
+        assertThat(registry.resolve(mallory, "hand_name")).isEqualTo(CLICK);
     }
 
-    private static UxmEssentialsExpansion expansion(PlaceholderContexts contexts) {
-        return new UxmEssentialsExpansion(new PlaceholderResolver(contexts), "test", PlaceholderRoute.current());
+    @Test
+    void theOlderFormAnswersTheSameWords() {
+        UxmEssentialsExpansion older = new UxmEssentialsExpansion(
+                new EssentialsAnswers(new PlaceholderResolver(EverySeam.answering(CLICK))),
+                "test",
+                PlaceholderRoute.legacy(new SilentLog()));
+
+        assertThat(older.onRequest(mallory, "hand_name")).isEqualTo(CLICK);
+        assertThat(MarkupPass.during(() -> older.onRequest(mallory, "hand_name")))
+                .startsWith("\\<click");
     }
 
-    /** PlaceholderAPI as far as our expansion is concerned: each of our placeholders handed to it, in one pass. */
+    /** The registry we join the shared {@code uxm} expansion with. */
+    private static PlaceholderRegistry registry(PlaceholderContexts contexts) {
+        return new EssentialsAnswers(new PlaceholderResolver(contexts)).registry();
+    }
+
+    /** PlaceholderAPI and the shared expansion as far as we are concerned: each key of ours handed over, in one pass. */
     private static BiFunction<OfflinePlayer, String, String> filler(PlaceholderContexts contexts) {
-        UxmEssentialsExpansion expansion = expansion(contexts);
+        PlaceholderRegistry registry = registry(contexts);
         return (player, text) -> {
             Matcher matcher = OURS.matcher(text);
             StringBuilder out = new StringBuilder();
             while (matcher.find()) {
-                String value = expansion.onRequest(player, matcher.group(1));
+                String value = registry.resolve(player, matcher.group(1));
                 matcher.appendReplacement(out, Matcher.quoteReplacement(value == null ? matcher.group() : value));
             }
             matcher.appendTail(out);
@@ -144,5 +170,21 @@ class OurValuesInOurLinesTest {
         List<Component> parts = new ArrayList<>();
         line.iterator(ComponentIteratorType.DEPTH_FIRST).forEachRemaining(parts::add);
         return parts;
+    }
+
+    /** A log nobody reads. */
+    private static final class SilentLog implements Logger {
+
+        @Override
+        public void info(String message, Object... args) {}
+
+        @Override
+        public void warn(String message, Object... args) {}
+
+        @Override
+        public void error(String message, Throwable cause) {}
+
+        @Override
+        public void debug(String message, Object... args) {}
     }
 }

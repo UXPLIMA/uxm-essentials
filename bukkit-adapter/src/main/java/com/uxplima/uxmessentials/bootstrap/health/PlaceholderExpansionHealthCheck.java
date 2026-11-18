@@ -28,12 +28,13 @@ public final class PlaceholderExpansionHealthCheck implements HealthCheck {
     private final BooleanSupplier placeholderApiPresent;
 
     /**
-     * Every state is asked when the doctor runs: the expansion is registered on {@code ServerLoadEvent}, after this
-     * check is built, because this plugin enables before PlaceholderAPI does, and another plugin can take an
+     * Every state is asked when the doctor runs: the placeholders are published on {@code ServerLoadEvent}, after
+     * this check is built, because this plugin enables before PlaceholderAPI does, and another plugin can take an
      * identifier from it at any time after.
      *
      * @param published whether any expansion of ours answers right now
-     * @param currentForm whether the {@code %uxm_essentials_<key>%} form answers, rather than only the older one
+     * @param currentForm whether the {@code %uxm_essentials_<key>%} form answers through the shared {@code uxm}
+     *     expansion, rather than only the older one
      * @param groupsEnabled whether at least one placeholder group is enabled, so there was something to publish
      * @param placeholderApiPresent whether PlaceholderAPI is on the server
      */
@@ -57,8 +58,10 @@ public final class PlaceholderExpansionHealthCheck implements HealthCheck {
     public HealthResult check() {
         if (published.getAsBoolean()) {
             if (!currentForm.getAsBoolean()) {
-                return HealthResult.warn("only the older %uxmessentials_<key>% form answers: another plugin holds the"
-                        + " uxm identifier, so %uxm_essentials_<key>% reads as written; the log names the holder");
+                return HealthResult.warn("only the older %uxmessentials_<key>% form answers: the uxm identifier is"
+                        + " held by an expansion that is not the one UXM plugins share, or another plugin holds the"
+                        + " essentials prefix in it, so %uxm_essentials_<key>% reads as written; the log names which"
+                        + " (papi_expansion_not_joined)");
             }
             return HealthResult.ok("published");
         }
@@ -70,8 +73,9 @@ public final class PlaceholderExpansionHealthCheck implements HealthCheck {
             return HealthResult.warn("PlaceholderAPI is here and no placeholder group is enabled, so nothing was"
                     + " published and every placeholder of ours reads as empty");
         }
-        return HealthResult.warn("our placeholders are not held: another plugin took the uxm and uxmessentials"
-                + " identifiers, at start or since, so every placeholder of ours reads as written; the log names the"
-                + " holder (papi_expansion_identifier_taken or papi_expansion_evicted)");
+        return HealthResult.warn("our placeholders are not held: we could not join the shared uxm expansion and"
+                + " another plugin took the uxmessentials identifier, at start or since, so every placeholder of ours"
+                + " reads as written; the log names the holder (papi_expansion_not_joined,"
+                + " papi_expansion_identifier_taken or papi_expansion_evicted)");
     }
 }

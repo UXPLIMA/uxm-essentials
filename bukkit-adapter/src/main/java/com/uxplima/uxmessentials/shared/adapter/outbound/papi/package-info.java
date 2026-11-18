@@ -13,8 +13,9 @@
  * <p>PlaceholderAPI types are kept entirely out of {@code :core}: the read seams carry only {@code
  * shared.domain} value objects, and the resolver logic lives behind {@link
  * com.uxplima.uxmessentials.shared.adapter.outbound.papi.PlaceholderResolver}, which has no compile-time
- * dependency on PlaceholderAPI at all. The {@code UxmEssentialsExpansion} shell is the only class that
- * extends {@code PlaceholderExpansion}.
+ * dependency on PlaceholderAPI at all. {@code %uxm_essentials_<key>%} is answered through the {@code uxm}
+ * expansion every UXM plugin shares, which uxmLib registers; the older {@code UxmEssentialsExpansion} shell, for
+ * {@code %uxmessentials_<key>%}, is the only class here that extends {@code PlaceholderExpansion}.
  */
 @NullMarked
 package com.uxplima.uxmessentials.shared.adapter.outbound.papi;
