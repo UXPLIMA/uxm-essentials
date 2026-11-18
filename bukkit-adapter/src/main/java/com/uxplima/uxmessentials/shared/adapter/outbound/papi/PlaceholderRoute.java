@@ -10,16 +10,13 @@ import java.util.concurrent.atomic.AtomicBoolean;
 import com.uxplima.uxmessentials.shared.application.placeholder.PlaceholderSpec;
 import com.uxplima.uxmessentials.shared.application.port.Logger;
 import org.jspecify.annotations.NullMarked;
-import org.jspecify.annotations.Nullable;
 
 /**
- * Which placeholders one registered expansion answers, and under which PlaceholderAPI identifier.
- *
- * <p>PlaceholderAPI finds an expansion by the text up to the first underscore, so {@code %uxm_essentials_balance%}
- * reaches the identifier {@code uxm} with {@code essentials_balance} as its parameters, and an identifier that itself
- * holds an underscore is never asked at all. The current route therefore registers the part of
- * {@link PlaceholderSpec#PREFIX} before its first underscore and answers only the parameters that start with the rest;
- * anything else under {@code uxm} gets no answer, which PlaceholderAPI leaves in the text as written.
+ * Where our placeholders are answered. PlaceholderAPI finds an expansion by the text up to the first underscore, so
+ * {@code %uxm_essentials_balance%} reaches the identifier {@code uxm} with {@code essentials_balance} as its
+ * parameters. Every UXM plugin shares that one {@code uxm} expansion, which uxmLib registers, and each joins it with a
+ * prefix of its own: ours is {@link #sharedPrefix()}, the part of {@link PlaceholderSpec#PREFIX} between its
+ * underscores.
  *
  * <p>The legacy route keeps {@code %uxmessentials_<key>%} answering, because those placeholders sit in other plugins'
  * files too (a tab list, a scoreboard, a hologram plugin) where nothing of ours can rewrite them. It names each key in
@@ -35,52 +32,44 @@ final class PlaceholderRoute {
     /** How many distinct old keys are named in the log before one line says there are more. */
     static final int WARNED_KEYS = 256;
 
-    private final String identifier;
-    private final String namespace;
-    private final @Nullable Logger log;
+    private final Logger log;
     private final Set<String> warned = ConcurrentHashMap.newKeySet();
     private final AtomicBoolean overflowed = new AtomicBoolean();
 
-    private PlaceholderRoute(String identifier, String namespace, @Nullable Logger log) {
-        this.identifier = identifier;
-        this.namespace = namespace;
+    private PlaceholderRoute(Logger log) {
         this.log = log;
     }
 
-    /** The route for {@code %uxm_essentials_<key>%} and {@code %rel_uxm_essentials_<key>%}. */
-    static PlaceholderRoute current() {
+    /** The prefix we join the shared {@code uxm} expansion with, for {@code %uxm_essentials_<key>%}. */
+    static String sharedPrefix() {
         String prefix = PlaceholderSpec.PREFIX;
-        int split = prefix.indexOf('_');
-        return new PlaceholderRoute(prefix.substring(0, split), prefix.substring(split + 1), null);
+        return prefix.substring(prefix.indexOf('_') + 1, prefix.length() - 1);
     }
 
     /** The route for {@code %uxmessentials_<key>%}, which names each key it is asked for through {@code log}. */
     static PlaceholderRoute legacy(Logger log) {
-        return new PlaceholderRoute(LEGACY_IDENTIFIER, "", Objects.requireNonNull(log, "log"));
+        return new PlaceholderRoute(Objects.requireNonNull(log, "log"));
     }
 
     /** The PlaceholderAPI identifier the expansion registers under. */
     String identifier() {
-        return identifier;
+        return LEGACY_IDENTIFIER;
     }
 
     /**
-     * The key PlaceholderAPI's {@code params} ask this route for, or empty when the parameters are not one of ours.
-     * Asking the legacy route counts as reading the old form even when no player is attached to the request.
+     * The key PlaceholderAPI's {@code params} ask this route for, or empty when there is none. Asking counts as reading
+     * the old form even when no player is attached to the request.
      */
     Optional<String> key(String params) {
         Objects.requireNonNull(params, "params");
-        if (!params.toLowerCase(Locale.ROOT).startsWith(namespace) || params.length() == namespace.length()) {
+        if (params.isEmpty()) {
             return Optional.empty();
         }
-        String key = params.substring(namespace.length());
-        if (log != null) {
-            warnOnce(log, key);
-        }
-        return Optional.of(key);
+        warnOnce(params);
+        return Optional.of(params);
     }
 
-    private void warnOnce(Logger log, String key) {
+    private void warnOnce(String key) {
         String folded = key.toLowerCase(Locale.ROOT);
         if (warned.contains(folded)) {
             return;

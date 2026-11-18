@@ -3,6 +3,15 @@
 What an operator edits when a release renames something an operator's own files or permission grants depend on, or
 needs a setting it did not need before.
 
+## Other UXM plugins answer `%uxm_...%` beside ours
+
+`%uxm_essentials_<key>%` is now answered through one `uxm` PlaceholderAPI expansion that every UXM plugin shares,
+each under its own prefix, rather than an expansion of our own that another UXM plugin would replace. Nothing to edit:
+every placeholder keeps its name and its value. The log line at start reads `event=papi_expansion_joined` in place of
+`event=papi_expansion_registered identifier=uxm`, and `/papi info uxm` names whichever UXM plugin registered the
+expansion. [upgrading-renames.md](upgrading-renames.md#the-old-placeholders-keep-answering-for-now) says what the
+log shows when `uxm` cannot be shared.
+
 ## Menus show what players type as words, and ask for a warp password as a secret
 
 What a player types into a menu shows as the words typed, in every line and action of an operator's menu. That

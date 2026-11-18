@@ -43,10 +43,15 @@ any file for you: most of these placeholders live in other plugins' files, which
 of your own files would race with an editor or a reload. A later release removes the old form, so search every plugin
 folder for `uxmessentials_` before then.
 
-PlaceholderAPI finds an expansion by the text before the first underscore, so the new form registers the identifier
-`uxm`, and PlaceholderAPI keeps one expansion per identifier. If another plugin already holds `uxm`, the log shows
-`event=papi_expansion_identifier_taken`, `/uxmess doctor` warns on its placeholders line, and only the old form
-answers. If another plugin takes `uxm` later, the log shows `event=papi_expansion_evicted`. Tell us which plugin it is.
+PlaceholderAPI finds an expansion by the text before the first underscore, so the new form is answered under the
+identifier `uxm`, and PlaceholderAPI keeps one expansion per identifier. Every UXM plugin shares that one `uxm`
+expansion, each under a prefix of its own, so `%uxm_essentials_...%` answers beside another UXM plugin's
+`%uxm_<plugin>_...%`. The expansion stays when the plugin that registered it is turned off, as long as another UXM
+plugin is still on. If `uxm` is held by a plugin that does not share it, or another plugin holds the `essentials`
+prefix, the log says which and then shows `event=papi_expansion_not_joined`, `/uxmess doctor` warns on its
+placeholders line, and only the old form answers. If another plugin takes `uxmessentials`, the log shows
+`event=papi_expansion_identifier_taken` or, when it happens later, `event=papi_expansion_evicted`. Tell us which
+plugin it is.
 
 ## Node names
 

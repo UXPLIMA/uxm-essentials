@@ -30,15 +30,16 @@ import org.jspecify.annotations.Nullable;
 
 /**
  * The placeholder resolution logic, behind a thin seam so it is testable without a live PlaceholderAPI.
- * The {@code UxmEssentialsExpansion} shell strips the {@code uxm_essentials_} prefix, builds a {@link
- * PlayerRef} from the requesting {@code OfflinePlayer}, and asks this resolver for the value; the resolver
- * never touches a PlaceholderAPI type.
+ * The shared {@code uxm} expansion hands {@link EssentialsAnswers} what follows {@code uxm_essentials_}, and the
+ * older {@code UxmEssentialsExpansion} what follows {@code uxmessentials_}; either builds a {@link PlayerRef} from
+ * the requesting {@code OfflinePlayer} and asks this resolver for the value. The resolver never touches a
+ * PlaceholderAPI type.
  *
  * <p>Each key is dispatched to the owning context's read seam ({@link PlaceholderContexts}). When that
  * context is disabled, its seam absent, or the player is offline for a session-only placeholder, the
  * value degrades to a sensible empty/"-" default ({@link #EMPTY}) rather than failing. An entirely unknown
- * key returns {@link Optional#empty()}, which the shell maps to {@code null} so PlaceholderAPI shows the
- * raw token unchanged.
+ * key returns {@link Optional#empty()}, which {@link EssentialsAnswers} maps to {@code null} so PlaceholderAPI
+ * shows the raw token unchanged.
  */
 @NullMarked
 public final class PlaceholderResolver {

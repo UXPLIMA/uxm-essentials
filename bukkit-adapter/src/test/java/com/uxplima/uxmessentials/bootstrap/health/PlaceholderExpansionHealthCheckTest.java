@@ -18,12 +18,12 @@ class PlaceholderExpansionHealthCheckTest {
     }
 
     @Test
-    void onlyTheOlderFormAnsweringWarnsThatUxmIsTaken() {
+    void onlyTheOlderFormAnsweringWarnsThatWeAreNotInTheSharedExpansion() {
         HealthResult result =
                 new PlaceholderExpansionHealthCheck(() -> true, () -> false, () -> true, () -> true).check();
 
         assertThat(result.status()).isEqualTo(HealthStatus.WARN);
-        assertThat(result.message()).contains("%uxmessentials_<key>%", "uxm identifier");
+        assertThat(result.message()).contains("%uxmessentials_<key>%", "uxm identifier", "papi_expansion_not_joined");
     }
 
     @Test

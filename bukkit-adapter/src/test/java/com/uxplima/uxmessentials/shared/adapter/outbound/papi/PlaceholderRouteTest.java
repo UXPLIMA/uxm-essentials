@@ -9,6 +9,7 @@ import java.util.Optional;
 import com.uxplima.uxmessentials.shared.application.placeholder.PlaceholderScope;
 import com.uxplima.uxmessentials.shared.application.placeholder.PlaceholderSpec;
 import com.uxplima.uxmessentials.shared.application.port.Logger;
+import com.uxplima.uxmlib.hook.placeholder.SharedPlaceholders;
 import org.junit.jupiter.api.Test;
 
 /**
@@ -25,23 +26,13 @@ class PlaceholderRouteTest {
     }
 
     @Test
-    void theCurrentFormReachesItsKeyThroughTheIdentifierPlaceholderApiLooksUp() {
-        PlaceholderRoute route = PlaceholderRoute.current();
+    void theCurrentFormReachesUsThroughTheSharedUxmExpansionUnderOurPrefix() {
         String[] plain = asPlaceholderApiSplitsIt("uxm_essentials_homes_count");
         String[] relational = asPlaceholderApiSplitsIt("uxm_essentials_can_see");
 
-        assertThat(route.identifier()).isEqualTo(plain[0]).isEqualTo(relational[0]);
-        assertThat(route.key(plain[1])).contains("homes_count");
-        assertThat(route.key(relational[1])).contains("can_see");
-    }
-
-    @Test
-    void aUxmPlaceholderThatIsNotOursGetsNoAnswer() {
-        PlaceholderRoute route = PlaceholderRoute.current();
-
-        assertThat(route.key("chat_nick")).isEmpty();
-        assertThat(route.key("essentials_")).isEmpty();
-        assertThat(route.key("essentialsx_balance")).isEmpty();
+        assertThat(plain[0]).isEqualTo(relational[0]).isEqualTo(SharedPlaceholders.IDENTIFIER);
+        assertThat(asPlaceholderApiSplitsIt(plain[1])).containsExactly(PlaceholderRoute.sharedPrefix(), "homes_count");
+        assertThat(asPlaceholderApiSplitsIt(relational[1])).containsExactly(PlaceholderRoute.sharedPrefix(), "can_see");
     }
 
     @Test
@@ -74,9 +65,8 @@ class PlaceholderRouteTest {
     }
 
     @Test
-    void theCurrentFormNeverWarns() {
-        PlaceholderRoute.current().key("essentials_balance");
-
+    void anEmptyOlderPlaceholderAsksForNothingAndWarnsNothing() {
+        assertThat(PlaceholderRoute.legacy(log).key("")).isEmpty();
         assertThat(log.warnings).isEmpty();
     }
 
@@ -91,7 +81,10 @@ class PlaceholderRouteTest {
         assertThat(between.placeholder()).isEqualTo("%rel_uxm_essentials_can_see%");
     }
 
-    /** The identifier and parameters PlaceholderAPI reads out of a placeholder's body: it splits at the first underscore. */
+    /**
+     * The identifier and parameters PlaceholderAPI reads out of a placeholder's body, and the prefix and key the shared
+     * expansion reads out of those parameters: each splits at the first underscore.
+     */
     private static String[] asPlaceholderApiSplitsIt(String body) {
         int split = body.indexOf('_');
         return new String[] {body.substring(0, split), body.substring(split + 1)};
