@@ -161,12 +161,14 @@ public final class HologramsWiring {
             TextInput textInput,
             Menus menus,
             MenuBindings menuBindings,
-            BedrockDetector bedrock) {
+            BedrockDetector bedrock,
+            com.uxplima.uxmessentials.shared.adapter.outbound.board.BoardHeads boardHeads) {
         Objects.requireNonNull(plugin, "plugin");
         Objects.requireNonNull(ctx, "ctx");
         Objects.requireNonNull(persistence, "persistence");
         Objects.requireNonNull(bus, "bus");
         Objects.requireNonNull(leaderboards, "leaderboards");
+        Objects.requireNonNull(boardHeads, "boardHeads");
         Objects.requireNonNull(economy, "economy");
         Objects.requireNonNull(guiText, "guiText");
         Objects.requireNonNull(guiLayouts, "guiLayouts");
@@ -199,7 +201,11 @@ public final class HologramsWiring {
         Function<UUID, UnaryOperator<String>> perViewerBridge =
                 viewer -> symbols.wrap(PlaceholderApiSupport.markupBridge(viewer));
         HologramViewerText viewerText = new HologramViewerText(
-                perViewerBridge, MiniMessage.miniMessage(), MiniPlaceholdersSupport::globalResolver, pageState);
+                perViewerBridge,
+                MiniMessage.miniMessage(),
+                MiniPlaceholdersSupport::globalResolver,
+                boardHeads,
+                pageState);
         HologramViewers viewers =
                 new HologramViewers(kernel.permissions(), repository::manualViewers, repository::blacklisted);
         // The NPC-link seam: a locator over the npc context's stored set kept current by the domain-event bus,

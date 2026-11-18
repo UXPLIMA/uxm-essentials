@@ -10,6 +10,7 @@ import java.util.function.Function;
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.minimessage.MiniMessage;
 
+import com.uxplima.uxmessentials.shared.adapter.outbound.board.BoardHeads;
 import com.uxplima.uxmessentials.shared.adapter.outbound.papi.PlaceholderApiSupport;
 import com.uxplima.uxmessentials.shared.adapter.outbound.style.StyleTags;
 import com.uxplima.uxmessentials.shared.adapter.outbound.style.StyledText;
@@ -30,6 +31,9 @@ import org.jspecify.annotations.Nullable;
  * ({@link CatalogLines}). The entry stands in for the line before anything else runs, so a surface with tokens of
  * its own calls {@link #lineFor} first and the entry's {@code {player}} or {@code %papi%} is read as if the operator
  * had written it on the line.
+ *
+ * <p>A board head tag ({@code <uxm_essentials_top_kills_weekly_1_head>}) puts the head itself in the line. Such a line
+ * is parsed every time, since the player at a place changes with the board.
  */
 @NullMarked
 public final class HudText {
@@ -45,6 +49,9 @@ public final class HudText {
 
     private static volatile Parsed parsed = new Parsed(StyleTags.theme(), new ConcurrentHashMap<>());
 
+    /** The board heads: none answer until the boards are wired. */
+    private static volatile BoardHeads heads = new BoardHeads();
+
     private HudText() {}
 
     /** Ask {@code resolver} for a viewer's language from now on. */
@@ -56,6 +63,11 @@ public final class HudText {
     public static Locale languageOf(UUID viewer) {
         Objects.requireNonNull(viewer, "viewer");
         return languages.apply(viewer);
+    }
+
+    /** Draw the board head tags from {@code boardHeads} from now on. */
+    public static void useBoardHeads(BoardHeads boardHeads) {
+        heads = Objects.requireNonNull(boardHeads, "boardHeads");
     }
 
     /** Read {@code @key} lines from {@code lines} from now on. */
@@ -88,7 +100,17 @@ public final class HudText {
         Objects.requireNonNull(viewer, "viewer");
         Objects.requireNonNull(miniMessageSource, "miniMessageSource");
         String expanded = PlaceholderApiSupport.markupBridge(viewer).apply(lineFor(viewer, miniMessageSource));
-        return parse(expanded);
+        return parse(viewer, expanded);
+    }
+
+    /** {@link #parse(String)} as {@code viewer} reads it, so the reader's own head tag draws their head. */
+    public static Component parse(UUID viewer, String miniMessageSource) {
+        Objects.requireNonNull(viewer, "viewer");
+        Objects.requireNonNull(miniMessageSource, "miniMessageSource");
+        if (BoardHeads.mentions(miniMessageSource)) {
+            return StyledText.render(miniMessageSource, heads.tags(viewer, null));
+        }
+        return parse(miniMessageSource);
     }
 
     /**
@@ -98,6 +120,9 @@ public final class HudText {
      */
     public static Component parse(String miniMessageSource) {
         Objects.requireNonNull(miniMessageSource, "miniMessageSource");
+        if (BoardHeads.mentions(miniMessageSource)) {
+            return StyledText.render(miniMessageSource, heads.tags(null, null));
+        }
         Theme theme = StyleTags.theme();
         Parsed held = parsed;
         if (held.theme() != theme) {

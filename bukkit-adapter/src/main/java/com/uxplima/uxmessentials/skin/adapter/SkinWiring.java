@@ -4,7 +4,9 @@ import java.nio.file.Path;
 import java.time.Clock;
 import java.util.List;
 import java.util.Objects;
+import java.util.UUID;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.function.BiConsumer;
 import java.util.function.Consumer;
 
 import org.bukkit.Server;
@@ -21,6 +23,7 @@ import com.uxplima.uxmessentials.shared.adapter.outbound.skin.MineSkinService;
 import com.uxplima.uxmessentials.shared.application.module.KernelPorts;
 import com.uxplima.uxmessentials.shared.application.module.ModuleContext;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
+import com.uxplima.uxmessentials.shared.domain.SkinTexture;
 import com.uxplima.uxmessentials.skin.adapter.inbound.command.SkinCommand;
 import com.uxplima.uxmessentials.skin.adapter.inbound.listener.SkinLoginListener;
 import com.uxplima.uxmessentials.skin.adapter.outbound.FloodgateLinks;
@@ -65,20 +68,26 @@ public final class SkinWiring {
 
     private SkinWiring() {}
 
-    /** Build the skin adapters and use cases from {@code ctx}, {@code persistence} and the resolved detector. */
+    /**
+     * Build the skin adapters and use cases from {@code ctx}, {@code persistence} and the resolved detector.
+     *
+     * @param worn told of every skin put on a player already in the world, as it is put on
+     */
     public static Wired wire(
             ModuleContext ctx,
             Persistence persistence,
             Server server,
             BedrockDetector bedrock,
             Path dataFolder,
-            Bus bus) {
+            Bus bus,
+            BiConsumer<UUID, SkinTexture> worn) {
         Objects.requireNonNull(ctx, "ctx");
         Objects.requireNonNull(persistence, "persistence");
         Objects.requireNonNull(server, "server");
         Objects.requireNonNull(bedrock, "bedrock");
         Objects.requireNonNull(dataFolder, "dataFolder");
         Objects.requireNonNull(bus, "bus");
+        Objects.requireNonNull(worn, "worn");
         SkinConfig config = SkinConfig.from(ctx.config());
         KernelPorts kernel = ctx.kernel();
         Clock clock = Clock.systemUTC();
@@ -87,7 +96,12 @@ public final class SkinWiring {
         // dresses them again; the cache under it is what that peer listener invalidates.
         CachedSkinRepository cache = SkinRepositories.cached(persistence);
         SkinRepository repository = SkinSync.repository(cache, bus.publisher(), kernel.log());
-        SkinView view = new PaperSkinView(server, kernel.scheduler());
+        SkinView paper = new PaperSkinView(server, kernel.scheduler());
+        // Every skin put on a player in the world is told to whoever draws it elsewhere, such as a board head.
+        SkinView view = (who, texture, model) -> {
+            paper.apply(who, texture, model);
+            worn.accept(who.uuid(), texture);
+        };
         MineSkinService mineSkins = new MineSkinService(
                 kernel.scheduler(),
                 kernel.log(),
