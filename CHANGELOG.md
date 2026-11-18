@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.14.0](https://github.com/UXPLIMA/uxm-essentials/compare/v0.13.0...v0.14.0) (2026-11-18)
+
+
+### Features
+
+* **integration:** join the shared uxm placeholder expansion ([#424](https://github.com/UXPLIMA/uxm-essentials/issues/424)) ([5226944](https://github.com/UXPLIMA/uxm-essentials/commit/5226944b8b0857c7f8293d1bf479cf75abda73c0))
+
 ## [0.13.0](https://github.com/UXPLIMA/uxm-essentials/compare/v0.12.0...v0.13.0) (2026-11-18)
 
 Upgrading: this release is built for networks and for every kind of player. Offline-mode accounts, players who are
